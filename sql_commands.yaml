@@ -1,0 +1,66 @@
+std_concept_to_std_vocab_code:
+  description: gathers standard concepts and their standard vocabularies codes
+  sql: |
+    SELECT 
+        c.concept_id,
+        c.concept_name,
+        c.vocabulary_id,
+        c.concept_code
+    FROM concept c
+    WHERE standard_concept = 'S'
+        AND vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
+        AND c.invalid_reason IS NULL
+
+std_concept_synonym_to_std_vocab_code:
+  description: gathers standard concept synonyms and their standard vocabularies codes
+  sql: |
+    SELECT 
+        c1.concept_id AS concept_id, 
+        c2.concept_synonym_name AS concept_name,
+        c1.vocabulary_id,
+        c1.concept_code
+    FROM concept c1
+    INNER JOIN concept_synonym c2 ON c1.concept_id = c2.concept_id
+    WHERE c1.standard_concept = 'S'
+        AND c1.vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
+        AND c1.invalid_reason IS NULL
+
+non_std_concept_to_std_vocab_code:
+  description: gathers non-standard concepts mapped to standard vocabularies codes
+  sql: |
+    SELECT
+        cr.concept_id_1 AS concept_id,
+        c1.concept_name AS concept_name,
+        c2.vocabulary_id,
+        c2.concept_code
+    FROM concept_relationship cr
+    LEFT JOIN concept c1 ON cr.concept_id_1 = c1.concept_id
+    LEFT JOIN concept c2 ON cr.concept_id_2 = c2.concept_id
+    WHERE cr.relationship_id = 'Maps to'
+        AND cr.concept_id_1 != cr.concept_id_2
+        AND c1.concept_name != c2.concept_name
+        AND c2.standard_concept = 'S'
+        AND c2.vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
+        AND cr.invalid_reason IS NULL
+        AND c1.invalid_reason IS NULL
+
+non_std_concept_synonym_to_std_vocab_code:
+  description: gathers non-standard concept synonyms mapped to standard vocabularies codes
+  sql: |
+    SELECT
+        cr.concept_id_1 AS concept_id,
+        cs.concept_synonym_name AS concept_name,
+        c2.vocabulary_id,
+        c2.concept_code
+    FROM concept_relationship cr
+    LEFT JOIN concept c1 ON cr.concept_id_1 = c1.concept_id
+    LEFT JOIN concept c2 ON cr.concept_id_2 = c2.concept_id
+    INNER JOIN concept_synonym cs ON c1.concept_id = cs.concept_id
+    WHERE cr.relationship_id = 'Maps to'
+        AND cr.concept_id_1 != cr.concept_id_2
+        AND c1.concept_name != c2.concept_name
+        AND c2.standard_concept = 'S'
+        AND c2.vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
+        AND cr.invalid_reason IS NULL
+        AND c1.invalid_reason IS NULL
+      

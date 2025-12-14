@@ -1,0 +1,2 @@
+base_model: meta-llama/Llama-3.2-1B
+dataset_path: datasets/standard_concepts_reference.csv
