@@ -70,11 +70,16 @@ stages:
       size: 41408679
     - path: split_datasets.py
       hash: md5
-      md5: 1980ef4e00ff2001df107b95ef1e7262
-      size: 1485
+      md5: 87e92656ea7b40e04126e57292af0719
+      size: 2882
     outs:
     - path: datasets/splits
       hash: md5
       md5: a8e830bcfe1fc49f79d26b079fe17d1e.dir
       size: 197559516
+      nfiles: 3
+    - path: datasets/splits-msg-format
+      hash: md5
+      md5: 246742623f902e367e4b9652e9fc3cf3.dir
+      size: 699407016
       nfiles: 3
