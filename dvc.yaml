@@ -29,4 +29,3 @@ stages:
       - datasets/std_concept_to_std_vocab_code.csv
     outs:
       - datasets/splits
-      - datasets/splits-msg-format
