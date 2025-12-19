@@ -18,3 +18,14 @@ stages:
       - datasets/non_std_concept_to_std_vocab_code.csv
       - datasets/std_concept_synonym_to_std_vocab_code.csv
       - datasets/std_concept_to_std_vocab_code.csv
+
+  split_datasets:
+    cmd: python split_datasets.py
+    deps:
+      - split_datasets.py
+      - datasets/non_std_concept_synonym_to_std_vocab_code.csv
+      - datasets/non_std_concept_to_std_vocab_code.csv
+      - datasets/std_concept_synonym_to_std_vocab_code.csv
+      - datasets/std_concept_to_std_vocab_code.csv
+    outs:
+      - datasets/splits

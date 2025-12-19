@@ -35,5 +35,7 @@ Four groups:
     - Total: 92166
     - File path: datasets\non_std_concept_synonym_to_std_vocab_code.csv
 
-# Validation:
-Mapped synonyms from regional vocabularies to standard ones.
+# Data splits:
+**Training data:** every standard concept and their synonyms mapped to standard vocabulary codes.
+
+**Validation and test data:** every non-standard concept and their synonyms mapped to standard vocabularies codes.
