@@ -3,6 +3,7 @@ from pathlib import Path
 import jsonlines
 from tqdm import tqdm
 from copy import deepcopy
+from datasets import load_dataset, Dataset
 
 random_seed = 42
 
@@ -60,28 +61,27 @@ messages_template = {
 }
 
 
-def generate_messages(df: pd.DataFrame) -> dict[str, list[dict[str, str]]]:
-    for _, row in df.iterrows():
-        messages = deepcopy(messages_template)
-        messages["messages"].append({"role": "user", "content": row["prompt"]})
-        messages["messages"].append({"role": "assistant", "content": row["completion"]})
-        yield messages
+def format_message(msg: dict[str, str]) -> dict[str, str]:
+    messages = deepcopy(messages_template)
+    messages["messages"].append({"role": "user", "content": msg["prompt"]})
+    messages["messages"].append({"role": "assistant", "content": msg["completion"]})
+    return messages
 
 
-def save_messages(df: pd.DataFrame, path: Path):
-    with jsonlines.open(path, mode="w") as writer:
-        for msg in tqdm(
-            generate_messages(df),
-            desc="Adding msg format and writing to jsonl file",
-            total=len(df),
-        ):
-            writer.write(msg)
-    print(f"Saved {path}")
+# Load datasets in hf Datasets object
+train_dataset = Dataset.from_pandas(train_df)
+val_dataset = Dataset.from_pandas(val_df)
+test_dataset = Dataset.from_pandas(test_df)
 
+# Apply formatting to datasets
+train_dataset = train_dataset.map(format_message)
+val_dataset = val_dataset.map(format_message)
+test_dataset = test_dataset.map(format_message)
 
-save_messages(train_df, datasets_split_msg_format_path / "train.jsonl")
-save_messages(val_df, datasets_split_msg_format_path / "val.jsonl")
-save_messages(test_df, datasets_split_msg_format_path / "test.jsonl")
+# Save them to disk
+train_dataset.save_to_disk(datasets_split_msg_format_path / "train")
+val_dataset.save_to_disk(datasets_split_msg_format_path / "val")
+test_dataset.save_to_disk(datasets_split_msg_format_path / "test")
 
 print(f"Train data shape: {train_df.shape}")
 print(f"Val data shape: {val_df.shape}")
