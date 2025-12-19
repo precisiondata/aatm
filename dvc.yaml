@@ -1,0 +1,20 @@
+stages:
+  prepare_database:
+    cmd: python prepare_database.py
+    deps:
+      - vocabularies
+      - prepare_database.py
+    outs:
+      - omop.db
+
+  prepare_datasets:
+    cmd: python prepare_datasets.py
+    deps:
+      - prepare_datasets.py
+      - omop.db
+      - sql_commands.yaml
+    outs:
+      - datasets/non_std_concept_synonym_to_std_vocab_code.csv
+      - datasets/non_std_concept_to_std_vocab_code.csv
+      - datasets/std_concept_synonym_to_std_vocab_code.csv
+      - datasets/std_concept_to_std_vocab_code.csv

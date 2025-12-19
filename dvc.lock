@@ -1,0 +1,51 @@
+schema: '2.0'
+stages:
+  prepare_database:
+    cmd: python prepare_database.py
+    deps:
+    - path: prepare_database.py
+      hash: md5
+      md5: 349d47e69571d40991adb721ccc92041
+      size: 569
+    - path: vocabularies
+      hash: md5
+      md5: a1a94642457b4f564a76ea770b0aed0c.dir
+      size: 1255423207
+      nfiles: 10
+    outs:
+    - path: omop.db
+      hash: md5
+      md5: 066be117d84c57991926fb34abe76db8
+      size: 1489776640
+  prepare_datasets:
+    cmd: python prepare_datasets.py
+    deps:
+    - path: omop.db
+      hash: md5
+      md5: 066be117d84c57991926fb34abe76db8
+      size: 1489776640
+    - path: prepare_datasets.py
+      hash: md5
+      md5: e14d51adab9655b7c57aabbaac21a9de
+      size: 1019
+    - path: sql_commands.yaml
+      hash: md5
+      md5: a1ea0e7b441477a85fad62ea3f99a9dc
+      size: 2509
+    outs:
+    - path: datasets/non_std_concept_synonym_to_std_vocab_code.csv
+      hash: md5
+      md5: 5ecb651be7bee938e1dbd54de629c99e
+      size: 8935428
+    - path: datasets/non_std_concept_to_std_vocab_code.csv
+      hash: md5
+      md5: 6a3ff40857a88dd430f4a64c40d3c2f4
+      size: 2842696
+    - path: datasets/std_concept_synonym_to_std_vocab_code.csv
+      hash: md5
+      md5: eae9577fbc770dd0c585d9c3b46dc998
+      size: 144372743
+    - path: datasets/std_concept_to_std_vocab_code.csv
+      hash: md5
+      md5: 9f04fe237b91cde8cba0a46b82efa65b
+      size: 41408679

@@ -1,3 +1,9 @@
+# Inspiration
+
+LLM-JEPA: Large Language Models Meet Joint Embedding Predictive Architectures
+https://arxiv.org/abs/2509.14252
+
+# General stats from OMOP standard vocabularies
 825246 standard concepts
 
 Por vocabulário:
