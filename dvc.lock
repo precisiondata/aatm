@@ -78,3 +78,38 @@ stages:
       md5: 5084d742c58946e17e107a393a26ec1f.dir
       size: 744552703
       nfiles: 10
+  llama-32-1b-jepa__tokenize_datasets:
+    cmd: python tokenize_datasets.py --params 
+      experiments/llama-32-1b-jepa/params.yaml
+    deps:
+    - path: datasets/splits
+      hash: md5
+      md5: 5084d742c58946e17e107a393a26ec1f.dir
+      size: 744552703
+      nfiles: 10
+    - path: tokenize_datasets.py
+      hash: md5
+      md5: e48fe24a8204df083203c6e2fe5ffab9
+      size: 9643
+    params:
+      experiments/llama-32-1b-jepa/params.yaml:
+        debug: -1
+        exp_name: llama-32-1b-jepa
+        front_pred: false
+        max_length: 512
+        model_id: meta-llama/Llama-3.2-1B-Instruct
+        plain: false
+        predictors: 0
+        regular: false
+        reverse_pred: false
+        splits_to_use:
+        - train
+        - val
+        - test
+        train_all: false
+    outs:
+    - path: datasets/splits-tokenized
+      hash: md5
+      md5: f688469e8058f6040b5ce49c3d9f481b.dir
+      size: 63279955116
+      nfiles: 134
