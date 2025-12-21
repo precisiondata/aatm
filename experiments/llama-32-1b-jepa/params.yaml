@@ -1,3 +1,6 @@
+debug: -1
+seed: 42
+
 exp_name: llama-32-1b-jepa
 model_id: meta-llama/Llama-3.2-1B-Instruct
 splits_to_use:
@@ -11,4 +14,27 @@ plain: false
 front_pred: false
 reverse_pred: false
 regular: false
-debug: -1
+
+use_lora: true
+lora_rank: 16
+pretrain: false
+
+eval_strategy: steps
+eval_steps: 1000
+save_strategy: steps
+save_steps: 1000
+save_total_limit: 1
+batch_size: 8
+gradient_accumulation_steps: 32
+learning_rate: 0.0001
+num_train_epochs: 1
+
+track_flop: false
+lbd: 0.1
+gamma: 1.0
+last_token: -1 # Index of last token, -1 is '<|eot|>'
+additive_mask: true
+jepa_l2: false
+jepa_mse: false
+infonce: false
+jepa_ratio: -1.0

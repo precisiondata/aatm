@@ -99,7 +99,7 @@ def tokenize_conversations(
             formatted_msgs,
             truncation=True,
             max_length=max_length,
-            padding=False,
+            padding="max_length",
             return_tensors=None,
         )
 
@@ -120,28 +120,28 @@ def tokenize_conversations(
         # Define prediction task
         ## user -> assistant or assistant -> user
         if reverse_pred:
-            predictor_messages = copy.deepcopy(msgs[2:3])
+            user_messages = copy.deepcopy(msgs[2:3])
         else:
-            predictor_messages = copy.deepcopy(msgs[1:2])
+            user_messages = copy.deepcopy(msgs[1:2])
 
         # Define and add predictor tokens
         to_add = predictors  # number of predictor tokens to add
         while to_add > 0:
             # Predictor tokens can be added at the beginning or in the end of the prompt
             if front_pred:
-                predictor_messages[0]["content"] = (
-                    f"<|predictor_{to_add}|>" + predictor_messages[0]["content"]
+                user_messages[0]["content"] = (
+                    f"<|predictor_{to_add}|>" + user_messages[0]["content"]
                 )
             else:
-                predictor_messages[0]["content"] += f"<|predictor_{to_add}|>"
+                user_messages[0]["content"] += f"<|predictor_{to_add}|>"
             to_add -= 1
 
         # Prepare msgs that will be used for prediction
         if plain:
-            formatted_chat_user = predictor_messages[0]["content"]
+            formatted_chat_user = user_messages[0]["content"]
         else:
             formatted_chat_user = tokenizer.apply_chat_template(
-                predictor_messages,
+                user_messages,
                 tokenize=False,
                 add_generation_prompt=False,
             )
@@ -156,22 +156,22 @@ def tokenize_conversations(
         user_labels_list.append([-100] * len(tokenized_user["input_ids"]))
         user_attention_mask_list.append(tokenized_user["attention_mask"])
 
-        # Prepare target msgs
+        # Prepare assistant msgs
         if reverse_pred:
-            target_messages = copy.deepcopy(msgs[1:2])
+            assistant_messages = copy.deepcopy(msgs[1:2])
         else:
-            target_messages = copy.deepcopy(msgs[2:3])
+            assistant_messages = copy.deepcopy(msgs[2:3])
 
         if plain:
-            formatted_target_messages = target_messages[0]["content"]
+            formatted_assistant_messages = assistant_messages[0]["content"]
         else:
-            formatted_target_messages = tokenizer.apply_chat_template(
-                target_messages,
+            formatted_assistant_messages = tokenizer.apply_chat_template(
+                assistant_messages,
                 tokenize=False,
                 add_generation_prompt=False,
             )
         tokenized_assistant = tokenizer(
-            formatted_target_messages,
+            formatted_assistant_messages,
             truncation=True,
             max_length=max_length,
             padding="max_length",  # Pad to max_length for consistent tensor shapes
@@ -249,7 +249,7 @@ if __name__ == "__main__":
         params = yaml.safe_load(f)
 
     with Live(
-        dir=Path(f'experiments/{params["exp_name"]}'),
+        dir=Path(f'experiments/{params["exp_name"]}/dvclive'),
     ) as live:
         tokenized_splits_base_path = Path("datasets/splits-tokenized")
         tokenized_splits_base_path.mkdir(exist_ok=True, parents=True)

@@ -15,14 +15,14 @@ stages:
     outs:
     - path: omop.db
       hash: md5
-      md5: 066be117d84c57991926fb34abe76db8
+      md5: e0b7a3d741f20d1018b969217996cc6d
       size: 1489776640
   prepare_datasets:
     cmd: python prepare_datasets.py
     deps:
     - path: omop.db
       hash: md5
-      md5: 066be117d84c57991926fb34abe76db8
+      md5: e0b7a3d741f20d1018b969217996cc6d
       size: 1489776640
     - path: prepare_datasets.py
       hash: md5
@@ -75,7 +75,7 @@ stages:
     outs:
     - path: datasets/splits
       hash: md5
-      md5: 5084d742c58946e17e107a393a26ec1f.dir
+      md5: c8f1eee5d28623fed79a005f61616c54.dir
       size: 744552703
       nfiles: 10
   llama-32-1b-jepa__tokenize_datasets:
@@ -84,13 +84,13 @@ stages:
     deps:
     - path: datasets/splits
       hash: md5
-      md5: 5084d742c58946e17e107a393a26ec1f.dir
-      size: 744552703
-      nfiles: 10
+      md5: 4db38ddd9a12918e4843ecf99d0a5a17.dir
+      size: 77823505015
+      nfiles: 13
     - path: tokenize_datasets.py
       hash: md5
-      md5: e48fe24a8204df083203c6e2fe5ffab9
-      size: 9643
+      md5: 0ba36cff7924da436d566bf8eb429b59
+      size: 9647
     params:
       experiments/llama-32-1b-jepa/params.yaml:
         debug: -1
@@ -110,6 +110,50 @@ stages:
     outs:
     - path: datasets/splits-tokenized
       hash: md5
-      md5: f688469e8058f6040b5ce49c3d9f481b.dir
-      size: 63279955116
-      nfiles: 134
+      md5: 7a85999da57e82f6d1f478aa8b9725e6.dir
+      size: 77079266940
+      nfiles: 162
+  llama-32-1b-jepa__train:
+    cmd: python train.py --params experiments/llama-32-1b-jepa/params.yaml
+    deps:
+    - path: datasets/splits-tokenized
+      hash: md5
+      md5: b8da9b27b706f91752c00096628cf12e.dir
+      size: 9394038
+      nfiles: 9
+    - path: train.py
+      hash: md5
+      md5: 5320a879869e21e075bd2a70c54d9ab9
+      size: 20515
+    params:
+      experiments/llama-32-1b-jepa/params.yaml:
+        additive_mask: true
+        batch_size: 8
+        eval_steps: 1000
+        eval_strategy: steps
+        exp_name: llama-32-1b-jepa
+        gamma: 1.0
+        gradient_accumulation_steps: 32
+        infonce: false
+        jepa_l2: false
+        jepa_mse: false
+        jepa_ratio: -1.0
+        last_token: -1
+        lbd: 0.1
+        learning_rate: 0.0001
+        lora_rank: 16
+        model_id: meta-llama/Llama-3.2-1B-Instruct
+        num_train_epochs: 1
+        pretrain: false
+        regular: false
+        save_steps: 1000
+        save_strategy: steps
+        save_total_limit: 1
+        track_flop: false
+        use_lora: true
+    outs:
+    - path: experiments/llama-32-1b-jepa/outputs
+      hash: md5
+      md5: c24a03fb3fbf6885750e7e6fb83fe9e3.dir
+      size: 3692518191
+      nfiles: 19

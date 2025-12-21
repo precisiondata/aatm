@@ -32,22 +32,68 @@ stages:
 
   # Llama 3.2 1B JEPA experiments
   llama-32-1b-jepa__tokenize_datasets:
-    cmd: python tokenize_datasets.py --params experiments/llama-32-1b-jepa/params.yaml
+    cmd: python tokenize_datasets.py --params 
+      experiments/llama-32-1b-jepa/params.yaml
     params:
     - experiments/llama-32-1b-jepa/params.yaml:
-        - exp_name
-        - model_id
-        - splits_to_use
-        - train_all
-        - predictors
-        - max_length
-        - plain
-        - front_pred
-        - reverse_pred
-        - regular
-        - debug
+      - exp_name
+      - model_id
+      - splits_to_use
+      - train_all
+      - predictors
+      - max_length
+      - plain
+      - front_pred
+      - reverse_pred
+      - regular
+      - debug
     deps:
     - tokenize_datasets.py
     - datasets/splits
     outs:
     - datasets/splits-tokenized
+
+  llama-32-1b-jepa__train:
+    cmd: python train.py --params experiments/llama-32-1b-jepa/params.yaml
+    params:
+    - experiments/llama-32-1b-jepa/params.yaml:
+      - exp_name
+      - model_id
+      - regular
+      - use_lora
+      - lora_rank
+      - pretrain
+      - eval_strategy
+      - eval_steps
+      - save_strategy
+      - save_steps
+      - save_total_limit
+      - batch_size
+      - gradient_accumulation_steps
+      - learning_rate
+      - num_train_epochs
+      - track_flop
+      - lbd
+      - gamma
+      - last_token
+      - additive_mask
+      - jepa_l2
+      - jepa_mse
+      - infonce
+      - jepa_ratio
+    deps:
+    - train.py
+    - datasets/splits-tokenized
+    outs:
+    - experiments/llama-32-1b-jepa/outputs
+params:
+- dvclive/params.yaml
+- experiments/llama-32-1b-jepa/dvclive/params.yaml
+metrics:
+- dvclive/metrics.json
+- experiments/llama-32-1b-jepa/dvclive/metrics.json
+plots:
+- dvclive/plots/metrics:
+    x: step
+- experiments/llama-32-1b-jepa/dvclive/plots/metrics:
+    x: step
