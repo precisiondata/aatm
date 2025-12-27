@@ -43,34 +43,9 @@ stages:
 
   llama-32-1b-jepa__train:
     cmd: python train.py --params experiments/llama-32-1b-jepa/params.yaml
-    params:
-    - experiments/llama-32-1b-jepa/params.yaml:
-      - exp_name
-      - model_id
-      - regular
-      - use_lora
-      - lora_rank
-      - pretrain
-      - eval_strategy
-      - eval_steps
-      - save_strategy
-      - save_steps
-      - save_total_limit
-      - batch_size
-      - gradient_accumulation_steps
-      - learning_rate
-      - num_train_epochs
-      - track_flop
-      - lbd
-      - gamma
-      - last_token
-      - additive_mask
-      - jepa_l2
-      - jepa_mse
-      - infonce
-      - jepa_ratio
     deps:
     - train.py
     - datasets/splits-tokenized
+    - experiments/llama-32-1b-jepa/params.yaml
     outs:
     - experiments/llama-32-1b-jepa/outputs

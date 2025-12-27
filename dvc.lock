@@ -75,9 +75,9 @@ stages:
     outs:
     - path: datasets/splits
       hash: md5
-      md5: c8f1eee5d28623fed79a005f61616c54.dir
-      size: 744552703
-      nfiles: 10
+      md5: 8f9bae80cc5122e34c78bc30ad4418fc.dir
+      size: 77823442407
+      nfiles: 13
   llama-32-1b-jepa__tokenize_datasets:
     cmd: python tokenize_datasets.py --params 
       experiments/llama-32-1b-jepa/params.yaml
