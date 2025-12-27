@@ -74,14 +74,3 @@ stages:
     - datasets/splits-tokenized
     outs:
     - experiments/llama-32-1b-jepa/outputs
-params:
-- dvclive/params.yaml
-- experiments/llama-32-1b-jepa/dvclive/params.yaml
-metrics:
-- dvclive/metrics.json
-- experiments/llama-32-1b-jepa/dvclive/metrics.json
-plots:
-- dvclive/plots/metrics:
-    x: step
-- experiments/llama-32-1b-jepa/dvclive/plots/metrics:
-    x: step
