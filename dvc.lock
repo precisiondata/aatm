@@ -84,22 +84,22 @@ stages:
     deps:
     - path: datasets/splits
       hash: md5
-      md5: c4079730c12f06dd4131f2c298b9fe5e.dir
-      size: 77823505015
+      md5: 8f9bae80cc5122e34c78bc30ad4418fc.dir
+      size: 77823442407
       nfiles: 13
     - path: experiments/llama-32-1b-jepa/params.yaml
       hash: md5
-      md5: 2653dc46e54fd888c1a00e4836880db9
-      size: 685
+      md5: 2a688ca5b74bf4714a842be31141f524
+      size: 683
     - path: tokenize_datasets.py
       hash: md5
-      md5: fc98145058df0f149dece03df0fb434d
-      size: 9453
+      md5: 1a5f2d6812568b08b4ae013fd3c7cb82
+      size: 9635
     outs:
     - path: datasets/splits-tokenized
       hash: md5
-      md5: b7f5c03a79648f273cfbb4be5a6bb2e1.dir
-      size: 77079266940
+      md5: dea2dbae2add540948b4375f55ce7978.dir
+      size: 77079204332
       nfiles: 162
   llama-32-1b-jepa__train:
     cmd: python train.py --params experiments/llama-32-1b-jepa/params.yaml
