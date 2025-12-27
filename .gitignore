@@ -4,3 +4,4 @@ datasets
 *.zip
 *.db
 .env
+__pycache__

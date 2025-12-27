@@ -5,8 +5,8 @@ stages:
     deps:
     - path: prepare_database.py
       hash: md5
-      md5: 349d47e69571d40991adb721ccc92041
-      size: 569
+      md5: aea35bf1c8854d12e6a8af8abd1ee93c
+      size: 550
     - path: vocabularies
       hash: md5
       md5: a1a94642457b4f564a76ea770b0aed0c.dir
@@ -26,12 +26,12 @@ stages:
       size: 1489776640
     - path: prepare_datasets.py
       hash: md5
-      md5: e14d51adab9655b7c57aabbaac21a9de
-      size: 1019
+      md5: 6620cfe33c3b714bb779ea671a18101e
+      size: 982
     - path: sql_commands.yaml
       hash: md5
-      md5: a1ea0e7b441477a85fad62ea3f99a9dc
-      size: 2509
+      md5: c251232387b4a3979fc138712bd24ff6
+      size: 2444
     outs:
     - path: datasets/non_std_concept_synonym_to_std_vocab_code.csv
       hash: md5
@@ -70,8 +70,8 @@ stages:
       size: 41408679
     - path: split_datasets.py
       hash: md5
-      md5: cce6af9991a15287ac6ff8d26c6ec40f
-      size: 2531
+      md5: 2b3b4653acca98fe2cdd2b9b98f2b31e
+      size: 2449
     outs:
     - path: datasets/splits
       hash: md5
@@ -84,33 +84,21 @@ stages:
     deps:
     - path: datasets/splits
       hash: md5
-      md5: 4db38ddd9a12918e4843ecf99d0a5a17.dir
+      md5: c4079730c12f06dd4131f2c298b9fe5e.dir
       size: 77823505015
       nfiles: 13
+    - path: experiments/llama-32-1b-jepa/params.yaml
+      hash: md5
+      md5: 2653dc46e54fd888c1a00e4836880db9
+      size: 685
     - path: tokenize_datasets.py
       hash: md5
-      md5: 0ba36cff7924da436d566bf8eb429b59
-      size: 9647
-    params:
-      experiments/llama-32-1b-jepa/params.yaml:
-        debug: -1
-        exp_name: llama-32-1b-jepa
-        front_pred: false
-        max_length: 512
-        model_id: meta-llama/Llama-3.2-1B-Instruct
-        plain: false
-        predictors: 0
-        regular: false
-        reverse_pred: false
-        splits_to_use:
-        - train
-        - val
-        - test
-        train_all: false
+      md5: fc98145058df0f149dece03df0fb434d
+      size: 9453
     outs:
     - path: datasets/splits-tokenized
       hash: md5
-      md5: 7a85999da57e82f6d1f478aa8b9725e6.dir
+      md5: b7f5c03a79648f273cfbb4be5a6bb2e1.dir
       size: 77079266940
       nfiles: 162
   llama-32-1b-jepa__train:
@@ -118,8 +106,8 @@ stages:
     deps:
     - path: datasets/splits-tokenized
       hash: md5
-      md5: b8da9b27b706f91752c00096628cf12e.dir
-      size: 9394038
+      md5: 0168c2ba824eafeaea2f82724f5be1b4.dir
+      size: 93817638
       nfiles: 9
     - path: train.py
       hash: md5
@@ -154,6 +142,6 @@ stages:
     outs:
     - path: experiments/llama-32-1b-jepa/outputs
       hash: md5
-      md5: c24a03fb3fbf6885750e7e6fb83fe9e3.dir
-      size: 3692518191
+      md5: 7790d225677f238c4bb09b3a83a8aa92.dir
+      size: 3692518192
       nfiles: 19

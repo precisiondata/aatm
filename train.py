@@ -186,10 +186,38 @@ class RepresentationTrainer(Trainer):
 
         for i in range(input_ids.shape[0]):
             uii = unpad(input_ids[i], attention_mask[i])
-
+            if self.debug == 1 and torch.cuda.current_device() == 0:
+                print(f"====={len(uii)}=====")
+                print(
+                    input_ids[i][len(uii) - 4],
+                    input_ids[i][len(uii) - 3],
+                    input_ids[i][len(uii) - 2],
+                    input_ids[i][len(uii) - 1],
+                    -100 if len(uii) >= len(input_ids[i]) else input_ids[i][len(uii)],
+                )
+                print(
+                    labels[i][len(uii) - 4],
+                    labels[i][len(uii) - 3],
+                    labels[i][len(uii) - 2],
+                    labels[i][len(uii) - 1],
+                    -100 if len(uii) >= len(labels[i]) else labels[i][len(uii)],
+                )
+                print(
+                    attention_mask[i][len(uii) - 4],
+                    attention_mask[i][len(uii) - 3],
+                    attention_mask[i][len(uii) - 2],
+                    attention_mask[i][len(uii) - 1],
+                    (
+                        -100
+                        if len(uii) >= len(attention_mask[i])
+                        else attention_mask[i][len(uii)]
+                    ),
+                )
             index.append(len(uii) + self.last_token)
 
         index_tensor = torch.tensor(index).to(input_ids.device)
+        if self.debug == 1 and torch.cuda.current_device() == 0:
+            print(index_tensor)
 
         return index_tensor
 
@@ -209,13 +237,9 @@ class RepresentationTrainer(Trainer):
         batch_size = inputs["input_ids"].shape[0]
         seq_length = inputs["input_ids"].shape[-1]
         device = inputs["input_ids"].device
-
-        # mask shape: [batch_size * 2, 1, seq_length, seq_length]
         mask = torch.full((batch_size * 2, 1, seq_length, seq_length), -torch.inf).to(
             device
         )
-
-        # last_token shape: [batch_size * 2]
         last_token = self._last_token_index(
             inputs["input_ids"], inputs["labels"], inputs["attention_mask"]
         )
@@ -229,11 +253,15 @@ class RepresentationTrainer(Trainer):
             inputs["labels_assistant"],
             inputs["attention_mask_assistant"],
         )
-
         for i in range(inputs["input_ids_user"].shape[0]):
-            length = last_token[i] + 1
-            length_user = last_token_user[i] + 1
-            length_assistant = last_token_assistant[i] + 1
+            length, length_user, length_assistant = (
+                last_token[i] + 1,
+                last_token_user[i] + 1,
+                last_token_assistant[i] + 1,
+            )
+            assert (
+                length_user + length_assistant <= seq_length
+            ), f"{length_user} + {length_assistant} > {seq_length}"
 
             inputs["input_ids_user"][
                 i, length_user : length_user + length_assistant
@@ -241,7 +269,6 @@ class RepresentationTrainer(Trainer):
             inputs["labels_user"][i, length_user : length_user + length_assistant] = (
                 inputs["labels_assistant"][i, :length_assistant]
             )
-
             mask[i, :, 0:length, 0:length] = self._build_additive_mask(length)
             mask[i + batch_size, :, 0:length_user, 0:length_user] = (
                 self._build_additive_mask(length_user)
@@ -296,9 +323,39 @@ class RepresentationTrainer(Trainer):
                     dim=0,
                 ),
             }
+        if self.debug == 7 and torch.cuda.current_device() == 0:
+            torch.set_printoptions(threshold=float("inf"))
+            torch.set_printoptions(linewidth=360)
+            print(">>>input_ids<<<")
+            print(llm_inputs["input_ids"])
+            print(">>>labels<<<")
+            print(llm_inputs["labels"])
+            print(">>>attention_mask<<<")
+            print(llm_inputs["attention_mask"])
+            if self.additive_mask:
+                print(">>>last_token_user<<<")
+                print(self._last_token_user)
+                print(">>>last_token_assistant<<<")
+                print(self._last_token_assistant)
+        if self.debug == 7:
+            exit(0)
+        if self.debug == 2 and torch.cuda.current_device() == 0:
+            print("=====before:outputs=====")
+            print("input_ids shapes:")
+            print(llm_inputs["input_ids"].shape)
+            print("labels shapes::")
+            print(llm_inputs["labels"].shape)
+            print("attention_mask shapes:")
+            print(llm_inputs["attention_mask"].shape)
 
         with torch.set_grad_enabled(True):
             outputs = model(**llm_inputs, output_hidden_states=True)
+
+        if self.debug == 2 and torch.cuda.current_device() == 0:
+            print(f"=====outputs.loss.shape:{outputs.loss.shape}=====")
+            print(
+                f"=====outputs.hidden_states[-1].shape:{outputs.hidden_states[-1].shape}====="
+            )
 
         if self.additive_mask:
             if skip_jepa:
@@ -315,6 +372,10 @@ class RepresentationTrainer(Trainer):
             user_hidden_states = outputs.hidden_states[-1][batch_size : batch_size * 2]
             assistant_hidden_states = outputs.hidden_states[-1][batch_size * 2 :]
 
+        if self.debug == 2 and torch.cuda.current_device() == 0:
+            print(f"====={user_hidden_states.shape}=====")
+            print(f"====={assistant_hidden_states.shape}=====")
+
         # Return all outputs needed for loss computation
         return {
             "main_outputs": outputs,
@@ -328,7 +389,7 @@ class RepresentationTrainer(Trainer):
         """
         Compute loss with additional regularization terms.
         """
-        # Get indices
+        # Get indeices
         if not self.additive_mask:
             index_user = self._last_token_index(
                 inputs["input_ids_user"],
@@ -341,6 +402,12 @@ class RepresentationTrainer(Trainer):
                 inputs["attention_mask_assistant"],
             )
         first_dim = inputs["input_ids_user"].shape[0]
+        if self.debug == 1 and torch.cuda.current_device() == 0:
+            print("=====last tokens=====")
+            print(inputs["input_ids_user"][range(first_dim), index_user])
+            print(inputs["input_ids_user"][range(first_dim), index_user - 1])
+            print(inputs["input_ids_assistant"][range(first_dim), index_assistant])
+            print(inputs["input_ids_assistant"][range(first_dim), index_assistant - 1])
 
         # Get all forward pass results
         forward_results = self.forward(model, inputs)
@@ -474,7 +541,6 @@ if __name__ == "__main__":
         # Memory optimization
         dataloader_num_workers=0,  # Avoid multiprocessing issues
         # Other
-        report_to="dvclive",
         remove_unused_columns=False,
         load_best_model_at_end=True,
         # Disable problematic optimizations
@@ -492,7 +558,7 @@ if __name__ == "__main__":
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
             data_collator=data_collator,
             callbacks=[flop_callback] if params["track_flop"] else [],
         )
@@ -502,7 +568,7 @@ if __name__ == "__main__":
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
             data_collator=data_collator,
             callbacks=[flop_callback] if params["track_flop"] else [],
             lbd=params["lbd"],  # Lambda for similarity loss

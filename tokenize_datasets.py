@@ -94,6 +94,11 @@ def tokenize_conversations(
             msgs, tokenize=False, add_generation_prompt=False
         )
 
+        # Check if the message is too long
+        if len(tokenizer.tokenize(formatted_msgs)) > max_length:
+            print("Skipping message", msg_idx)
+            continue
+
         # Tokenize
         tokenized_msgs = tokenizer(
             formatted_msgs,
@@ -239,7 +244,6 @@ def load_and_prepare_dataset(
 if __name__ == "__main__":
     import argparse
     import yaml
-    from dvclive import Live
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--params", type=str)
@@ -248,24 +252,21 @@ if __name__ == "__main__":
     with open(args.params, "r", encoding="utf-8") as f:
         params = yaml.safe_load(f)
 
-    with Live(
-        dir=Path(f'experiments/{params["exp_name"]}/dvclive'),
-    ) as live:
-        tokenized_splits_base_path = Path("datasets/splits-tokenized")
-        tokenized_splits_base_path.mkdir(exist_ok=True, parents=True)
+    tokenized_splits_base_path = Path("datasets/splits-tokenized")
+    tokenized_splits_base_path.mkdir(exist_ok=True, parents=True)
 
-        tokenizer = AutoTokenizer.from_pretrained(params["model_id"])
-        for split in params["splits_to_use"]:
-            tokenized_dataset = load_and_prepare_dataset(
-                dataset_path=f"datasets/splits/{split}",
-                tokenizer=tokenizer,
-                predictors=params["predictors"],
-                train_all=params["train_all"],
-                plain=params["plain"],
-                front_pred=params["front_pred"],
-                reverse_pred=params["reverse_pred"],
-                regular=params["regular"],
-                max_length=params["max_length"],
-                debug=params["debug"],
-            )
-            tokenized_dataset.save_to_disk(tokenized_splits_base_path / f"{split}")
+    tokenizer = AutoTokenizer.from_pretrained(params["model_id"])
+    for split in params["splits_to_use"]:
+        tokenized_dataset = load_and_prepare_dataset(
+            dataset_path=f"datasets/splits/{split}",
+            tokenizer=tokenizer,
+            predictors=params["predictors"],
+            train_all=params["train_all"],
+            plain=params["plain"],
+            front_pred=params["front_pred"],
+            reverse_pred=params["reverse_pred"],
+            regular=params["regular"],
+            max_length=params["max_length"],
+            debug=params["debug"],
+        )
+        tokenized_dataset.save_to_disk(tokenized_splits_base_path / f"{split}")

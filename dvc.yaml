@@ -34,22 +34,10 @@ stages:
   llama-32-1b-jepa__tokenize_datasets:
     cmd: python tokenize_datasets.py --params 
       experiments/llama-32-1b-jepa/params.yaml
-    params:
-    - experiments/llama-32-1b-jepa/params.yaml:
-      - exp_name
-      - model_id
-      - splits_to_use
-      - train_all
-      - predictors
-      - max_length
-      - plain
-      - front_pred
-      - reverse_pred
-      - regular
-      - debug
     deps:
     - tokenize_datasets.py
     - datasets/splits
+    - experiments/llama-32-1b-jepa/params.yaml
     outs:
     - datasets/splits-tokenized
 
