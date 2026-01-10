@@ -591,7 +591,7 @@ if __name__ == "__main__":
     trainer.add_callback(
         DVCLiveCallback(Live(dir=Path(f'experiments/{params["exp_name"]}/dvclive')))
     )
-    trainer.train()
+    trainer.train(resume_from_checkpoint=params.get("resume_from_checkpoint", False))
 
     def save_model(model):
         if params["use_lora"]:
