@@ -1,38 +1,44 @@
-std_concept_to_std_vocab_code:
+standard_concept:
   description: gathers standard concepts and their standard vocabularies codes
   sql: |
     SELECT 
-        c.concept_id,
-        c.concept_name,
-        c.vocabulary_id,
-        c.concept_code
+        c.concept_name AS expression,
+        c.concept_id AS expression_concept_id,
+        c.concept_id AS std_concept_id,
+        c.concept_name AS std_concept_name,
+        c.vocabulary_id AS std_vocabulary_id,
+        c.concept_code AS std_vocabulary_code
     FROM concept c
     WHERE standard_concept = 'S'
         AND vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
         AND c.invalid_reason IS NULL
 
-std_concept_synonym_to_std_vocab_code:
+standard_concept_synonym:
   description: gathers standard concept synonyms and their standard vocabularies codes
   sql: |
     SELECT 
-        c1.concept_id AS concept_id, 
-        c2.concept_synonym_name AS concept_name,
-        c1.vocabulary_id,
-        c1.concept_code
+        c2.concept_synonym_name AS expression,
+        c2.concept_id AS expression_concept_id,
+        c1.concept_id AS std_concept_id, 
+        c1.concept_name AS std_concept_name,
+        c1.vocabulary_id AS std_vocabulary_id,
+        c1.concept_code AS std_vocabulary_code
     FROM concept c1
     INNER JOIN concept_synonym c2 ON c1.concept_id = c2.concept_id
     WHERE c1.standard_concept = 'S'
         AND c1.vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
         AND c1.invalid_reason IS NULL
 
-non_std_concept_to_std_vocab_code:
+mapped_non_standard_concept:
   description: gathers non-standard concepts mapped to standard vocabularies codes
   sql: |
     SELECT
-        cr.concept_id_1 AS concept_id,
-        c1.concept_name AS concept_name,
-        c2.vocabulary_id,
-        c2.concept_code
+        c1.concept_name AS expression,
+        cr.concept_id_1 AS expression_concept_id,
+        c2.concept_id AS std_concept_id,
+        c2.concept_name AS std_concept_name,
+        c2.vocabulary_id AS std_vocabulary_id,
+        c2.concept_code AS std_vocabulary_code
     FROM concept_relationship cr
     LEFT JOIN concept c1 ON cr.concept_id_1 = c1.concept_id
     LEFT JOIN concept c2 ON cr.concept_id_2 = c2.concept_id
@@ -44,14 +50,16 @@ non_std_concept_to_std_vocab_code:
         AND cr.invalid_reason IS NULL
         AND c1.invalid_reason IS NULL
 
-non_std_concept_synonym_to_std_vocab_code:
+mapped_non_standard_concept_synonym:
   description: gathers non-standard concept synonyms mapped to standard vocabularies codes
   sql: |
     SELECT
-        cr.concept_id_1 AS concept_id,
-        cs.concept_synonym_name AS concept_name,
-        c2.vocabulary_id,
-        c2.concept_code
+        cs.concept_synonym_name AS expression,
+        cr.concept_id_1 AS expression_concept_id,
+        c2.concept_id AS std_concept_id,
+        c2.concept_name AS std_concept_name,
+        c2.vocabulary_id AS std_vocabulary_id,
+        c2.concept_code AS std_vocabulary_code
     FROM concept_relationship cr
     LEFT JOIN concept c1 ON cr.concept_id_1 = c1.concept_id
     LEFT JOIN concept c2 ON cr.concept_id_2 = c2.concept_id

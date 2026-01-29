@@ -5,3 +5,4 @@ datasets
 *.db
 .env
 __pycache__
+chroma

@@ -26,29 +26,29 @@ stages:
       size: 1489776640
     - path: prepare_datasets.py
       hash: md5
-      md5: 6620cfe33c3b714bb779ea671a18101e
-      size: 982
+      md5: 4c5add1b78361af980fb9da601007051
+      size: 627
     - path: sql_commands.yaml
       hash: md5
-      md5: c251232387b4a3979fc138712bd24ff6
-      size: 2444
+      md5: 67f9fc3f735044740ff1f1e28cd081c0
+      size: 2990
     outs:
-    - path: datasets/non_std_concept_synonym_to_std_vocab_code.csv
+    - path: datasets/mapped_non_standard_concept.csv
       hash: md5
-      md5: 5ecb651be7bee938e1dbd54de629c99e
-      size: 8935428
-    - path: datasets/non_std_concept_to_std_vocab_code.csv
+      md5: 01d27bea127501aba5f312c803f9c7a3
+      size: 4181263
+    - path: datasets/mapped_non_standard_concept_synonym.csv
       hash: md5
-      md5: 6a3ff40857a88dd430f4a64c40d3c2f4
-      size: 2842696
-    - path: datasets/std_concept_synonym_to_std_vocab_code.csv
+      md5: b6b85ac1a54d187c3ec126dd7b68cdf9
+      size: 12275086
+    - path: datasets/standard_concept.csv
       hash: md5
-      md5: eae9577fbc770dd0c585d9c3b46dc998
-      size: 144372743
-    - path: datasets/std_concept_to_std_vocab_code.csv
+      md5: d192a15420431d1af7b74d361cfddcf1
+      size: 72114443
+    - path: datasets/standard_concept_synonym.csv
       hash: md5
-      md5: 9f04fe237b91cde8cba0a46b82efa65b
-      size: 41408679
+      md5: c108ecc35c9a53fa7a29f5a40557841c
+      size: 226860601
   split_datasets:
     cmd: python split_datasets.py
     deps:
