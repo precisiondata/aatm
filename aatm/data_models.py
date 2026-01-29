@@ -1,7 +1,10 @@
+from datetime import datetime
 import hashlib
-from typing import Any, Optional
-from pydantic import BaseModel, field_validator
+from pathlib import Path
+from typing import Any, List, Optional
+from pydantic import BaseModel, ConfigDict, field_validator
 from enum import Enum
+import pandas as pd
 
 
 def deterministic_id_from_strings(strings: list[str], digest_size: int = 8) -> str:
@@ -71,3 +74,79 @@ class ExpressionMetadata(BaseModel):
 
 class Translation(BaseModel):
     text: str
+
+
+class SourceConcept(BaseModel):
+    # ignore extra fields
+    model_config = ConfigDict(extra="ignore")
+
+    # fields
+    source_code: str
+    source_concept_id: str
+    source_vocabulary_id: str
+    source_code_description: str
+    valid_start_date: str
+    valid_end_date: str
+    invalid_reason: str
+
+    @field_validator(
+        "source_code", "source_concept_id", "source_vocabulary_id", mode="before"
+    )
+    @classmethod
+    def validate_strings(cls, value: Any) -> str:
+        return str(value)
+
+    @field_validator("valid_start_date", "valid_end_date", mode="before")
+    @classmethod
+    def validate_yyyy_mm_dd(cls, v: str) -> str:
+        if not isinstance(v, str):
+            raise TypeError("date must be a string in YYYY-MM-DD format")
+
+        elif v == "":
+            return v
+
+        try:
+            # Strict format check
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("date must be in YYYY-MM-DD format")
+
+        return v
+
+    @classmethod
+    def from_csv(cls, path: str | Path) -> List["SourceConcept"]:
+        if isinstance(path, str):
+            path = Path(path)
+        df = pd.read_csv(path).fillna("")
+
+        return [cls(**row) for row in df.to_dict("records")]
+
+
+class MappedSourceConcept(SourceConcept):
+    # ignore extra fields
+    model_config = ConfigDict(extra="ignore")
+
+    # fields
+    target_concept_id: str
+    target_vocabulary_id: str
+    domain_id: str
+
+    @field_validator(
+        "source_code",
+        "source_concept_id",
+        "source_vocabulary_id",
+        "target_concept_id",
+        "target_vocabulary_id",
+        mode="before",
+    )
+    @classmethod
+    def validate_strings(cls, value: Any) -> str:
+        return str(value)
+
+    @classmethod
+    def from_csv(cls, path: str | Path) -> List["MappedSourceConcept"]:
+        if isinstance(path, str):
+            path = Path(path)
+        df = pd.read_csv(path).fillna("")
+
+        return [cls(**row) for row in df.to_dict("records")]
