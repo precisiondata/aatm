@@ -42,7 +42,9 @@ class ExpressionMetadata(BaseModel):
     std_vocabulary_id: StandardVocabulary
     std_vocabulary_code: str
 
-    @field_validator("expression_concept_id", "std_concept_id", mode="before")
+    @field_validator(
+        "expression_concept_id", "std_concept_id", "std_vocabulary_code", mode="before"
+    )
     @classmethod
     def validate_concept_id(cls, value: Any) -> str:
         return str(value)
@@ -65,3 +67,7 @@ class ExpressionMetadata(BaseModel):
         model_dict["expression_origin"] = model_dict["expression_origin"].value
         model_dict["std_vocabulary_id"] = model_dict["std_vocabulary_id"].value
         return model_dict
+
+
+class Translation(BaseModel):
+    text: str

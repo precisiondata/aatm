@@ -39,3 +39,12 @@ Four groups:
 **Training data:** every standard concept and their synonyms mapped to standard vocabulary codes.
 
 **Validation and test data:** every non-standard concept and their synonyms mapped to standard vocabularies codes.
+
+
+# Challenges
+- Acronyms
+- Concept decomposition
+- Imprecise translation of domain specific term
+- Selecting best target vocabulary
+- Define confidence threshold for requiring human supervision and revision
+- Define relevant data for human revision
