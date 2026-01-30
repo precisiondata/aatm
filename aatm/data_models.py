@@ -7,7 +7,7 @@ from enum import Enum
 import pandas as pd
 
 
-def deterministic_id_from_strings(strings: list[str], digest_size: int = 8) -> str:
+def deterministic_id_from_strings(strings: list[str], digest_size: int = 16) -> str:
     """
     Generate a deterministic id from a list of strings.
 
@@ -150,3 +150,11 @@ class MappedSourceConcept(SourceConcept):
         df = pd.read_csv(path).fillna("")
 
         return [cls(**row) for row in df.to_dict("records")]
+
+
+class RetrievedExpressionMetadata(ExpressionMetadata):
+    # ignore extra fields
+    model_config = ConfigDict(extra="ignore")
+
+    # fields
+    distance: Optional[float] = None
