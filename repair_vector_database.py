@@ -54,23 +54,23 @@ for dataset_path in datasets_base_path.glob("*.csv"):
             ExpressionMetadata(**record, expression_origin=expression_origin)
             for record in records
         ]
-        pairs = [(r.expression_id, r) for r in records]
+        records_dict = [record.to_dict() for record in records]
+        ids = [record.expression_id for record in records]
 
-        seen = set()
-        pairs = [(i, r) for (i, r) in pairs if (i not in seen and not seen.add(i))]
-
-        ids = [i for i, _ in pairs]
+        # # check if all ids alerady exist in the database
         results = collection.get(ids=ids)
-        found_ids = set(results["ids"])
 
-        pairs = [(i, r) for (i, r) in pairs if i not in found_ids]
-        if not pairs:
-            continue
+        found_metadatas = results["metadatas"][0]
+        for idx, (new_metadata, old_metadata) in enumerate(
+            zip(records_dict, found_metadatas)
+        ):
+            if new_metadata == old_metadata:
+                records.pop(idx)
+                ids.pop(idx)
 
-        rate_limit(n_docs=len(pairs))
-
-        collection.add(
-            ids=[i for i, _ in pairs],
-            documents=[r.expression for _, r in pairs],
-            metadatas=[r.to_dict() for _, r in pairs],
-        )
+        if len(records) > 0:
+            # rate_limit(len(records))
+            collection.update(
+                ids=ids,
+                metadatas=[record.to_dict() for record in records],
+            )
