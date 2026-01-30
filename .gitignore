@@ -6,3 +6,4 @@ datasets
 .env
 __pycache__
 chroma
+.secrets
