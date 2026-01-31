@@ -4,16 +4,30 @@ from typing import List
 from chromadb import EmbeddingFunction
 import chromadb
 
-from aatm.data_models import RetrievedExpressionMetadata, Translation
+from aatm.data_models import RetrievedExpressionMetadata, RetrieverResults, Translation
 from aatm.pipeline import PipelineBaseClass
 
 
 class BaseRetriever(PipelineBaseClass, ABC):
     @abstractmethod
-    def __call__(
-        self, text: str | List[str] | List[Translation]
-    ) -> List[RetrievedExpressionMetadata]:
+    def retrieve(self, queries: List[str]) -> RetrieverResults:
         pass
+
+    def __call__(
+        self, text: str | Translation | List[str] | List[Translation]
+    ) -> RetrieverResults:
+        if isinstance(text, str):
+            queries = [text]
+        elif isinstance(text, Translation):
+            queries = [text.text]
+        elif isinstance(text, list) and isinstance(text[0], Translation):
+            queries = [t.text for t in text]
+
+        assert isinstance(queries, list) and isinstance(queries[0], str), (
+            f"text must be a string, a Translation, a list of strings, or a list of Translation objects. Got {text}."
+        )
+
+        return self.retrieve(queries)
 
 
 class ChromaDBRetriever(BaseRetriever):
@@ -34,29 +48,13 @@ class ChromaDBRetriever(BaseRetriever):
         )
         self.top_k = top_k
 
-    def __call__(
-        self, text: str | Translation | List[str] | List[Translation]
-    ) -> List[List[RetrievedExpressionMetadata]]:
-        if isinstance(text, str):
-            text = [text]
-        elif isinstance(text, Translation):
-            text = [text.text]
-        elif isinstance(text, list) and isinstance(text[0], Translation):
-            text = [t.text for t in text]
-
-        assert isinstance(text, list) and isinstance(text[0], str), (
-            f"text must be a string, a Translation, a list of strings, or a list of Translation objects. Got {text}."
-        )
-
-        # Query
-        print(text)
+    def retrieve(self, queries: List[str]) -> RetrieverResults:
         results = self.collection.query(
-            query_texts=text,
+            query_texts=queries,
             n_results=self.top_k,
         )
-        print(results)
         processed_results = []
-        for query_id, _ in enumerate(text):
+        for query_id, _ in enumerate(queries):
             query_results = []
             for distance, metadata in zip(
                 results["distances"][query_id], results["metadatas"][query_id]
@@ -66,4 +64,7 @@ class ChromaDBRetriever(BaseRetriever):
                 )
             processed_results.append(query_results)
 
-        return processed_results
+        return RetrieverResults(
+            results=processed_results,
+            queries=queries,
+        )
