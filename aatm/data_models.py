@@ -123,10 +123,6 @@ class SourceConcept(BaseModel):
 
 
 class MappedSourceConcept(SourceConcept):
-    # ignore extra fields
-    model_config = ConfigDict(extra="ignore")
-
-    # fields
     target_concept_id: str
     target_vocabulary_id: str
     domain_id: str
@@ -151,6 +147,29 @@ class MappedSourceConcept(SourceConcept):
 
         return [cls(**row) for row in df.to_dict("records")]
 
+    @classmethod
+    def from_selector_results(
+        cls, source_concepts: List[SourceConcept], results: "SelectorResults"
+    ):
+        mapped_source_concepts = []
+        for source_concept, selected_result in zip(source_concepts, results.results):
+            mapped_source_concepts.append(
+                cls(
+                    source_code=source_concept.source_code,
+                    source_concept_id=source_concept.source_concept_id,
+                    source_vocabulary_id=source_concept.source_vocabulary_id,
+                    source_code_description=source_concept.source_code_description,
+                    target_concept_id=selected_result.std_concept_id,
+                    target_vocabulary_id=selected_result.std_vocabulary_id,
+                    domain_id="",
+                    valid_start_date=source_concept.valid_start_date,
+                    valid_end_date=source_concept.valid_end_date,
+                    invalid_reason=source_concept.invalid_reason,
+                )
+            )
+
+        return mapped_source_concepts
+
 
 class RetrievedExpressionMetadata(ExpressionMetadata):
     # ignore extra fields
@@ -158,3 +177,17 @@ class RetrievedExpressionMetadata(ExpressionMetadata):
 
     # fields
     distance: Optional[float] = None
+
+
+class SelectedExpressionMetadata(RetrievedExpressionMetadata):
+    result_list_index: int
+
+
+class RetrieverResults(BaseModel):
+    results: List[List[RetrievedExpressionMetadata]]
+    queries: List[str]
+
+
+class SelectorResults(BaseModel):
+    results: List[SelectedExpressionMetadata]
+    queries: List[str]
