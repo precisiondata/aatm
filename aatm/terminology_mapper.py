@@ -1,9 +1,10 @@
 from pathlib import Path
 from selectors import BaseSelector
 from typing import List
-
+from tqdm import tqdm
 import chromadb
 import pandas as pd
+import csv
 
 from aatm.data_models import MappedSourceConcept, SelectorResults, SourceConcept
 from aatm.translators import BaseTranslator, GeminiTranslator
@@ -60,12 +61,12 @@ class TerminologyMapper:
             ]
         )
 
-    def map(self, file_path: str | Path = None) -> str:
+    def map(self, file_path: str | Path = None, limit_to: int = None) -> str:
         if file_path is not None:
             if isinstance(file_path, str):
                 file_path = Path(file_path)
             if file_path.suffix == ".csv":
-                source_concepts = self.map_csv_to_source_concepts(file_path)
+                source_concepts = self.map_csv_to_source_concepts(file_path, limit_to)
             else:
                 raise ValueError(
                     f"Unsupported file type: {file_path.suffix}. File path provided: {file_path}"
@@ -75,7 +76,10 @@ class TerminologyMapper:
 
         # map source concepts
         mapped_source_concepts: List[MappedSourceConcept] = []
-        for batch_idx in range(0, len(source_concepts), self.batch_size):
+        for batch_idx in tqdm(
+            range(0, len(source_concepts), self.batch_size),
+            desc=f"Mapping source concepts (batch_size = {self.batch_size})",
+        ):
             batch = source_concepts[batch_idx : batch_idx + self.batch_size]
             selected_source_concepts: SelectorResults = (
                 batch | self.translator | self.retriever | self.selector
@@ -89,7 +93,7 @@ class TerminologyMapper:
         # write mapped source concepts to csv
         mapped_source_concepts_df = pd.DataFrame(
             [
-                mapped_source_concept.model_dump()
+                mapped_source_concept.to_dict()
                 for mapped_source_concept in mapped_source_concepts
             ]
         )
@@ -97,10 +101,22 @@ class TerminologyMapper:
             self.output_dir / "mapped_source_concepts.csv", index=False
         )
 
-        return self.output_dir
+        return mapped_source_concepts_df
 
-    def map_csv_to_source_concepts(self, file_path: Path) -> str:
-        df = pd.read_csv(file_path).fillna("")
+    def map_csv_to_source_concepts(self, file_path: Path, limit_to: int = None) -> str:
+        df = pd.read_csv(file_path, on_bad_lines="skip")
+
+        if df["source_code_description"].isnull().any():
+            print(
+                f"There are {df['source_code_description'].isnull().sum()} null values in the source_code_description column. Those rows will be dropped."
+            )
+            print(
+                f"Dropped rows: {df[df['source_code_description'].isnull()].index.to_list()}"
+            )
+            df = df.dropna(subset=["source_code_description"])
+
+        if limit_to is not None:
+            df = df.iloc[:limit_to]
 
         # Check if all expected columns are present
         if not self.expected_columns.issubset(set(df.columns)):
@@ -108,6 +124,7 @@ class TerminologyMapper:
                 f"Expected columns: {self.expected_columns}. Got columns: {set(df.columns)}"
             )
 
+        df = df.astype(str).fillna("")
         # Convert to SourceConcept objects
         source_concepts: List[SourceConcept] = [
             SourceConcept(**row) for row in df.to_dict("records")

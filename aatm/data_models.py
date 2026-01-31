@@ -124,7 +124,7 @@ class SourceConcept(BaseModel):
 
 class MappedSourceConcept(SourceConcept):
     target_concept_id: str
-    target_vocabulary_id: str
+    target_vocabulary_id: StandardVocabulary
     domain_id: str
 
     @field_validator(
@@ -160,7 +160,7 @@ class MappedSourceConcept(SourceConcept):
                     source_vocabulary_id=source_concept.source_vocabulary_id,
                     source_code_description=source_concept.source_code_description,
                     target_concept_id=selected_result.std_concept_id,
-                    target_vocabulary_id=selected_result.std_vocabulary_id,
+                    target_vocabulary_id=selected_result.std_vocabulary_id.value,
                     domain_id="",
                     valid_start_date=source_concept.valid_start_date,
                     valid_end_date=source_concept.valid_end_date,
@@ -169,6 +169,11 @@ class MappedSourceConcept(SourceConcept):
             )
 
         return mapped_source_concepts
+
+    def to_dict(self):
+        model_dict = self.model_dump()
+        model_dict["target_vocabulary_id"] = model_dict["target_vocabulary_id"].value
+        return model_dict
 
 
 class RetrievedExpressionMetadata(ExpressionMetadata):

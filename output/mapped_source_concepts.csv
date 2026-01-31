@@ -1,0 +1,11 @@
+source_code,source_concept_id,source_vocabulary_id,source_code_description,valid_start_date,valid_end_date,invalid_reason,target_concept_id,target_vocabulary_id,domain_id
+Crizotinibe,0.0,SUS,CRIZOTINIBE,1970-01-01,2099-12-31,nan,40242675,RxNorm,
+Cemiplimabe,0.0,SUS,Cemeiplimab,1970-01-01,2099-12-31,nan,35200783,RxNorm,
+Atezolizumabe,0.0,SUS,Altezolizumab,1970-01-01,2099-12-31,nan,42629079,RxNorm,
+Panitumumabe,0.0,SUS,Panitumumab,1970-01-01,2099-12-31,nan,19100985,RxNorm,
+Alfapoetina,0.0,SUS,Alfapoetin,1970-01-01,2099-12-31,nan,4137015,SNOMED,
+Docetaxel,0.0,SUS,Docetaxel,1970-01-01,2099-12-31,nan,1315942,RxNorm,
+Cloridrato de irinotecano tri-hidratado,0.0,SUS,Trihydrate Irinotecan Hydrochloride,1970-01-01,2099-12-31,nan,1367268,RxNorm,
+Acetato de megestrol,0.0,SUS,Megestrol acetate,1970-01-01,2099-12-31,nan,1300978,RxNorm,
+Ácido Trans-retinoico,0.0,SUS,Transretinoic acid,1970-01-01,2099-12-31,nan,903643,RxNorm,
+Ditosilato de lapatinibe,0.0,SUS,Lapatinib,1970-01-01,2099-12-31,nan,1359548,RxNorm,
