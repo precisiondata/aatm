@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from rank_bm25 import BM25Okapi
 
 # Custom modules
 from aatm.data_models import RetrieverResults, Translation
@@ -24,6 +25,26 @@ class BaseReranker(PipelineBaseClass, ABC):
         )
 
         return self.rerank(retriever_results)
+
+
+class BM25Reranker(BaseReranker):
+    def rerank(self, retriever_results: RetrieverResults) -> RetrieverResults:
+        for query_index, query in enumerate(retriever_results.queries):
+            corpus = retriever_results.results[query_index]
+            tokenized_corpus = [doc.expression.split(" ") for doc in corpus]
+            bm25 = BM25Okapi(tokenized_corpus)
+            tokenized_query = query.split(" ")
+            doc_scores = bm25.get_scores(tokenized_query)
+
+            # update scores
+            for doc_index, _ in enumerate(corpus):
+                retriever_results.results[query_index][doc_index].rerank_score = doc_scores[doc_index]
+            
+        # sort results based on scores
+        for list_of_results in retriever_results.results:
+            list_of_results.sort(key=lambda x: x.rerank_score, reverse=True)
+
+        return retriever_results
 
 
 class Qwen3RerankerModels(Enum):

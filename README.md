@@ -62,3 +62,11 @@ Four groups:
 | Qwen3 0.6B                | Qwen          | 0.886                        | 0.923                        |
 | text-embedding-3-small    | OpenAI        | 0.886                        | 0.920                        |
 | Qwen3 4B                  | Qwen          | 0.885                        | 0.924                        |
+
+## Simple retrieval with rerank and first result selection
+
+| **Model name**            | **Company**   | **Reranker**        | **PR-AUC concept_id level**  | **PR-AUC vocab code level**  |
+|------------               |-------------- |--------------       |--------                      |------------------------      |
+| Embedding Gemma 300M      | Google        | BM25                | 0.904                        | 0.928                        |
+| Embedding Gemma 300M      | Google        | Qwen3-Reranker-4B   | 0.888                        | 0.934                        |
+| Embedding Gemma 300M      | Google        | Qwen3-Reranker-0.6B | 0.849                        | 0.906                        |

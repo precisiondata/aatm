@@ -4,3 +4,6 @@ class PipelineBaseClass:
 
     def __ror__(self, other):
         return self(other)
+
+    def __call__(self, input, *args, **kwargs):
+        return input
