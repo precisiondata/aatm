@@ -11,7 +11,7 @@ from aatm.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry
 
 dotenv.load_dotenv()
 
-model_name = "text-embedding-3-small"
+model_name = "text-embedding-3-large"
 
 
 # Rate limiting config
