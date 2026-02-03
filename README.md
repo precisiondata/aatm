@@ -55,9 +55,10 @@ Four groups:
 
 - Precision and recall curves are computed for every confidence score threshold
 
-| **Model name**            | **PR-AUC concept_id level**  | **PR-AUC vocab code level**  |
-|------------               |--------                      |------------------------      |
-| Embedding Gemma 300M      | 0.911                        | 0.935                        |
-| gemini-embedding-001      | 0.903                        | 0.938                        |
-| Qwen3 0.6B                | 0.886                        | 0.923                        |
-| Qwen3 4B                  | 0.885                        | 0.924                        |
+| **Model name**            | **Company**   | **PR-AUC concept_id level**  | **PR-AUC vocab code level**  |
+|------------               |-------------- |--------                      |------------------------      |
+| Embedding Gemma 300M      | Google        | 0.911                        | 0.935                        |
+| gemini-embedding-001      | Google        | 0.903                        | 0.938                        |
+| Qwen3 0.6B                | Qwen          | 0.886                        | 0.923                        |
+| text-embedding-3-small    | OpenAI        | 0.886                        | 0.920                        |
+| Qwen3 4B                  | Qwen          | 0.885                        | 0.924                        |
