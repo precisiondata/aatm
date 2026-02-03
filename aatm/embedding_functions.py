@@ -3,6 +3,7 @@ from chromadb import Documents, EmbeddingFunction, Embeddings
 from google import genai
 import os
 import dotenv
+from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 import torch
 
@@ -58,3 +59,18 @@ class GemmaEmbeddingFunction(EmbeddingFunction):
     def __call__(self, input: Documents) -> Embeddings:
         embeddings = self.model.encode(input)
         return embeddings.tolist()
+
+
+class OpenAIEmbeddingModels(Enum):
+    TEXT_EMBEDDING_3_SMALL = "text-embedding-3-small"
+    TEXT_EMBEDDING_3_LARGE = "text-embedding-3-large"
+
+
+class OpenAIEmbeddingFunction(EmbeddingFunction):
+    def __init__(self, model: str, *args, **kwargs):
+        self.model_id = OpenAIEmbeddingModels(model).value
+        self.client = OpenAI()
+
+    def __call__(self, input: Documents) -> Embeddings:
+        response = self.client.embeddings.create(input=input, model=self.model_id)
+        return [emb.embedding for emb in response.data]

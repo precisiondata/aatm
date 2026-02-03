@@ -9,6 +9,8 @@ from aatm.embedding_functions import (
     GemmaEmbeddingFunction,
     GemmaEmbeddingModels,
     GoogleEmbeddingFunction,
+    OpenAIEmbeddingFunction,
+    OpenAIEmbeddingModels,
     Qwen3EmbeddingFunction,
     Qwen3Models,
 )
@@ -44,6 +46,20 @@ CHROMADB_RETRIEVER_MODEL_REGISTRY = {
         "chromadb_path": "chroma_vector_dbs/embeddinggemma-300M",
         "output_path": "output/embeddinggemma-300M",
         "rate_limit": 1000,
+    },
+    "text-embedding-3-small": {
+        "model_id": OpenAIEmbeddingModels.TEXT_EMBEDDING_3_SMALL.value,
+        "embedding_function": OpenAIEmbeddingFunction,
+        "collection_name": "expressions",
+        "chromadb_path": "chroma_vector_dbs/text-embedding-3-small",
+        "output_path": "output/text-embedding-3-small",
+    },
+    "text-embedding-3-large": {
+        "model_id": OpenAIEmbeddingModels.TEXT_EMBEDDING_3_LARGE.value,
+        "embedding_function": OpenAIEmbeddingFunction,
+        "collection_name": "expressions",
+        "chromadb_path": "chroma_vector_dbs/text-embedding-3-large",
+        "output_path": "output/text-embedding-3-large",
     },
 }
 

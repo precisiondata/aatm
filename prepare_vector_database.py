@@ -7,16 +7,17 @@ import dotenv
 from tqdm import tqdm
 
 # Custom modules
-from aatm.embedding_functions import GoogleEmbeddingFunction
+from aatm.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry
 
 dotenv.load_dotenv()
 
-# Rate limiting config
-DOCS_PER_MIN = 3_000  # GCP limits to 3,000 docs per minute
-if DOCS_PER_MIN <= 0:
-    raise ValueError("DOCS_PER_MIN must be > 0")
+model_name = "text-embedding-3-small"
 
-SECONDS_PER_DOC = 60.0 / DOCS_PER_MIN
+
+# Rate limiting config
+DOCS_PER_MIN = model_registry[model_name].get("rate_limit", None)
+if DOCS_PER_MIN is not None and DOCS_PER_MIN <= 0:
+    raise ValueError("DOCS_PER_MIN must be > 0")
 
 next_allowed_time = time.monotonic()
 
@@ -29,15 +30,18 @@ def rate_limit(n_docs: int) -> None:
         time.sleep(next_allowed_time - now)
         now = time.monotonic()
     # Reserve time for this batch
-    next_allowed_time = max(next_allowed_time, now) + n_docs * SECONDS_PER_DOC
+    next_allowed_time = max(next_allowed_time, now) + n_docs * 60.0 / DOCS_PER_MIN
 
 
-client = chromadb.PersistentClient()
+client = chromadb.PersistentClient(model_registry[model_name]["chromadb_path"])
 
 collection = client.get_or_create_collection(
-    "expressions",
-    embedding_function=GoogleEmbeddingFunction(model="gemini-embedding-001"),
+    model_registry[model_name]["collection_name"],
+    embedding_function=model_registry[model_name]["embedding_function"](
+        model=model_registry[model_name]["model_id"]
+    ),
 )
+
 
 batch_size = 100  # max batch size = 100
 datasets_base_path = Path("datasets")
@@ -67,7 +71,8 @@ for dataset_path in datasets_base_path.glob("*.csv"):
         if not pairs:
             continue
 
-        rate_limit(n_docs=len(pairs))
+        if DOCS_PER_MIN is not None:
+            rate_limit(n_docs=len(pairs))
 
         collection.add(
             ids=[i for i, _ in pairs],
