@@ -185,6 +185,7 @@ class RetrievedExpressionMetadata(ExpressionMetadata):
 
     # fields
     distance: Optional[float] = None
+    rerank_score: Optional[float] = None
 
 
 class SelectedExpressionMetadata(RetrievedExpressionMetadata):
