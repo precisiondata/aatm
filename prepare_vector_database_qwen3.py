@@ -7,7 +7,7 @@ import dotenv
 from tqdm import tqdm
 
 # Custom modules
-from aatm.embedding_functions import GoogleEmbeddingFunction
+from aatm.embedding_functions import GoogleEmbeddingFunction, Qwen3EmbeddingFunction
 
 dotenv.load_dotenv()
 
@@ -32,11 +32,11 @@ def rate_limit(n_docs: int) -> None:
     next_allowed_time = max(next_allowed_time, now) + n_docs * SECONDS_PER_DOC
 
 
-client = chromadb.PersistentClient()
+client = chromadb.PersistentClient("chroma_vector_dbs/qwen3_4B")
 
 collection = client.get_or_create_collection(
     "expressions",
-    embedding_function=GoogleEmbeddingFunction(model="gemini-embedding-001"),
+    embedding_function=Qwen3EmbeddingFunction(model="Qwen/Qwen3-Embedding-4B"),
 )
 
 batch_size = 100  # max batch size = 100
@@ -54,23 +54,23 @@ for dataset_path in datasets_base_path.glob("*.csv"):
             ExpressionMetadata(**record, expression_origin=expression_origin)
             for record in records
         ]
-        records_dict = [record.to_dict() for record in records]
-        ids = [record.expression_id for record in records]
+        pairs = [(r.expression_id, r) for r in records]
 
-        # # check if all ids alerady exist in the database
+        seen = set()
+        pairs = [(i, r) for (i, r) in pairs if (i not in seen and not seen.add(i))]
+
+        ids = [i for i, _ in pairs]
         results = collection.get(ids=ids)
+        found_ids = set(results["ids"])
 
-        found_metadatas = results["metadatas"][0]
-        for idx, (new_metadata, old_metadata) in enumerate(
-            zip(records_dict, found_metadatas)
-        ):
-            if new_metadata == old_metadata:
-                records.pop(idx)
-                ids.pop(idx)
+        pairs = [(i, r) for (i, r) in pairs if i not in found_ids]
+        if not pairs:
+            continue
 
-        if len(records) > 0:
-            # rate_limit(len(records))
-            collection.update(
-                ids=ids,
-                metadatas=[record.to_dict() for record in records],
-            )
+        # rate_limit(n_docs=len(pairs))
+
+        collection.add(
+            ids=[i for i, _ in pairs],
+            documents=[r.expression for _, r in pairs],
+            metadatas=[r.to_dict() for _, r in pairs],
+        )

@@ -9,10 +9,7 @@ from aatm.translators import GeminiTranslator
 
 
 class AsyncGeminiTranslator(GeminiTranslator):
-    async def __call__(self, text: str | List[str]) -> List[Translation]:
-        if isinstance(text, str):
-            text = [text]
-
+    async def translate(self, texts: List[str]) -> List[Translation]:
         async with asyncio.TaskGroup() as tg:
             tasks = [
                 tg.create_task(
@@ -25,9 +22,18 @@ class AsyncGeminiTranslator(GeminiTranslator):
                         ),
                     )
                 )
-                for t in text
+                for t in texts
             ]
 
         results = [t.result() for t in tasks]
-        results = [json.loads(r.text) for r in results]
-        return [Translation(**r) for r in results]
+
+        processed_results = []
+        for result, t in zip(results, texts):
+            try:
+                processed_results.append(Translation(**json.loads(result.text)))
+            except Exception as e:
+                print(
+                    f"Error while processing text '{t}' and response '{result}': {e}. Original text was maintained."
+                )
+                processed_results.append(Translation(text=t))
+        return processed_results

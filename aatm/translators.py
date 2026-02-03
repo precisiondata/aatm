@@ -36,10 +36,18 @@ class BaseTranslator(PipelineBaseClass, ABC):
 
 
 class GeminiTranslator(BaseTranslator):
-    def __init__(self, model: str, prompt_template: str = None, *args, **kwargs):
+    def __init__(
+        self,
+        model: str,
+        prompt_template: str = None,
+        n_retries: int = 3,
+        *args,
+        **kwargs,
+    ):
         self.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
         self.model = model
         self.prompt_template = prompt_template
+        self.n_retries = n_retries
 
         if self.prompt_template is None:
             self.prompt_template = 'Translate the following text into English: "{text}"'
@@ -47,13 +55,25 @@ class GeminiTranslator(BaseTranslator):
     def translate(self, texts: List[str]) -> List[Translation]:
         results = []
         for t in texts:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=self.prompt_template.format(text=t),
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=Translation,
-                ),
-            )
-            results.append(Translation(**json.loads(response.text)))
+            n_retries = 0
+            while n_retries < self.n_retries:
+                try:
+                    response = self.client.models.generate_content(
+                        model=self.model,
+                        contents=self.prompt_template.format(text=t),
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=Translation,
+                        ),
+                    )
+                    results.append(Translation(**json.loads(response.text)))
+                    break
+                except Exception as e:
+                    n_retries += 1
+                    print(
+                        f"Error while processing text '{t}' (type: {type(t)}): {e}. Retrying... ({n_retries}/{self.n_retries})"
+                    )
+                    print(f'Malformed response: "{response}"')
+                    if n_retries == self.n_retries:
+                        results.append(Translation(text=t))
         return results

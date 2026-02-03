@@ -37,13 +37,14 @@ class StandardVocabulary(Enum):
 
 class ExpressionMetadata(BaseModel):
     expression_id: Optional[str] = None
-    expression: str
-    expression_concept_id: str
-    expression_origin: ExpressionOrigin
-    std_concept_id: str
-    std_concept_name: str
-    std_vocabulary_id: StandardVocabulary
-    std_vocabulary_code: str
+    expression: Optional[str]
+    expression_concept_id: Optional[str]
+    expression_origin: Optional[ExpressionOrigin]
+    std_concept_id: Optional[str]
+    std_concept_name: Optional[str]
+    std_vocabulary_id: Optional[StandardVocabulary]
+    std_vocabulary_code: Optional[str]
+    std_domain_id: Optional[str]
 
     @field_validator(
         "expression_concept_id", "std_concept_id", "std_vocabulary_code", mode="before"
@@ -57,10 +58,10 @@ class ExpressionMetadata(BaseModel):
             [
                 self.expression,
                 self.expression_concept_id,
-                self.expression_origin.value,
+                self.expression_origin.value if self.expression_origin else None,
                 self.std_concept_id,
                 self.std_concept_name,
-                self.std_vocabulary_id.value,
+                self.std_vocabulary_id.value if self.std_vocabulary_id else None,
                 self.std_vocabulary_code,
             ]
         )
@@ -123,9 +124,10 @@ class SourceConcept(BaseModel):
 
 
 class MappedSourceConcept(SourceConcept):
-    target_concept_id: str
-    target_vocabulary_id: StandardVocabulary
-    domain_id: str
+    target_concept_id: Optional[str]
+    target_vocabulary_id: Optional[StandardVocabulary]
+    target_vocabulary_code: Optional[str]
+    domain_id: Optional[str]
 
     @field_validator(
         "source_code",
@@ -161,10 +163,11 @@ class MappedSourceConcept(SourceConcept):
                     source_code_description=source_concept.source_code_description,
                     target_concept_id=selected_result.std_concept_id,
                     target_vocabulary_id=selected_result.std_vocabulary_id.value,
-                    domain_id="",
+                    domain_id=selected_result.std_domain_id,
                     valid_start_date=source_concept.valid_start_date,
                     valid_end_date=source_concept.valid_end_date,
                     invalid_reason=source_concept.invalid_reason,
+                    target_vocabulary_code=selected_result.std_vocabulary_code,
                 )
             )
 
@@ -186,6 +189,19 @@ class RetrievedExpressionMetadata(ExpressionMetadata):
 
 class SelectedExpressionMetadata(RetrievedExpressionMetadata):
     result_list_index: int
+
+
+class EmptySelectionMetadata(RetrievedExpressionMetadata):
+    expression_id: None = None
+    expression: None = None
+    expression_concept_id: None = None
+    expression_origin: None = None
+    std_concept_id: None = None
+    std_concept_name: None = None
+    std_vocabulary_id: None = None
+    std_vocabulary_code: None = None
+    std_domain_id: None = None
+    result_list_index: None = None
 
 
 class RetrieverResults(BaseModel):

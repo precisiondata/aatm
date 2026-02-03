@@ -5,7 +5,63 @@ from chromadb import EmbeddingFunction
 import chromadb
 
 from aatm.data_models import RetrievedExpressionMetadata, RetrieverResults, Translation
+from aatm.embedding_functions import (
+    GemmaEmbeddingFunction,
+    GemmaEmbeddingModels,
+    GoogleEmbeddingFunction,
+    Qwen3EmbeddingFunction,
+    Qwen3Models,
+)
 from aatm.pipeline import PipelineBaseClass
+
+CHROMADB_RETRIEVER_MODEL_REGISTRY = {
+    "qwen3-06B": {
+        "model_id": Qwen3Models.QWEN3_06B.value,
+        "embedding_function": Qwen3EmbeddingFunction,
+        "collection_name": "expressions",
+        "chromadb_path": "chroma_vector_dbs/qwen3-06B",
+        "output_path": "output/qwen3-06B",
+    },
+    "qwen3-4B": {
+        "model_id": Qwen3Models.QWEN3_4B.value,
+        "embedding_function": Qwen3EmbeddingFunction,
+        "collection_name": "expressions",
+        "chromadb_path": "chroma_vector_dbs/qwen3-4B",
+        "output_path": "output/qwen3-4B",
+    },
+    "gemini-embedding-001": {
+        "model_id": "gemini-embedding-001",
+        "embedding_function": GoogleEmbeddingFunction,
+        "collection_name": "expressions",
+        "chromadb_path": "chroma_vector_dbs/gemini-embedding-001",
+        "output_path": "output/gemini-embedding-001",
+        "rate_limit": 3000,
+    },
+    "embeddinggemma-300M": {
+        "model_id": GemmaEmbeddingModels.EMBEDDING_GEMMA_300M.value,
+        "embedding_function": GemmaEmbeddingFunction,
+        "collection_name": "expressions",
+        "chromadb_path": "chroma_vector_dbs/embeddinggemma-300M",
+        "output_path": "output/embeddinggemma-300M",
+        "rate_limit": 1000,
+    },
+}
+
+
+def load_chromadb_retriever(model_name: str) -> "ChromaDBRetriever":
+    client = chromadb.PersistentClient(
+        CHROMADB_RETRIEVER_MODEL_REGISTRY[model_name]["chromadb_path"]
+    )
+    retriever = ChromaDBRetriever(
+        client=client,
+        collection_name=CHROMADB_RETRIEVER_MODEL_REGISTRY[model_name][
+            "collection_name"
+        ],
+        embedding_function=CHROMADB_RETRIEVER_MODEL_REGISTRY[model_name][
+            "embedding_function"
+        ](model=CHROMADB_RETRIEVER_MODEL_REGISTRY[model_name]["model_id"]),
+    )
+    return retriever
 
 
 class BaseRetriever(PipelineBaseClass, ABC):
@@ -37,6 +93,7 @@ class ChromaDBRetriever(BaseRetriever):
         collection_name: str,
         embedding_function: EmbeddingFunction,
         top_k: int = 10,
+        where: str = None,
         *args,
         **kwargs,
     ):
@@ -47,11 +104,15 @@ class ChromaDBRetriever(BaseRetriever):
             collection_name, embedding_function=embedding_function
         )
         self.top_k = top_k
+        self.where = where
 
-    def retrieve(self, queries: List[str]) -> RetrieverResults:
+    def retrieve(
+        self, queries: List[str], where: str = None, top_k: int = None
+    ) -> RetrieverResults:
         results = self.collection.query(
             query_texts=queries,
-            n_results=self.top_k,
+            n_results=top_k if top_k is not None else self.top_k,
+            where=where if where is not None else self.where,
         )
         processed_results = []
         for query_id, _ in enumerate(queries):

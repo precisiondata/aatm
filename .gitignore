@@ -6,4 +6,5 @@ datasets
 .env
 __pycache__
 chroma
+chroma_vector_dbs
 .secrets

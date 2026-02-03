@@ -48,3 +48,16 @@ Four groups:
 - Selecting best target vocabulary
 - Define confidence threshold for requiring human supervision and revision
 - Define relevant data for human revision
+
+# Leaderboards
+
+## Simple retrieval with first result selection
+
+- Precision and recall curves are computed for every confidence score threshold
+
+| **Model name**            | **PR-AUC concept_id level**  | **PR-AUC vocab code level**  |
+|------------               |--------                      |------------------------      |
+| Embedding Gemma 300M      | 0.911                        | 0.935                        |
+| gemini-embedding-001      | 0.903                        | 0.938                        |
+| Qwen3 0.6B                | 0.886                        | 0.923                        |
+| Qwen3 4B                  | 0.885                        | 0.924                        |
