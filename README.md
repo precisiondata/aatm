@@ -59,6 +59,7 @@ Four groups:
 |------------               |-------------- |--------                      |------------------------      |
 | Embedding Gemma 300M      | Google        | 0.911                        | 0.935                        |
 | gemini-embedding-001      | Google        | 0.903                        | 0.938                        |
+| text-embedding-3-large    | OpenAI        | 0.892                        | 0.932                        |
 | Qwen3 0.6B                | Qwen          | 0.886                        | 0.923                        |
 | text-embedding-3-small    | OpenAI        | 0.886                        | 0.920                        |
 | Qwen3 4B                  | Qwen          | 0.885                        | 0.924                        |
