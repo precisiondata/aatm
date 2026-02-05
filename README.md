@@ -69,5 +69,42 @@ Four groups:
 | **Model name**            | **Company**   | **Reranker**        | **PR-AUC concept_id level**  | **PR-AUC vocab code level**  |
 |------------               |-------------- |--------------       |--------                      |------------------------      |
 | Embedding Gemma 300M      | Google        | BM25                | 0.904                        | 0.928                        |
+| text-embedding-3-large    | OpenAI        | BM25                | 0.895                        | 0.928                        |
+| gemini-embedding-001      | Google        | BM25                | 0.888                        | 0.922                        |
 | Embedding Gemma 300M      | Google        | Qwen3-Reranker-4B   | 0.888                        | 0.934                        |
+| text-embedding-3-large    | OpenAI        | Qwen3-Reranker-4B   | 0.860                        | 0.927                        |
+| text-embedding-3-small    | OpenAI        | BM25                | 0.853                        | 0.895                        |
 | Embedding Gemma 300M      | Google        | Qwen3-Reranker-0.6B | 0.849                        | 0.906                        |
+| gemini-embedding-001      | Google        | Qwen3-Reranker-0.6B | 0.830                        | 0.910                        |
+| text-embedding-3-small    | OpenAI        | Qwen3-Reranker-4B   | 0.829                        | 0.910                        |
+| text-embedding-3-large    | OpenAI        | Qwen3-Reranker-0.6B | 0.796                        | 0.878                        |
+| text-embedding-3-small    | OpenAI        | Qwen3-Reranker-0.6B | 0.780                        | 0.872                        |
+
+## Simple retrieval with LLM result selection
+
+| **Model name**            | **Company**   | **LLM selector**    | **PR-AUC concept_id level**  | **PR-AUC vocab code level**  |
+|------------               |-------------- |------------------   |--------                      |------------------------      |
+| Embedding Gemma 300M      | Google        | gpt-5.2             |                              |                              |
+| Embedding Gemma 300M      | Google        | gpt-5               |                              |                              |
+| Embedding Gemma 300M      | Google        | gpt-5-nano          |                              |                              |
+| Embedding Gemma 300M      | Google        | gpt-5-mini          |                              |                              |
+| gemini-embedding-001      | Google        | gpt-5.2             |                              |                              |
+| gemini-embedding-001      | Google        | gpt-5               |                              |                              |
+| gemini-embedding-001      | Google        | gpt-5-nano          |                              |                              |
+| gemini-embedding-001      | Google        | gpt-5-mini          |                              |                              |
+| text-embedding-3-large    | OpenAI        | gpt-5.2             |                              |                              |
+| text-embedding-3-large    | OpenAI        | gpt-5               |                              |                              |
+| text-embedding-3-large    | OpenAI        | gpt-5-nano          |                              |                              |
+| text-embedding-3-large    | OpenAI        | gpt-5-mini          |                              |                              |
+| Qwen3 0.6B                | Qwen          | gpt-5.2             |                              |                              |
+| Qwen3 0.6B                | Qwen          | gpt-5               |                              |                              |
+| Qwen3 0.6B                | Qwen          | gpt-5-nano          |                              |                              |
+| Qwen3 0.6B                | Qwen          | gpt-5-mini          |                              |                              |
+| text-embedding-3-small    | OpenAI        | gpt-5.2             |                              |                              |
+| text-embedding-3-small    | OpenAI        | gpt-5               |                              |                              |
+| text-embedding-3-small    | OpenAI        | gpt-5-nano          |                              |                              |
+| text-embedding-3-small    | OpenAI        | gpt-5-mini          |                              |                              |
+| Qwen3 4B                  | Qwen          | gpt-5.2             |                              |                              |
+| Qwen3 4B                  | Qwen          | gpt-5               |                              |                              |
+| Qwen3 4B                  | Qwen          | gpt-5-nano          |                              |                              |
+| Qwen3 4B                  | Qwen          | gpt-5-mini          |                              |                              |

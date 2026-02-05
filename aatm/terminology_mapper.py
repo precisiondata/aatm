@@ -186,7 +186,7 @@ class TerminologyMapper:
 
             translated_batch = await (batch | self.translator)
 
-            selected_source_concepts: SelectorResults = (
+            selected_source_concepts: SelectorResults = await (
                 translated_batch | self.retriever | self.reranker | self.selector
             )
             mapped_source_concepts.extend(
@@ -196,7 +196,9 @@ class TerminologyMapper:
             )
             confidence_scores.extend(
                 [
-                    1 - selected_source_concepts.results[i].distance
+                    1 - (selected_source_concepts.results[i].distance or 0)
+                    if selected_source_concepts.results[i] is not None
+                    else None
                     for i in range(len(selected_source_concepts.results))
                 ]
             )

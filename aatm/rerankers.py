@@ -15,6 +15,9 @@ dotenv.load_dotenv()
 
 
 class BaseReranker(PipelineBaseClass, ABC):
+    def __init__(self, *args, **kwargs):
+        pass
+
     @abstractmethod
     def rerank(self, retriever_results: RetrieverResults) -> Translation:
         pass
@@ -38,8 +41,10 @@ class BM25Reranker(BaseReranker):
 
             # update scores
             for doc_index, _ in enumerate(corpus):
-                retriever_results.results[query_index][doc_index].rerank_score = doc_scores[doc_index]
-            
+                retriever_results.results[query_index][
+                    doc_index
+                ].rerank_score = doc_scores[doc_index]
+
         # sort results based on scores
         for list_of_results in retriever_results.results:
             list_of_results.sort(key=lambda x: x.rerank_score, reverse=True)
@@ -162,3 +167,15 @@ class Qwen3Reranker(BaseReranker):
             list_of_results.sort(key=lambda x: x.rerank_score, reverse=True)
 
         return retriever_results
+
+
+RERANKER_REGISTRY = {
+    "BM25": BM25Reranker,
+    Qwen3RerankerModels.QWEN3_06B.value: Qwen3Reranker,
+    Qwen3RerankerModels.QWEN3_4B.value: Qwen3Reranker,
+    Qwen3RerankerModels.QWEN3_8B.value: Qwen3Reranker,
+}
+
+
+def load_reranker(reranker_name, **kwargs):
+    return RERANKER_REGISTRY[reranker_name](reranker_name, **kwargs)

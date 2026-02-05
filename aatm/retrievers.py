@@ -86,17 +86,17 @@ class BaseRetriever(PipelineBaseClass, ABC):
         pass
 
     def __call__(
-        self, text: str | Translation | List[str] | List[Translation]
+        self, queries: str | Translation | List[str] | List[Translation]
     ) -> RetrieverResults:
-        if isinstance(text, str):
-            queries = [text]
-        elif isinstance(text, Translation):
-            queries = [text.text]
-        elif isinstance(text, list) and isinstance(text[0], Translation):
-            queries = [t.text for t in text]
+        if isinstance(queries, str):
+            queries = [queries]
+        elif isinstance(queries, Translation):
+            queries = [queries.text]
+        elif isinstance(queries, list) and isinstance(queries[0], Translation):
+            queries = [t.text for t in queries]
 
         assert isinstance(queries, list) and isinstance(queries[0], str), (
-            f"text must be a string, a Translation, a list of strings, or a list of Translation objects. Got {text}."
+            f"queries must be a string, a Translation, a list of strings, or a list of Translation objects. Got {queries}."
         )
 
         return self.retrieve(queries)

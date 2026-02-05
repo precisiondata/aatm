@@ -1,7 +1,7 @@
 from datetime import datetime
 import hashlib
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, field_validator
 from enum import Enum
 import pandas as pd
@@ -82,13 +82,13 @@ class SourceConcept(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     # fields
-    source_code: str
-    source_concept_id: str
-    source_vocabulary_id: str
-    source_code_description: str
-    valid_start_date: str
-    valid_end_date: str
-    invalid_reason: str
+    source_code: Optional[str]
+    source_concept_id: Optional[str]
+    source_vocabulary_id: Optional[str]
+    source_code_description: Optional[str]
+    valid_start_date: Optional[str]
+    valid_end_date: Optional[str]
+    invalid_reason: Optional[str]
 
     @field_validator(
         "source_code", "source_concept_id", "source_vocabulary_id", mode="before"
@@ -139,7 +139,8 @@ class MappedSourceConcept(SourceConcept):
     )
     @classmethod
     def validate_strings(cls, value: Any) -> str:
-        return str(value)
+        if value is not None:
+            return str(value)
 
     @classmethod
     def from_csv(cls, path: str | Path) -> List["MappedSourceConcept"]:
@@ -162,7 +163,9 @@ class MappedSourceConcept(SourceConcept):
                     source_vocabulary_id=source_concept.source_vocabulary_id,
                     source_code_description=source_concept.source_code_description,
                     target_concept_id=selected_result.std_concept_id,
-                    target_vocabulary_id=selected_result.std_vocabulary_id.value,
+                    target_vocabulary_id=selected_result.std_vocabulary_id.value
+                    if selected_result.std_vocabulary_id
+                    else None,
                     domain_id=selected_result.std_domain_id,
                     valid_start_date=source_concept.valid_start_date,
                     valid_end_date=source_concept.valid_end_date,
@@ -175,7 +178,11 @@ class MappedSourceConcept(SourceConcept):
 
     def to_dict(self):
         model_dict = self.model_dump()
-        model_dict["target_vocabulary_id"] = model_dict["target_vocabulary_id"].value
+        model_dict["target_vocabulary_id"] = (
+            model_dict["target_vocabulary_id"].value
+            if model_dict["target_vocabulary_id"]
+            else None
+        )
         return model_dict
 
 
@@ -187,12 +194,22 @@ class RetrievedExpressionMetadata(ExpressionMetadata):
     distance: Optional[float] = None
     rerank_score: Optional[float] = None
 
+    def to_prompt_object(self, *args, **kwargs) -> Dict[str, str]:
+        return {
+            "expression_id": self.expression_id,
+            "expression": self.expression,
+            "standard_concept_name": self.std_concept_name,
+            "standard_vocabulary_id": self.std_vocabulary_id.value,
+            "standard_vocabulary_code": self.std_vocabulary_code,
+            "standard_domain_id": self.std_domain_id,
+        }
+
 
 class SelectedExpressionMetadata(RetrievedExpressionMetadata):
     result_list_index: int
 
 
-class EmptySelectionMetadata(RetrievedExpressionMetadata):
+class EmptySelectionMetadata(BaseModel):
     expression_id: None = None
     expression: None = None
     expression_concept_id: None = None
@@ -203,6 +220,7 @@ class EmptySelectionMetadata(RetrievedExpressionMetadata):
     std_vocabulary_code: None = None
     std_domain_id: None = None
     result_list_index: None = None
+    distance: None = None
 
 
 class RetrieverResults(BaseModel):
@@ -213,3 +231,7 @@ class RetrieverResults(BaseModel):
 class SelectorResults(BaseModel):
     results: List[SelectedExpressionMetadata]
     queries: List[str]
+
+
+class SelectedResult(BaseModel):
+    expression_id: Optional[str] = None
