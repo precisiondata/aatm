@@ -60,7 +60,7 @@ def configure_logging(
     root_logger.setLevel(level)
     root_logger.addHandler(handler)
 
-    # logging.getLogger("aatm").setLevel(logging.DEBUG)
+    logging.getLogger("aatm").setLevel(logging.DEBUG)
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:
