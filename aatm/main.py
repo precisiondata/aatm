@@ -1,13 +1,17 @@
 import typer
 from rich.console import Console
 from pathlib import Path
+import questionary
+from questionary import Choice
 
 from .local_database_utils import build_local_sqlite_vocab_database
+from .retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY
 
 app = typer.Typer()
 console = Console()
 
 DEFAULT_VOCAB_DIR = Path("vocabularies")
+DEFAULT_EMBEDDING_MODEL = "embeddinggemma-300M"
 
 AATM_LOGO = r"""
    █████╗  █████╗ ████████╗███╗   ███╗
@@ -48,6 +52,18 @@ def init(
         console.print("[yellow]OOPS![/yellow] You still don't have a `vocabularies` directory. Download the desired OMOP vocabularies at https://athena.ohdsi.org/ and place them in the `./vocabularies` directory or use the `--vocab-dir` option to specify a different directory.\n")
         raise typer.Exit()
 
-    console.print(f"Using vocabulary files from: '{vocab_dir}'\n")
+    console.print("[blue]1) Building local OMOP vocabulary database[/blue]")
+    console.print(f"Using vocabulary files from: '{vocab_dir}'")
 
-    build_local_sqlite_vocab_database(vocab_dir)
+    #build_local_sqlite_vocab_database(vocab_dir)
+    console.print("[green]Done![/green]\n")
+
+    console.print("[blue]2) Building local vector database[/blue]")
+    supported_embedding_models = list(CHROMADB_RETRIEVER_MODEL_REGISTRY.keys())
+    supported_embedding_models_choices = [
+        Choice(f"{model_name} (default)", value=model_name) if model_name == DEFAULT_EMBEDDING_MODEL else Choice(model_name, value=model_name) for model_name in supported_embedding_models 
+    ]
+    selected_embedding_model = questionary.select(
+    "Select one of the supported embedding models for building the vector database:",
+    choices=supported_embedding_models_choices,
+    default=DEFAULT_EMBEDDING_MODEL).ask()
