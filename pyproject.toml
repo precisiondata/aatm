@@ -20,6 +20,7 @@ dependencies = [
     "peft>=0.18.0",
     "pyyaml>=6.0.3",
     "rank-bm25>=0.2.2",
+    "rich>=14.3.1",
     "sentence-transformers>=5.2.2",
     "streamlit>=1.54.0",
     "torch>=2.10.0",
@@ -28,6 +29,20 @@ dependencies = [
     "transformers>=4.57.3",
     "typer>=0.21.1",
 ]
+
+[project.scripts]
+aatm = "aatm.main:app"
+
+[build-system]
+requires = ["uv_build >= 0.10.10, <0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "aatm"  
+module-root = "."      
+
+[tool.setuptools]
+packages = ["aatm"]
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
