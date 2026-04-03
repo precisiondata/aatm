@@ -12,20 +12,20 @@ from aatm.embedding_functions import (
     OpenAIEmbeddingFunction,
     OpenAIEmbeddingModels,
     Qwen3EmbeddingFunction,
-    Qwen3Models,
+    Qwen3EmbeddingModels,
 )
 from aatm.pipeline import PipelineBaseClass
 
 CHROMADB_RETRIEVER_MODEL_REGISTRY = {
     "qwen3-06B": {
-        "model_id": Qwen3Models.QWEN3_06B.value,
+        "model_id": Qwen3EmbeddingModels.QWEN3_06B.value,
         "embedding_function": Qwen3EmbeddingFunction,
         "collection_name": "expressions",
         "chromadb_path": "chroma_vector_dbs/qwen3-06B",
         "output_path": "output/qwen3-06B",
     },
     "qwen3-4B": {
-        "model_id": Qwen3Models.QWEN3_4B.value,
+        "model_id": Qwen3EmbeddingModels.QWEN3_4B.value,
         "embedding_function": Qwen3EmbeddingFunction,
         "collection_name": "expressions",
         "chromadb_path": "chroma_vector_dbs/qwen3-4B",
@@ -86,17 +86,17 @@ class BaseRetriever(PipelineBaseClass, ABC):
         pass
 
     def __call__(
-        self, text: str | Translation | List[str] | List[Translation]
+        self, queries: str | Translation | List[str] | List[Translation]
     ) -> RetrieverResults:
-        if isinstance(text, str):
-            queries = [text]
-        elif isinstance(text, Translation):
-            queries = [text.text]
-        elif isinstance(text, list) and isinstance(text[0], Translation):
-            queries = [t.text for t in text]
+        if isinstance(queries, str):
+            queries = [queries]
+        elif isinstance(queries, Translation):
+            queries = [queries.text]
+        elif isinstance(queries, list) and isinstance(queries[0], Translation):
+            queries = [t.text for t in queries]
 
         assert isinstance(queries, list) and isinstance(queries[0], str), (
-            f"text must be a string, a Translation, a list of strings, or a list of Translation objects. Got {text}."
+            f"queries must be a string, a Translation, a list of strings, or a list of Translation objects. Got {queries}."
         )
 
         return self.retrieve(queries)

@@ -23,7 +23,7 @@ class GoogleEmbeddingFunction(EmbeddingFunction):
         return [emb.values for emb in response.embeddings]
 
 
-class Qwen3Models(Enum):
+class Qwen3EmbeddingModels(Enum):
     QWEN3_06B = "Qwen/Qwen3-Embedding-0.6B"
     QWEN3_4B = "Qwen/Qwen3-Embedding-4B"
     QWEN3_8B = "Qwen/Qwen3-Embedding-8B"
@@ -31,7 +31,7 @@ class Qwen3Models(Enum):
 
 class Qwen3EmbeddingFunction(EmbeddingFunction):
     def __init__(self, model: str, *args, **kwargs):
-        self.model_id = Qwen3Models(model).value
+        self.model_id = Qwen3EmbeddingModels(model).value
         self.model = SentenceTransformer(
             self.model_id,
             model_kwargs={"device_map": "cuda" if torch.cuda.is_available() else "cpu"},

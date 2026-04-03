@@ -6,7 +6,9 @@ from tqdm import tqdm
 import chromadb
 import pandas as pd
 
+from aatm.pipeline import PipelineBaseClass
 from aatm.data_models import MappedSourceConcept, SelectorResults, SourceConcept
+from aatm.rerankers import BaseReranker
 from aatm.translators import BaseTranslator, GeminiTranslator
 from aatm.retrievers import BaseRetriever, ChromaDBRetriever
 from aatm.selectors import FirstResultSelector
@@ -27,11 +29,12 @@ class TerminologyMapper:
     def __init__(
         self,
         output_dir: str | Path = Path("output"),
-        translator: BaseTranslator = None,
-        retriever: BaseRetriever = None,
-        selector: BaseSelector = None,
+        translator: Optional[BaseTranslator] = None,
+        retriever: Optional[BaseRetriever] = None,
+        selector: Optional[BaseSelector] = None,
+        reranker: Optional[BaseReranker] = None,
         batch_size: int = 100,
-        rate_limit: int = None,
+        rate_limit: Optional[int] = None,
         *args,
         **kwargs,
     ):
@@ -51,6 +54,9 @@ class TerminologyMapper:
         if selector is None:
             selector = FirstResultSelector()
 
+        if reranker is None:
+            reranker = PipelineBaseClass()  # empty reranker
+
         if isinstance(output_dir, str):
             output_dir = Path(output_dir)
 
@@ -59,6 +65,7 @@ class TerminologyMapper:
         self.translator: BaseTranslator = translator
         self.retriever: BaseRetriever = retriever
         self.selector: BaseSelector = selector
+        self.reranker: BaseReranker | PipelineBaseClass = reranker
         self.batch_size: int = batch_size
         self.rate_limit: Optional[int] = rate_limit
         self.expected_columns: set[str] = set(
@@ -109,7 +116,7 @@ class TerminologyMapper:
                 )
 
             selected_source_concepts: SelectorResults = (
-                batch | self.translator | self.retriever | self.selector
+                batch | self.translator | self.retriever | self.reranker | self.selector
             )
             mapped_source_concepts.extend(
                 MappedSourceConcept.from_selector_results(
@@ -179,8 +186,8 @@ class TerminologyMapper:
 
             translated_batch = await (batch | self.translator)
 
-            selected_source_concepts: SelectorResults = (
-                translated_batch | self.retriever | self.selector
+            selected_source_concepts: SelectorResults = await (
+                translated_batch | self.retriever | self.reranker | self.selector
             )
             mapped_source_concepts.extend(
                 MappedSourceConcept.from_selector_results(
@@ -189,7 +196,9 @@ class TerminologyMapper:
             )
             confidence_scores.extend(
                 [
-                    1 - selected_source_concepts.results[i].distance
+                    1 - (selected_source_concepts.results[i].distance or 0)
+                    if selected_source_concepts.results[i] is not None
+                    else None
                     for i in range(len(selected_source_concepts.results))
                 ]
             )

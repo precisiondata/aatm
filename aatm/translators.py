@@ -6,9 +6,13 @@ import dotenv
 from abc import ABC, abstractmethod
 from typing import List
 
+from openai import OpenAI
+
 # Custom modules
 from aatm.data_models import SourceConcept, Translation
 from aatm.pipeline import PipelineBaseClass
+from aatm.prompt_helpers import format_prompt
+from aatm.selectors import OpenAILLMModels
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -33,6 +37,11 @@ class BaseTranslator(PipelineBaseClass, ABC):
         )
 
         return self.translate(text)
+
+
+class EmptyTranslator(BaseTranslator):
+    def translate(self, texts: List[str]) -> List[Translation]:
+        return [Translation(text=t) for t in texts]
 
 
 class GeminiTranslator(BaseTranslator):
@@ -67,6 +76,52 @@ class GeminiTranslator(BaseTranslator):
                         ),
                     )
                     results.append(Translation(**json.loads(response.text)))
+                    break
+                except Exception as e:
+                    n_retries += 1
+                    print(
+                        f"Error while processing text '{t}' (type: {type(t)}): {e}. Retrying... ({n_retries}/{self.n_retries})"
+                    )
+                    print(f'Malformed response: "{response}"')
+                    if n_retries == self.n_retries:
+                        results.append(Translation(text=t))
+        return results
+
+
+class OpenAITranslator(BaseTranslator):
+    def __init__(
+        self,
+        model: str,
+        prompt_template: str = None,
+        n_retries: int = 3,
+        *args,
+        **kwargs,
+    ):
+        self.model_id = OpenAILLMModels(model).value
+        self.prompt_template = prompt_template
+        self.client = OpenAI()
+        self.n_retries = n_retries
+
+        if self.prompt_template is None:
+            self.prompt_template = [
+                {
+                    "role": "user",
+                    "content": 'Translate the following text into English: "{text}"',
+                }
+            ]
+
+    def translate(self, texts: List[str]) -> List[Translation]:
+        results = []
+        for t in texts:
+            n_retries = 0
+            while n_retries < self.n_retries:
+                try:
+                    response = self.client.responses.parse(
+                        model=self.model_id,
+                        input=format_prompt(self.prompt_template, {"text": t}),
+                        text_format=Translation,
+                    )
+                    results.append(response.output_parsed)
                     break
                 except Exception as e:
                     n_retries += 1
