@@ -53,6 +53,7 @@ class DebugMode(Enum):
 
     NONE = None
     OPENAI_LLM_SELECTOR = "openai_llm_selector"
+    GEMINI_LLM_SELECTOR = "gemini_llm_selector"
     # Add more package-wide modes here, e.g.:
     # DATASET_LOADING = "dataset_loading"
     # TOKEN_ALIGNMENT = "token_alignment"
