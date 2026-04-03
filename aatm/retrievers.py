@@ -12,20 +12,20 @@ from aatm.embedding_functions import (
     OpenAIEmbeddingFunction,
     OpenAIEmbeddingModels,
     Qwen3EmbeddingFunction,
-    Qwen3Models,
+    Qwen3EmbeddingModels,
 )
 from aatm.pipeline import PipelineBaseClass
 
 CHROMADB_RETRIEVER_MODEL_REGISTRY = {
     "qwen3-06B": {
-        "model_id": Qwen3Models.QWEN3_06B.value,
+        "model_id": Qwen3EmbeddingModels.QWEN3_06B.value,
         "embedding_function": Qwen3EmbeddingFunction,
         "collection_name": "expressions",
         "chromadb_path": "chroma_vector_dbs/qwen3-06B",
         "output_path": "output/qwen3-06B",
     },
     "qwen3-4B": {
-        "model_id": Qwen3Models.QWEN3_4B.value,
+        "model_id": Qwen3EmbeddingModels.QWEN3_4B.value,
         "embedding_function": Qwen3EmbeddingFunction,
         "collection_name": "expressions",
         "chromadb_path": "chroma_vector_dbs/qwen3-4B",
