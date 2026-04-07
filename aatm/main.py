@@ -1,3 +1,6 @@
+import subprocess
+import sys
+
 import typer
 from rich.console import Console
 from pathlib import Path
@@ -134,3 +137,17 @@ def init(
 
     build_local_vector_database(selected_embedding_model)
     console.print("[green]Done![/green]\n")
+
+
+@app.command("search-ui")
+def search_ui() -> None:
+    """Launch the Streamlit search UI."""
+    streamlit_app = Path(__file__).resolve().parent / "search_ui.py"
+
+    if not streamlit_app.exists():
+        raise typer.BadParameter(f"Streamlit app not found: {streamlit_app}")
+
+    subprocess.run(
+        [sys.executable, "-m", "streamlit", "run", str(streamlit_app)],
+        check=True,
+    )
