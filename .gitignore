@@ -8,3 +8,4 @@ __pycache__
 chroma
 chroma_vector_dbs
 .secrets
+.aatm
