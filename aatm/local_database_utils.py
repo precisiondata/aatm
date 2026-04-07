@@ -100,9 +100,6 @@ def build_local_vector_database(
     if vector_db_dir is None:
         vector_db_dir = Path(model_registry[embedding_model_name]["chromadb_path"])
 
-    print(vector_db_dir)
-    print(vector_db_dir.exists())
-
     # check user preference if vector db already exists
     if vector_db_dir.exists():
         user_preference = questionary.select(
