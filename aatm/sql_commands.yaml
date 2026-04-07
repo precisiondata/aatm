@@ -11,7 +11,7 @@ standard_concept:
         c.domain_id AS std_domain_id
     FROM concept c
     WHERE standard_concept = 'S'
-        AND vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
+        AND vocabulary_id IN {standard_vocabulary_list}
         AND c.invalid_reason IS NULL
 
 standard_concept_synonym:
@@ -28,7 +28,7 @@ standard_concept_synonym:
     FROM concept c1
     INNER JOIN concept_synonym c2 ON c1.concept_id = c2.concept_id
     WHERE c1.standard_concept = 'S'
-        AND c1.vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
+        AND c1.vocabulary_id IN {standard_vocabulary_list}
         AND c1.invalid_reason IS NULL
 
 mapped_non_standard_concept:
@@ -49,7 +49,7 @@ mapped_non_standard_concept:
         AND cr.concept_id_1 != cr.concept_id_2
         AND c1.concept_name != c2.concept_name
         AND c2.standard_concept = 'S'
-        AND c2.vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
+        AND c2.vocabulary_id IN {standard_vocabulary_list}
         AND cr.invalid_reason IS NULL
         AND c1.invalid_reason IS NULL
 
@@ -72,7 +72,7 @@ mapped_non_standard_concept_synonym:
         AND cr.concept_id_1 != cr.concept_id_2
         AND c1.concept_name != c2.concept_name
         AND c2.standard_concept = 'S'
-        AND c2.vocabulary_id IN ('SNOMED', 'RxNorm', 'LOINC')
+        AND c2.vocabulary_id IN {standard_vocabulary_list}
         AND cr.invalid_reason IS NULL
         AND c1.invalid_reason IS NULL
       
