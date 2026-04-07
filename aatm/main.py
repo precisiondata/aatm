@@ -66,11 +66,19 @@ def init(
     # Setup local directories
     LOCAL_HELPER_PATH.mkdir(exist_ok=True, parents=True)
     gitignore_path = Path(".gitignore")
-    gitignore_path.write_text(
-        gitignore_path.read_text() + "\n.aatm\n"
-        if gitignore_path.exists()
-        else ".aatm\n"
-    )
+    entry = ".aatm"
+    if not gitignore_path.exists():
+        gitignore_path.write_text(entry + "\n")
+    else:
+        lines = {line.strip() for line in gitignore_path.read_text().splitlines()}
+
+        if entry not in lines:
+            with gitignore_path.open("a") as f:
+                f.write(
+                    "\n" + entry
+                    if not gitignore_path.read_text().endswith("\n")
+                    else entry + "\n"
+                )
 
     print_logo()
     console.print("Let's set up your environment!\n")
