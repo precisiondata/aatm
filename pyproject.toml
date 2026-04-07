@@ -1,7 +1,7 @@
 [project]
-name = "precision-data"
+name = "aatm"
 version = "0.1.0"
-description = "Add your description here"
+description = "Any-to-Any Terminology Mapping (AATM) is a framework for creating mappings between different terminologies or vocabularies. It uses OHDSI standard vocabularies and data models as a basis for mapping, and can be used to create mappings between any two terminologies or vocabularies. AATM is designed to be flexible and extensible, allowing users to create mappings for a wide range of use cases."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -15,18 +15,37 @@ dependencies = [
     "ipywidgets>=8.1.8",
     "jsonlines>=4.0.0",
     "matplotlib>=3.10.8",
+    "nvidia-ml-py>=13.590.48",
     "openai>=2.16.0",
     "pandas>=2.3.1",
     "peft>=0.18.0",
     "pyyaml>=6.0.3",
+    "questionary>=2.1.1",
     "rank-bm25>=0.2.2",
+    "rich>=14.3.1",
     "sentence-transformers>=5.2.2",
     "streamlit>=1.54.0",
     "torch>=2.10.0",
     "torchvision>=0.25.0",
     "tqdm>=4.66.5",
     "transformers>=4.57.3",
+    "typer>=0.21.1",
 ]
+
+[project.scripts]
+aatm = "aatm.main:app"
+
+[build-system]
+requires = ["uv_build >= 0.10.10, <0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "aatm"  
+module-root = "."      
+source-include = ["aatm/*.yaml"]
+
+[tool.setuptools]
+packages = ["aatm"]
 
 [[tool.uv.index]]
 name = "pytorch-cu128"

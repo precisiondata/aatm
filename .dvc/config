@@ -1,5 +1,0 @@
-[core]
-    remote = gcloud
-    autostage = true
-['remote "gcloud"']
-    url = gs://aatm-dvc

@@ -2,14 +2,12 @@ import streamlit as st
 import chromadb
 import dotenv
 
-from aatm.data_models import RetrievedExpressionMetadata, RetrieverResults
+from aatm.data_models import RetrievedExpressionMetadata
 from aatm.retrievers import (
     CHROMADB_RETRIEVER_MODEL_REGISTRY,
     ChromaDBRetriever,
     load_chromadb_retriever,
 )
-from aatm.embedding_functions import GoogleEmbeddingFunction
-from aatm.selectors import FirstResultSelector
 
 dotenv.load_dotenv()
 
