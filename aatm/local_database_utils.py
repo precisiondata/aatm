@@ -3,10 +3,13 @@ import pandas as pd
 from pathlib import Path
 import sqlite3
 import questionary
+from rich.console import Console
 from rich.progress import track
 import shutil
 
 from .data_models import ExpressionMetadata
+
+console = Console()
 
 
 def rate_limiter(n_docs: int, rate_limit: int, next_allowed_time: float) -> float:
@@ -28,6 +31,18 @@ def rate_limiter(n_docs: int, rate_limit: int, next_allowed_time: float) -> floa
 
 
 def build_local_sqlite_vocab_database(vocab_dir: Path) -> None:
+    if Path(".aatm/omop.db").exists():
+        user_preference = questionary.select(
+            "A vocabulary database already exists. What would you like to do?",
+            choices=[
+                "Skip",
+                "Overwrite",
+            ],
+        ).ask()
+
+        if user_preference == "Skip":
+            return
+
     con = sqlite3.connect(".aatm/omop.db")
     list(vocab_dir.glob("*.csv"))[0].stem.lower()
 
@@ -56,6 +71,18 @@ def build_mapping_datasets(standard_vocabularies: list[str]) -> None:
         raise ValueError("No standard vocabularies provided")
 
     datasets_base_path = Path(".aatm/datasets")
+    if datasets_base_path.exists() and len(list(datasets_base_path.glob("*.csv"))) > 0:
+        user_preference = questionary.select(
+            "The datasets for terminology mapping already exist. What would you like to do?",
+            choices=[
+                "Skip",
+                "Overwrite",
+            ],
+        ).ask()
+
+        if user_preference == "Skip":
+            return
+
     datasets_base_path.mkdir(exist_ok=True, parents=True)
 
     con = sqlite3.connect(".aatm/omop.db")
@@ -125,6 +152,7 @@ def build_local_vector_database(
     if rate_limit is not None:
         next_allowed_time = time.monotonic()
 
+    console.print("Creating local vector database...")
     client = chromadb.PersistentClient(
         model_registry[embedding_model_name]["chromadb_path"]
         if vector_db_dir is None
