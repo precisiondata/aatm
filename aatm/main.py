@@ -53,7 +53,9 @@ def main(ctx: typer.Context) -> None:
         console.print("[dim]Use 'aatm --help' to see available commands.[/dim]")
 
 
-@app.command()
+@app.command(
+    help="Set up your environment to work with OMOP vocabularies and create terminology mappings."
+)
 def init(
     vocab_dir: str = typer.Option(
         None,
@@ -102,7 +104,7 @@ def init(
     console.print("[blue]1) Building local OMOP vocabulary database[/blue]")
     console.print(f"Using vocabulary files from: '{vocab_dir}'")
 
-    # build_local_sqlite_vocab_database(vocab_dir)
+    build_local_sqlite_vocab_database(vocab_dir)
     console.print("[green]Done![/green]\n")
 
     console.print("[blue]2) Building local vector database[/blue]")
@@ -128,8 +130,7 @@ def init(
         ],
     ).ask()
 
-    # build_mapping_datasets(selected_standard_vocabularies)
+    build_mapping_datasets(selected_standard_vocabularies)
 
-    console.print("Creating local vector database...")
     build_local_vector_database(selected_embedding_model)
     console.print("[green]Done![/green]\n")
