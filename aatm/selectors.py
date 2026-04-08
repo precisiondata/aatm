@@ -247,18 +247,3 @@ class GeminiLLMSelector(BaseSelector):
                     break
 
         return selector_results
-
-
-SELECTOR_REGISTRY = {
-    "first": FirstResultSelector,
-    "gpt-5.2": OpenAILLMSelector,
-    GeminiLLMModels.GEMINI_3_PRO_PREVIEW.value: GeminiLLMSelector,
-    GeminiLLMModels.GEMINI_3_FLASH_PREVIEW.value: GeminiLLMSelector,
-    GeminiLLMModels.GEMINI_2_5_FLASH.value: GeminiLLMSelector,
-    GeminiLLMModels.GEMINI_2_5_FLASH_LITE.value: GeminiLLMSelector,
-    GeminiLLMModels.GEMINI_2_5_PRO.value: GeminiLLMSelector,
-}
-
-
-def load_selector(name: str, *args, **kwargs):
-    return SELECTOR_REGISTRY[name](name, *args, **kwargs)
