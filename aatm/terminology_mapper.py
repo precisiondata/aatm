@@ -7,9 +7,17 @@ import chromadb
 import pandas as pd
 
 from aatm.pipeline import PipelineBaseClass
-from aatm.data_models import MappedSourceConcept, SelectorResults, SourceConcept
+from aatm.data_models import (
+    MappedSourceConcept,
+    SelectorResults,
+    SourceConcept,
+    TerminologyMappingTask,
+)
+from aatm.registries.retrievers import load_retriever
+from aatm.registries.selectors import load_selector
+from aatm.registries.translators import load_translator
 from aatm.rerankers import BaseReranker
-from aatm.translators import BaseTranslator, EmptyTranslator, GeminiTranslator
+from aatm.translators import BaseTranslator, EmptyTranslator
 from aatm.retrievers import BaseRetriever, ChromaDBRetriever
 from aatm.selectors import FirstResultSelector
 from aatm.embedding_functions import GoogleEmbeddingFunction
@@ -78,6 +86,39 @@ class TerminologyMapper:
                 "valid_end_date",
                 "invalid_reason",
             ]
+        )
+
+    @classmethod
+    def from_task_config(
+        cls, task_config: TerminologyMappingTask
+    ) -> "TerminologyMapper":
+        translator = (
+            load_translator(task_config.translator_id)
+            if task_config.translator_id
+            else None
+        )
+
+        retriever = (
+            load_retriever(task_config.retriever_id)
+            if task_config.retriever_id
+            else None
+        )
+
+        selector = (
+            load_selector(task_config.selector_id) if task_config.selector_id else None
+        )
+
+        reranker = (
+            load_reranker(task_config.reranker_id) if task_config.reranker_id else None
+        )
+
+        return cls(
+            translator=translator,
+            retriever=retriever,
+            selector=selector,
+            reranker=reranker,
+            batch_size=task_config.batch_size,
+            rate_limit=task_config.rate_limit,
         )
 
     def map(
