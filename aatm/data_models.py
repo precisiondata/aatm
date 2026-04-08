@@ -235,3 +235,21 @@ class SelectorResults(BaseModel):
 
 class SelectedResult(BaseModel):
     expression_id: Optional[str] = None
+
+
+class TerminologyMappingTask(BaseModel):
+    input_file: Path
+    output_dir: Optional[Path] = None
+    translator_id: Optional[str] = None
+    retriever_id: Optional[str] = None
+    selector_id: Optional[str] = None
+    reranker_id: Optional[str] = None
+    batch_size: Optional[int] = None
+    rate_limit: Optional[int] = None
+
+    @field_validator("input_file", "output_dir", mode="before")
+    def validate_paths(cls, value: Any) -> Path:
+        if isinstance(value, Path):
+            return value
+
+        return Path(value)
