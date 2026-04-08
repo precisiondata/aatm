@@ -63,7 +63,9 @@ def configure_logging(
     logging.getLogger("aatm").setLevel(logging.DEBUG)
 
 
-def get_logger(name: Optional[str] = None) -> logging.Logger:
+def get_logger(
+    name: Optional[str] = None, level: Optional[int] = None
+) -> logging.Logger:
     """
     Get a logger with module awareness.
 
@@ -76,4 +78,9 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
     Returns:
         logging.Logger
     """
-    return logging.getLogger(name)
+    logger = logging.getLogger(name or __name__)
+
+    if level:
+        logger.setLevel(level)
+
+    return logger
