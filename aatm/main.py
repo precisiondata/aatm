@@ -199,3 +199,13 @@ def search_ui() -> None:
         [sys.executable, "-m", "streamlit", "run", str(streamlit_app)],
         check=True,
     )
+
+
+@app.command("map")
+def map() -> None:
+    pass
+
+
+@app.command("amap")
+def amap() -> None:
+    pass
