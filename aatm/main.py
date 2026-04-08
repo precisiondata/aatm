@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import sys
 from typing import Annotated, List, Optional
@@ -9,7 +10,8 @@ import questionary
 from questionary import Choice
 import dotenv
 
-
+from .data_models import TerminologyMappingTask
+from .logs import get_logger
 from .local_database_utils import (
     build_local_sqlite_vocab_database,
     build_local_vector_database,
@@ -17,6 +19,7 @@ from .local_database_utils import (
 )
 
 dotenv.load_dotenv()  # Load environment variables
+logger = get_logger(__name__, level=logging.DEBUG)
 
 app = typer.Typer()
 console = Console()
@@ -202,8 +205,102 @@ def search_ui() -> None:
 
 
 @app.command("map")
-def map() -> None:
-    pass
+def map(
+    task_config_path: Annotated[
+        Optional[str],
+        typer.Option(
+            "--task-config-path",
+            "-t",
+            help="Path to the task config file",
+        ),
+    ] = None,
+    input_file: Annotated[
+        Optional[str],
+        typer.Option(
+            "--input-file",
+            "-i",
+            help="Path to the input file containing source concepts",
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Optional[str],
+        typer.Option(
+            "--output-dir",
+            "-o",
+            help="Path to the output directory",
+        ),
+    ] = None,
+    translator_id: Annotated[
+        Optional[str],
+        typer.Option(
+            "--translator-id",
+            "-tr",
+            help="ID of the translator to use",
+        ),
+    ] = None,
+    retriever_id: Annotated[
+        Optional[str],
+        typer.Option(
+            "--retriever-id",
+            "-r",
+            help="ID of the retriever to use",
+        ),
+    ] = None,
+    selector_id: Annotated[
+        Optional[str],
+        typer.Option(
+            "--selector-id",
+            "-s",
+            help="ID of the selector to use",
+        ),
+    ] = None,
+    reranker_id: Annotated[
+        Optional[str],
+        typer.Option(
+            "--reranker-id",
+            "-rr",
+            help="ID of the reranker to use",
+        ),
+    ] = None,
+    batch_size: Annotated[
+        Optional[int],
+        typer.Option(
+            "--batch-size",
+            "-b",
+            help="Batch size to use when mapping source concepts",
+        ),
+    ] = None,
+    rate_limit: Annotated[
+        Optional[int],
+        typer.Option(
+            "--rate-limit",
+            "-rl",
+            help="Rate limit to use when mapping source concepts",
+        ),
+    ] = None,
+) -> None:
+    if task_config_path is not None:
+        task_config_path = Path(task_config_path)
+        if not task_config_path.exists():
+            console.print(
+                f"[yellow]OOPS![/yellow] You specified a non-existent task config file: `{task_config_path}`. Please, check the path and try again.\n"
+            )
+            raise typer.Exit()
+
+        task_config = TerminologyMappingTask.from_config_file(task_config_path)
+    else:
+        task_config = TerminologyMappingTask(
+            input_file=Path(input_file) if input_file else None,
+            output_dir=Path(output_dir) if output_dir else None,
+            translator_id=translator_id,
+            retriever_id=retriever_id,
+            selector_id=selector_id,
+            reranker_id=reranker_id,
+            batch_size=batch_size,
+            rate_limit=rate_limit,
+        )
+
+    logger.debug(f"Loaded task config: {task_config} {task_config.model_dump()}")
 
 
 @app.command("amap")
