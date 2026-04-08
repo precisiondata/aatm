@@ -125,7 +125,7 @@ def build_local_vector_database(
         raise ValueError("vector_db_dir does not exist")
 
     if vector_db_dir is None:
-        vector_db_dir = Path(model_registry[embedding_model_name]["chromadb_path"])
+        vector_db_dir = Path(model_registry[embedding_model_name].chromadb_path)
 
     # check user preference if vector db already exists
     if vector_db_dir.exists():
@@ -144,7 +144,7 @@ def build_local_vector_database(
             pass
 
     if rate_limit is None:
-        rate_limit = model_registry[embedding_model_name].get("rate_limit", None)
+        rate_limit = model_registry[embedding_model_name].rate_limit
 
     if rate_limit is not None and rate_limit <= 0:
         raise ValueError("rate_limit must be > 0")
@@ -154,14 +154,14 @@ def build_local_vector_database(
 
     console.print("Creating local vector database...")
     client = chromadb.PersistentClient(
-        model_registry[embedding_model_name]["chromadb_path"]
+        model_registry[embedding_model_name].chromadb_path
         if vector_db_dir is None
         else vector_db_dir
     )
     collection = client.get_or_create_collection(
-        model_registry[embedding_model_name]["collection_name"],
-        embedding_function=model_registry[embedding_model_name]["embedding_function"](
-            model=model_registry[embedding_model_name]["model_id"]
+        model_registry[embedding_model_name].collection_name,
+        embedding_function=model_registry[embedding_model_name].embedding_function_cls(
+            model=model_registry[embedding_model_name].model_id
         ),
     )
 
