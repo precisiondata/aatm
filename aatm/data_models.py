@@ -1,10 +1,12 @@
 from datetime import datetime
 import hashlib
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, field_validator
 from enum import Enum
 import pandas as pd
+import yaml
 
 
 def deterministic_id_from_strings(strings: list[str], digest_size: int = 16) -> str:
@@ -253,3 +255,26 @@ class TerminologyMappingTask(BaseModel):
             return value
 
         return Path(value)
+
+    @classmethod
+    def from_json(cls, path: str | Path) -> "TerminologyMappingTask":
+        if isinstance(path, str):
+            path = Path(path)
+        return cls(**json.loads(path.read_text()))
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "TerminologyMappingTask":
+        if isinstance(path, str):
+            path = Path(path)
+        return cls(**yaml.safe_load(path.read_text()))
+
+    @classmethod
+    def from_config_file(cls, path: str | Path) -> "TerminologyMappingTask":
+        if isinstance(path, str):
+            path = Path(path)
+        if path.suffix == ".json":
+            return cls.from_json(path)
+        elif path.suffix == ".yaml":
+            return cls.from_yaml(path)
+        else:
+            raise ValueError(f"Unsupported config file format: '{path.suffix}'")
