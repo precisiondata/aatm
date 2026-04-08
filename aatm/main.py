@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from typing import Annotated, List, Optional
 
 import typer
 from rich.console import Console
@@ -31,6 +32,8 @@ SUPPORTED_EMBEDDING_MODELS = [
     "text-embedding-3-small",
     "text-embedding-3-large",
 ]
+STANDARD_VOCABULARIES = ["LOINC", "SNOMED", "RxNorm"]
+DEFAULT_STANDARD_VOCABULARIES = ["LOINC", "SNOMED", "RxNorm"]
 
 AATM_LOGO = r"""
    █████╗  █████╗ ████████╗███╗   ███╗
@@ -60,13 +63,32 @@ def main(ctx: typer.Context) -> None:
     help="Set up your environment to work with OMOP vocabularies and create terminology mappings."
 )
 def init(
-    vocab_dir: str = typer.Option(
-        None,
-        "--vocab-dir",
-        "-vd",
-        help="Path to the OMOP vocabularies directory.",
-        show_default=False,
-    ),
+    vocab_dir: Annotated[
+        str,
+        typer.Option(
+            "--vocab-dir",
+            "-vd",
+            help="Path to the OMOP vocabularies directory.",
+            show_default=False,
+        ),
+    ] = None,
+    embedding_model: Annotated[
+        Optional[str],
+        typer.Option(
+            "--embedding-model",
+            "-e",
+            help="Name of the embedding model to use.",
+            show_default=False,
+        ),
+    ] = None,
+    standard_vocabs: Annotated[
+        Optional[List[str]],
+        typer.Option(
+            "--standard-vocabs",
+            "-sv",
+            help=f"List of standard vocabularies to use. Available options: {STANDARD_VOCABULARIES}.",
+        ),
+    ] = None,
 ) -> None:
     # Setup local directories
     LOCAL_HELPER_PATH.mkdir(exist_ok=True, parents=True)
@@ -88,6 +110,7 @@ def init(
     print_logo()
     console.print("Let's set up your environment!\n")
 
+    # Validate vocab directory
     if vocab_dir is None:
         vocab_dir: Path = DEFAULT_VOCAB_DIR
     else:
@@ -104,6 +127,22 @@ def init(
         )
         raise typer.Exit()
 
+    # Validate embedding model
+    if embedding_model is not None:
+        if embedding_model not in SUPPORTED_EMBEDDING_MODELS:
+            console.print(
+                f"[yellow]OOPS![/yellow] You specified an unsupported embedding model: `{embedding_model}`. Please, check the model name and try again.\nThe supported embedding models are: {SUPPORTED_EMBEDDING_MODELS}\n"
+            )
+            raise typer.Exit()
+
+    # Validate provided standard vocabs
+    if standard_vocabs is not None:
+        if not set(standard_vocabs).issubset(STANDARD_VOCABULARIES):
+            console.print(
+                f"[yellow]OOPS![/yellow] You specified standard vocabularies that are not available. Available options: {STANDARD_VOCABULARIES}. You provided: {standard_vocabs}\n"
+            )
+            raise typer.Exit()
+
     console.print("[blue]1) Building local OMOP vocabulary database[/blue]")
     console.print(f"Using vocabulary files from: '{vocab_dir}'")
 
@@ -112,26 +151,35 @@ def init(
 
     console.print("[blue]2) Building local vector database[/blue]")
 
-    supported_embedding_models_choices = [
-        Choice(f"{model_name} (default)", value=model_name)
-        if model_name == DEFAULT_EMBEDDING_MODEL
-        else Choice(model_name, value=model_name)
-        for model_name in SUPPORTED_EMBEDDING_MODELS
-    ]
-    selected_embedding_model = questionary.select(
-        "Select one of the supported embedding models for building the vector database:",
-        choices=supported_embedding_models_choices,
-        default=DEFAULT_EMBEDDING_MODEL,
-    ).ask()
+    if embedding_model is None:
+        supported_embedding_models_choices = [
+            Choice(f"{model_name} (default)", value=model_name)
+            if model_name == DEFAULT_EMBEDDING_MODEL
+            else Choice(model_name, value=model_name)
+            for model_name in SUPPORTED_EMBEDDING_MODELS
+        ]
+        selected_embedding_model = questionary.select(
+            "Select one of the supported embedding models for building the vector database:",
+            choices=supported_embedding_models_choices,
+            default=DEFAULT_EMBEDDING_MODEL,
+        ).ask()
+    else:
+        console.print(f"Using embedding model: {embedding_model}")
+        selected_embedding_model = embedding_model
 
-    selected_standard_vocabularies = questionary.checkbox(
-        "Select one or more standard vocabularies to use for mapping:",
-        choices=[
-            Choice("LOINC", value="LOINC", checked=True),
-            Choice("RxNorm", value="RxNorm", checked=True),
-            Choice("SNOMED", value="SNOMED", checked=True),
-        ],
-    ).ask()
+    if standard_vocabs is None:
+        selected_standard_vocabularies = questionary.checkbox(
+            "Select one or more standard vocabularies to use for mapping:",
+            choices=[
+                Choice(
+                    vocab, value=vocab, checked=vocab in DEFAULT_STANDARD_VOCABULARIES
+                )
+                for vocab in STANDARD_VOCABULARIES
+            ],
+        ).ask()
+    else:
+        console.print(f"Using standard vocabularies: {standard_vocabs}")
+        selected_standard_vocabularies = standard_vocabs
 
     build_mapping_datasets(selected_standard_vocabularies)
 
