@@ -9,7 +9,7 @@ import pandas as pd
 from aatm.pipeline import PipelineBaseClass
 from aatm.data_models import MappedSourceConcept, SelectorResults, SourceConcept
 from aatm.rerankers import BaseReranker
-from aatm.translators import BaseTranslator, GeminiTranslator
+from aatm.translators import BaseTranslator, EmptyTranslator, GeminiTranslator
 from aatm.retrievers import BaseRetriever, ChromaDBRetriever
 from aatm.selectors import FirstResultSelector
 from aatm.embedding_functions import GoogleEmbeddingFunction
@@ -39,7 +39,7 @@ class TerminologyMapper:
         **kwargs,
     ):
         if translator is None:
-            translator = GeminiTranslator(model="gemini-2.5-flash")
+            translator = EmptyTranslator()
 
         if retriever is None:
             client = chromadb.PersistentClient()
