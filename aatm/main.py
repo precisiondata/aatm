@@ -207,7 +207,7 @@ def search_ui() -> None:
     )
 
 
-@app.command("map")
+@app.command("map", help="Run a terminology mapping task")
 def map(
     task_config_path: Annotated[
         Optional[List[str]],
@@ -317,6 +317,6 @@ def map(
     console.print("[green]Done![/green]\n")
 
 
-@app.command("amap")
+@app.command("amap", help="Run a terminology mapping task with asynchronous methods")
 def amap() -> None:
     raise NotImplementedError
