@@ -210,7 +210,7 @@ def search_ui() -> None:
 @app.command("map")
 def map(
     task_config_path: Annotated[
-        Optional[str],
+        Optional[List[str]],
         typer.Option(
             "--task-config-path",
             "-t",
@@ -319,4 +319,4 @@ def map(
 
 @app.command("amap")
 def amap() -> None:
-    pass
+    raise NotImplementedError
