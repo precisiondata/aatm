@@ -2,6 +2,8 @@ from pathlib import Path
 from selectors import BaseSelector
 import time
 from typing import List, Optional, Tuple
+from rich.console import Console
+from rich.progress import track
 from tqdm import tqdm
 import chromadb
 import pandas as pd
@@ -22,6 +24,9 @@ from aatm.translators import BaseTranslator, EmptyTranslator
 from aatm.retrievers import BaseRetriever, ChromaDBRetriever
 from aatm.selectors import FirstResultSelector
 from aatm.embedding_functions import GoogleEmbeddingFunction
+
+
+console = Console()
 
 
 def rate_limit(n_docs: int, next_allowed_time: float, rate_limit: int) -> None:
@@ -152,9 +157,9 @@ class TerminologyMapper:
         mapped_source_concepts: List[MappedSourceConcept] = []
         confidence_scores = []
         next_allowed_time = time.monotonic()
-        for batch_idx in tqdm(
+        for batch_idx in track(
             range(0, len(source_concepts), self.batch_size),
-            desc=f"Mapping source concepts (batch_size = {self.batch_size})",
+            description=f"Mapping source concepts (batch_size = {self.batch_size})",
         ):
             batch = source_concepts[batch_idx : batch_idx + self.batch_size]
 
@@ -275,10 +280,10 @@ class TerminologyMapper:
         df = pd.read_csv(file_path, on_bad_lines="skip")
 
         if df["source_code_description"].isnull().any():
-            print(
-                f"There are {df['source_code_description'].isnull().sum()} null values in the source_code_description column. Those rows will be dropped."
+            console.print(
+                f"[yellow]Attention:[/yellow] There are {df['source_code_description'].isnull().sum()} null values in the source_code_description column. Those rows will be dropped."
             )
-            print(
+            console.print(
                 f"Dropped rows: {df[df['source_code_description'].isnull()].index.to_list()}"
             )
             df = df.dropna(subset=["source_code_description"])
@@ -289,7 +294,7 @@ class TerminologyMapper:
         # Check if all expected columns are present
         if not self.expected_columns.issubset(set(df.columns)):
             raise ValueError(
-                f"Expected columns: {self.expected_columns}. Got columns: {set(df.columns)}"
+                f"This function expects a SOURCE_TO_CONCEPT_MAP table as defined by the official OMOP Common Data Model. It must include the following columns: {self.expected_columns}. Got columns: {set(df.columns)}"
             )
 
         df = df.astype(str).fillna("")
