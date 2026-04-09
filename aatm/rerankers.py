@@ -167,15 +167,3 @@ class Qwen3Reranker(BaseReranker):
             list_of_results.sort(key=lambda x: x.rerank_score, reverse=True)
 
         return retriever_results
-
-
-RERANKER_REGISTRY = {
-    "BM25": BM25Reranker,
-    Qwen3RerankerModels.QWEN3_06B.value: Qwen3Reranker,
-    Qwen3RerankerModels.QWEN3_4B.value: Qwen3Reranker,
-    Qwen3RerankerModels.QWEN3_8B.value: Qwen3Reranker,
-}
-
-
-def load_reranker(reranker_name, **kwargs):
-    return RERANKER_REGISTRY[reranker_name](reranker_name, **kwargs)
