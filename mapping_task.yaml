@@ -1,0 +1,7 @@
+translator_id: gemini-2.5-flash
+retriever_id: embeddinggemma-300M
+selector_id: first-result-selector
+batch_size: 10
+rate_limit: 1000
+output_dir: ./output
+input_file: ./vocabularies/SOURCE_TO_CONCEPT_MAP.csv

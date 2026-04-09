@@ -1,10 +1,12 @@
 from datetime import datetime
 import hashlib
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, field_validator
 from enum import Enum
 import pandas as pd
+import yaml
 
 
 def deterministic_id_from_strings(strings: list[str], digest_size: int = 16) -> str:
@@ -235,3 +237,54 @@ class SelectorResults(BaseModel):
 
 class SelectedResult(BaseModel):
     expression_id: Optional[str] = None
+
+
+class TerminologyMappingTask(BaseModel):
+    input_file: Path
+    output_dir: Optional[Path] = None
+    translator_id: Optional[str] = None
+    retriever_id: Optional[str] = None
+    selector_id: Optional[str] = None
+    reranker_id: Optional[str] = None
+    batch_size: Optional[int] = None
+    rate_limit: Optional[int] = None
+
+    @field_validator("input_file", "output_dir", mode="before")
+    def validate_paths(cls, value: Any) -> Path:
+        if isinstance(value, Path):
+            return value
+
+        return Path(value)
+
+    @classmethod
+    def from_json(cls, path: str | Path) -> "TerminologyMappingTask":
+        if isinstance(path, str):
+            path = Path(path)
+        return cls(**json.loads(path.read_text()))
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "TerminologyMappingTask":
+        if isinstance(path, str):
+            path = Path(path)
+        return cls(**yaml.safe_load(path.read_text()))
+
+    @classmethod
+    def from_config_file(cls, path: str | Path) -> "TerminologyMappingTask":
+        if isinstance(path, str):
+            path = Path(path)
+        if path.suffix == ".json":
+            return cls.from_json(path)
+        elif path.suffix == ".yaml":
+            return cls.from_yaml(path)
+        else:
+            raise ValueError(f"Unsupported config file format: '{path.suffix}'")
+
+    def save_to_disk(self, path: str | Path) -> None:
+        if isinstance(path, str):
+            path = Path(path)
+        if path.suffix == ".json":
+            path.write_text(json.dumps(self.model_dump()))
+        elif path.suffix == ".yaml":
+            path.write_text(yaml.safe_dump(self.model_dump()))
+        else:
+            raise ValueError(f"Unsupported config file format: '{path.suffix}'")

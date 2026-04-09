@@ -2,17 +2,31 @@ from pathlib import Path
 from selectors import BaseSelector
 import time
 from typing import List, Optional, Tuple
+from rich.console import Console
+from rich.progress import track
 from tqdm import tqdm
 import chromadb
 import pandas as pd
 
 from aatm.pipeline import PipelineBaseClass
-from aatm.data_models import MappedSourceConcept, SelectorResults, SourceConcept
+from aatm.data_models import (
+    MappedSourceConcept,
+    SelectorResults,
+    SourceConcept,
+    TerminologyMappingTask,
+)
+from aatm.registries.rerankers import load_reranker
+from aatm.registries.retrievers import load_retriever
+from aatm.registries.selectors import load_selector
+from aatm.registries.translators import load_translator
 from aatm.rerankers import BaseReranker
-from aatm.translators import BaseTranslator, EmptyTranslator, GeminiTranslator
+from aatm.translators import BaseTranslator, EmptyTranslator
 from aatm.retrievers import BaseRetriever, ChromaDBRetriever
 from aatm.selectors import FirstResultSelector
 from aatm.embedding_functions import GoogleEmbeddingFunction
+
+
+console = Console()
 
 
 def rate_limit(n_docs: int, next_allowed_time: float, rate_limit: int) -> None:
@@ -28,6 +42,7 @@ def rate_limit(n_docs: int, next_allowed_time: float, rate_limit: int) -> None:
 class TerminologyMapper:
     def __init__(
         self,
+        input_file: Optional[str | Path] = None,
         output_dir: str | Path = Path("output"),
         translator: Optional[BaseTranslator] = None,
         retriever: Optional[BaseRetriever] = None,
@@ -60,6 +75,7 @@ class TerminologyMapper:
         if isinstance(output_dir, str):
             output_dir = Path(output_dir)
 
+        self.input_file: Optional[Path] = Path(input_file) if input_file else None
         self.output_dir: Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.translator: BaseTranslator = translator
@@ -80,6 +96,41 @@ class TerminologyMapper:
             ]
         )
 
+    @classmethod
+    def from_task_config(
+        cls, task_config: TerminologyMappingTask
+    ) -> "TerminologyMapper":
+        translator = (
+            load_translator(task_config.translator_id)
+            if task_config.translator_id
+            else None
+        )
+
+        retriever = (
+            load_retriever(task_config.retriever_id)
+            if task_config.retriever_id
+            else None
+        )
+
+        selector = (
+            load_selector(task_config.selector_id) if task_config.selector_id else None
+        )
+
+        reranker = (
+            load_reranker(task_config.reranker_id) if task_config.reranker_id else None
+        )
+
+        return cls(
+            translator=translator,
+            retriever=retriever,
+            selector=selector,
+            reranker=reranker,
+            batch_size=task_config.batch_size,
+            rate_limit=task_config.rate_limit,
+            input_file=task_config.input_file,
+            output_dir=task_config.output_dir,
+        )
+
     def map(
         self,
         file_path: str | Path = None,
@@ -87,6 +138,9 @@ class TerminologyMapper:
         return_confidence_scores: bool = True,
         output_dir: str | Path = None,
     ) -> Tuple[pd.DataFrame, List[float]] | pd.DataFrame:
+        if file_path is None:
+            file_path = self.input_file
+
         if file_path is not None:
             if isinstance(file_path, str):
                 file_path = Path(file_path)
@@ -103,9 +157,9 @@ class TerminologyMapper:
         mapped_source_concepts: List[MappedSourceConcept] = []
         confidence_scores = []
         next_allowed_time = time.monotonic()
-        for batch_idx in tqdm(
+        for batch_idx in track(
             range(0, len(source_concepts), self.batch_size),
-            desc=f"Mapping source concepts (batch_size = {self.batch_size})",
+            description=f"Mapping source concepts (batch_size = {self.batch_size})",
         ):
             batch = source_concepts[batch_idx : batch_idx + self.batch_size]
 
@@ -226,10 +280,10 @@ class TerminologyMapper:
         df = pd.read_csv(file_path, on_bad_lines="skip")
 
         if df["source_code_description"].isnull().any():
-            print(
-                f"There are {df['source_code_description'].isnull().sum()} null values in the source_code_description column. Those rows will be dropped."
+            console.print(
+                f"[yellow]Attention:[/yellow] There are {df['source_code_description'].isnull().sum()} null values in the source_code_description column. Those rows will be dropped."
             )
-            print(
+            console.print(
                 f"Dropped rows: {df[df['source_code_description'].isnull()].index.to_list()}"
             )
             df = df.dropna(subset=["source_code_description"])
@@ -240,7 +294,7 @@ class TerminologyMapper:
         # Check if all expected columns are present
         if not self.expected_columns.issubset(set(df.columns)):
             raise ValueError(
-                f"Expected columns: {self.expected_columns}. Got columns: {set(df.columns)}"
+                f"This function expects a SOURCE_TO_CONCEPT_MAP table as defined by the official OMOP Common Data Model. It must include the following columns: {self.expected_columns}. Got columns: {set(df.columns)}"
             )
 
         df = df.astype(str).fillna("")
