@@ -90,11 +90,11 @@ def load_retriever(model_name: str) -> "ChromaDBRetriever":
     """Instantiate a ChromaDBRetriever from a registered model name."""
     try:
         spec = CHROMADB_RETRIEVER_MODEL_REGISTRY[model_name]
-    except KeyError as exc:
+    except KeyError as e:
         available = ", ".join(sorted(CHROMADB_RETRIEVER_MODEL_REGISTRY))
         raise ValueError(
             f"Unknown retriever model '{model_name}'. Available models: {available}"
-        ) from exc
+        ) from e
 
     client = chromadb.PersistentClient(spec.chromadb_path)
 
