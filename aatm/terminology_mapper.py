@@ -13,6 +13,7 @@ from aatm.data_models import (
     SourceConcept,
     TerminologyMappingTask,
 )
+from aatm.registries.rerankers import load_reranker
 from aatm.registries.retrievers import load_retriever
 from aatm.registries.selectors import load_selector
 from aatm.registries.translators import load_translator
@@ -36,6 +37,7 @@ def rate_limit(n_docs: int, next_allowed_time: float, rate_limit: int) -> None:
 class TerminologyMapper:
     def __init__(
         self,
+        input_file: Optional[str | Path] = None,
         output_dir: str | Path = Path("output"),
         translator: Optional[BaseTranslator] = None,
         retriever: Optional[BaseRetriever] = None,
@@ -68,6 +70,7 @@ class TerminologyMapper:
         if isinstance(output_dir, str):
             output_dir = Path(output_dir)
 
+        self.input_file: Optional[Path] = Path(input_file) if input_file else None
         self.output_dir: Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.translator: BaseTranslator = translator
@@ -119,6 +122,8 @@ class TerminologyMapper:
             reranker=reranker,
             batch_size=task_config.batch_size,
             rate_limit=task_config.rate_limit,
+            input_file=task_config.input_file,
+            output_dir=task_config.output_dir,
         )
 
     def map(
@@ -128,6 +133,9 @@ class TerminologyMapper:
         return_confidence_scores: bool = True,
         output_dir: str | Path = None,
     ) -> Tuple[pd.DataFrame, List[float]] | pd.DataFrame:
+        if file_path is None:
+            file_path = self.input_file
+
         if file_path is not None:
             if isinstance(file_path, str):
                 file_path = Path(file_path)
