@@ -278,3 +278,13 @@ class TerminologyMappingTask(BaseModel):
             return cls.from_yaml(path)
         else:
             raise ValueError(f"Unsupported config file format: '{path.suffix}'")
+
+    def save_to_disk(self, path: str | Path) -> None:
+        if isinstance(path, str):
+            path = Path(path)
+        if path.suffix == ".json":
+            path.write_text(json.dumps(self.model_dump()))
+        elif path.suffix == ".yaml":
+            path.write_text(yaml.safe_dump(self.model_dump()))
+        else:
+            raise ValueError(f"Unsupported config file format: '{path.suffix}'")
