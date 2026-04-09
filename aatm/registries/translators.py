@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import Any
 import copy
 
-from .translators import EmptyTranslator, GeminiTranslator
-from .translators import BaseTranslator
+from aatm.translators import EmptyTranslator, GeminiTranslator
+from aatm.translators import BaseTranslator
 
 
 @dataclass(slots=True, frozen=True)
@@ -16,7 +16,9 @@ class TranslatorRegistryEntry:
 
 
 TRANSLATORS_SPECS = [
-    TranslatorRegistryEntry(name="empty-translator", translator_class=EmptyTranslator),
+    TranslatorRegistryEntry(
+        name="empty-translator", translator_class=EmptyTranslator, kwargs={}
+    ),
     TranslatorRegistryEntry(
         name="gemini-2.5-flash",
         translator_class=GeminiTranslator,
