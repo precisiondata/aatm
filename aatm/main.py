@@ -2,6 +2,7 @@ import logging
 import subprocess
 import sys
 from typing import Annotated, List, Optional
+from rich.json import JSON
 
 import typer
 from rich.console import Console
@@ -21,7 +22,7 @@ from .local_database_utils import (
 )
 
 dotenv.load_dotenv()  # Load environment variables
-logger = get_logger(__name__, level=logging.DEBUG)
+logger = get_logger(__name__, level=logging.INFO)
 
 app = typer.Typer()
 console = Console()
@@ -302,10 +303,18 @@ def map(
             rate_limit=rate_limit,
         )
 
+    print_logo()
+
     logger.debug(f"Loaded task config: {task_config} {task_config.model_dump()}")
 
+    console.print("[blue]Loaded mapping task config:[/blue]")
+    console.print(JSON(task_config.model_dump_json()), "\n")
+
+    console.print("[blue]Started mapping...[/blue]")
     terminology_mapper = TerminologyMapper.from_task_config(task_config)
     terminology_mapper.map()
+
+    console.print("[green]Done![/green]\n")
 
 
 @app.command("amap")
