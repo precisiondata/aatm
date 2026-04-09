@@ -10,6 +10,8 @@ import questionary
 from questionary import Choice
 import dotenv
 
+from aatm.terminology_mapper import TerminologyMapper
+
 from .data_models import TerminologyMappingTask
 from .logs import get_logger
 from .local_database_utils import (
@@ -301,6 +303,9 @@ def map(
         )
 
     logger.debug(f"Loaded task config: {task_config} {task_config.model_dump()}")
+
+    terminology_mapper = TerminologyMapper.from_task_config(task_config)
+    terminology_mapper.map()
 
 
 @app.command("amap")
