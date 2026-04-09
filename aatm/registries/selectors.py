@@ -97,12 +97,19 @@ SELECTORS_REGISTRY: dict[str, SelectorRegistryEntry] = {
 
 def load_selector(name: str, **kwargs) -> BaseSelector:
     try:
-        selector_kwargs: dict = copy.deepcopy(SELECTORS_REGISTRY[name].kwargs)
-        selector_kwargs.update(kwargs)  # override with user provided kwargs
-        return SELECTORS_REGISTRY[name].selector_class(**selector_kwargs)
-    except KeyError:
-        raise KeyError(
-            f"Selector '{name}' not found. Available selectors: {list(SELECTORS_REGISTRY.keys())}"
-        )
-    except Exception as e:
-        raise e(f"Unexpected error while loading selector '{name}': {e}")
+        spec = SELECTORS_REGISTRY[name]
+    except KeyError as e:
+        available = ", ".join(sorted(SELECTORS_REGISTRY))
+        raise ValueError(
+            f"Selector '{name}' not found. Available selectors: {available}"
+        ) from e
+
+    selector_kwargs = copy.deepcopy(spec.kwargs)
+    selector_kwargs.update(kwargs)
+
+    try:
+        return spec.selector_class(**selector_kwargs)
+    except TypeError as e:
+        raise TypeError(
+            f"Invalid arguments while instantiating selector '{name}': {e}"
+        ) from e
