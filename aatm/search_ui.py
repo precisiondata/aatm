@@ -3,10 +3,9 @@ import chromadb
 import dotenv
 
 from aatm.data_models import RetrievedExpressionMetadata
+from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY, load_retriever
 from aatm.retrievers import (
-    CHROMADB_RETRIEVER_MODEL_REGISTRY,
     ChromaDBRetriever,
-    load_chromadb_retriever,
 )
 
 dotenv.load_dotenv()
@@ -18,7 +17,7 @@ client = chromadb.PersistentClient()
 def cached_load_retriever(
     retriever_name: str = "embeddinggemma-300M",
 ) -> "ChromaDBRetriever":
-    retriever = load_chromadb_retriever(retriever_name)
+    retriever = load_retriever(retriever_name)
     return retriever
 
 

@@ -210,7 +210,7 @@ def search_ui() -> None:
 @app.command("map", help="Run a terminology mapping task")
 def map(
     task_config_path: Annotated[
-        Optional[List[str]],
+        Optional[str],
         typer.Option(
             "--task-config-path",
             "-t",

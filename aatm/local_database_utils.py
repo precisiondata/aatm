@@ -118,7 +118,9 @@ def build_local_vector_database(
     """
     # lazy loading for performance
     import chromadb
-    from .retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry
+    from aatm.registries.retrievers import (
+        CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry,
+    )
 
     # check if vector database directory provided exists
     if vector_db_dir is not None and not vector_db_dir.exists():
