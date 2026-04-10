@@ -50,6 +50,7 @@ class TerminologyMapper:
         reranker: Optional[BaseReranker] = None,
         batch_size: int = 100,
         rate_limit: Optional[int] = None,
+        column_mapping: Optional[dict] = None,
         *args,
         **kwargs,
     ):
@@ -90,11 +91,9 @@ class TerminologyMapper:
                 "source_concept_id",
                 "source_vocabulary_id",
                 "source_code_description",
-                "valid_start_date",
-                "valid_end_date",
-                "invalid_reason",
             ]
         )
+        self.column_mapping = column_mapping
 
     @classmethod
     def from_task_config(
@@ -129,6 +128,7 @@ class TerminologyMapper:
             rate_limit=task_config.rate_limit,
             input_file=task_config.input_file,
             output_dir=task_config.output_dir,
+            column_mapping=task_config.column_mapping,
         )
 
     def map(
@@ -276,9 +276,25 @@ class TerminologyMapper:
 
         return mapped_source_concepts_df
 
-    def map_csv_to_source_concepts(self, file_path: Path, limit_to: int = None) -> str:
+    def map_csv_to_source_concepts(
+        self, file_path: Path, limit_to: int = None
+    ) -> List[SourceConcept]:
         df = pd.read_csv(file_path, on_bad_lines="skip")
 
+        if limit_to is not None:
+            df = df.iloc[:limit_to]
+
+        # Rename columns
+        if self.column_mapping is not None:
+            df = df.rename(columns=self.column_mapping)
+
+        # Check if all expected columns are present
+        if not self.expected_columns.issubset(set(df.columns)):
+            raise ValueError(
+                f"This function expects a SOURCE_TO_CONCEPT_MAP table as defined by the official OMOP Common Data Model. It must include the following columns: {self.expected_columns}. Please, either edit the column names or provide the column_mapping argument containing the mapping between the current column names and the expected column names. Got columns: {set(df.columns)}"
+            )
+
+        # Check for null values
         if df["source_code_description"].isnull().any():
             console.print(
                 f"[yellow]Attention:[/yellow] There are {df['source_code_description'].isnull().sum()} null values in the source_code_description column. Those rows will be dropped."
@@ -287,15 +303,6 @@ class TerminologyMapper:
                 f"Dropped rows: {df[df['source_code_description'].isnull()].index.to_list()}"
             )
             df = df.dropna(subset=["source_code_description"])
-
-        if limit_to is not None:
-            df = df.iloc[:limit_to]
-
-        # Check if all expected columns are present
-        if not self.expected_columns.issubset(set(df.columns)):
-            raise ValueError(
-                f"This function expects a SOURCE_TO_CONCEPT_MAP table as defined by the official OMOP Common Data Model. It must include the following columns: {self.expected_columns}. Got columns: {set(df.columns)}"
-            )
 
         df = df.astype(str).fillna("")
         # Convert to SourceConcept objects
