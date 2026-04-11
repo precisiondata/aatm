@@ -1,15 +1,51 @@
 site_name: Any-to-Any Terminology Mapping
-site_url: https://example.com/docs/
+site_url: 
 repo_url: https://github.com/precisiondata/aatm
 site_description: Any-to-Any Terminology Mapping, a tool for mapping between different terminologies in the healthcare domain.
 site_author: Vinicius Anjos de Almeida (https://github.com/almeidava93) supported by Precision Data.
 
 nav:
-  - Welcome: 'index.md'
+  - Home: 'index.md'
+  - Getting Started: 
+    - 'getting-started/index.md'
+  - API Reference:
+    - 'reference/index.md'
+    - Command Line Interface: 'reference/cli.md'
+    - Data Models: 'reference/data_models.md'
+    - Debug: 'reference/debug.md'
+    - Embedding functions: 'reference/embedding_functions.md'
+    - Local database utilities: 'reference/local_database_utils.md'
+    - Logs: 'reference/logs.md'
+    - Pipeline: 'reference/pipeline.md'
+    - Prompt helpers: 'reference/prompt_helpers.md'
+    - Rerankers: 'reference/rerankers.md'
+    - Retrievers: 'reference/retrievers.md'
+    - Search engine interface: 'reference/search_ui.md'
+    - Selectors: 'reference/selectors.md'
+    - Terminology mapper: 'reference/terminology_mapper.md'
+    - Translators: 'reference/translators.md'
+    - Registries:
+      - 'reference/registries/index.md'
+      - Rerankers registry: 'reference/registries/rerankers.md'
+      - Retrievers registry: 'reference/registries/retrievers.md'
+      - Selectors registry: 'reference/registries/selectors.md'
+      - Translators registry: 'reference/registries/translators.md'
+
 
 theme:
   name: material
   locale: en
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes 
+    - toc.follow
+    - content.code.copy
+    - content.code.select
+    - content.code.annotate
 
 extra:
   version: 0.1.0
@@ -19,3 +55,15 @@ plugins:
       handlers:
         python:
           paths: [aatm]
+          options:
+            docstring_style: google
+            show_source: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
