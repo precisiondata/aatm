@@ -249,6 +249,7 @@ class TerminologyMappingTask(BaseModel):
     batch_size: Optional[int] = None
     rate_limit: Optional[int] = None
     column_mapping: Optional[dict] = None
+    limit_to: Optional[int] = None
 
     @field_validator("input_file", "output_dir", mode="before")
     def validate_paths(cls, value: Any) -> Path:
