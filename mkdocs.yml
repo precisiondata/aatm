@@ -8,8 +8,14 @@ nav:
   - Welcome: 'index.md'
 
 theme:
-  name: readthedocs
+  name: material
   locale: en
 
 extra:
   version: 0.1.0
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [aatm]
