@@ -1,0 +1,15 @@
+site_name: Any-to-Any Terminology Mapping
+site_url: https://example.com/docs/
+repo_url: https://github.com/precisiondata/aatm
+site_description: Any-to-Any Terminology Mapping, a tool for mapping between different terminologies in the healthcare domain.
+site_author: Vinicius Anjos de Almeida (https://github.com/almeidava93) supported by Precision Data.
+
+nav:
+  - Welcome: 'index.md'
+
+theme:
+  name: readthedocs
+  locale: en
+
+extra:
+  version: 0.1.0
