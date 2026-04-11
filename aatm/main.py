@@ -210,7 +210,7 @@ def search_ui() -> None:
 @app.command("map", help="Run a terminology mapping task")
 def map(
     task_config_path: Annotated[
-        Optional[List[str]],
+        Optional[str],
         typer.Option(
             "--task-config-path",
             "-t",
@@ -281,6 +281,14 @@ def map(
             help="Rate limit to use when mapping source concepts",
         ),
     ] = None,
+    limit_to: Annotated[
+        Optional[int],
+        typer.Option(
+            "--limit-to",
+            "-l",
+            help="Limit the number of source concepts to map. Useful for testing and debugging.",
+        ),
+    ] = None,
 ) -> None:
     if task_config_path is not None:
         task_config_path = Path(task_config_path)
@@ -301,6 +309,7 @@ def map(
             reranker_id=reranker_id,
             batch_size=batch_size,
             rate_limit=rate_limit,
+            limit_to=limit_to,
         )
 
     print_logo()

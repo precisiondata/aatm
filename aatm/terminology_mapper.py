@@ -14,6 +14,7 @@ from aatm.data_models import (
     SelectorResults,
     SourceConcept,
     TerminologyMappingTask,
+    Translation,
 )
 from aatm.registries.rerankers import load_reranker
 from aatm.registries.retrievers import load_retriever
@@ -50,6 +51,8 @@ class TerminologyMapper:
         reranker: Optional[BaseReranker] = None,
         batch_size: int = 100,
         rate_limit: Optional[int] = None,
+        column_mapping: Optional[dict] = None,
+        limit_to: Optional[int] = None,
         *args,
         **kwargs,
     ):
@@ -95,6 +98,8 @@ class TerminologyMapper:
                 "invalid_reason",
             ]
         )
+        self.column_mapping = column_mapping
+        self.limit_to = limit_to
 
     @classmethod
     def from_task_config(
@@ -129,6 +134,8 @@ class TerminologyMapper:
             rate_limit=task_config.rate_limit,
             input_file=task_config.input_file,
             output_dir=task_config.output_dir,
+            column_mapping=task_config.column_mapping,
+            limit_to=task_config.limit_to,
         )
 
     def map(
@@ -140,6 +147,9 @@ class TerminologyMapper:
     ) -> Tuple[pd.DataFrame, List[float]] | pd.DataFrame:
         if file_path is None:
             file_path = self.input_file
+
+        if limit_to is None:
+            limit_to = self.limit_to
 
         if file_path is not None:
             if isinstance(file_path, str):
@@ -155,7 +165,8 @@ class TerminologyMapper:
 
         # map source concepts
         mapped_source_concepts: List[MappedSourceConcept] = []
-        confidence_scores = []
+        translated_source_concepts: List[Translation] = []
+        confidence_scores: List[float] = []
         next_allowed_time = time.monotonic()
         for batch_idx in track(
             range(0, len(source_concepts), self.batch_size),
@@ -169,9 +180,11 @@ class TerminologyMapper:
                     len(batch), next_allowed_time, self.rate_limit
                 )
 
+            translated_batch = batch | self.translator
             selected_source_concepts: SelectorResults = (
-                batch | self.translator | self.retriever | self.reranker | self.selector
+                translated_batch | self.retriever | self.reranker | self.selector
             )
+            translated_source_concepts.extend(translated_batch)
             mapped_source_concepts.extend(
                 MappedSourceConcept.from_selector_results(
                     batch, selected_source_concepts
@@ -194,6 +207,13 @@ class TerminologyMapper:
 
         if return_confidence_scores:
             mapped_source_concepts_df["confidence_score"] = confidence_scores
+
+        mapped_source_concepts_df["source_code_description_original"] = (
+            mapped_source_concepts_df["source_code_description"]
+        )
+        mapped_source_concepts_df["source_code_description"] = [
+            t.text for t in translated_source_concepts
+        ]
 
         output_dir = output_dir if output_dir is not None else self.output_dir
 
@@ -276,9 +296,25 @@ class TerminologyMapper:
 
         return mapped_source_concepts_df
 
-    def map_csv_to_source_concepts(self, file_path: Path, limit_to: int = None) -> str:
+    def map_csv_to_source_concepts(
+        self, file_path: Path, limit_to: int = None
+    ) -> List[SourceConcept]:
         df = pd.read_csv(file_path, on_bad_lines="skip")
 
+        if limit_to is not None:
+            df = df.iloc[:limit_to]
+
+        # Rename columns
+        if self.column_mapping is not None:
+            df = df.rename(columns=self.column_mapping)
+
+        # Check if all expected columns are present
+        if not self.expected_columns.issubset(set(df.columns)):
+            raise ValueError(
+                f"This function expects a SOURCE_TO_CONCEPT_MAP table as defined by the official OMOP Common Data Model. It must include the following columns: {self.expected_columns}. Please, either edit the column names or provide the column_mapping argument containing the mapping between the current column names and the expected column names. Got columns: {set(df.columns)}"
+            )
+
+        # Check for null values
         if df["source_code_description"].isnull().any():
             console.print(
                 f"[yellow]Attention:[/yellow] There are {df['source_code_description'].isnull().sum()} null values in the source_code_description column. Those rows will be dropped."
@@ -287,15 +323,6 @@ class TerminologyMapper:
                 f"Dropped rows: {df[df['source_code_description'].isnull()].index.to_list()}"
             )
             df = df.dropna(subset=["source_code_description"])
-
-        if limit_to is not None:
-            df = df.iloc[:limit_to]
-
-        # Check if all expected columns are present
-        if not self.expected_columns.issubset(set(df.columns)):
-            raise ValueError(
-                f"This function expects a SOURCE_TO_CONCEPT_MAP table as defined by the official OMOP Common Data Model. It must include the following columns: {self.expected_columns}. Got columns: {set(df.columns)}"
-            )
 
         df = df.astype(str).fillna("")
         # Convert to SourceConcept objects
