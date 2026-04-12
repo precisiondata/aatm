@@ -61,6 +61,7 @@ extra:
   version: 0.1.0
 
 plugins:
+  - glightbox
   - mkdocstrings:
       handlers:
         python:
@@ -83,3 +84,4 @@ markdown_extensions:
       slugify: !!python/object/apply:pymdownx.slugs.slugify
         kwds:
           case: lower
+  - pymdownx.blocks.caption

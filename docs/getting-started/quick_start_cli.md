@@ -2,7 +2,7 @@
 
 This page shows how to use **AATM entirely from the command line**.
 
-It is focused on the actual CLI workflow exposed by the package: `init`, `map`, and `search-ui`.
+It is focused on the actual CLI workflow exposed by the commads: `init`, `map`, and `search-ui`.
 
 ---
 
@@ -10,7 +10,7 @@ It is focused on the actual CLI workflow exposed by the package: `init`, `map`, 
 
 With the CLI, you can:
 
-- initialize the local AATM environment
+- initialize the local environment
 - build the local SQLite vocabulary database
 - build the mapping datasets
 - build the local vector database
@@ -23,68 +23,29 @@ The main commands are:
 - `aatm map`
 - `aatm search-ui`
 
-These commands are defined directly in the CLI entrypoint. fileciteturn4file0
-
 ---
 
-## 1. Install AATM
+## 1. Prepare your OMOP vocabularies directory
 
-Install the package in your environment:
+Before running `aatm init`, download the OMOP vocabularies you want to use and place them in a directory. You can find them at https://athena.ohdsi.org/vocabulary/list
 
-```bash
-pip install aatm
-```
-
-For local development:
-
-```bash
-pip install -e .
-```
-
-Or with `uv`:
-
-```bash
-uv sync
-```
-
----
-
-## 2. Set your environment variables
-
-Some CLI workflows use external APIs. Create a `.env` file in your project root when needed.
-
-Example:
-
-```env
-GOOGLE_API_KEY=your_google_api_key
-OPENAI_API_KEY=your_openai_api_key
-```
-
-AATM loads environment variables automatically when the CLI starts. fileciteturn4file0
-
----
-
-## 3. Prepare your OMOP vocabularies directory
-
-Before running `aatm init`, download the OMOP vocabularies you want to use and place them in a directory.
-
-By default, the CLI expects:
+By default, the CLI expects it at the root directory:
 
 ```text
 ./vocabularies
 ```
 
-If you do not use that location, you can point the CLI to a different directory with `--vocab-dir`. The CLI validates this path during initialization. fileciteturn4file0
+If you do not use that location, you can point the CLI to a different directory with the option `--vocab-dir` or `-vd`. The CLI validates this path during initialization.
 
 ---
 
-## 4. Initialize everything from the CLI
+## 2. Run the initialization command
 
 The `init` command is the main CLI setup workflow.
 
 It does all of the following for you:
 
-- creates the local `.aatm` helper directory
+- creates the local `.aatm` helper directory where the local databases and aatm config files will be stored
 - ensures `.aatm` is added to `.gitignore`
 - builds the local OMOP SQLite database
 - lets you choose an embedding model
@@ -92,7 +53,7 @@ It does all of the following for you:
 - builds the mapping datasets
 - builds the local vector database
 
-That means you do **not** need to call Python setup functions manually for the normal setup flow. fileciteturn4file0
+That means you do **not** need to call Python setup functions manually for the normal setup flow. At the end, you will be ready to run terminology mapping tasks.
 
 ### Simplest setup
 
@@ -100,7 +61,7 @@ That means you do **not** need to call Python setup functions manually for the n
 aatm init
 ```
 
-This uses the default vocab directory and interactively asks you to choose the embedding model and standard vocabularies. fileciteturn4file0
+This uses the default vocab directory and interactively asks you to choose the embedding model, standard vocabularies and other options.
 
 ### Setup with a custom vocab directory
 
@@ -131,32 +92,7 @@ aatm init \
   --standard-vocabs RxNorm
 ```
 
-### Supported embedding models
-
-The CLI supports these embedding models during initialization:
-
-- `qwen3-06B`
-- `qwen3-4B`
-- `gemini-embedding-001`
-- `embeddinggemma-300M`
-- `text-embedding-3-small`
-- `text-embedding-3-large`
-
-These are the supported embedding model names hardcoded in the CLI. fileciteturn4file0
-
-### Supported standard vocabularies
-
-The CLI setup flow supports these standard vocabularies:
-
-- `LOINC`
-- `SNOMED`
-- `RxNorm`
-
-These are also defined in the CLI entrypoint. fileciteturn4file0
-
----
-
-## 5. Prepare your input CSV
+## 3. Prepare your input CSV
 
 After initialization, prepare the CSV you want to map.
 
@@ -180,14 +116,14 @@ B02,,LOCAL,"Diabetes mellitus tipo 2",2020-01-01,2099-12-31,
 
 ---
 
-## 6. Run mapping directly from the CLI
+## 4. Run mapping directly from the CLI
 
 The `map` command runs a terminology mapping task. You can use it in two ways:
 
 - with a task config file
 - with explicit CLI options
 
-Both paths are supported directly by the CLI implementation. fileciteturn4file0
+Both paths are supported directly by the CLI implementation.
 
 ### Option A: run from explicit CLI arguments
 
@@ -204,28 +140,7 @@ aatm map \
   --batch-size 100
 ```
 
-### Recommended first mapping run
-
-A good first run is:
-
-- `empty-translator`
-- `embeddinggemma-300M`
-- `bm25-reranker`
-- `first-result-selector`
-
-Example:
-
-```bash
-aatm map \
-  --input-file data/source_to_concept_map.csv \
-  --output-dir output \
-  --translator-id empty-translator \
-  --retriever-id embeddinggemma-300M \
-  --reranker-id bm25-reranker \
-  --selector-id first-result-selector
-```
-
-### Run a small test job
+#### Run a small test job
 
 Use `--limit-to` when you want to test with only a few rows.
 
@@ -240,7 +155,7 @@ aatm map \
   --limit-to 20
 ```
 
-### Apply rate limiting
+#### Apply rate limiting
 
 If needed, you can also pass a rate limit:
 
@@ -256,41 +171,61 @@ aatm map \
   --rate-limit 100
 ```
 
-The CLI accepts all of these options directly. fileciteturn4file0
+The CLI accepts all of these options directly.
 
 ---
 
-## 7. Run mapping from a config file
+### Option B. Run mapping from a config file
 
-The other CLI workflow is to store the mapping task in a config file and pass it with `--task-config-path`.
+The other CLI workflow is to store the mapping task in a config file and pass it with `--task-config-path` or `-t`.
 
-### Example command
+#### Example command
 
 ```bash
 aatm map --task-config-path task.yaml
 ```
 
-When you do this, the CLI loads the task config file and runs the mapping task from it. fileciteturn4file0
+When you do this, the CLI loads the task config file and runs the mapping task from it. 
 
-### Example task config
+#### Example task config
 
-```yaml
-input_file: data/source_to_concept_map.csv
-output_dir: output
-translator_id: empty-translator
-retriever_id: embeddinggemma-300M
-reranker_id: bm25-reranker
-selector_id: first-result-selector
-batch_size: 100
-rate_limit: null
-limit_to: null
-```
+Task config files are supported as `.yaml` or `.json` files.
+
+=== "YAML"
+
+    ```yaml
+    input_file: data/source_to_concept_map.csv
+    output_dir: output
+    translator_id: empty-translator
+    retriever_id: embeddinggemma-300M
+    reranker_id: bm25-reranker
+    selector_id: first-result-selector
+    batch_size: 100
+    rate_limit: null
+    limit_to: null
+    ```
+
+=== "JSON"
+
+    ```json
+    {
+      "input_file": "data/source_to_concept_map.csv",
+      "output_dir": "output",
+      "translator_id": "empty-translator",
+      "retriever_id": "embeddinggemma-300M",
+      "reranker_id": "bm25-reranker",
+      "selector_id": "first-result-selector",
+      "batch_size": 100,
+      "rate_limit": null,
+      "limit_to": null
+    }
+    ```
 
 This is useful when you want reproducible runs or reusable task definitions.
 
 ---
 
-## 8. Launch the search UI from the CLI
+## 5. Launch the search UI from the CLI
 
 You can also launch the Streamlit-based search interface directly from the CLI:
 
@@ -298,11 +233,16 @@ You can also launch the Streamlit-based search interface directly from the CLI:
 aatm search-ui
 ```
 
-The CLI resolves the packaged `search_ui.py` file and launches it through Streamlit using the current Python interpreter. fileciteturn4file0
+The CLI resolves the packaged `search_ui.py` file and launches it through Streamlit using the current Python interpreter. 
+
+![Streamlit search UI screenshot.](../assets/search-ui-screenshot.png)
+/// caption
+Streamlit search UI screenshot.
+///
 
 ---
 
-## 9. What gets created locally
+## 6. What gets created locally
 
 After a normal CLI setup and mapping workflow, you will typically have local artifacts such as:
 
@@ -319,51 +259,11 @@ And your mapped output will typically be written to:
 output/mapped_source_concepts.csv
 ```
 
-The CLI `init` command is responsible for creating the local helper resources, and the `map` command runs the terminology mapping workflow. fileciteturn4file0
+The CLI `init` command is responsible for creating the local helper resources, and the `map` command runs the terminology mapping workflow. 
 
 ---
 
-## 10. Useful component IDs for CLI runs
-
-### Translators
-
-- `empty-translator`
-- `gemini-2.5-flash`
-
-### Retrievers
-
-- `qwen3-06B`
-- `qwen3-4B`
-- `gemini-embedding-001`
-- `embeddinggemma-300M`
-- `text-embedding-3-small`
-- `text-embedding-3-large`
-
-### Rerankers
-
-- `bm25-reranker`
-- `qwen3-reranker-0.6b`
-- `qwen3-reranker-4b`
-- `qwen3-reranker-8b`
-
-### Selectors
-
-- `first-result-selector`
-- `gpt-5.2`
-- `gpt-5`
-- `gpt-5-mini`
-- `gpt-5-nano`
-- `gemini-3-pro-preview`
-- `gemini-3-flash-preview`
-- `gemini-2.5-flash`
-- `gemini-2.5-flash-lite`
-- `gemini-2.5-pro`
-
-These identifiers match the registries used by the mapper workflow you invoke from the CLI.
-
----
-
-## End-to-end CLI example
+## 7. End-to-end CLI example
 
 Here is a full CLI-only path.
 
@@ -407,7 +307,7 @@ aatm search-ui
 
 ---
 
-## Troubleshooting
+## 8. Troubleshooting
 
 ### `aatm init` says the vocabulary directory does not exist
 
@@ -417,11 +317,11 @@ Make sure your OMOP vocabulary files are present in `./vocabularies`, or pass th
 aatm init --vocab-dir /path/to/vocabularies
 ```
 
-The CLI explicitly checks whether the provided directory exists. fileciteturn4file0
+The CLI explicitly checks whether the provided directory exists. 
 
 ### `aatm init` says the embedding model is unsupported
 
-Use one of the supported model names listed in this page. The CLI validates the model name before continuing. fileciteturn4file0
+Use one of the supported model names listed in this page. The CLI validates the model name before continuing. 
 
 ### `aatm map` says the task config file does not exist
 
@@ -431,7 +331,7 @@ Check the path you passed to:
 aatm map --task-config-path task.yaml
 ```
 
-The CLI verifies that the config file exists before loading it. fileciteturn4file0
+The CLI verifies that the config file exists before loading it. 
 
 ### Retrieval fails at mapping time
 
@@ -440,15 +340,3 @@ Make sure you ran `aatm init` first and successfully built the local vector data
 ### API-backed components fail
 
 Check that your `.env` file contains the required API keys.
-
----
-
-## Next steps
-
-After this CLI quick start, the most useful next pages are usually:
-
-- Python API quick start
-- task configuration reference
-- component registry reference
-- search UI
-- advanced customization
