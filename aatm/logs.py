@@ -1,12 +1,14 @@
 """
-Centralized logging configuration for the package.
+Provide centralized logging utilities for the package.
 
-Features:
-- Timestamped logs
-- Log level
-- Module name and line number
-- Single configuration point
-- Safe against double-handler issues
+This module defines a shared logging configuration and a helper for retrieving
+module-aware logger instances. It is intended to offer a single, consistent
+entry point for logging setup across the package, including timestamped output,
+log levels, module names, and source line numbers.
+
+The configuration is designed to be safe in environments where code may be
+reloaded multiple times, such as notebooks or interactive sessions, by avoiding
+duplicate handler registration.
 """
 
 from __future__ import annotations
@@ -28,19 +30,35 @@ def configure_logging(
     log_format: str = DEFAULT_LOG_FORMAT,
     date_format: str = DEFAULT_DATE_FORMAT,
 ) -> None:
-    """
-    Configure global logging for the package.
+    """Configure the root logger for the package.
 
-    This should be called **once**, ideally at application startup.
+    This function sets up a stream handler with a consistent formatter and
+    attaches it to the root logger. It is intended to be called once, typically
+    during application startup, so that all package modules share the same
+    logging behavior.
 
-    Parameters:
-        level (int): Logging level (e.g., logging.INFO, logging.DEBUG)
-        stream (object, optional): Output stream (defaults to sys.stdout)
-        log_format (str): Logging format string
-        date_format (str): Timestamp format
+    If the root logger already has handlers attached, the function returns
+    without making changes. This prevents duplicate log messages in interactive
+    or reloaded environments.
+
+    Args:
+        level: Logging level to apply to the root logger, such as
+            ``logging.INFO`` or ``logging.DEBUG``.
+        stream: Output stream for log messages. If not provided, standard output
+            is used.
+        log_format: Format string used to render each log record.
+        date_format: Format string used to render timestamps in log messages.
 
     Returns:
-        None
+        None.
+
+    Side Effects:
+        Configures the global root logger, attaches a stream handler, and sets
+        the logging level for the package logger namespace.
+
+    Notes:
+        The ``aatm`` logger namespace is explicitly set to ``logging.DEBUG``
+        after the root logger is configured.
     """
     stream = stream or sys.stdout
 
@@ -66,17 +84,24 @@ def configure_logging(
 def get_logger(
     name: Optional[str] = None, level: Optional[int] = None
 ) -> logging.Logger:
-    """
-    Get a logger with module awareness.
+    """Return a logger instance for a module or component.
 
-    Usually called as:
-        logger = get_logger(__name__)
+    This helper retrieves a logger by name and optionally overrides its logging
+    level. It is typically used to create module-aware loggers, for example
+    with ``get_logger(__name__)``.
 
     Args:
-        name (str): name of the logger. Defaults to module name.
+        name: Name of the logger to retrieve. If not provided, the current
+            module name is used.
+        level: Optional logging level to apply to the returned logger.
 
     Returns:
-        logging.Logger
+        A configured ``logging.Logger`` instance.
+
+    Notes:
+        This function does not configure handlers. It assumes logging has
+        already been configured elsewhere, typically through
+        ``configure_logging()``.
     """
     logger = logging.getLogger(name or __name__)
 

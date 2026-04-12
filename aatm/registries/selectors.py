@@ -1,3 +1,15 @@
+"""
+Register and instantiate selector implementations used by the package.
+
+This module defines a registry of available selector components, including
+their public names, implementation classes, and default initialization
+arguments. It also provides a helper function for constructing selector
+instances by name with optional runtime argument overrides.
+
+The registry allows selectors to be referenced declaratively from task
+configurations, CLI options, or other factory-based workflows.
+"""
+
 from dataclasses import dataclass
 from typing import Any
 import copy
@@ -12,11 +24,21 @@ from aatm.selectors import (
 
 @dataclass(slots=True, frozen=True)
 class SelectorRegistryEntry:
-    "Specification for a selector instance"
+    """Store the specification required to instantiate a selector.
+
+    Instances of this dataclass define a registry entry for a selector,
+    including its public name, the selector class to instantiate, and the
+    default keyword arguments used during construction.
+    """
 
     name: str
+    """Unique registry name used to identify the selector."""
+
     selector_class: BaseSelector
+    """Selector class or constructor used to create the selector instance."""
+
     kwargs: dict[str, Any]
+    """Default keyword arguments passed when instantiating the selector."""
 
 
 SELECTORS_SPECS = [
@@ -95,7 +117,27 @@ SELECTORS_REGISTRY: dict[str, SelectorRegistryEntry] = {
 }
 
 
-def load_selector(name: str, **kwargs) -> BaseSelector:
+def load_selector(name: str, **kwargs: Any) -> BaseSelector:
+    """Load and instantiate a selector from the registry.
+
+    This function looks up a selector specification by name, copies its default
+    keyword arguments, applies any user-provided overrides, and returns a new
+    selector instance.
+
+    Args:
+        name: Registry name of the selector to instantiate.
+        **kwargs: Keyword arguments that override or extend the default
+            constructor arguments stored in the registry entry.
+
+    Returns:
+        A newly instantiated selector corresponding to the requested registry
+            entry.
+
+    Raises:
+        ValueError: If no selector with the given name exists in the registry.
+        TypeError: If the provided arguments are invalid for the selector
+            constructor.
+    """
     try:
         spec = SELECTORS_REGISTRY[name]
     except KeyError as e:

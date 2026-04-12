@@ -1,3 +1,81 @@
+"""
+This module defines the main Typer application for the Any-to-Any
+Terminology Mapping (AATM) package. It provides commands for
+initializing the local project environment, launching the search user
+interface, and running terminology mapping tasks from either a config
+file or command-line options.
+
+The CLI is responsible for orchestrating high-level workflows such as:
+
+- setting up local helper directories and Git ignore rules
+- validating vocabulary and embedding model inputs
+- building local SQLite and vector databases for terminology mapping
+- collecting interactive user input for setup choices
+- loading and displaying mapping task configurations
+- starting synchronous terminology mapping runs
+- launching the Streamlit-based search interface
+
+**Commands**:
+
+- `init`:
+    Set up the local environment for OMOP vocabulary processing and
+    vector database creation.
+
+- `search-ui`:
+    Launch the Streamlit-based search interface.
+
+- `map`:
+    Run a terminology mapping task from a configuration file or from
+    explicit CLI arguments.
+
+- `amap`:
+    Placeholder for future asynchronous mapping support.
+
+Attributes:
+    LOCAL_HELPER_PATH (Path): Path to the local helper directory used by AATM
+        to store generated artifacts and local resources.
+    DEFAULT_VOCAB_DIR (Path): Default directory containing OMOP vocabulary
+        files.
+    DEFAULT_EMBEDDING_MODEL (str): Default embedding model used when building
+        the local vector database.
+    SUPPORTED_EMBEDDING_MODELS (List[str]): List of embedding model identifiers
+        supported by the CLI setup workflow.
+    STANDARD_VOCABULARIES (List[str]): List of supported standard vocabularies
+        available for terminology mapping.
+    DEFAULT_STANDARD_VOCABULARIES (List[str]): Default subset of standard
+        vocabularies selected during initialization.
+    AATM_LOGO (str): Multiline ASCII logo displayed in the CLI welcome
+        screen.        
+
+Examples:
+    Initialize the local environment with defaults:
+
+        $ aatm init
+
+    Initialize with a custom vocabulary directory:
+
+        $ aatm init --vocab-dir ./vocabularies
+
+    Run a mapping task from a config file:
+
+        $ aatm map --task-config-path config.yaml
+
+    Run a mapping task from explicit options:
+
+        $ aatm map --input-file concepts.csv --output-dir outputs \\
+            --translator-id my_translator --retriever-id my_retriever \\
+            --selector-id my_selector
+
+    Launch the search UI:
+
+        $ aatm search-ui
+
+Note:
+    This module is intended to serve as the main CLI entrypoint for the
+    package. It coordinates user interaction and delegates implementation
+    details to lower-level utilities and domain-specific components.
+"""
+
 import logging
 import subprocess
 import sys
@@ -96,6 +174,52 @@ def init(
         ),
     ] = None,
 ) -> None:
+    """Initialize the local AATM environment.
+
+    This command prepares the local project environment required for
+    terminology mapping with OMOP vocabularies. It creates the helper
+    directory used by AATM, ensures `.aatm` is listed in `.gitignore`,
+    validates user inputs, builds the local SQLite vocabulary database,
+    prepares mapping datasets for the selected standard vocabularies,
+    and creates the local vector database used for retrieval.
+
+    When `embedding_model` or `standard_vocabs` are not provided, the
+    command interactively prompts the user to choose among the supported
+    options.
+
+    Args:
+        vocab_dir: Path to the directory containing the OMOP vocabulary
+            files. If not provided, the default vocabulary directory is
+            used.
+        embedding_model: Name of the embedding model to use for building
+            the local vector database. If not provided, the user is
+            prompted to select one interactively.
+        standard_vocabs: List of standard vocabularies to include in the
+            mapping datasets. If not provided, the user is prompted to
+            select one or more interactively.
+
+    Raises:
+        typer.Exit: If the vocabulary directory does not exist, if the
+            embedding model is not supported, or if any provided
+            standard vocabulary is invalid.
+
+    Examples:
+        Initialize using the default vocabulary directory:
+
+            $ aatm init
+
+        Initialize with a custom vocabulary directory:
+
+            $ aatm init --vocab-dir ./vocabularies
+
+        Initialize with an explicit embedding model:
+
+            $ aatm init --embedding-model qwen3-4B
+
+        Initialize with specific standard vocabularies:
+
+            $ aatm init --standard-vocabs LOINC --standard-vocabs SNOMED
+    """
     # Setup local directories
     LOCAL_HELPER_PATH.mkdir(exist_ok=True, parents=True)
     gitignore_path = Path(".gitignore")
@@ -195,7 +319,18 @@ def init(
 
 @app.command("search-ui")
 def search_ui() -> None:
-    """Launch the Streamlit search UI."""
+    """Launch the Streamlit-based search interface.
+
+    This command locates the `search_ui.py` application in the same
+    package directory as this module and starts it using the current
+    Python interpreter with Streamlit.
+
+    Raises:
+        typer.BadParameter: If the Streamlit application file cannot be
+            found.
+        subprocess.CalledProcessError: If the Streamlit process exits
+            with a non-zero status code.
+    """
     streamlit_app = Path(__file__).resolve().parent / "search_ui.py"
 
     if not streamlit_app.exists():
@@ -290,6 +425,60 @@ def map(
         ),
     ] = None,
 ) -> None:
+    """Run a terminology mapping task.
+
+    This command executes a terminology mapping workflow using either a
+    configuration file or parameters provided directly through the command
+    line. When a task configuration file is given, it is loaded and used to
+    build the mapping task. Otherwise, a `TerminologyMappingTask` is created
+    from the individual command options.
+
+    The command prints the loaded task configuration, instantiates a
+    `TerminologyMapper` from it, and starts the mapping process.
+
+    Args:
+        task_config_path (Optional[str]): Path to a task configuration file.
+            When provided, the mapping task is loaded from this file.
+        input_file (Optional[str]): Path to the input file containing source
+            concepts to be mapped. Used when no task configuration file is
+            provided.
+        output_dir (Optional[str]): Path to the output directory where
+            mapping results will be written. Used when no task configuration
+            file is provided.
+        translator_id (Optional[str]): Identifier of the translator to use
+            in the mapping pipeline.
+        retriever_id (Optional[str]): Identifier of the retriever to use in
+            the mapping pipeline.
+        selector_id (Optional[str]): Identifier of the selector to use in
+            the mapping pipeline.
+        reranker_id (Optional[str]): Identifier of the reranker to use in
+            the mapping pipeline.
+        batch_size (Optional[int]): Batch size to use during the mapping
+            process.
+        rate_limit (Optional[int]): Rate limit to apply when processing
+            source concepts.
+        limit_to (Optional[int]): Maximum number of source concepts to map.
+            Useful for testing and debugging.
+
+    Raises:
+        typer.Exit: If `task_config_path` is provided but does not exist.
+
+    Examples:
+        Run a mapping task from a config file:
+
+            $ aatm map --task-config-path config.yaml
+
+        Run a mapping task from explicit options:
+
+            $ aatm map --input-file concepts.csv --output-dir outputs \\
+                --translator-id my_translator --retriever-id my_retriever \\
+                --selector-id my_selector
+
+        Run a small test mapping job:
+
+            $ aatm map --input-file concepts.csv --output-dir outputs \\
+                --limit-to 20
+    """
     if task_config_path is not None:
         task_config_path = Path(task_config_path)
         if not task_config_path.exists():

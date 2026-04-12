@@ -13,15 +13,16 @@ falls back to a default mode if the value is missing or invalid.
 
 Typical usage:
 
-``` py title="debug_example.py"
+```python title="debug_example.py"
 from aatm.debug import DebugMode, get_debug_mode
+
 DEBUG_MODE = get_debug_mode()
 if DEBUG_MODE == DebugMode.MY_MODE:
     logger.debug("MY_MODE is active")
 ```
 
 Environment Variables:
-    SPESIA_DEBUG_MODE: Name or value of a `DebugMode` enum member.
+    DEBUG_MODE: Name or value of a `DebugMode` enum member.
         Matching is case-insensitive. If unset or invalid, the debug
         mode defaults to `DebugMode.NONE`.
 
@@ -70,7 +71,7 @@ def get_debug_mode(
     Args:
         enum (Enum): Enumeration containing the debug modes.
         env_var (str): Environment variable containing the debug mode.
-            Defaults to "SPESIA_DEBUG_MODE".
+            Defaults to "DEBUG_MODE".
         default (Enum): Default debug mode if env_var is unset or invalid.
             Defaults to DebugMode.NONE.
 

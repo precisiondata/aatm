@@ -1,3 +1,15 @@
+"""Utilities for building and managing local terminology-mapping data assets.
+
+This module provides helper functions for constructing the local resources
+required by the terminology-mapping workflow. These resources include a local
+SQLite vocabulary database, derived CSV datasets used for terminology mapping,
+and a local vector database for semantic retrieval.
+
+The module also includes a simple rate-limiting helper for embedding generation
+workloads and interactive prompts to prevent accidental overwrites of existing
+artifacts.
+"""
+
 import time
 import pandas as pd
 from pathlib import Path
@@ -13,13 +25,31 @@ console = Console()
 
 
 def rate_limiter(n_docs: int, rate_limit: int, next_allowed_time: float) -> float:
-    """Rate limit helper. Sleep as needed so we don't exceed the rate limit.
+    """Apply a document-based rate limit and return the next allowed execution time.
+
+    This helper ensures that document processing respects a maximum throughput
+    expressed in documents per minute. If the current time is earlier than the
+    next permitted execution time, the function sleeps until processing is
+    allowed. It then reserves time for the current batch and returns the updated
+    timestamp for the next permitted request.
 
     Args:
-        n_docs: Number of documents to process
-        rate_limit: Rate limit in docs per minute
-        next_allowed_time: Next allowed time
+        n_docs: Number of documents that will be processed in the current batch.
+        rate_limit: Maximum allowed processing rate in documents per minute.
+        next_allowed_time: Monotonic timestamp representing when the next batch
+            is allowed to start.
 
+    Returns:
+        The updated monotonic timestamp indicating when the next batch may be
+        processed.
+
+    Raises:
+        ValueError: In contexts where the caller validates that the provided
+            rate limit is invalid, such as non-positive values.
+
+    Notes:
+        This function uses ``time.monotonic()`` so that elapsed-time calculations
+        are not affected by system clock changes.
     """
     now = time.monotonic()
     if now < next_allowed_time:
@@ -31,6 +61,36 @@ def rate_limiter(n_docs: int, rate_limit: int, next_allowed_time: float) -> floa
 
 
 def build_local_sqlite_vocab_database(vocab_dir: Path) -> None:
+    """Build a local SQLite vocabulary database from OMOP vocabulary files.
+
+    This function reads vocabulary files from a directory, converts each file
+    into a SQLite table, and stores the result in a local database file. If a
+    database already exists, the user is prompted to either skip rebuilding it
+    or overwrite the existing database.
+
+    CSV parsing behavior depends on the table being imported. The
+    ``source_to_concept_map`` file is read as comma-separated, while the other
+    vocabulary files are read as tab-separated.
+
+    Args:
+        vocab_dir: Path to the directory containing the vocabulary files to be
+            imported into the local SQLite database.
+
+    Returns:
+        None.
+
+    Side Effects:
+        Creates or overwrites the local SQLite database at ``.aatm/omop.db``.
+        Prompts the user for confirmation when an existing database is found.
+        Writes one table per vocabulary file into the database.
+
+    Raises:
+        FileNotFoundError: If the expected vocabulary files are not present in
+            the provided directory.
+        sqlite3.Error: If a database connection or write operation fails.
+        pandas.errors.ParserError: If a vocabulary file cannot be parsed.
+    """
+
     if Path(".aatm/omop.db").exists():
         user_preference = questionary.select(
             "A vocabulary database already exists. What would you like to do?",
@@ -61,6 +121,35 @@ def build_local_sqlite_vocab_database(vocab_dir: Path) -> None:
 
 
 def build_mapping_datasets(standard_vocabularies: list[str]) -> None:
+    """Generate terminology-mapping datasets from SQL templates and a local database.
+
+    This function loads SQL command templates from a packaged YAML file, formats
+    them using the provided list of standard vocabularies, executes each query
+    against the local OMOP SQLite database, and saves the resulting datasets as
+    CSV files in the local datasets directory.
+
+    If mapping datasets already exist, the user is prompted to either skip
+    regeneration or overwrite the existing files.
+
+    Args:
+        standard_vocabularies: List of standard vocabulary names used to
+            parameterize the SQL queries that generate the mapping datasets.
+
+    Returns:
+        None.
+
+    Raises:
+        ValueError: If no standard vocabularies are provided.
+        FileNotFoundError: If the SQL command resource file cannot be located.
+        sqlite3.Error: If an error occurs while querying the local SQLite
+            database.
+        yaml.YAMLError: If the SQL command YAML file cannot be parsed.
+
+    Side Effects:
+        Creates the ``.aatm/datasets`` directory when needed.
+        Writes one CSV file per SQL command to the local datasets directory.
+        Prompts the user before overwriting existing dataset files.
+    """
     import yaml
     from importlib.resources import files
 
@@ -107,14 +196,51 @@ def build_local_vector_database(
     rate_limit: int | None = None,
     batch_size: int = 100,
 ) -> None:
-    """
-    Build local vector database. By default, uses chromadb for vector database and creates/repair the database. It gives the option to skip this step if the database already exists, to repair the database, or to overwrite the database.
+    """Build or repair a local vector database for terminology mapping.
+
+    This function creates a persistent vector database from the generated
+    terminology-mapping datasets. It loads records from local CSV files,
+    converts them into structured metadata objects, avoids duplicate or already
+    indexed entries, and stores embeddings in a ChromaDB collection using the
+    configured embedding model.
+
+    If a vector database already exists, the user may choose to skip the
+    operation, overwrite the existing database, or repair it. Optional
+    rate-limiting can be applied to control embedding throughput for providers
+    with request limits.
 
     Args:
-        vector_db_dir: Path to directory containing vector database
-        embedding_model_name: Name of embedding model
-        rate_limit: Rate limit in docs per minute
-        batch_size: Batch size
+        embedding_model_name: Registry key identifying the embedding model
+            configuration to use.
+        vector_db_dir: Optional path to the vector database directory. If not
+            provided, the default path from the retriever model registry is used.
+        rate_limit: Optional maximum number of documents to embed per minute. If
+            not provided, the default value from the model registry is used.
+        batch_size: Number of records to process and add to the vector database
+            in each batch.
+
+    Returns:
+        None.
+
+    Raises:
+        ValueError: If ``vector_db_dir`` is provided but does not exist.
+        ValueError: If ``rate_limit`` is provided and is not greater than zero.
+        FileNotFoundError: If required dataset files are missing.
+        sqlite3.Error: If dependent local resources are unavailable or invalid.
+        Exception: If the vector database client, embedding function, or
+            collection operations fail.
+
+    Side Effects:
+        Creates, repairs, or overwrites a local persistent vector database.
+        Reads CSV datasets from ``.aatm/datasets``.
+        Prompts the user before modifying an existing vector database.
+        Generates embeddings and stores documents and metadata in the target
+        collection.
+
+    Notes:
+        The function performs lazy imports for some dependencies to reduce
+        startup overhead for workflows that do not require vector database
+        creation.
     """
     # lazy loading for performance
     import chromadb
