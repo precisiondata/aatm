@@ -1,3 +1,16 @@
+"""
+Register and instantiate reranker implementations used by the package.
+
+This module defines a lightweight registry for available reranker components,
+including their human-readable names, implementation classes, and default
+initialization arguments. It also provides a helper function to construct
+reranker instances by name with optional runtime overrides.
+
+The registry centralizes reranker configuration so that rerankers can be
+referenced declaratively from task configurations, CLI options, or other
+factory-based workflows.
+"""
+
 import copy
 from dataclasses import dataclass
 from typing import Any
@@ -12,11 +25,19 @@ from aatm.rerankers import (
 
 @dataclass(slots=True, frozen=True)
 class RerankerRegistryEntry:
-    "Specification for a reranker instance"
+    """Store the specification required to instantiate a reranker.
+
+    Instances of this dataclass define a registry entry for a reranker,
+    including its public name, the reranker class to instantiate, and the
+    default keyword arguments used during construction.
+    """
 
     name: str
+    """Unique registry name used to identify the reranker."""
     reranker_class: BaseReranker
+    """Reranker class or constructor used to create the reranker instance."""
     kwargs: dict[str, Any]
+    """Default keyword arguments passed when instantiating the reranker."""
 
 
 RERANKERS_SPECS = [
@@ -53,7 +74,27 @@ RERANKERS_REGISTRY: dict[str, RerankerRegistryEntry] = {
 }
 
 
-def load_reranker(name: str, **kwargs) -> BaseReranker:
+def load_reranker(name: str, **kwargs: Any) -> BaseReranker:
+    """Load and instantiate a reranker from the registry.
+
+    This function looks up a reranker specification by name, copies its default
+    keyword arguments, applies any user-provided overrides, and returns a new
+    reranker instance.
+
+    Args:
+        name: Registry name of the reranker to instantiate.
+        **kwargs: Keyword arguments that override or extend the default
+            constructor arguments stored in the registry entry.
+
+    Returns:
+        A newly instantiated reranker corresponding to the requested registry
+            entry.
+
+    Raises:
+        ValueError: If no reranker with the given name exists in the registry.
+        TypeError: If the provided arguments are invalid for the reranker
+            constructor.
+    """
     try:
         spec = RERANKERS_REGISTRY[name]
     except KeyError as e:

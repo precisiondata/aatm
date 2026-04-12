@@ -8,28 +8,37 @@ nav:
   - Home: 'index.md'
   - Getting Started: 
     - 'getting-started/index.md'
+    - Installation: 'getting-started/installation.md'
+    - Environment variables: 'getting-started/env.md'
+    - Project artifacts created locally: 'getting-started/artifacts.md'
+    - Basic concepts: 'getting-started/concepts.md'
+    - Quick start:
+      - Command Line Interface: 'getting-started/quick_start_cli.md'
+      - Python API: 'getting-started/quick_start_python_api.md'
   - API Reference:
-    - 'reference/index.md'
     - Command Line Interface: 'reference/cli.md'
-    - Data Models: 'reference/data_models.md'
-    - Debug: 'reference/debug.md'
-    - Embedding functions: 'reference/embedding_functions.md'
-    - Local database utilities: 'reference/local_database_utils.md'
-    - Logs: 'reference/logs.md'
-    - Pipeline: 'reference/pipeline.md'
-    - Prompt helpers: 'reference/prompt_helpers.md'
-    - Rerankers: 'reference/rerankers.md'
-    - Retrievers: 'reference/retrievers.md'
-    - Search engine interface: 'reference/search_ui.md'
-    - Selectors: 'reference/selectors.md'
-    - Terminology mapper: 'reference/terminology_mapper.md'
-    - Translators: 'reference/translators.md'
+    - Pipeline components:
+      - Pipeline: 'reference/pipeline.md'
+      - Translators: 'reference/translators.md'
+      - Embedding functions: 'reference/embedding_functions.md'
+      - Retrievers: 'reference/retrievers.md'
+      - Rerankers: 'reference/rerankers.md'
+      - Selectors: 'reference/selectors.md'
+      - Terminology mapper: 'reference/terminology_mapper.md'
+    - User interface:
+      - Search engine interface: 'reference/search_ui.md'
     - Registries:
-      - 'reference/registries/index.md'
       - Rerankers registry: 'reference/registries/rerankers.md'
       - Retrievers registry: 'reference/registries/retrievers.md'
       - Selectors registry: 'reference/registries/selectors.md'
       - Translators registry: 'reference/registries/translators.md'
+    - Other modules:
+      - Data Models: 'reference/data_models.md'
+      - Debug: 'reference/debug.md'
+      - Local database utilities: 'reference/local_database_utils.md'
+      - Logs: 'reference/logs.md'
+      - Prompt helpers: 'reference/prompt_helpers.md'
+
 
 
 theme:
@@ -46,6 +55,7 @@ theme:
     - content.code.copy
     - content.code.select
     - content.code.annotate
+    - content.tabs.link
 
 extra:
   version: 0.1.0
@@ -58,6 +68,7 @@ plugins:
           options:
             docstring_style: google
             show_source: true
+            members_order: source
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -67,3 +78,8 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower

@@ -1,3 +1,15 @@
+"""
+Provide a Streamlit-based search interface for the Any-to-Any Terminology Mapper.
+
+This module defines an interactive web application for querying a terminology
+retrieval system backed by ChromaDB. It exposes a simple search UI with
+multiple tabs, supports cached retriever loading, and displays ranked candidate
+concepts with key metadata and confidence scores.
+
+The application is intended for local or internal use as a lightweight search
+front end for terminology exploration and validation.
+"""
+
 import streamlit as st
 import chromadb
 import dotenv
@@ -17,6 +29,24 @@ client = chromadb.PersistentClient()
 def cached_load_retriever(
     retriever_name: str = "embeddinggemma-300M",
 ) -> "ChromaDBRetriever":
+    """Load and cache a retriever instance for the Streamlit application.
+
+    This function wraps retriever loading with Streamlit's resource cache so
+    that the same retriever is reused across reruns, avoiding repeated model or
+    database initialization overhead.
+
+    Args:
+        retriever_name: Name of the retriever configuration to load from the
+            retriever registry.
+
+    Returns:
+        A loaded ``ChromaDBRetriever`` instance corresponding to the requested
+            retriever name.
+
+    Raises:
+        KeyError: If the provided retriever name is not found in the registry.
+        Exception: Propagates errors raised during retriever initialization.
+    """
     retriever = load_retriever(retriever_name)
     return retriever
 
