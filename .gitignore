@@ -12,3 +12,5 @@ chroma_vector_dbs
 data
 tasks
 site
+*.ipynb
+*.png
