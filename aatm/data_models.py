@@ -36,7 +36,7 @@ def deterministic_id_from_strings(strings: list[str], digest_size: int = 16) -> 
 
     Args:
         strings (list[str]): A list of strings to generate the id from.
-        digest_size (int, optional): The size of the digest in bytes. Defaults to 8.
+        digest_size (int, optional): The size of the digest in bytes.
 
     Returns:
         str: A deterministic id as a hexadecimal string.
