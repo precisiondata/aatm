@@ -127,6 +127,53 @@
     
     
     
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard="" data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"></path></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
     
       <div class="md-header__source">
         <a href="https://github.com/precisiondata/aatm" title="Go to repository" class="md-source" data-md-component="source">
@@ -135,7 +182,7 @@
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
   </div>
   <div class="md-source__repository">
-    GitHub
+    precisiondata/aatm
   </div>
 </a>
       </div>
@@ -257,7 +304,7 @@
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
   </div>
   <div class="md-source__repository">
-    GitHub
+    precisiondata/aatm
   </div>
 </a>
     </div>
@@ -1523,488 +1570,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#environment-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Environment variables
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#project-artifacts-created-locally" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Project artifacts created locally
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#basic-concepts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic concepts
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Basic concepts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#translator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Translator
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#retriever" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Retriever
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reranker" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reranker
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#selector" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Selector
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick start
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quick start">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-load-a-translator-retriever-reranker-and-selector" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Load a translator, retriever, reranker, and selector
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-build-a-mapper" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Build a mapper
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-map-a-csv-file" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Map a CSV file
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#expected-input-format" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Expected input format
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Expected input format">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#using-custom-column-names" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using custom column names
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#building-the-local-databases" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Building the local databases
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Building the local databases">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-build-the-local-sqlite-vocabulary-database" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Build the local SQLite vocabulary database
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-build-terminology-mapping-datasets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Build terminology-mapping datasets
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-build-the-local-vector-database" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Build the local vector database
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#minimal-end-to-end-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Minimal end-to-end example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#using-llm-based-components" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using LLM-based components
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Using LLM-based components">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#openai-selector" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        OpenAI selector
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gemini-selector" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Gemini selector
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gemini-translator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Gemini translator
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#qwen-reranker" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Qwen reranker
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#supported-registered-components" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Supported registered components
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Supported registered components">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#translators" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Translators
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#retrievers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Retrievers
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rerankers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rerankers
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#selectors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Selectors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pipeline-composition" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pipeline composition
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#streamlit-search-ui" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Streamlit search UI
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common workflow
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#missing-api-key" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Missing API key
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#missing-vector-database" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Missing vector database
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#invalid-input-columns" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Invalid input columns
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#existing-local-artifacts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Existing local artifacts
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next steps
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2070,6 +1635,11 @@
 
 
   
+    <a href="https://github.com/precisiondata/aatm/edit/master/docs/getting-started/index.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"></path></svg>
+    </a>
+  
   
 
 
@@ -2100,304 +1670,6 @@
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  -&gt; mapped concept
 </span></code></pre></div>
 <p>The default workflow is centered on OMOP-style terminology mapping.</p>
-<hr>
-<h2 id="installation">Installation</h2>
-<p>Install the package in your environment.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>aatm
-</span></code></pre></div>
-<p>If you are developing locally:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
-</span></code></pre></div>
-<p>If you use <code>uv</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>sync
-</span></code></pre></div>
-<hr>
-<h2 id="environment-variables">Environment variables</h2>
-<p>Some components depend on external APIs. Create a <code>.env</code> file in your project root when needed.</p>
-<p>Example:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>GOOGLE_API_KEY=your_google_api_key
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>OPENAI_API_KEY=your_openai_api_key
-</span></code></pre></div>
-<p>AATM loads environment variables automatically with <code>python-dotenv</code>.</p>
-<hr>
-<h2 id="project-artifacts-created-locally">Project artifacts created locally</h2>
-<p>AATM uses a local <code>.aatm/</code> directory to store generated assets such as:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>.aatm/
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>├── omop.db
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>├── datasets/
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>└── chroma_vector_dbs/
-</span></code></pre></div>
-<p>Typical outputs are written to:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>output/
-</span></code></pre></div>
-<hr>
-<h2 id="basic-concepts">Basic concepts</h2>
-<h3 id="translator">Translator</h3>
-<p>Translators convert input text into English before retrieval.</p>
-<p>Examples:</p>
-<ul>
-<li><code>EmptyTranslator</code></li>
-<li><code>GeminiTranslator</code></li>
-<li><code>OpenAITranslator</code></li>
-</ul>
-<p>Use <code>EmptyTranslator</code> when your inputs are already in the desired language.</p>
-<h3 id="retriever">Retriever</h3>
-<p>Retrievers fetch candidate concepts from a vector database.</p>
-<p>Main implementation:</p>
-<ul>
-<li><code>ChromaDBRetriever</code></li>
-</ul>
-<h3 id="reranker">Reranker</h3>
-<p>Rerankers reorder retrieved candidates.</p>
-<p>Examples:</p>
-<ul>
-<li><code>BM25Reranker</code></li>
-<li><code>Qwen3Reranker</code></li>
-</ul>
-<h3 id="selector">Selector</h3>
-<p>Selectors choose the final mapped concept from the retrieved candidates.</p>
-<p>Examples:</p>
-<ul>
-<li><code>FirstResultSelector</code></li>
-<li><code>OpenAILLMSelector</code></li>
-<li><code>GeminiLLMSelector</code></li>
-</ul>
-<hr>
-<h2 id="quick-start">Quick start</h2>
-<h3 id="1-load-a-translator-retriever-reranker-and-selector">1. Load a translator, retriever, reranker, and selector</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.registries.translators</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_translator</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.registries.retrievers</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_retriever</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.registries.rerankers</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_reranker</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.registries.selectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_selector</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">translator</span> <span class="o">=</span> <span class="n">load_translator</span><span class="p">(</span><span class="s2">"empty-translator"</span><span class="p">)</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">retriever</span> <span class="o">=</span> <span class="n">load_retriever</span><span class="p">(</span><span class="s2">"embeddinggemma-300M"</span><span class="p">)</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">reranker</span> <span class="o">=</span> <span class="n">load_reranker</span><span class="p">(</span><span class="s2">"bm25-reranker"</span><span class="p">)</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">selector</span> <span class="o">=</span> <span class="n">load_selector</span><span class="p">(</span><span class="s2">"first-result-selector"</span><span class="p">)</span>
-</span></code></pre></div>
-<h3 id="2-build-a-mapper">2. Build a mapper</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.terminology_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminologyMapper</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">translator</span><span class="o">=</span><span class="n">translator</span><span class="p">,</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">retriever</span><span class="o">=</span><span class="n">retriever</span><span class="p">,</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">reranker</span><span class="o">=</span><span class="n">reranker</span><span class="p">,</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="n">selector</span><span class="o">=</span><span class="n">selector</span><span class="p">,</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="p">)</span>
-</span></code></pre></div>
-<h3 id="3-map-a-csv-file">3. Map a CSV file</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">results_df</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="s2">"source_to_concept_map.csv"</span><span class="p">)</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">results_df</span><span class="o">.</span><span class="n">head</span><span class="p">())</span>
-</span></code></pre></div>
-<p>This runs the full pipeline and writes the output to:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>output/mapped_source_concepts.csv
-</span></code></pre></div>
-<hr>
-<h2 id="expected-input-format">Expected input format</h2>
-<p>The CSV input is expected to follow the OMOP <code>SOURCE_TO_CONCEPT_MAP</code> structure.</p>
-<p>Required columns:</p>
-<ul>
-<li><code>source_code</code></li>
-<li><code>source_concept_id</code></li>
-<li><code>source_vocabulary_id</code></li>
-<li><code>source_code_description</code></li>
-<li><code>valid_start_date</code></li>
-<li><code>valid_end_date</code></li>
-<li><code>invalid_reason</code></li>
-</ul>
-<h3 id="example">Example</h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>source_code,source_concept_id,source_vocabulary_id,source_code_description,valid_start_date,valid_end_date,invalid_reason
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>A01,,LOCAL,"Dor no peito",2020-01-01,2099-12-31,
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>B02,,LOCAL,"Diabetes mellitus tipo 2",2020-01-01,2099-12-31,
-</span></code></pre></div>
-<hr>
-<h2 id="using-custom-column-names">Using custom column names</h2>
-<p>If your file does not use the expected OMOP column names, provide a column mapping.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="n">column_mapping</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>        <span class="s2">"code"</span><span class="p">:</span> <span class="s2">"source_code"</span><span class="p">,</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>        <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"source_code_description"</span><span class="p">,</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>        <span class="s2">"vocabulary"</span><span class="p">:</span> <span class="s2">"source_vocabulary_id"</span><span class="p">,</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>        <span class="s2">"start_date"</span><span class="p">:</span> <span class="s2">"valid_start_date"</span><span class="p">,</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>        <span class="s2">"end_date"</span><span class="p">:</span> <span class="s2">"valid_end_date"</span><span class="p">,</span>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>        <span class="s2">"reason"</span><span class="p">:</span> <span class="s2">"invalid_reason"</span><span class="p">,</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>        <span class="s2">"concept_id"</span><span class="p">:</span> <span class="s2">"source_concept_id"</span><span class="p">,</span>
-</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="p">}</span>
-</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="p">)</span>
-</span></code></pre></div>
-<p>Then call:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">results_df</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="s2">"my_input.csv"</span><span class="p">)</span>
-</span></code></pre></div>
-<hr>
-<h2 id="building-the-local-databases">Building the local databases</h2>
-<p>Before retrieval works, you usually need to build local assets.</p>
-<h3 id="1-build-the-local-sqlite-vocabulary-database">1. Build the local SQLite vocabulary database</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.builders</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_local_sqlite_vocab_database</span>
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="n">build_local_sqlite_vocab_database</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"/path/to/omop_vocab_files"</span><span class="p">))</span>
-</span></code></pre></div>
-<p>This creates:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>.aatm/omop.db
-</span></code></pre></div>
-<h3 id="2-build-terminology-mapping-datasets">2. Build terminology-mapping datasets</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.builders</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_mapping_datasets</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">build_mapping_datasets</span><span class="p">(</span>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    <span class="n">standard_vocabularies</span><span class="o">=</span><span class="p">[</span><span class="s2">"SNOMED"</span><span class="p">,</span> <span class="s2">"LOINC"</span><span class="p">,</span> <span class="s2">"RxNorm"</span><span class="p">]</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="p">)</span>
-</span></code></pre></div>
-<p>This creates CSV datasets under:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>.aatm/datasets/
-</span></code></pre></div>
-<h3 id="3-build-the-local-vector-database">3. Build the local vector database</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.builders</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_local_vector_database</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">build_local_vector_database</span><span class="p">(</span>
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="n">embedding_model_name</span><span class="o">=</span><span class="s2">"embeddinggemma-300M"</span><span class="p">,</span>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="p">)</span>
-</span></code></pre></div>
-<p>This creates a ChromaDB vector store for retrieval.</p>
-<hr>
-<h2 id="minimal-end-to-end-example">Minimal end-to-end example</h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.terminology_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminologyMapper</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.registries.translators</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_translator</span>
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.registries.retrievers</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_retriever</span>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.registries.selectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_selector</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.registries.rerankers</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_reranker</span>
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
-</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span>
-</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>    <span class="n">translator</span><span class="o">=</span><span class="n">load_translator</span><span class="p">(</span><span class="s2">"empty-translator"</span><span class="p">),</span>
-</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>    <span class="n">retriever</span><span class="o">=</span><span class="n">load_retriever</span><span class="p">(</span><span class="s2">"embeddinggemma-300M"</span><span class="p">),</span>
-</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>    <span class="n">reranker</span><span class="o">=</span><span class="n">load_reranker</span><span class="p">(</span><span class="s2">"bm25-reranker"</span><span class="p">),</span>
-</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>    <span class="n">selector</span><span class="o">=</span><span class="n">load_selector</span><span class="p">(</span><span class="s2">"first-result-selector"</span><span class="p">),</span>
-</span><span id="__span-19-12"><a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>    <span class="n">batch_size</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
-</span><span id="__span-19-13"><a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="p">)</span>
-</span><span id="__span-19-14"><a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>
-</span><span id="__span-19-15"><a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="s2">"source_to_concept_map.csv"</span><span class="p">)</span>
-</span><span id="__span-19-16"><a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a><span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">())</span>
-</span></code></pre></div>
-<hr>
-<h2 id="using-llm-based-components">Using LLM-based components</h2>
-<p>You can replace the default rule-based stages with LLM-backed components.</p>
-<h3 id="openai-selector">OpenAI selector</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">selector</span> <span class="o">=</span> <span class="n">load_selector</span><span class="p">(</span><span class="s2">"gpt-5-mini"</span><span class="p">)</span>
-</span></code></pre></div>
-<h3 id="gemini-selector">Gemini selector</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">selector</span> <span class="o">=</span> <span class="n">load_selector</span><span class="p">(</span><span class="s2">"gemini-2.5-flash"</span><span class="p">)</span>
-</span></code></pre></div>
-<h3 id="gemini-translator">Gemini translator</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">translator</span> <span class="o">=</span> <span class="n">load_translator</span><span class="p">(</span><span class="s2">"gemini-2.5-flash"</span><span class="p">)</span>
-</span></code></pre></div>
-<h3 id="qwen-reranker">Qwen reranker</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">reranker</span> <span class="o">=</span> <span class="n">load_reranker</span><span class="p">(</span><span class="s2">"qwen3-reranker-0.6b"</span><span class="p">)</span>
-</span></code></pre></div>
-<p>These components may require API keys, model downloads, or additional runtime resources.</p>
-<hr>
-<h2 id="supported-registered-components">Supported registered components</h2>
-<h3 id="translators">Translators</h3>
-<ul>
-<li><code>empty-translator</code></li>
-<li><code>gemini-2.5-flash</code></li>
-</ul>
-<h3 id="retrievers">Retrievers</h3>
-<ul>
-<li><code>qwen3-06B</code></li>
-<li><code>qwen3-4B</code></li>
-<li><code>gemini-embedding-001</code></li>
-<li><code>embeddinggemma-300M</code></li>
-<li><code>text-embedding-3-small</code></li>
-<li><code>text-embedding-3-large</code></li>
-</ul>
-<h3 id="rerankers">Rerankers</h3>
-<ul>
-<li><code>bm25-reranker</code></li>
-<li><code>qwen3-reranker-0.6b</code></li>
-<li><code>qwen3-reranker-4b</code></li>
-<li><code>qwen3-reranker-8b</code></li>
-</ul>
-<h3 id="selectors">Selectors</h3>
-<ul>
-<li><code>first-result-selector</code></li>
-<li><code>gpt-5.2</code></li>
-<li><code>gpt-5</code></li>
-<li><code>gpt-5-mini</code></li>
-<li><code>gpt-5-nano</code></li>
-<li><code>gemini-3-pro-preview</code></li>
-<li><code>gemini-3-flash-preview</code></li>
-<li><code>gemini-2.5-flash</code></li>
-<li><code>gemini-2.5-flash-lite</code></li>
-<li><code>gemini-2.5-pro</code></li>
-</ul>
-<hr>
-<h2 id="pipeline-composition">Pipeline composition</h2>
-<p>AATM components are pipeline-compatible and use <code>|</code> composition.</p>
-<p>For example:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">selected_results</span> <span class="o">=</span> <span class="n">translated_batch</span> <span class="o">|</span> <span class="n">retriever</span> <span class="o">|</span> <span class="n">reranker</span> <span class="o">|</span> <span class="n">selector</span>
-</span></code></pre></div>
-<p>This makes it easy to replace or combine stages.</p>
-<hr>
-<h2 id="streamlit-search-ui">Streamlit search UI</h2>
-<p>AATM also includes a lightweight Streamlit-based search interface for exploring retrieval results interactively.</p>
-<p>Typical features include:</p>
-<ul>
-<li>search by expression</li>
-<li>retriever selection from the registry</li>
-<li>ranked candidate inspection</li>
-<li>concept metadata display</li>
-<li>confidence score display</li>
-</ul>
-<p>If your project exposes a Streamlit entry point, you can run it with something like:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>streamlit<span class="w"> </span>run<span class="w"> </span>path/to/search_ui.py
-</span></code></pre></div>
-<hr>
-<h2 id="logging">Logging</h2>
-<p>AATM includes centralized logging utilities so that modules share a consistent format.</p>
-<p>Typical usage:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.logs</span><span class="w"> </span><span class="kn">import</span> <span class="n">configure_logging</span><span class="p">,</span> <span class="n">get_logger</span>
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="n">configure_logging</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
-</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
-</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>
-</span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"AATM initialized"</span><span class="p">)</span>
-</span></code></pre></div>
-<hr>
-<h2 id="common-workflow">Common workflow</h2>
-<p>A typical setup looks like this:</p>
-<ol>
-<li>Prepare OMOP vocabulary files</li>
-<li>Build the local SQLite database</li>
-<li>Build derived mapping datasets</li>
-<li>Build a vector database for your chosen embedding model</li>
-<li>Configure translator, retriever, reranker, and selector</li>
-<li>Run <code>TerminologyMapper.map(...)</code></li>
-<li>Review the generated CSV output</li>
-</ol>
-<hr>
-<h2 id="troubleshooting">Troubleshooting</h2>
-<h3 id="missing-api-key">Missing API key</h3>
-<p>If you use Gemini or OpenAI components and get authentication errors, verify your <code>.env</code> file contains the correct key.</p>
-<h3 id="missing-vector-database">Missing vector database</h3>
-<p>If retrieval fails, make sure you already built the local ChromaDB store for the selected retriever model.</p>
-<h3 id="invalid-input-columns">Invalid input columns</h3>
-<p>If mapping fails on CSV loading, verify that your file contains the required OMOP columns or provide <code>column_mapping</code>.</p>
-<h3 id="existing-local-artifacts">Existing local artifacts</h3>
-<p>Some build steps prompt before overwriting existing assets. This is expected behavior and helps protect generated data.</p>
-<hr>
-<h2 id="next-steps">Next steps</h2>
-<p>After the initial setup, the best next pages are usually:</p>
-<ul>
-<li><strong>Configuration</strong></li>
-<li><strong>Pipeline components</strong></li>
-<li><strong>Registries</strong></li>
-<li><strong>CLI usage</strong></li>
-<li><strong>Streamlit UI</strong></li>
-<li><strong>Advanced customization</strong></li>
-<li><strong>API reference</strong></li>
-</ul>
 
 
 
@@ -2420,9 +1692,55 @@
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
         </div>
         
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden="">
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+        
       </main>
       
         <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer">
+        
+          
+          <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: Home">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Home
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="installation/" class="md-footer__link md-footer__link--next" aria-label="Next: Installation">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Installation
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"></path></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
@@ -2449,7 +1767,7 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "toc.follow", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "0.1.0"}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["search.suggest", "search.highlight", "search.share", "navigation.instant", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.footer", "navigation.top", "navigation.tracking", "toc.follow", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "0.1.0"}</script>
     
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
