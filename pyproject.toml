@@ -16,6 +16,7 @@ dependencies = [
     "jsonlines>=4.0.0",
     "matplotlib>=3.10.8",
     "mkdocs>=1.6.1",
+    "mkdocs-glightbox>=0.5.2",
     "mkdocs-material>=9.7.6",
     "mkdocstrings[python]>=1.0.3",
     "nvidia-ml-py>=13.590.48",

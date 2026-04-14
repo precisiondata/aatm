@@ -1,6 +1,7 @@
 site_name: Any-to-Any Terminology Mapping
 site_url: 
 repo_url: https://github.com/precisiondata/aatm
+repo_name: precisiondata/aatm
 site_description: Any-to-Any Terminology Mapping, a tool for mapping between different terminologies in the healthcare domain.
 site_author: Vinicius Anjos de Almeida (https://github.com/almeidava93) supported by Precision Data.
 
@@ -45,22 +46,31 @@ theme:
   name: material
   locale: en
   features:
+    - search.suggest
+    - search.highlight
+    - search.share
     - navigation.instant
     - navigation.tabs
     - navigation.sections
     - navigation.expand
     - navigation.path
     - navigation.indexes 
+    - navigation.footer
+    - navigation.top
+    - navigation.tracking
     - toc.follow
     - content.code.copy
     - content.code.select
     - content.code.annotate
     - content.tabs.link
+    - content.action.edit
 
 extra:
   version: 0.1.0
 
 plugins:
+  - search
+  - glightbox
   - mkdocstrings:
       handlers:
         python:
@@ -77,9 +87,14 @@ markdown_extensions:
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+          - name: mermaid
+            class: mermaid
+            format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
       slugify: !!python/object/apply:pymdownx.slugs.slugify
         kwds:
           case: lower
+  - pymdownx.blocks.caption
