@@ -227,6 +227,7 @@ class TerminologyMapper:
 
     def map(
         self,
+        expressions: Optional[List[str | SourceConcept]] = None,
         file_path: str | Path = None,
         limit_to: int = None,
         return_confidence_scores: bool = True,
@@ -234,13 +235,10 @@ class TerminologyMapper:
     ) -> Tuple[pd.DataFrame, List[float]] | pd.DataFrame:
         """Map source concepts from a file to standardized concepts.
 
-        This method loads source concepts from a supported input file, processes
-        them in batches through the configured translation, retrieval,
-        reranking, and selection pipeline, and returns the mapped results as a
-        DataFrame. The resulting mappings are also written to a CSV file in the
-        output directory.
+        This method loads source concepts from a supported input file or from a list of strings, processes them in batches through the configured translation, retrieval, reranking, and selection pipeline, and returns the mapped results as a DataFrame. The resulting mappings are also written to a CSV file in the output directory.
 
         Args:
+            expressions: Optional list of expressions to map.
             file_path: Optional path to the source concept file. If not
                 provided, the mapper's configured input file is used.
             limit_to: Optional maximum number of rows to process from the
@@ -259,13 +257,20 @@ class TerminologyMapper:
             ValueError: If no file path is available or the file type is not
                 supported.
         """
-        if file_path is None:
-            file_path = self.input_file
+        file_path = self.input_file if file_path is None else file_path
+        limit_to = self.limit_to if limit_to is None else limit_to
 
-        if limit_to is None:
-            limit_to = self.limit_to
+        if expressions is not None:
+            assert all(
+                isinstance(e, str) or isinstance(e, SourceConcept) for e in expressions
+            ), "Expressions must be either strings or SourceConcept objects."
 
-        if file_path is not None:
+            source_concepts = [
+                SourceConcept(source_code_description=e) if isinstance(e, str) else e
+                for e in expressions
+            ]
+
+        elif file_path is not None:
             if isinstance(file_path, str):
                 file_path = Path(file_path)
             if file_path.suffix == ".csv":
