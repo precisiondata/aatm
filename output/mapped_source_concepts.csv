@@ -1,0 +1,2 @@
+source_code,source_concept_id,source_vocabulary_id,source_code_description,valid_start_date,valid_end_date,invalid_reason,target_concept_id,target_vocabulary_id,target_vocabulary_code,domain_id,confidence_score,source_code_description_original
+,,,referral to a cardiologist,,,,4204664,SNOMED,308471005,Observation,0.9253294691443443,encaminhamento para um cardiologista

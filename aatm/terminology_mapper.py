@@ -90,10 +90,10 @@ class TerminologyMapper:
         self,
         input_file: Optional[str | Path] = None,
         output_dir: str | Path = Path("output"),
-        translator: Optional[BaseTranslator] = None,
-        retriever: Optional[BaseRetriever] = None,
-        selector: Optional[BaseSelector] = None,
-        reranker: Optional[BaseReranker] = None,
+        translator: Optional[BaseTranslator | str] = None,
+        retriever: Optional[BaseRetriever | str] = None,
+        selector: Optional[BaseSelector | str] = None,
+        reranker: Optional[BaseReranker | str] = None,
         batch_size: int = 100,
         rate_limit: Optional[int] = None,
         column_mapping: Optional[dict] = None,
@@ -130,12 +130,25 @@ class TerminologyMapper:
         Returns:
             None.
         """
+        # Define translator
         if translator is None:
-            translator = EmptyTranslator()
+            self.translator = EmptyTranslator()
 
+        elif isinstance(translator, str):
+            self.translator = load_translator(translator)
+
+        elif isinstance(BaseTranslator, translator):
+            self.translator = translator
+
+        else:
+            raise TypeError(
+                f"Translator must be a BaseTranslator or str representing the translator name.  Given type: {type(translator)}."
+            )
+
+        # Define retriever
         if retriever is None:
             client = chromadb.PersistentClient()
-            retriever = ChromaDBRetriever(
+            self.retriever = ChromaDBRetriever(
                 client=client,
                 collection_name="expressions",
                 embedding_function=GoogleEmbeddingFunction(
@@ -143,22 +156,54 @@ class TerminologyMapper:
                 ),
             )
 
+        elif isinstance(retriever, str):
+            self.retriever = load_retriever(retriever)
+
+        elif isinstance(BaseRetriever, retriever):
+            self.retriever = retriever
+
+        else:
+            raise TypeError(
+                f"Retriever must be a BaseRetriever or str representing the retriever name.  Given type: {type(retriever)}."
+            )
+
+        # Define selector
         if selector is None:
-            selector = FirstResultSelector()
+            self.selector = FirstResultSelector()
 
+        elif isinstance(selector, str):
+            self.selector = load_selector(selector)
+
+        elif isinstance(BaseSelector, selector):
+            self.selector = selector
+
+        else:
+            raise TypeError(
+                f"Selector must be a BaseSelector or str representing the selector name.  Given type: {type(selector)}."
+            )
+
+        # Define reranker
         if reranker is None:
-            reranker = PipelineBaseClass()  # empty reranker
+            self.reranker = PipelineBaseClass()
 
+        elif isinstance(reranker, str):
+            self.reranker = load_reranker(reranker)
+
+        elif isinstance(BaseReranker, reranker):
+            self.reranker = reranker
+
+        else:
+            raise TypeError(
+                f"Reranker must be a BaseReranker or str representing the reranker name.  Given type: {type(reranker)}."
+            )
+
+        # Other attributes
         if isinstance(output_dir, str):
             output_dir = Path(output_dir)
 
         self.input_file: Optional[Path] = Path(input_file) if input_file else None
         self.output_dir: Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.translator: BaseTranslator = translator
-        self.retriever: BaseRetriever = retriever
-        self.selector: BaseSelector = selector
-        self.reranker: BaseReranker | PipelineBaseClass = reranker
         self.batch_size: int = batch_size
         self.rate_limit: Optional[int] = rate_limit
         self.expected_columns: set[str] = set(
