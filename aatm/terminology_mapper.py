@@ -90,10 +90,10 @@ class TerminologyMapper:
         self,
         input_file: Optional[str | Path] = None,
         output_dir: str | Path = Path("output"),
-        translator: Optional[BaseTranslator] = None,
-        retriever: Optional[BaseRetriever] = None,
-        selector: Optional[BaseSelector] = None,
-        reranker: Optional[BaseReranker] = None,
+        translator: Optional[BaseTranslator | str] = None,
+        retriever: Optional[BaseRetriever | str] = None,
+        selector: Optional[BaseSelector | str] = None,
+        reranker: Optional[BaseReranker | str] = None,
         batch_size: int = 100,
         rate_limit: Optional[int] = None,
         column_mapping: Optional[dict] = None,
@@ -112,13 +112,13 @@ class TerminologyMapper:
         Args:
             input_file: Optional path to the source concept file to map.
             output_dir: Directory where mapping outputs will be written.
-            translator: Optional translator component used before retrieval.
+            translator: Optional translator component used before retrieval. Expects a BaseTranslator or the translator id in the registry.
             retriever: Optional retriever component used to fetch candidate
-                concepts.
+                concepts. Expects a BaseRetriever or the retriever id in the registry.
             selector: Optional selector component used to choose the final
-                mapped concept.
+                mapped concept. Expects a BaseSelector or the selector id in the registry.
             reranker: Optional reranker component used to reorder retrieved
-                candidates before selection.
+                candidates before selection. Expects a BaseReranker or the reranker id in the registry.
             batch_size: Number of source concepts to process per batch.
             rate_limit: Optional maximum number of items to process per minute.
             column_mapping: Optional mapping from input column names to the
@@ -130,12 +130,25 @@ class TerminologyMapper:
         Returns:
             None.
         """
+        # Define translator
         if translator is None:
-            translator = EmptyTranslator()
+            self.translator = EmptyTranslator()
 
+        elif isinstance(translator, str):
+            self.translator = load_translator(translator)
+
+        elif isinstance(BaseTranslator, translator):
+            self.translator = translator
+
+        else:
+            raise TypeError(
+                f"Translator must be a BaseTranslator or str representing the translator name.  Given type: {type(translator)}."
+            )
+
+        # Define retriever
         if retriever is None:
             client = chromadb.PersistentClient()
-            retriever = ChromaDBRetriever(
+            self.retriever = ChromaDBRetriever(
                 client=client,
                 collection_name="expressions",
                 embedding_function=GoogleEmbeddingFunction(
@@ -143,22 +156,54 @@ class TerminologyMapper:
                 ),
             )
 
+        elif isinstance(retriever, str):
+            self.retriever = load_retriever(retriever)
+
+        elif isinstance(BaseRetriever, retriever):
+            self.retriever = retriever
+
+        else:
+            raise TypeError(
+                f"Retriever must be a BaseRetriever or str representing the retriever name.  Given type: {type(retriever)}."
+            )
+
+        # Define selector
         if selector is None:
-            selector = FirstResultSelector()
+            self.selector = FirstResultSelector()
 
+        elif isinstance(selector, str):
+            self.selector = load_selector(selector)
+
+        elif isinstance(BaseSelector, selector):
+            self.selector = selector
+
+        else:
+            raise TypeError(
+                f"Selector must be a BaseSelector or str representing the selector name.  Given type: {type(selector)}."
+            )
+
+        # Define reranker
         if reranker is None:
-            reranker = PipelineBaseClass()  # empty reranker
+            self.reranker = PipelineBaseClass()
 
+        elif isinstance(reranker, str):
+            self.reranker = load_reranker(reranker)
+
+        elif isinstance(BaseReranker, reranker):
+            self.reranker = reranker
+
+        else:
+            raise TypeError(
+                f"Reranker must be a BaseReranker or str representing the reranker name.  Given type: {type(reranker)}."
+            )
+
+        # Other attributes
         if isinstance(output_dir, str):
             output_dir = Path(output_dir)
 
         self.input_file: Optional[Path] = Path(input_file) if input_file else None
         self.output_dir: Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.translator: BaseTranslator = translator
-        self.retriever: BaseRetriever = retriever
-        self.selector: BaseSelector = selector
-        self.reranker: BaseReranker | PipelineBaseClass = reranker
         self.batch_size: int = batch_size
         self.rate_limit: Optional[int] = rate_limit
         self.expected_columns: set[str] = set(
@@ -227,6 +272,7 @@ class TerminologyMapper:
 
     def map(
         self,
+        expressions: Optional[List[str | SourceConcept]] = None,
         file_path: str | Path = None,
         limit_to: int = None,
         return_confidence_scores: bool = True,
@@ -234,13 +280,11 @@ class TerminologyMapper:
     ) -> Tuple[pd.DataFrame, List[float]] | pd.DataFrame:
         """Map source concepts from a file to standardized concepts.
 
-        This method loads source concepts from a supported input file, processes
-        them in batches through the configured translation, retrieval,
-        reranking, and selection pipeline, and returns the mapped results as a
-        DataFrame. The resulting mappings are also written to a CSV file in the
-        output directory.
+        This method loads source concepts from a supported input file or from a list of strings or SourceConcept objects, processes them in batches through the pipeline, and returns the mapped results as a DataFrame. The resulting mappings are also written to a CSV file in the output directory.
 
         Args:
+            expressions: Optional list of expressions to map. Expects a list of
+                strings or SourceConcept objects.
             file_path: Optional path to the source concept file. If not
                 provided, the mapper's configured input file is used.
             limit_to: Optional maximum number of rows to process from the
@@ -259,13 +303,20 @@ class TerminologyMapper:
             ValueError: If no file path is available or the file type is not
                 supported.
         """
-        if file_path is None:
-            file_path = self.input_file
+        file_path = self.input_file if file_path is None else file_path
+        limit_to = self.limit_to if limit_to is None else limit_to
 
-        if limit_to is None:
-            limit_to = self.limit_to
+        if expressions is not None:
+            assert all(
+                isinstance(e, str) or isinstance(e, SourceConcept) for e in expressions
+            ), "Expressions must be either strings or SourceConcept objects."
 
-        if file_path is not None:
+            source_concepts = [
+                SourceConcept(source_code_description=e) if isinstance(e, str) else e
+                for e in expressions
+            ]
+
+        elif file_path is not None:
             if isinstance(file_path, str):
                 file_path = Path(file_path)
             if file_path.suffix == ".csv":

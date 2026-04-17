@@ -206,13 +206,13 @@ class SourceConcept(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     # fields
-    source_code: Optional[str]
-    source_concept_id: Optional[str]
-    source_vocabulary_id: Optional[str]
-    source_code_description: Optional[str]
-    valid_start_date: Optional[str]
-    valid_end_date: Optional[str]
-    invalid_reason: Optional[str]
+    source_code: Optional[str] = None
+    source_concept_id: Optional[str] = None
+    source_vocabulary_id: Optional[str] = None
+    source_code_description: Optional[str] = None
+    valid_start_date: Optional[str] = None
+    valid_end_date: Optional[str] = None
+    invalid_reason: Optional[str] = None
 
     @field_validator(
         "source_code", "source_concept_id", "source_vocabulary_id", mode="before"
@@ -230,7 +230,7 @@ class SourceConcept(BaseModel):
         Returns:
             The normalized string representation of the input value.
         """
-        return str(value)
+        return str(value) if value is not None else value
 
     @field_validator("valid_start_date", "valid_end_date", mode="before")
     @classmethod
@@ -252,6 +252,9 @@ class SourceConcept(BaseModel):
             ValueError: If the string is not empty and does not match the
                 `YYYY-MM-DD` format.
         """
+        if v is None:
+            return v
+
         if not isinstance(v, str):
             raise TypeError("date must be a string in YYYY-MM-DD format")
 
