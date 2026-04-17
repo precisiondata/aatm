@@ -680,3 +680,19 @@ class TerminologyMappingTask(BaseModel):
             path.write_text(yaml.safe_dump(self.model_dump()))
         else:
             raise ValueError(f"Unsupported config file format: '{path.suffix}'")
+
+
+class ExtractedConcept(BaseModel):
+    text: str
+    start: Optional[int] = None
+    end: Optional[int] = None
+    label: str
+
+
+class ListOfExtractedConcepts(BaseModel):
+    extracted_concepts: List[ExtractedConcept]
+
+    def __getitem__(
+        self, index: int | slice
+    ) -> ExtractedConcept | List[ExtractedConcept]:
+        return self.extracted_concepts[index]
