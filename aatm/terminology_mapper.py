@@ -112,13 +112,13 @@ class TerminologyMapper:
         Args:
             input_file: Optional path to the source concept file to map.
             output_dir: Directory where mapping outputs will be written.
-            translator: Optional translator component used before retrieval.
+            translator: Optional translator component used before retrieval. Expects a BaseTranslator or the translator id in the registry.
             retriever: Optional retriever component used to fetch candidate
-                concepts.
+                concepts. Expects a BaseRetriever or the retriever id in the registry.
             selector: Optional selector component used to choose the final
-                mapped concept.
+                mapped concept. Expects a BaseSelector or the selector id in the registry.
             reranker: Optional reranker component used to reorder retrieved
-                candidates before selection.
+                candidates before selection. Expects a BaseReranker or the reranker id in the registry.
             batch_size: Number of source concepts to process per batch.
             rate_limit: Optional maximum number of items to process per minute.
             column_mapping: Optional mapping from input column names to the
@@ -280,10 +280,11 @@ class TerminologyMapper:
     ) -> Tuple[pd.DataFrame, List[float]] | pd.DataFrame:
         """Map source concepts from a file to standardized concepts.
 
-        This method loads source concepts from a supported input file or from a list of strings, processes them in batches through the configured translation, retrieval, reranking, and selection pipeline, and returns the mapped results as a DataFrame. The resulting mappings are also written to a CSV file in the output directory.
+        This method loads source concepts from a supported input file or from a list of strings or SourceConcept objects, processes them in batches through the pipeline, and returns the mapped results as a DataFrame. The resulting mappings are also written to a CSV file in the output directory.
 
         Args:
-            expressions: Optional list of expressions to map.
+            expressions: Optional list of expressions to map. Expects a list of
+                strings or SourceConcept objects.
             file_path: Optional path to the source concept file. If not
                 provided, the mapper's configured input file is used.
             limit_to: Optional maximum number of rows to process from the
