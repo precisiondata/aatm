@@ -24,10 +24,11 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from enum import Enum
 import pandas as pd
 import yaml
+import itertools
 
 
 def deterministic_id_from_strings(strings: list[str], digest_size: int = 16) -> str:
@@ -206,13 +207,15 @@ class SourceConcept(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     # fields
-    source_code: Optional[str] = None
-    source_concept_id: Optional[str] = None
-    source_vocabulary_id: Optional[str] = None
-    source_code_description: Optional[str] = None
-    valid_start_date: Optional[str] = None
-    valid_end_date: Optional[str] = None
-    invalid_reason: Optional[str] = None
+    source_code: Optional[str] = Field(None, examples=["I63"])
+    source_concept_id: Optional[str] = Field(None, examples=["45543186"])
+    source_vocabulary_id: Optional[str] = Field(None, examples=["ICD10"])
+    source_code_description: Optional[str] = Field(
+        None, examples=["Cerebral infarction"]
+    )
+    valid_start_date: Optional[str] = Field(None, examples=["1990-05-01"])
+    valid_end_date: Optional[str] = Field(None, examples=["2099-12-31"])
+    invalid_reason: Optional[str] = Field(None, examples=[None])
 
     @field_validator(
         "source_code", "source_concept_id", "source_vocabulary_id", mode="before"
@@ -303,12 +306,16 @@ class MappedSourceConcept(SourceConcept):
         target_vocabulary_code: Code of the mapped target concept in the
             target vocabulary.
         domain_id: Domain of the mapped target concept.
+        confidence_score: Confidence score of the mapping.
+        source_code_description_original: Source code description before translation.
     """
 
     target_concept_id: Optional[str]
     target_vocabulary_id: Optional[StandardVocabulary]
     target_vocabulary_code: Optional[str]
     domain_id: Optional[str]
+    confidence_score: Optional[float]
+    source_code_description_original: Optional[str]
 
     @field_validator(
         "source_code",
@@ -359,7 +366,10 @@ class MappedSourceConcept(SourceConcept):
 
     @classmethod
     def from_selector_results(
-        cls, source_concepts: List[SourceConcept], results: "SelectorResults"
+        cls,
+        source_concepts: List[SourceConcept],
+        results: "SelectorResults",
+        translated_source_code_descriptions: Optional[List[Translation]] = None,
     ) -> List["MappedSourceConcept"]:
         """Build mapped source concepts from source concepts and selector results.
 
@@ -373,19 +383,30 @@ class MappedSourceConcept(SourceConcept):
                 selections.
             results: Selection results containing the chosen standardized
                 concept for each source concept.
+            translated_source_code_descriptions: Optional list of translations for the source code descriptions.
 
         Returns:
             A list of `MappedSourceConcept` instances built from the source
             concepts and selector results.
         """
         mapped_source_concepts = []
-        for source_concept, selected_result in zip(source_concepts, results.results):
+        for source_concept, selected_result, translation in itertools.zip_longest(
+            source_concepts, results.results, translated_source_code_descriptions
+        ):
+            # Add type annotations
+            source_concept: SourceConcept
+            selected_result: SelectedExpressionMetadata
+            translation: Optional[Translation]
+
+            # Create MappedSourceConcept
             mapped_source_concepts.append(
                 cls(
                     source_code=source_concept.source_code,
                     source_concept_id=source_concept.source_concept_id,
                     source_vocabulary_id=source_concept.source_vocabulary_id,
-                    source_code_description=source_concept.source_code_description,
+                    source_code_description=translation.text
+                    if translation
+                    else source_concept.source_code_description,
                     target_concept_id=selected_result.std_concept_id,
                     target_vocabulary_id=selected_result.std_vocabulary_id.value
                     if selected_result.std_vocabulary_id
@@ -395,6 +416,10 @@ class MappedSourceConcept(SourceConcept):
                     valid_end_date=source_concept.valid_end_date,
                     invalid_reason=source_concept.invalid_reason,
                     target_vocabulary_code=selected_result.std_vocabulary_code,
+                    confidence_score=1 - selected_result.distance,
+                    source_code_description_original=source_concept.source_code_description
+                    if translation
+                    else None,
                 )
             )
 
