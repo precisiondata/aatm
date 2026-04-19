@@ -79,7 +79,7 @@ Note:
 import logging
 import subprocess
 import sys
-from typing import Annotated, List, Optional
+from typing import Annotated, List, Literal, Optional
 from rich.json import JSON
 
 import typer
@@ -518,3 +518,83 @@ def map(
 @app.command("amap", help="Run a terminology mapping task with asynchronous methods")
 def amap() -> None:
     raise NotImplementedError
+
+
+@app.command("serve", help="Serve a FastAPI application with AATM's functionality")
+def serve(
+    host: Annotated[
+        Optional[str],
+        typer.Option(
+            "--host",
+            "-h",
+            help="Host",
+        ),
+    ] = "0.0.0.0",
+    port: Annotated[
+        str,
+        typer.Option(
+            "--port",
+            "-p",
+            help="Port",
+        ),
+    ] = "8000",
+    mode: Annotated[
+        Literal["prod", "dev"],
+        typer.Option("--mode", "-m", help="Serving mode: 'prod' or 'dev'"),
+    ] = "dev",
+    reload: Annotated[
+        bool | None,
+        typer.Option(
+            "--reload", help="Enables hot reload. Compatible with 'dev' mode only."
+        ),
+    ] = False,
+    workers: Annotated[
+        Optional[str],
+        typer.Option(
+            "--workers",
+            "-w",
+            help="Number of workers",
+        ),
+    ] = None,
+) -> None:
+    api_main_file = Path(__file__).resolve().parent / Path("api/main.py")
+
+    if not api_main_file.exists():
+        raise typer.BadParameter(
+            f"FastAPI application implementation was not found: {api_main_file}"
+        )
+
+    if reload and mode != "dev":
+        console.print(
+            f"[yellow]Attention:[/yellow] You provided the flag '--reload' and the mode '{mode}'. Hot reload is only enabled in 'dev' mode, so it will be ignored.\n"
+        )
+
+    print_logo()
+
+    command = [
+        sys.executable,
+        "-m",
+        "fastapi",
+        "run" if mode == "prod" else "dev",
+        # default entrypoint is defined at pyproject.toml
+        "--host",
+        host,
+        "--port",
+        port,
+    ]
+
+    if workers and mode != "prod":
+        console.print(
+            f"[yellow]Attention:[/yellow] You provided the flag '--workers' and the mode '{mode}'. Workers are only enabled in 'prod' mode, so it will be ignored.\n"
+        )
+    elif workers:
+        command.append("--workers")
+        command.append(workers)
+
+    if reload and mode == "dev":
+        command.append("--reload")
+
+    subprocess.run(
+        command,
+        check=True,
+    )
