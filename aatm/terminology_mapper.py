@@ -14,13 +14,14 @@ concept files, process them in batches, and write the mapped output to disk.
 from pathlib import Path
 from selectors import BaseSelector
 import time
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Literal, Optional, Tuple
 from rich.console import Console
 from rich.progress import track
 from tqdm import tqdm
 import chromadb
 import pandas as pd
 
+from aatm.api.data_models import TerminologyMappingRequest
 from aatm.pipeline import PipelineBaseClass
 from aatm.data_models import (
     MappedSourceConcept,
@@ -270,14 +271,28 @@ class TerminologyMapper:
             limit_to=task_config.limit_to,
         )
 
+    @classmethod
+    def from_task_request(
+        cls, task_request: TerminologyMappingRequest, *args, **kwargs
+    ) -> "TerminologyMapper":
+        return cls(
+            translator=task_request.translator_id,
+            retriever=task_request.retriever_id,
+            selector=task_request.selector_id,
+            reranker=task_request.reranker_id,
+            *args,
+            **kwargs,
+        )
+
     def map(
         self,
         expressions: Optional[List[str | SourceConcept]] = None,
         file_path: str | Path = None,
         limit_to: int = None,
-        return_confidence_scores: bool = True,
         output_dir: str | Path = None,
-    ) -> Tuple[pd.DataFrame, List[float]] | pd.DataFrame:
+        return_as: Literal["df", "mapped_source_concepts"] = "df",
+        save_to_disk: bool = True,
+    ) -> pd.DataFrame:
         """Map source concepts from a file to standardized concepts.
 
         This method loads source concepts from a supported input file or from a list of strings or SourceConcept objects, processes them in batches through the pipeline, and returns the mapped results as a DataFrame. The resulting mappings are also written to a CSV file in the output directory.
@@ -289,15 +304,14 @@ class TerminologyMapper:
                 provided, the mapper's configured input file is used.
             limit_to: Optional maximum number of rows to process from the
                 source file.
-            return_confidence_scores: Whether to include confidence scores in
-                the returned output DataFrame.
             output_dir: Optional output directory override for this mapping
                 operation.
+            return_as: Return type. Options: "df" or
+                "mapped_source_concepts".
+            save_to_disk: Whether to save the results to disk.
 
         Returns:
-            A pandas DataFrame containing the mapped source concepts. The
-            current annotation allows for a tuple including confidence scores,
-            but the present implementation returns only the DataFrame.
+            A pandas DataFrame containing the mapped source concepts.
 
         Raises:
             ValueError: If no file path is available or the file type is not
@@ -328,10 +342,13 @@ class TerminologyMapper:
         else:
             raise ValueError("No file path provided")
 
+        assert return_as in ["df", "mapped_source_concepts"], (
+            "Parameter return_as must be either 'df' or 'mapped_source_concepts'."
+        )
+
         # map source concepts
         mapped_source_concepts: List[MappedSourceConcept] = []
         translated_source_concepts: List[Translation] = []
-        confidence_scores: List[float] = []
         next_allowed_time = time.monotonic()
         for batch_idx in track(
             range(0, len(source_concepts), self.batch_size),
@@ -345,48 +362,45 @@ class TerminologyMapper:
                     len(batch), next_allowed_time, self.rate_limit
                 )
 
-            translated_batch = batch | self.translator
+            translated_batch: List[Translation] = batch | self.translator
             selected_source_concepts: SelectorResults = (
                 translated_batch | self.retriever | self.reranker | self.selector
             )
             translated_source_concepts.extend(translated_batch)
             mapped_source_concepts.extend(
                 MappedSourceConcept.from_selector_results(
-                    batch, selected_source_concepts
+                    batch, selected_source_concepts, translated_batch
                 )
             )
-            confidence_scores.extend(
+
+        mapped_source_concepts_df = None
+        if save_to_disk:
+            # write mapped source concepts to csv
+            mapped_source_concepts_df = pd.DataFrame(
                 [
-                    1 - selected_source_concepts.results[i].distance
-                    for i in range(len(selected_source_concepts.results))
+                    mapped_source_concept.to_dict()
+                    for mapped_source_concept in mapped_source_concepts
                 ]
             )
 
-        # write mapped source concepts to csv
-        mapped_source_concepts_df = pd.DataFrame(
-            [
-                mapped_source_concept.to_dict()
-                for mapped_source_concept in mapped_source_concepts
-            ]
-        )
+            output_dir = output_dir if output_dir is not None else self.output_dir
 
-        if return_confidence_scores:
-            mapped_source_concepts_df["confidence_score"] = confidence_scores
+            mapped_source_concepts_df.to_csv(
+                self.output_dir / "mapped_source_concepts.csv", index=False
+            )
 
-        mapped_source_concepts_df["source_code_description_original"] = (
-            mapped_source_concepts_df["source_code_description"]
-        )
-        mapped_source_concepts_df["source_code_description"] = [
-            t.text for t in translated_source_concepts
-        ]
+        if return_as == "df":
+            if mapped_source_concepts_df is None:
+                mapped_source_concepts_df = pd.DataFrame(
+                    [
+                        mapped_source_concept.to_dict()
+                        for mapped_source_concept in mapped_source_concepts
+                    ]
+                )
+            return mapped_source_concepts_df
 
-        output_dir = output_dir if output_dir is not None else self.output_dir
-
-        mapped_source_concepts_df.to_csv(
-            self.output_dir / "mapped_source_concepts.csv", index=False
-        )
-
-        return mapped_source_concepts_df
+        elif return_as == "mapped_source_concepts":
+            return mapped_source_concepts
 
     async def amap(
         self,
