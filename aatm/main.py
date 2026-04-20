@@ -89,6 +89,7 @@ import questionary
 from questionary import Choice
 import dotenv
 
+from aatm.api.config import APIConfig
 from aatm.terminology_mapper import TerminologyMapper
 
 from .data_models import TerminologyMappingTask
@@ -556,6 +557,22 @@ def serve(
             help="Number of workers",
         ),
     ] = None,
+    rate_limit: Annotated[
+        Optional[int],
+        typer.Option(
+            "--rate-limit",
+            "-r",
+            help="Maximum number of documents allowed per minute",
+        ),
+    ] = None,
+    batch_size: Annotated[
+        int,
+        typer.Option(
+            "--batch-size",
+            "-b",
+            help="Batch size",
+        ),
+    ] = 100,
 ) -> None:
     api_main_file = Path(__file__).resolve().parent / Path("api/main.py")
 
@@ -570,6 +587,16 @@ def serve(
         )
 
     print_logo()
+
+    # Save API configuration to disk
+    api_config = APIConfig(
+        host=host,
+        port=port,
+        rate_limit=rate_limit,
+        batch_size=batch_size,
+        workers=workers,
+    )
+    api_config.save_to_disk()
 
     command = [
         sys.executable,
