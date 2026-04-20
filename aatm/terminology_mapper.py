@@ -21,6 +21,7 @@ from tqdm import tqdm
 import chromadb
 import pandas as pd
 
+from aatm.api.config import APIConfig
 from aatm.api.data_models import TerminologyMappingRequest
 from aatm.pipeline import PipelineBaseClass
 from aatm.data_models import (
@@ -95,7 +96,7 @@ class TerminologyMapper:
         retriever: Optional[BaseRetriever | str] = None,
         selector: Optional[BaseSelector | str] = None,
         reranker: Optional[BaseReranker | str] = None,
-        batch_size: int = 100,
+        batch_size: Optional[int] = None,
         rate_limit: Optional[int] = None,
         column_mapping: Optional[dict] = None,
         limit_to: Optional[int] = None,
@@ -205,7 +206,7 @@ class TerminologyMapper:
         self.input_file: Optional[Path] = Path(input_file) if input_file else None
         self.output_dir: Path = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.batch_size: int = batch_size
+        self.batch_size: int = batch_size if batch_size else 100
         self.rate_limit: Optional[int] = rate_limit
         self.expected_columns: set[str] = set(
             [
@@ -273,15 +274,17 @@ class TerminologyMapper:
 
     @classmethod
     def from_task_request(
-        cls, task_request: TerminologyMappingRequest, *args, **kwargs
+        cls,
+        task_request: TerminologyMappingRequest,
+        api_config: APIConfig = None,
     ) -> "TerminologyMapper":
         return cls(
             translator=task_request.translator_id,
             retriever=task_request.retriever_id,
             selector=task_request.selector_id,
             reranker=task_request.reranker_id,
-            *args,
-            **kwargs,
+            batch_size=api_config.batch_size if api_config else None,
+            rate_limit=api_config.rate_limit if api_config else None,
         )
 
     def map(
