@@ -31,6 +31,9 @@ The CLI is responsible for orchestrating high-level workflows such as:
 - `amap`:
     Placeholder for future asynchronous mapping support.
 
+- `serve`:
+    Serves a minimal FastAPI application with AATM's functionality.
+
 Attributes:
     LOCAL_HELPER_PATH (Path): Path to the local helper directory used by AATM
         to store generated artifacts and local resources.
@@ -79,7 +82,7 @@ Note:
 import logging
 import subprocess
 import sys
-from typing import Annotated, List, Optional
+from typing import Annotated, List, Literal, Optional
 from rich.json import JSON
 
 import typer
@@ -89,6 +92,7 @@ import questionary
 from questionary import Choice
 import dotenv
 
+from aatm.api.config import APIConfig
 from aatm.terminology_mapper import TerminologyMapper
 
 from .data_models import TerminologyMappingTask
@@ -518,3 +522,137 @@ def map(
 @app.command("amap", help="Run a terminology mapping task with asynchronous methods")
 def amap() -> None:
     raise NotImplementedError
+
+
+@app.command("serve", help="Serve a FastAPI application with AATM's functionality")
+def serve(
+    host: Annotated[
+        Optional[str],
+        typer.Option(
+            "--host",
+            "-h",
+            help="Host",
+        ),
+    ] = "0.0.0.0",
+    port: Annotated[
+        str,
+        typer.Option(
+            "--port",
+            "-p",
+            help="Port",
+        ),
+    ] = "8000",
+    mode: Annotated[
+        Literal["prod", "dev"],
+        typer.Option("--mode", "-m", help="Serving mode: 'prod' or 'dev'"),
+    ] = "dev",
+    reload: Annotated[
+        bool | None,
+        typer.Option(
+            "--reload", help="Enables hot reload. Compatible with 'dev' mode only."
+        ),
+    ] = False,
+    workers: Annotated[
+        Optional[str],
+        typer.Option(
+            "--workers",
+            "-w",
+            help="Number of workers",
+        ),
+    ] = None,
+    rate_limit: Annotated[
+        Optional[int],
+        typer.Option(
+            "--rate-limit",
+            "-r",
+            help="Maximum number of documents allowed per minute",
+        ),
+    ] = None,
+    batch_size: Annotated[
+        int,
+        typer.Option(
+            "--batch-size",
+            "-b",
+            help="Batch size",
+        ),
+    ] = 100,
+) -> None:
+    """Serve a FastAPI application exposing AATM functionality.
+
+    This command validates the serving configuration, persists the API settings to
+    disk, and launches the FastAPI application using the appropriate runtime mode.
+    It supports development and production execution, optional hot reload, worker
+    configuration, and request-processing parameters such as rate limits and batch
+    size.
+
+    Args:
+        host: Host interface on which the FastAPI application will listen.
+        port: Port on which the FastAPI application will listen.
+        mode: Serving mode. Use `"dev"` for development and `"prod"` for
+            production.
+        reload: Whether to enable hot reload. This option is only effective in
+            development mode.
+        workers: Number of worker processes to use. This option is only effective
+            in production mode.
+        rate_limit: Maximum number of documents allowed per minute.
+        batch_size: Batch size used by the API processing pipeline.
+
+    Returns:
+        None.
+
+    Raises:
+        typer.BadParameter: If the FastAPI application entrypoint cannot be found.
+        subprocess.CalledProcessError: If the FastAPI process exits with a
+            non-zero status.
+    """
+    api_main_file = Path(__file__).resolve().parent / Path("api/main.py")
+
+    if not api_main_file.exists():
+        raise typer.BadParameter(
+            f"FastAPI application implementation was not found: {api_main_file}"
+        )
+
+    if reload and mode != "dev":
+        console.print(
+            f"[yellow]Attention:[/yellow] You provided the flag '--reload' and the mode '{mode}'. Hot reload is only enabled in 'dev' mode, so it will be ignored.\n"
+        )
+
+    print_logo()
+
+    # Save API configuration to disk
+    api_config = APIConfig(
+        host=host,
+        port=port,
+        rate_limit=rate_limit,
+        batch_size=batch_size,
+        workers=workers,
+    )
+    api_config.save_to_disk()
+
+    command = [
+        sys.executable,
+        "-m",
+        "fastapi",
+        "run" if mode == "prod" else "dev",
+        # default entrypoint is defined at pyproject.toml
+        "--host",
+        host,
+        "--port",
+        port,
+    ]
+
+    if workers and mode != "prod":
+        console.print(
+            f"[yellow]Attention:[/yellow] You provided the flag '--workers' and the mode '{mode}'. Workers are only enabled in 'prod' mode, so it will be ignored.\n"
+        )
+    elif workers:
+        command.append("--workers")
+        command.append(workers)
+
+    if reload and mode == "dev":
+        command.append("--reload")
+
+    subprocess.run(
+        command,
+        check=True,
+    )
