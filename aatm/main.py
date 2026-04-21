@@ -31,6 +31,9 @@ The CLI is responsible for orchestrating high-level workflows such as:
 - `amap`:
     Placeholder for future asynchronous mapping support.
 
+- `serve`:
+    Serves a minimal FastAPI application with AATM's functionality.
+
 Attributes:
     LOCAL_HELPER_PATH (Path): Path to the local helper directory used by AATM
         to store generated artifacts and local resources.
@@ -574,6 +577,34 @@ def serve(
         ),
     ] = 100,
 ) -> None:
+    """Serve a FastAPI application exposing AATM functionality.
+
+    This command validates the serving configuration, persists the API settings to
+    disk, and launches the FastAPI application using the appropriate runtime mode.
+    It supports development and production execution, optional hot reload, worker
+    configuration, and request-processing parameters such as rate limits and batch
+    size.
+
+    Args:
+        host: Host interface on which the FastAPI application will listen.
+        port: Port on which the FastAPI application will listen.
+        mode: Serving mode. Use `"dev"` for development and `"prod"` for
+            production.
+        reload: Whether to enable hot reload. This option is only effective in
+            development mode.
+        workers: Number of worker processes to use. This option is only effective
+            in production mode.
+        rate_limit: Maximum number of documents allowed per minute.
+        batch_size: Batch size used by the API processing pipeline.
+
+    Returns:
+        None.
+
+    Raises:
+        typer.BadParameter: If the FastAPI application entrypoint cannot be found.
+        subprocess.CalledProcessError: If the FastAPI process exits with a
+            non-zero status.
+    """
     api_main_file = Path(__file__).resolve().parent / Path("api/main.py")
 
     if not api_main_file.exists():
