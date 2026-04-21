@@ -48,7 +48,10 @@ class BaseRetriever(PipelineBaseClass, ABC):
         pass
 
     def __call__(
-        self, queries: str | Translation | List[str] | List[Translation]
+        self,
+        queries: str | Translation | List[str] | List[Translation],
+        *args: Any,
+        **kwargs: Any,
     ) -> RetrieverResults:
         """Normalize query inputs and perform retrieval.
 
@@ -86,7 +89,7 @@ class BaseRetriever(PipelineBaseClass, ABC):
             f"of Translation objects. Got {queries}."
         )
 
-        return self.retrieve(queries)
+        return self.retrieve(queries, *args, **kwargs)
 
 
 class ChromaDBRetriever(BaseRetriever):
@@ -147,6 +150,8 @@ class ChromaDBRetriever(BaseRetriever):
         queries: List[str],
         where: dict[str, Any] | None = None,
         top_k: int | None = None,
+        *args,
+        **kwargs,
     ) -> RetrieverResults:
         """Retrieve nearest candidates for the given queries from ChromaDB.
 
