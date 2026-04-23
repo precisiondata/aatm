@@ -17,7 +17,7 @@ predefined label set and enriches each extracted concept with character-level
 start and end offsets computed from the source text.
 """
 
-from typing import List, Optional
+from typing import Any, List, Optional
 import dotenv
 from abc import ABC, abstractmethod
 from google import genai
@@ -42,12 +42,14 @@ class BaseExtractor(PipelineBaseClass, ABC):
 
     @abstractmethod
     def extract(
-        self, texts: List[str]
+        self, texts: List[str], prompt_args: Optional[List[dict[str, Any]]]
     ) -> List[List[ExtractedConcept]] | List[ListOfExtractedConcepts]:
         """Extract concepts from a batch of texts.
 
         Args:
             texts: A list of input texts to be processed.
+            prompt_args: Optional list of dictionaries containing arguments to be
+                passed to the prompt template.
 
         Returns:
             A list with one extraction result per input text. Each result may be
@@ -61,7 +63,7 @@ class BaseExtractor(PipelineBaseClass, ABC):
         pass
 
     def __call__(
-        self, texts: List[str]
+        self, texts: List[str], prompt_args: Optional[List[dict[str, Any]]] = None
     ) -> List[List[ExtractedConcept]] | List[ListOfExtractedConcepts]:
         """Run extraction on a batch of texts.
 
@@ -70,6 +72,8 @@ class BaseExtractor(PipelineBaseClass, ABC):
 
         Args:
             texts: A list of input texts.
+            prompt_args: Optional list of dictionaries containing arguments to be
+                passed to the prompt template.
 
         Returns:
             The extraction results returned by `extract`.
@@ -81,7 +85,7 @@ class BaseExtractor(PipelineBaseClass, ABC):
         assert isinstance(texts, list) and isinstance(texts[0], str), (
             "Input must be a list of strings."
         )
-        return self.extract(texts)
+        return self.extract(texts, prompt_args)
 
 
 class GeminiExtractor(BaseExtractor):
@@ -158,7 +162,9 @@ class GeminiExtractor(BaseExtractor):
         end_index = start_index + len(prompt)
         return [start_index, end_index]
 
-    def extract(self, texts: List[str]) -> List[ListOfExtractedConcepts]:
+    def extract(
+        self, texts: List[str], prompt_args: Optional[List[dict[str, Any]]] = None
+    ) -> List[ListOfExtractedConcepts]:
         """Extract structured concepts from a batch of texts using Gemini.
 
         For each input text, this method formats the configured prompt template,
@@ -168,6 +174,8 @@ class GeminiExtractor(BaseExtractor):
 
         Args:
             texts: A list of raw texts to process.
+            prompt_args: Optional list of dictionaries containing arguments to be
+                passed to the prompt template.
 
         Returns:
             A list of `ListOfExtractedConcepts` objects, with one validated extraction
@@ -181,8 +189,9 @@ class GeminiExtractor(BaseExtractor):
         """
 
         results = []
-        for text in texts:
-            prompt = self.prompt_template.format(text=text)
+        for idx, text in enumerate(texts):
+            curr_prompt_args = prompt_args[idx] if prompt_args else {}
+            prompt = self.prompt_template.format(text=text, **curr_prompt_args)
             response = self.client.models.generate_content(
                 model=self.model_id,
                 contents=prompt,

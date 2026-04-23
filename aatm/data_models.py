@@ -24,11 +24,14 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from enum import Enum
 import pandas as pd
 import yaml
 import itertools
+import copy
+
+from aatm.omop.registry import OMOP_EXTRACTION_MODEL_REGISTRY
 
 
 def deterministic_id_from_strings(strings: list[str], digest_size: int = 16) -> str:
@@ -708,16 +711,200 @@ class TerminologyMappingTask(BaseModel):
 
 
 class ExtractedConcept(BaseModel):
+    """Represents a labeled concept extracted from a text span.
+
+    This model stores the extracted text, its optional character offsets in the
+    source text, and the label assigned to the concept. Extra fields are allowed
+    to support extensible annotation payloads.
+
+    Attributes:
+        text: Extracted text span.
+        start: Optional start character offset of the span in the source text.
+        end: Optional end character offset of the span in the source text.
+        label: Label assigned to the extracted concept.
+    """
+
     text: str
     start: Optional[int] = None
     end: Optional[int] = None
     label: str
 
+    model_config = ConfigDict(extra="allow")
+
 
 class ListOfExtractedConcepts(BaseModel):
+    """Container for a list of extracted concepts.
+
+    Attributes:
+        extracted_concepts: List of extracted concepts.
+    """
+
     extracted_concepts: List[ExtractedConcept]
 
     def __getitem__(
         self, index: int | slice
     ) -> ExtractedConcept | List[ExtractedConcept]:
+        """Return one or more extracted concepts by index or slice.
+
+        Args:
+            index: Integer index for a single concept or slice for multiple concepts.
+
+        Returns:
+            A single `ExtractedConcept` when `index` is an integer, or a list of
+                `ExtractedConcept` objects when `index` is a slice.
+        """
         return self.extracted_concepts[index]
+
+
+class Message(BaseModel):
+    """Represents a single message in a prompt.
+
+    Attributes:
+        role: Role of the message author, such as user, system, or assistant.
+        content: Text content of the message.
+    """
+
+    role: str
+    content: str
+
+
+class Prompt(BaseModel):
+    """Represents a prompt composed of multiple messages.
+
+    Attributes:
+        messages: Ordered list of messages that make up the prompt.
+    """
+
+    messages: List[Message]
+
+    def __getitem__(self, index: int | slice) -> Message:
+        """Return a message from the prompt by index or slice.
+
+        Args:
+            index: Integer index or slice used to access prompt messages.
+
+        Returns:
+            The selected `Message` object or message slice from `self.messages`.
+        """
+        return self.messages[index]
+
+    def format(
+        self,
+        ignore_unknown_keys: bool = False,
+        **kwargs,
+    ) -> List[Message]:
+        """Format the content of all prompt messages with the provided variables.
+
+        This method creates a deep copy of the prompt messages and applies Python
+        string formatting to each message content. When `ignore_unknown_keys` is
+        enabled, only keys that appear in the message content are passed to
+        `str.format`.
+
+        Args:
+            ignore_unknown_keys: Whether to ignore formatting keys that are not used
+                in a given message content.
+            **kwargs: Keyword arguments used to format the message contents.
+
+        Returns:
+            A new list of formatted `Message` objects.
+        """
+        messages = copy.deepcopy(self.messages)
+        for idx in range(len(self.messages)):
+            if ignore_unknown_keys:
+                filtered_args = {
+                    k: v for k, v in kwargs.items() if k in messages[idx].content
+                }
+                messages[idx].content = messages[idx].content.format(**filtered_args)
+            else:
+                messages[idx].content = messages[idx].content.format(**kwargs)
+        return messages
+
+
+class ExtractionTask(BaseModel):
+    """Represents a structured information extraction task.
+
+    This model bundles the prompt template, optional prompt-formatting arguments,
+    input texts to process, and the target data model expected from extraction.
+
+    Attributes:
+        prompt_template: Prompt template used to generate extraction prompts.
+        prompt_args: Optional formatting arguments applied to the prompt template.
+            This may be a single dictionary shared across inputs or a list of
+            dictionaries for per-input formatting.
+        texts: List of input texts from which information should be extracted.
+        data_model: Pydantic model describing the expected structured extraction
+            output.
+    """
+
+    prompt_template: Prompt
+    prompt_args: Optional[List[dict[str, Any]] | dict[str, Any]] = None
+    texts: List[str]
+    data_model: BaseModel
+
+    @field_validator("data_model", mode="before")
+    def validate_data_model(cls, v: Any) -> BaseModel:
+        """Validate or resolve the extraction output data model.
+
+        This validator accepts either a model object directly or a string identifier.
+        When a string is provided, it is treated as a key into the extraction model
+        registry and replaced by the corresponding registered model.
+
+        Args:
+            v: Data model value provided to the field. This may be a Pydantic model
+                instance, model class, or a string key referencing a registered model.
+
+        Returns:
+            The resolved data model object to be stored in the field.
+        """
+
+        if isinstance(v, str):
+            return OMOP_EXTRACTION_MODEL_REGISTRY.get(v)
+        return v
+
+    @field_validator("prompt_args", mode="after")
+    def validate_prompt_args(
+        cls, value: Any, info: ValidationInfo
+    ) -> List[dict[str, Any]] | dict[str, Any] | None:
+        """Validate that all prompt argument keys correspond to placeholders in the prompt template.
+
+        This validator ensures that every key provided in `prompt_args` appears as a
+        placeholder in at least one message of the prompt template. It supports either
+        a single dictionary of prompt arguments or a list of dictionaries.
+
+        Args:
+            value: Prompt arguments to validate.
+            info: Validation context containing the other model fields, including the
+                prompt template.
+
+        Returns:
+            The validated prompt arguments, or `None` if no prompt arguments were
+                provided.
+
+        Raises:
+            AssertionError: If `prompt_args` contains values that are not dictionaries
+                when a list is provided.
+            AssertionError: If any prompt argument key does not correspond to a
+                placeholder in the prompt template.
+        """
+        if value is None:
+            return
+
+        if isinstance(value, dict):
+            for k in value.keys():
+                assert any(
+                    f"{{{k}}}" in message.content
+                    for message in info.data["prompt_template"].messages
+                ), f"Missing placeholder in prompt template: {k}"
+
+        elif isinstance(value, list):
+            for args in value:
+                assert isinstance(args, dict), (
+                    "Prompt args must be a dictionary or a list of dictionaries."
+                )
+                for k in args.keys():
+                    assert any(
+                        f"{{{k}}}" in message.content
+                        for message in info.data["prompt_template"].messages
+                    ), f"Missing placeholder in prompt template: {k}"
+
+        return value
