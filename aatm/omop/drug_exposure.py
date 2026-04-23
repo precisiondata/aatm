@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Optional
+from typing import Annotated, Optional
 
 from pydantic import (
     BaseModel,
     Field,
     ConfigDict,
+    StringConstraints,
     field_validator,
-    conint,
-    constr,
 )
 
 from aatm.omop.registry import register_omop_extraction_model
@@ -18,7 +17,7 @@ from aatm.omop.registry import register_omop_extraction_model
 @register_omop_extraction_model(register_id="drug_exposure")
 class DrugExposureExtractionModel(BaseModel):
     """
-    Pydantic model to be used for information extraction from clinical documents based on the OMOP CDM `drug_exposure` table.
+    Pydantic model to be used for information extraction from clinical documents based on the OMOP CDM `drug_exposure` table. Contains fields that may be extracted from a clinical document, such as a patient note or a prescription.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -43,7 +42,7 @@ class DrugExposureExtractionModel(BaseModel):
         None,
         description="End date of the drug exposure as represented in the source data if available.",
     )
-    stop_reason: Optional[constr(max_length=20)] = Field(
+    stop_reason: Annotated[Optional[str], StringConstraints(max_length=20)] = Field(
         None,
         description="Reason the medication was stopped, as represented in the source.",
     )
@@ -55,7 +54,7 @@ class DrugExposureExtractionModel(BaseModel):
         None,
         description="Quantity of drug dispensed, prescribed, or administered.",
     )
-    days_supply: Optional[conint(ge=0)] = Field(
+    days_supply: Annotated[Optional[int], Field(strict=True, gt=0)] = Field(
         None,
         description="Number of days of supply recorded in the source.",
     )
@@ -63,20 +62,19 @@ class DrugExposureExtractionModel(BaseModel):
         None,
         description="Verbatim instruction for the drug as written by the provider.",
     )
-    route_concept_id: Optional[int] = Field(
-        None,
-        description="Standard concept identifier for the route of administration.",
-    )
-    lot_number: Optional[constr(max_length=50)] = Field(
+    lot_number: Annotated[Optional[str], StringConstraints(max_length=50)] = Field(
         None,
         description="Lot number of the drug product.",
     )
-
-    route_source_value: Optional[constr(max_length=50)] = Field(
-        None,
-        description="Verbatim route value from the source data.",
+    route_source_value: Annotated[Optional[str], StringConstraints(max_length=50)] = (
+        Field(
+            None,
+            description="Verbatim route value from the source data.",
+        )
     )
-    dose_unit_source_value: Optional[constr(max_length=50)] = Field(
+    dose_unit_source_value: Annotated[
+        Optional[str], StringConstraints(max_length=50)
+    ] = Field(
         None,
         description="Verbatim dose unit value from the source data.",
     )
@@ -111,7 +109,7 @@ class DrugExposureExtractionModel(BaseModel):
 
 class DrugExposure(DrugExposureExtractionModel):
     """
-    Pydantic model for the OMOP CDM `drug_exposure` table.
+    Pydantic model for the OMOP CDM `drug_exposure` table. It completes the DrugExposureExtractionModel with additional fields from the OMOP CDM that are not expected to be extracted from a clinical document.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -144,11 +142,17 @@ class DrugExposure(DrugExposureExtractionModel):
         None,
         description="Identifier of the visit detail during which the drug exposure occurred.",
     )
-    drug_source_value: Optional[constr(max_length=50)] = Field(
-        None,
-        description="Verbatim drug code or value from the source data.",
+    drug_source_value: Annotated[Optional[str], StringConstraints(max_length=50)] = (
+        Field(
+            None,
+            description="Verbatim drug code or value from the source data.",
+        )
     )
     drug_source_concept_id: Optional[int] = Field(
         None,
         description="Source concept identifier representing the original drug code/value.",
+    )
+    route_concept_id: Optional[int] = Field(
+        None,
+        description="Standard concept identifier for the route of administration.",
     )
