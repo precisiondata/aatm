@@ -22,6 +22,7 @@ nav:
       - Pipeline: 'reference/pipeline.md'
       - Translators: 'reference/translators.md'
       - Embedding functions: 'reference/embedding_functions.md'
+      - Extractors: 'reference/extractors.md'
       - Retrievers: 'reference/retrievers.md'
       - Rerankers: 'reference/rerankers.md'
       - Selectors: 'reference/selectors.md'
