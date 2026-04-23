@@ -178,7 +178,6 @@ class GeminiExtractor(BaseExtractor):
             for idx, text in enumerate(task.texts):
                 curr_prompt_args = task.prompt_args[idx] if task.prompt_args else {}
                 prompt = task.prompt_template.format(text=text, **curr_prompt_args)
-                print(prompt)
                 response = self.client.models.generate_content(
                     model=self.model_id,
                     contents=prompt,
