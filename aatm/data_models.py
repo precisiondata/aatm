@@ -817,7 +817,7 @@ class Prompt(BaseModel):
                 messages[idx].content = messages[idx].content.format(**filtered_args)
             else:
                 messages[idx].content = messages[idx].content.format(**kwargs)
-        return messages
+        return [msg.model_dump() for msg in messages]
 
 
 class ExtractionTask(BaseModel):
@@ -836,10 +836,10 @@ class ExtractionTask(BaseModel):
             output.
     """
 
-    prompt_template: Prompt
+    prompt_template: Prompt | str
     prompt_args: Optional[List[dict[str, Any]] | dict[str, Any]] = None
     texts: List[str]
-    data_model: BaseModel
+    data_model: type[BaseModel]
 
     @field_validator("data_model", mode="before")
     def validate_data_model(cls, v: Any) -> BaseModel:
