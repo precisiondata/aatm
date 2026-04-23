@@ -17,12 +17,12 @@ predefined label set and enriches each extracted concept with character-level
 start and end offsets computed from the source text.
 """
 
-from typing import Any, List, Optional
+from typing import List, Optional
 import dotenv
 from abc import ABC, abstractmethod
 from google import genai
 
-from aatm.data_models import ExtractedConcept, ListOfExtractedConcepts
+from aatm.data_models import ExtractedConcept, ExtractionTask, ListOfExtractedConcepts
 from aatm.pipeline import PipelineBaseClass
 
 dotenv.load_dotenv()
@@ -42,14 +42,12 @@ class BaseExtractor(PipelineBaseClass, ABC):
 
     @abstractmethod
     def extract(
-        self, texts: List[str], prompt_args: Optional[List[dict[str, Any]]]
+        self, tasks: List[ExtractionTask]
     ) -> List[List[ExtractedConcept]] | List[ListOfExtractedConcepts]:
         """Extract concepts from a batch of texts.
 
         Args:
-            texts: A list of input texts to be processed.
-            prompt_args: Optional list of dictionaries containing arguments to be
-                passed to the prompt template.
+            tasks: A list of `ExtractionTask` instances.
 
         Returns:
             A list with one extraction result per input text. Each result may be
@@ -63,7 +61,7 @@ class BaseExtractor(PipelineBaseClass, ABC):
         pass
 
     def __call__(
-        self, texts: List[str], prompt_args: Optional[List[dict[str, Any]]] = None
+        self, tasks: List[ExtractionTask]
     ) -> List[List[ExtractedConcept]] | List[ListOfExtractedConcepts]:
         """Run extraction on a batch of texts.
 
@@ -71,9 +69,7 @@ class BaseExtractor(PipelineBaseClass, ABC):
         and then delegates execution to `extract`.
 
         Args:
-            texts: A list of input texts.
-            prompt_args: Optional list of dictionaries containing arguments to be
-                passed to the prompt template.
+            tasks: A list of `ExtractionTask` instances.
 
         Returns:
             The extraction results returned by `extract`.
@@ -82,10 +78,10 @@ class BaseExtractor(PipelineBaseClass, ABC):
             AssertionError: If the input is not a list of strings.
         """
 
-        assert isinstance(texts, list) and isinstance(texts[0], str), (
-            "Input must be a list of strings."
+        assert isinstance(tasks, list) and isinstance(tasks[0], ExtractionTask), (
+            "Input must be a list of ExtractionTask instances."
         )
-        return self.extract(texts, prompt_args)
+        return self.extract(tasks)
 
 
 class GeminiExtractor(BaseExtractor):
@@ -111,17 +107,12 @@ class GeminiExtractor(BaseExtractor):
     def __init__(
         self,
         model_id: str,
-        prompt_template: str,
         api_key: Optional[str] = None,
-        labels: Optional[List[str]] = None,
     ) -> None:
         """Initialize a Gemini-based extractor.
 
         Args:
             model_id: Identifier of the Gemini model to be used for extraction.
-            prompt_template: Prompt template used to instruct the model. The template
-                must contain a `{text}` placeholder where the input text will be
-                inserted.
             api_key: Optional Google API key used to initialize the Gemini client.
                 If omitted, authentication may rely on environment configuration.
             labels: Optional list of allowed labels. When provided, extracted concepts
@@ -135,12 +126,6 @@ class GeminiExtractor(BaseExtractor):
         self.model_id = model_id
         self.api_key = api_key
         self.client = genai.Client(api_key=api_key)
-        self.prompt_template = prompt_template
-        self.labels = labels
-
-        assert "{text}" in self.prompt_template, (
-            "Prompt template must contain a {text} placeholder."
-        )
 
     def _get_start_and_end_indices(self, text: str, prompt: str) -> List[int]:
         """Compute character offsets for an extracted span in the source text.
@@ -162,9 +147,7 @@ class GeminiExtractor(BaseExtractor):
         end_index = start_index + len(prompt)
         return [start_index, end_index]
 
-    def extract(
-        self, texts: List[str], prompt_args: Optional[List[dict[str, Any]]] = None
-    ) -> List[ListOfExtractedConcepts]:
+    def extract(self, tasks: List[ExtractionTask]) -> List[ListOfExtractedConcepts]:
         """Extract structured concepts from a batch of texts using Gemini.
 
         For each input text, this method formats the configured prompt template,
@@ -173,9 +156,7 @@ class GeminiExtractor(BaseExtractor):
         assigning character offsets and applying optional label filtering.
 
         Args:
-            texts: A list of raw texts to process.
-            prompt_args: Optional list of dictionaries containing arguments to be
-                passed to the prompt template.
+            tasks: A list of `ExtractionTask` instances.
 
         Returns:
             A list of `ListOfExtractedConcepts` objects, with one validated extraction
@@ -189,38 +170,25 @@ class GeminiExtractor(BaseExtractor):
         """
 
         results = []
-        for idx, text in enumerate(texts):
-            curr_prompt_args = prompt_args[idx] if prompt_args else {}
-            prompt = self.prompt_template.format(text=text, **curr_prompt_args)
-            response = self.client.models.generate_content(
-                model=self.model_id,
-                contents=prompt,
-                config={
-                    "response_mime_type": "application/json",
-                    "response_json_schema": ListOfExtractedConcepts.model_json_schema(),
-                },
+        for task in tasks:
+            current_task_results = []
+            assert isinstance(task, ExtractionTask), (
+                "Input must be a list of ExtractionTask instances."
             )
-            result = ListOfExtractedConcepts.model_validate_json(response.text)
-
-            # Add start and end indices
-            for concept in result.extracted_concepts:
-                start_end_indices = self._get_start_and_end_indices(text, concept.text)
-                concept.start = start_end_indices[0]
-                concept.end = start_end_indices[1]
-
-            # Keep only extracted concept that are present in the original text
-            result.extracted_concepts = [
-                concept for concept in result.extracted_concepts if concept.start != -1
-            ]
-
-            # Keep only valid labels
-            if self.labels:
-                result.extracted_concepts = [
-                    concept
-                    for concept in result.extracted_concepts
-                    if concept.label in self.labels
-                ]
-
-            results.append(result)
+            for idx, text in enumerate(task.texts):
+                curr_prompt_args = task.prompt_args[idx] if task.prompt_args else {}
+                prompt = task.prompt_template.format(text=text, **curr_prompt_args)
+                print(prompt)
+                response = self.client.models.generate_content(
+                    model=self.model_id,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json",
+                        "response_json_schema": task.data_model.model_json_schema(),
+                    },
+                )
+                result = task.data_model.model_validate_json(response.text)
+                current_task_results.append(result)
+            results.append(current_task_results)
 
         return results
