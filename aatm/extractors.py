@@ -176,7 +176,13 @@ class GeminiExtractor(BaseExtractor):
                 "Input must be a list of ExtractionTask instances."
             )
             for idx, text in enumerate(task.texts):
-                curr_prompt_args = task.prompt_args[idx] if task.prompt_args else {}
+                if task.prompt_args is None:
+                    curr_prompt_args = {}
+                elif isinstance(task.prompt_args, list):
+                    curr_prompt_args = task.prompt_args[idx]
+                elif isinstance(task.prompt_args, dict):
+                    curr_prompt_args = task.prompt_args
+
                 prompt = task.prompt_template.format(text=text, **curr_prompt_args)
                 response = self.client.models.generate_content(
                     model=self.model_id,
