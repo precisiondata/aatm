@@ -891,6 +891,12 @@ class ExtractionTask(BaseModel):
 
         if isinstance(value, dict):
             for k in value.keys():
+                if isinstance(info.data["prompt_template"], str):
+                    assert f"{{{k}}}" in info.data["prompt_template"], (
+                        f"Missing placeholder in prompt template: {k}"
+                    )
+                    continue
+
                 assert any(
                     f"{{{k}}}" in message.content
                     for message in info.data["prompt_template"].messages
@@ -902,6 +908,11 @@ class ExtractionTask(BaseModel):
                     "Prompt args must be a dictionary or a list of dictionaries."
                 )
                 for k in args.keys():
+                    if isinstance(info.data["prompt_template"], str):
+                        assert f"{{{k}}}" in info.data["prompt_template"], (
+                            f"Missing placeholder in prompt template: {k}"
+                        )
+                        continue
                     assert any(
                         f"{{{k}}}" in message.content
                         for message in info.data["prompt_template"].messages
