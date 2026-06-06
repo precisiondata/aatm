@@ -10,7 +10,9 @@ chroma_vector_dbs
 .secrets
 .aatm
 data
+dist
 tasks
 site
 ./*.ipynb
 notebooks
+draft.md
