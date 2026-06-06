@@ -7,7 +7,7 @@ In simple terms, mapping a new expression to a specific terminology involves con
 AATM leverages the [OMOP vocabularies](https://athena.ohdsi.org/search-terms/start) to facilitate this task. These vocabularies reflect large, community-driven mapping efforts that connect many different health-related terminologies and classifications worldwide and organize them around standard terminologies, which serve as the central connecting nodes in the system. As these mapping efforts continue, healthcare-related concepts become increasingly well represented in these vocabularies, creating a virtuous cycle and increasing the chances of finding a strong correspondence for a new unmapped expression.
 
 <p align="center">
-  <img src="./docs/assets/std_vocabs_diagram.png" alt="Standard vocabularies">
+  <img src="https://github.com/precisiondata/aatm/blob/main/docs/assets/std_vocabs_diagram.png?raw=true" alt="Standard vocabularies">
 </p>
 
 To accomplish this, AATM organizes the mapping process into very simple steps: 
@@ -18,7 +18,7 @@ To accomplish this, AATM organizes the mapping process into very simple steps:
 
 Once this connection is made, every link associated with that standard concept becomes immediately available, enabling mapping to many different terminologies and classifications that are already connected to that concept, effectively breaking down barriers to interoperability in healthcare.
 
-![Terminology mapping pipeline](./docs/assets/aatm-pipeline-diagram.jpg)
+![Terminology mapping pipeline](https://github.com/precisiondata/aatm/blob/main/docs/assets/aatm-pipeline-diagram.jpg?raw=true)
 
 
 ## Documentation
