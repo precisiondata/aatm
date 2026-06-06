@@ -62,18 +62,5 @@ source-include = ["aatm/*.yaml"]
 [tool.setuptools]
 packages = ["aatm"]
 
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
-[tool.uv.sources]
-torch = [
-  { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
-]
-torchvision = [
-  { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
-]
-
 [tool.fastapi]
 entrypoint = "aatm.api.main:app"
