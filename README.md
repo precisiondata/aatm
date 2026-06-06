@@ -126,3 +126,16 @@ Four groups:
 | Qwen3 0.6B                | Qwen          | gemini-2.5-pro      |               |            |               |
 | text-embedding-3-small    | OpenAI        | gemini-2.5-pro      |               |            |               |
 | Qwen3 4B                  | Qwen          | gemini-2.5-pro      |               |            |               |
+
+
+
+
+
+
+| source_code | source_vocabulary_id | source_code_description                             | target_concept_id | target_vocabulary_id | target_vocabulary_code | domain_id   | confidence_score | source_code_description_original                               |
+| ----------- | -------------------- | --------------------------------------------------- | ----------------: | -------------------- | ---------------------- | ----------- | ---------------: | -------------------------------------------------------------- |
+| 10101012    | TUSS                 | Office consultation (normal or pre-scheduled hours) |          45878568 | LOINC                | LA7553-6               | Meas Value  |            0.344 | Consulta em consultório (no horário normal ou preestabelecido) |
+| 10101020    | TUSS                 | Home consultation                                   |          45878568 | LOINC                | LA7553-6               | Meas Value  |            0.692 | Consulta em domicílio                                          |
+| 10101039    | TUSS                 | Emergency room consultation                         |           3015595 | LOINC                | 8647-0                 | Observation |            0.675 | Consulta em pronto socorro                                     |
+| 10102019    | TUSS                 | Hospital visit (inpatient)                          |          45885231 | LOINC                | LA12769-8              | Meas Value  |            0.661 | Visita hospitalar (paciente internado)                         |
+| 10103015    | TUSS                 | Newborn care in the nursery                         |           4222294 | SNOMED               | 8390008                | Observation |            0.821 | Atendimento ao recém-nascido em berçário                       |

@@ -27,6 +27,12 @@ from pydantic import (
 from aatm.omop.registry import register_omop_extraction_model
 
 
+@register_omop_extraction_model(register_id="drug_exposure_list")
+class ListOfDrugExposureExtractionModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    records: list[DrugExposureExtractionModel]
+
+
 @register_omop_extraction_model(register_id="drug_exposure")
 class DrugExposureExtractionModel(BaseModel):
     """Structured extraction model for OMOP CDM `drug_exposure` information.
@@ -36,6 +42,9 @@ class DrugExposureExtractionModel(BaseModel):
     `drug_exposure` fields that may reasonably be inferred from unstructured text.
 
     Attributes:
+        drug_source_value: Verbatim drug code or value from the source.
+        drug_source_concept_id: Source concept identifier for the original drug
+            code or value.
         drug_exposure_start_date: Start date of the drug exposure.
         drug_exposure_start_datetime: Start date and time of the drug exposure.
         drug_exposure_end_date: End date of the drug exposure.
@@ -52,7 +61,16 @@ class DrugExposureExtractionModel(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-
+    drug_source_value: Annotated[Optional[str], StringConstraints(max_length=50)] = (
+        Field(
+            None,
+            description="Verbatim drug code or value from the source data.",
+        )
+    )
+    drug_source_concept_id: Optional[int] = Field(
+        None,
+        description="Source concept identifier representing the original drug code/value.",
+    )
     drug_exposure_start_date: Optional[date] = Field(
         None,
         description="Start date of the drug exposure. Must follow the format YYYY-MM-DD.",
@@ -127,7 +145,7 @@ class DrugExposureExtractionModel(BaseModel):
                 `drug_exposure_start_date`.
         """
         start_date = info.data.get("drug_exposure_start_date")
-        if start_date is not None and v < start_date:
+        if start_date is not None and v is not None and v < start_date:
             raise ValueError(
                 "drug_exposure_end_date cannot be earlier than drug_exposure_start_date"
             )
@@ -191,9 +209,6 @@ class DrugExposure(DrugExposureExtractionModel):
         provider_id: Identifier of the associated provider.
         visit_occurrence_id: Identifier of the associated visit occurrence.
         visit_detail_id: Identifier of the associated visit detail.
-        drug_source_value: Verbatim drug code or value from the source.
-        drug_source_concept_id: Source concept identifier for the original drug
-            code or value.
         route_concept_id: Standard concept identifier for the route of
             administration.
     """
@@ -227,16 +242,6 @@ class DrugExposure(DrugExposureExtractionModel):
     visit_detail_id: Optional[int] = Field(
         None,
         description="Identifier of the visit detail during which the drug exposure occurred.",
-    )
-    drug_source_value: Annotated[Optional[str], StringConstraints(max_length=50)] = (
-        Field(
-            None,
-            description="Verbatim drug code or value from the source data.",
-        )
-    )
-    drug_source_concept_id: Optional[int] = Field(
-        None,
-        description="Source concept identifier representing the original drug code/value.",
     )
     route_concept_id: Optional[int] = Field(
         None,
