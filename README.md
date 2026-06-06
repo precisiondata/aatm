@@ -6,11 +6,9 @@ In simple terms, mapping a new expression to a specific terminology involves con
 
 AATM leverages the [OMOP vocabularies](https://athena.ohdsi.org/search-terms/start) to facilitate this task. These vocabularies reflect large, community-driven mapping efforts that connect many different health-related terminologies and classifications worldwide and organize them around standard terminologies, which serve as the central connecting nodes in the system. As these mapping efforts continue, healthcare-related concepts become increasingly well represented in these vocabularies, creating a virtuous cycle and increasing the chances of finding a strong correspondence for a new unmapped expression.
 
-![Standard vocabularies](./docs/assets/std_vocabs_diagram.png)
-/// caption
-Standard vocabularies
-///
-
+<p align="center">
+  <img src="./docs/assets/std_vocabs_diagram.png" alt="Standard vocabularies">
+</p>
 
 To accomplish this, AATM organizes the mapping process into very simple steps: 
 
@@ -21,26 +19,178 @@ To accomplish this, AATM organizes the mapping process into very simple steps:
 Once this connection is made, every link associated with that standard concept becomes immediately available, enabling mapping to many different terminologies and classifications that are already connected to that concept, effectively breaking down barriers to interoperability in healthcare.
 
 ![Terminology mapping pipeline](./docs/assets/aatm-pipeline-diagram.jpg)
-/// caption
-Terminology mapping pipeline
-///
 
-## Design principles
 
-**Modularity**
+## Documentation
 
-AATM is designed as a pipeline of clearly separated components, each responsible for a specific part of the terminology mapping process. Translation, retrieval, reranking, and selection are treated as independent steps with well-defined interfaces. This separation makes the library easier to understand, test, maintain, and adapt. It also allows users to inspect and improve one part of the workflow without having to redesign the entire system.
+The full documentation is available at: https://precisiondata.github.io/aatm
 
-This modular structure is especially important because terminology mapping is not a single uniform problem. Different use cases may require different translation strategies, retrieval methods, or selection criteria depending on the source language, target terminology, domain, or level of ambiguity in the input expressions. By isolating responsibilities, AATM allows each part of the pipeline to evolve independently while remaining compatible with the broader framework.
 
-**Extensibility**
+## Installation
 
-AATM was built with the expectation that terminology mapping methods will continue to evolve. New embedding models, retrieval systems, rerankers, large language model–based selectors, rule-based selectors, and domain-specific heuristics can be incorporated into the framework without requiring major changes to its core design. Users can replace existing components or add new ones while preserving the overall pipeline structure.
 
-This extensibility is important both for research and for production settings. In research, it enables rapid experimentation with new methods and easier comparison between approaches. In applied settings, it allows users to adapt the system to new terminologies, new languages, and new operational requirements. In this sense, AATM is intended not only as a tool for performing terminology mapping, but also as a flexible foundation for building and evaluating new mapping workflows.
+Install the package in your environment.
 
-**Simplicity**
+```bash
+pip install aatm
+```
 
-Although terminology mapping can involve complex methods, AATM is designed to keep the overall process conceptually simple. The framework reduces the task to a small number of intuitive steps that reflect how a person might approach the problem: optionally translate the input, retrieve possible matches, rerank or organize the candidates, and select the best concept. This organization helps make the library more accessible to users who are not specialists in information retrieval or machine learning.
+If you want to build from the source, clone the repository and install it locally:
 
-Simplicity also guides the user experience. The library aims to provide clear abstractions, predictable behavior, and straightforward ways to configure and run mapping pipelines. This makes it easier to get started with basic workflows while still leaving room for more advanced customization when needed. By prioritizing simplicity, AATM seeks to lower the barrier to terminology mapping and make interoperable healthcare data workflows more approachable.
+```bash
+git clone https://github.com/precisiondata/aatm.git
+pip install -e . 
+```
+
+```bash
+git clone https://github.com/precisiondata/aatm.git
+uv sync
+```
+
+## 1. Prepare your OMOP vocabularies directory
+
+Before running `aatm init`, download the OMOP vocabularies you want to use and place them in a directory. You can find them at https://athena.ohdsi.org/vocabulary/list
+
+By default, the CLI expects it at the root directory:
+
+```text
+./vocabularies
+```
+
+If you do not use that location, you can point the CLI to a different directory with the option `--vocab-dir` or `-vd`. The CLI validates this path during initialization.
+
+---
+
+## 2. Run the initialization command
+
+The `init` command is the main CLI setup workflow.
+
+It does all of the following for you:
+
+- creates the local `.aatm` helper directory where the local databases and aatm config files will be stored
+- ensures `.aatm` is added to `.gitignore`
+- builds the local OMOP SQLite database
+- lets you choose an embedding model
+- lets you choose the standard vocabularies
+- builds the mapping datasets
+- builds the local vector database
+
+That means you do **not** need to call Python setup functions manually for the normal setup flow. At the end, you will be ready to run terminology mapping tasks.
+
+### Simplest setup
+
+```bash
+aatm init
+```
+
+This uses the default vocab directory and interactively asks you to choose the embedding model, standard vocabularies and other options.
+
+### Setup with a custom vocab directory
+
+```bash
+aatm init --vocab-dir ./my_vocabularies
+```
+
+### Setup with an explicit embedding model
+
+```bash
+aatm init --embedding-model embeddinggemma-300M
+```
+
+### Setup with explicit standard vocabularies
+
+```bash
+aatm init --standard-vocabs LOINC --standard-vocabs SNOMED --standard-vocabs RxNorm
+```
+
+### Fully explicit setup
+
+```bash
+aatm init \
+  --vocab-dir ./vocabularies \
+  --embedding-model embeddinggemma-300M \
+  --standard-vocabs LOINC \
+  --standard-vocabs SNOMED \
+  --standard-vocabs RxNorm
+```
+
+## 3. Prepare your input CSV
+
+After initialization, prepare the CSV you want to map.
+
+The mapper expects an OMOP-style `SOURCE_TO_CONCEPT_MAP` input structure, including these columns:
+
+- `source_code`
+- `source_concept_id`
+- `source_vocabulary_id`
+- `source_code_description`
+- `valid_start_date`
+- `valid_end_date`
+- `invalid_reason`
+
+Example:
+
+```csv
+source_code,source_concept_id,source_vocabulary_id,source_code_description,valid_start_date,valid_end_date,invalid_reason
+A01,,LOCAL,"Dor no peito",2020-01-01,2099-12-31,
+B02,,LOCAL,"Diabetes mellitus tipo 2",2020-01-01,2099-12-31,
+```
+
+---
+
+## 4. Run mapping directly from the CLI
+
+The `map` command runs a terminology mapping task. You can use it in two ways:
+
+- with a task config file
+- with explicit CLI options
+
+Both paths are supported directly by the CLI implementation.
+
+### Option A: run from explicit CLI arguments
+
+This is the most direct fully-CLI workflow.
+
+```bash
+aatm map \
+  --input-file data/source_to_concept_map.csv \
+  --output-dir output \
+  --translator-id empty-translator \
+  --retriever-id embeddinggemma-300M \
+  --reranker-id bm25-reranker \
+  --selector-id first-result-selector \
+  --batch-size 100
+```
+
+#### Run a small test job
+
+Use `--limit-to` when you want to test with only a few rows.
+
+```bash
+aatm map \
+  --input-file data/source_to_concept_map.csv \
+  --output-dir output \
+  --translator-id empty-translator \
+  --retriever-id embeddinggemma-300M \
+  --reranker-id bm25-reranker \
+  --selector-id first-result-selector \
+  --limit-to 20
+```
+
+#### Apply rate limiting
+
+If needed, you can also pass a rate limit:
+
+```bash
+aatm map \
+  --input-file data/source_to_concept_map.csv \
+  --output-dir output \
+  --translator-id gemini-2.5-flash \
+  --retriever-id embeddinggemma-300M \
+  --reranker-id bm25-reranker \
+  --selector-id first-result-selector \
+  --batch-size 50 \
+  --rate-limit 100
+```
+
+The CLI accepts all of these options directly.
