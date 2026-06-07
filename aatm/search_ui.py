@@ -14,7 +14,6 @@ import streamlit as st
 import chromadb
 import dotenv
 
-from aatm.data_models import RetrievedExpressionMetadata
 from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY, load_retriever
 from aatm.retrievers import (
     ChromaDBRetriever,

@@ -14,7 +14,7 @@ from aatm.api.data_models import SearchRequest, TerminologyMappingRequest
 from aatm.data_models import MappedSourceConcept, RetrieverResults
 from aatm.pipeline import PipelineBaseClass
 from aatm.registries.retrievers import load_retriever
-from aatm.retrievers import BaseRetriever, ChromaDBRetriever
+from aatm.retrievers import BaseRetriever
 from aatm.terminology_mapper import TerminologyMapper
 
 app = FastAPI()
