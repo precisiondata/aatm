@@ -61,10 +61,10 @@ class DebugMode(Enum):
 
 
 def get_debug_mode(
-    enum: Enum = DebugMode,
+    enum: type[DebugMode] = DebugMode,
     env_var: str = "DEBUG_MODE",
     default: Enum = DebugMode.NONE,
-) -> DebugMode:
+) -> Enum:
     """
     Resolve the active debug mode from environment variables.
 

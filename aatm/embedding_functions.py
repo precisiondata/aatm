@@ -49,6 +49,7 @@ from chromadb import Documents, EmbeddingFunction, Embeddings
 from google import genai
 import os
 import dotenv
+import numpy as np
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 import torch
@@ -86,20 +87,23 @@ class GoogleEmbeddingFunction(EmbeddingFunction):
         self.model = model
 
     def __call__(self, input: Documents) -> Embeddings:
-        """Generate embeddings for the provided documents.
-
-        Args:
-            input: Documents to be embedded.
-
-        Returns:
-            Embeddings returned by the Google embedding API, converted to the
-            format expected by ChromaDB.
-        """
         response = self.client.models.embed_content(
             model=self.model,
-            contents=input,
+            contents=input,  # type: ignore[arg-type]
         )
-        return [emb.values for emb in response.embeddings]
+
+        if response.embeddings is None:
+            raise RuntimeError("Google embedding API returned no embeddings.")
+
+        embeddings: Embeddings = []
+
+        for emb in response.embeddings:
+            if emb is None or emb.values is None:
+                raise RuntimeError("Google embedding API returned an empty embedding.")
+
+            embeddings.append(np.asarray(emb.values, dtype=np.float32))
+
+        return embeddings
 
 
 class Qwen3EmbeddingModels(Enum):
@@ -287,4 +291,15 @@ class OpenAIEmbeddingFunction(EmbeddingFunction):
             expected by ChromaDB.
         """
         response = self.client.embeddings.create(input=input, model=self.model_id)
-        return [emb.embedding for emb in response.data]
+
+        embeddings: Embeddings = []
+
+        if response.data is None:
+            raise RuntimeError("OpenAI embedding API returned no embeddings.")
+
+        for emb in response.data:
+            if emb is None or emb.embedding is None:
+                raise RuntimeError("OpenAI embedding API returned an empty embedding.")
+            embeddings.append(np.asarray(emb.embedding, dtype=np.float32))
+
+        return embeddings

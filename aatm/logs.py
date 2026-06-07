@@ -68,7 +68,7 @@ def configure_logging(
     if root_logger.handlers:
         return
 
-    handler = logging.StreamHandler(stream)
+    handler = logging.StreamHandler(stream)  # type: ignore[arg-type]
     formatter = logging.Formatter(
         fmt=log_format,
         datefmt=date_format,

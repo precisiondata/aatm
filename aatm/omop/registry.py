@@ -1,12 +1,11 @@
-from collections.abc import Callable
 from typing import Optional
 from pydantic import BaseModel
 
-OMOP_EXTRACTION_MODEL_REGISTRY: dict[str, Callable] = {}
+OMOP_EXTRACTION_MODEL_REGISTRY: dict[str, BaseModel] = {}
 
 
 def register_omop_extraction_model(
-    obj: type[BaseModel] = None,
+    obj: type[BaseModel] | None = None,
     *,
     register_id: Optional[str] = None,
 ):

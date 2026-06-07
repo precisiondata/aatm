@@ -23,7 +23,7 @@ from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Self
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from enum import Enum
 import pandas as pd
@@ -34,7 +34,9 @@ import copy
 from aatm.omop.registry import OMOP_EXTRACTION_MODEL_REGISTRY
 
 
-def deterministic_id_from_strings(strings: list[str], digest_size: int = 16) -> str:
+def deterministic_id_from_strings(
+    strings: list[str | None], digest_size: int = 16
+) -> str:
     """
     Generate a deterministic id from a list of strings.
 
@@ -45,7 +47,9 @@ def deterministic_id_from_strings(strings: list[str], digest_size: int = 16) -> 
     Returns:
         str: A deterministic id as a hexadecimal string.
     """
-    joined = "||".join(strings)
+    if not strings:
+        raise ValueError("List of strings must not be empty.")
+    joined = "||".join([str(s) for s in strings if s is not None])
     return hashlib.blake2b(joined.encode("utf-8"), digest_size=digest_size).hexdigest()
 
 
@@ -224,7 +228,7 @@ class SourceConcept(BaseModel):
         "source_code", "source_concept_id", "source_vocabulary_id", mode="before"
     )
     @classmethod
-    def validate_strings(cls, value: Any) -> str:
+    def validate_strings(cls, value: Any) -> str | None:
         """Convert source identifier fields to strings before validation.
 
         This validator coerces selected source concept fields to `str`
@@ -276,7 +280,7 @@ class SourceConcept(BaseModel):
         return v
 
     @classmethod
-    def from_csv(cls, path: str | Path) -> List["SourceConcept"]:
+    def from_csv(cls, path: str | Path) -> List[Self]:
         """Load source concepts from a CSV file.
 
         This class method reads a CSV file into a pandas DataFrame, replaces
@@ -293,7 +297,7 @@ class SourceConcept(BaseModel):
             path = Path(path)
         df = pd.read_csv(path).fillna("")
 
-        return [cls(**row) for row in df.to_dict("records")]
+        return [cls(**row) for row in df.to_dict("records")]  # type: ignore[arg-type]
 
 
 class MappedSourceConcept(SourceConcept):
@@ -329,7 +333,7 @@ class MappedSourceConcept(SourceConcept):
         mode="before",
     )
     @classmethod
-    def validate_strings(cls, value: Any) -> str:
+    def validate_strings(cls, value: Any) -> str | None:
         """Convert selected source and target fields to strings before validation.
 
         This validator coerces selected identifier and vocabulary fields to
@@ -345,27 +349,7 @@ class MappedSourceConcept(SourceConcept):
         if value is not None:
             return str(value)
 
-    @classmethod
-    def from_csv(cls, path: str | Path) -> List["MappedSourceConcept"]:
-        """Load mapped source concepts from a CSV file.
-
-        This class method reads a CSV file into a pandas DataFrame, replaces
-        missing values with empty strings, and constructs one
-        `MappedSourceConcept` instance per row.
-
-        Args:
-            path: Path to the CSV file containing mapped source concept
-                records.
-
-        Returns:
-            A list of `MappedSourceConcept` instances loaded from the CSV
-            file.
-        """
-        if isinstance(path, str):
-            path = Path(path)
-        df = pd.read_csv(path).fillna("")
-
-        return [cls(**row) for row in df.to_dict("records")]
+        return None
 
     @classmethod
     def from_selector_results(
@@ -394,12 +378,14 @@ class MappedSourceConcept(SourceConcept):
         """
         mapped_source_concepts = []
         for source_concept, selected_result, translation in itertools.zip_longest(
-            source_concepts, results.results, translated_source_code_descriptions
+            source_concepts,
+            results.results,
+            translated_source_code_descriptions,  # type: ignore[arg-type]
         ):
             # Add type annotations
-            source_concept: SourceConcept
-            selected_result: SelectedExpressionMetadata
-            translation: Optional[Translation]
+            source_concept: SourceConcept  # type: ignore[no-redef]
+            selected_result: SelectedExpressionMetadata  # type: ignore[no-redef]
+            translation: Optional[Translation]  # type: ignore[no-redef]
 
             # Create MappedSourceConcept
             mapped_source_concepts.append(
@@ -419,7 +405,9 @@ class MappedSourceConcept(SourceConcept):
                     valid_end_date=source_concept.valid_end_date,
                     invalid_reason=source_concept.invalid_reason,
                     target_vocabulary_code=selected_result.std_vocabulary_code,
-                    confidence_score=1 - selected_result.distance,
+                    confidence_score=1 - selected_result.distance
+                    if selected_result.distance
+                    else None,
                     source_code_description_original=source_concept.source_code_description
                     if translation
                     else None,
@@ -468,7 +456,7 @@ class RetrievedExpressionMetadata(ExpressionMetadata):
     distance: Optional[float] = None
     rerank_score: Optional[float] = None
 
-    def to_prompt_object(self, *args: Any, **kwargs: Any) -> Dict[str, str]:
+    def to_prompt_object(self, *args: Any, **kwargs: Any) -> Dict[str, str | None]:
         """Convert retrieved metadata to a prompt-friendly dictionary.
 
         This method returns a reduced dictionary representation containing
@@ -490,7 +478,9 @@ class RetrievedExpressionMetadata(ExpressionMetadata):
             "expression_id": self.expression_id,
             "expression": self.expression,
             "standard_concept_name": self.std_concept_name,
-            "standard_vocabulary_id": self.std_vocabulary_id.value,
+            "standard_vocabulary_id": self.std_vocabulary_id.value
+            if self.std_vocabulary_id
+            else None,
             "standard_vocabulary_code": self.std_vocabulary_code,
             "standard_domain_id": self.std_domain_id,
         }
@@ -777,7 +767,7 @@ class Prompt(BaseModel):
 
     messages: List[Message]
 
-    def __getitem__(self, index: int | slice) -> Message:
+    def __getitem__(self, index: int | slice) -> Message | List[Message]:
         """Return a message from the prompt by index or slice.
 
         Args:
@@ -792,7 +782,7 @@ class Prompt(BaseModel):
         self,
         ignore_unknown_keys: bool = False,
         **kwargs,
-    ) -> List[Message]:
+    ) -> List[dict[str, Any]]:
         """Format the content of all prompt messages with the provided variables.
 
         This method creates a deep copy of the prompt messages and applies Python
@@ -842,7 +832,7 @@ class ExtractionTask(BaseModel):
     data_model: type[BaseModel]
 
     @field_validator("data_model", mode="before")
-    def validate_data_model(cls, v: Any) -> BaseModel:
+    def validate_data_model(cls, v: Any) -> BaseModel | None:
         """Validate or resolve the extraction output data model.
 
         This validator accepts either a model object directly or a string identifier.
@@ -858,7 +848,9 @@ class ExtractionTask(BaseModel):
         """
 
         if isinstance(v, str):
-            return OMOP_EXTRACTION_MODEL_REGISTRY.get(v)
+            data_model = OMOP_EXTRACTION_MODEL_REGISTRY.get(v)
+            if data_model is None:
+                raise NotImplementedError(f"Unknown data model: {v}")
         return v
 
     @field_validator("prompt_args", mode="after")
@@ -887,7 +879,7 @@ class ExtractionTask(BaseModel):
                 placeholder in the prompt template.
         """
         if value is None:
-            return
+            return value
 
         if isinstance(value, dict):
             for k in value.keys():
