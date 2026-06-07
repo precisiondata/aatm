@@ -27,6 +27,7 @@ dependencies = [
     "torch>=2.10.0",
     "sentence-transformers>=5.2.2",
     "transformers>=4.57.3",
+    
 ]
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
@@ -42,6 +43,11 @@ dev = [
     "ipywidgets>=8.1.8",
     "dvc[gs]>=3.64.2",
     "dvclive>=3.49.0",
+    "ruff>=0.15.16",
+    "mypy>=2.1.0",
+    "types-pyyaml>=6.0.12.20260518",
+    "pandas-stubs>=3.0.3.260530",
+    "types-tqdm>=4.67.3.20260518",
 ]
 
 [project.scripts]
@@ -77,6 +83,12 @@ torch = [
 torchvision = [
   { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
 ]
+aatm = { workspace = true }
 
 [tool.fastapi]
 entrypoint = "aatm.api.main:app"
+
+[dependency-groups]
+dev = [
+    "aatm[dev]",
+]
