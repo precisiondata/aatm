@@ -16,3 +16,4 @@ site
 ./*.ipynb
 notebooks
 draft.md
+output
