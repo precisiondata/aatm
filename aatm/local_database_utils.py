@@ -11,6 +11,7 @@ artifacts.
 """
 
 import time
+from typing import Any, Hashable, List, Tuple
 import pandas as pd
 from pathlib import Path
 import sqlite3
@@ -304,33 +305,42 @@ def build_local_vector_database(
             range(0, len(df), batch_size),
             description=f"Adding embeddings for {expression_origin}",
         ):
-            records = df.iloc[i : i + batch_size].to_dict("records")
-            records = [
-                ExpressionMetadata(**record, expression_origin=expression_origin)
+            records: list[dict[Hashable, Any]] = df.iloc[i : i + batch_size].to_dict(
+                "records"
+            )
+            expression_metadatas: list[ExpressionMetadata] = [
+                ExpressionMetadata(**record, expression_origin=expression_origin)  # type: ignore[arg-type]
                 for record in records
             ]
-            pairs = [(r.expression_id, r) for r in records]
 
-            seen = set()
-            pairs = [(i, r) for (i, r) in pairs if (i not in seen and not seen.add(i))]
+            pairs = [(r.expression_id, r) for r in expression_metadatas]
 
-            ids = [i for i, _ in pairs]
-            results = collection.get(ids=ids)
+            unique_pairs = list(set(pairs))
+
+            ids = [i for i, _ in unique_pairs]
+            assert all([identifier is not None for identifier in ids]), (
+                f"Missing identifier in {expression_origin}"
+            )
+            results = collection.get(ids=ids)  # type: ignore[arg-type]
             found_ids = set(results["ids"])
 
-            pairs = [(i, r) for (i, r) in pairs if i not in found_ids]
-            if not pairs:
+            filtered_unique_pairs: List[Tuple[str, ExpressionMetadata]] = [
+                (i, r)
+                for (i, r) in unique_pairs
+                if i not in found_ids and i is not None
+            ]
+            if not filtered_unique_pairs:
                 continue
 
             if rate_limit is not None:
                 rate_limiter(
-                    n_docs=len(pairs),
+                    n_docs=len(filtered_unique_pairs),
                     rate_limit=rate_limit,
                     next_allowed_time=next_allowed_time,
                 )
 
             collection.add(
-                ids=[i for i, _ in pairs],
-                documents=[r.expression for _, r in pairs],
-                metadatas=[r.to_dict() for _, r in pairs],
+                ids=[i for i, _ in filtered_unique_pairs],
+                documents=[r.expression for _, r in filtered_unique_pairs],  # type: ignore[misc]
+                metadatas=[r.to_dict() for _, r in filtered_unique_pairs],
             )

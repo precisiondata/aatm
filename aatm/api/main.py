@@ -14,7 +14,7 @@ from aatm.api.data_models import SearchRequest, TerminologyMappingRequest
 from aatm.data_models import MappedSourceConcept, RetrieverResults
 from aatm.pipeline import PipelineBaseClass
 from aatm.registries.retrievers import load_retriever
-from aatm.retrievers import ChromaDBRetriever
+from aatm.retrievers import BaseRetriever, ChromaDBRetriever
 from aatm.terminology_mapper import TerminologyMapper
 
 app = FastAPI()
@@ -46,11 +46,11 @@ class ComponentRegistry:
                 the least recently used entry.
         """
         self.max_size = max_size
-        self._store: OrderedDict[tuple, TerminologyMapper | PipelineBaseClass] = (
+        self._store: OrderedDict[tuple | str, TerminologyMapper | PipelineBaseClass] = (
             OrderedDict()
         )
 
-    def get(self, key: tuple) -> TerminologyMapper | PipelineBaseClass | None:
+    def get(self, key: tuple | str) -> TerminologyMapper | PipelineBaseClass | None:
         """Retrieve a cached component by key.
 
         If the key is present, the corresponding component is marked as recently used
@@ -70,7 +70,9 @@ class ComponentRegistry:
         self._store.move_to_end(key)
         return self._store[key]
 
-    def set(self, key: tuple, value: TerminologyMapper | PipelineBaseClass) -> None:
+    def set(
+        self, key: tuple | str, value: TerminologyMapper | PipelineBaseClass
+    ) -> None:
         """Store a component in the registry.
 
         If the key already exists, the existing entry is updated and marked as recently
@@ -128,8 +130,12 @@ def map(request: TerminologyMappingRequest):
         tm = TerminologyMapper.from_task_request(request, api_config)
         PIPELINE_COMPONENTS_REGISTRY.set(tm_key, tm)
 
+    assert isinstance(tm, TerminologyMapper), (
+        f"Expected TerminologyMapper, but got {type(tm)}"
+    )
+
     mapped_concepts = tm.map(
-        request.source_concepts,
+        request.source_concepts,  # type: ignore[arg-type]
         save_to_disk=False,
         return_as="mapped_source_concepts",
     )
@@ -153,8 +159,12 @@ def search(request: SearchRequest) -> RetrieverResults:
     """
     retriever_key = f"retriever-{request.retriever_id}"
     retriever = PIPELINE_COMPONENTS_REGISTRY.get(retriever_key)
+
+    assert isinstance(retriever, BaseRetriever) or retriever is None, (
+        f"Expected BaseRetriever or None, but got {type(retriever)}"
+    )
     if retriever is None:
-        retriever: ChromaDBRetriever = load_retriever(request.retriever_id)
+        retriever = load_retriever(request.retriever_id)
         PIPELINE_COMPONENTS_REGISTRY.set(retriever_key, retriever)
 
     return retriever(**request.model_dump())

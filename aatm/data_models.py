@@ -116,6 +116,20 @@ class ExpressionMetadata(BaseModel):
     std_vocabulary_code: Optional[str]
     std_domain_id: Optional[str]
 
+    @field_validator("expression_origin", mode="before")
+    def validate_expression_origin(cls, value: Any) -> ExpressionOrigin:
+        """Convert expression origin to an ExpressionOrigin instance.
+
+        Args:
+            value: Raw value provided for the expression origin.
+
+        Returns:
+            The corresponding ExpressionOrigin instance.
+        """
+        if isinstance(value, ExpressionOrigin):
+            return value
+        return ExpressionOrigin(value)
+
     @field_validator(
         "expression_concept_id", "std_concept_id", "std_vocabulary_code", mode="before"
     )
@@ -592,8 +606,8 @@ class TerminologyMappingTask(BaseModel):
             process.
     """
 
-    input_file: Path
-    output_dir: Optional[Path] = None
+    input_file: Path | str
+    output_dir: Optional[Path | str] = None
     translator_id: Optional[str] = None
     retriever_id: Optional[str] = None
     selector_id: Optional[str] = None

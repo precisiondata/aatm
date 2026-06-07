@@ -80,7 +80,6 @@ with search_an_expression_tab:
         if submitted:
             results = query | retriever
             for idx, result in enumerate(results.results[0]):
-                result: RetrievedExpressionMetadata
                 expander = st.expander(f"{idx + 1} - {result.expression.capitalize()}")
                 with expander:
                     col1, col2 = st.columns([5, 1])

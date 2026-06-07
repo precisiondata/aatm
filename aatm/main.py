@@ -143,7 +143,7 @@ def main(ctx: typer.Context) -> None:
 )
 def init(
     vocab_dir: Annotated[
-        str,
+        Optional[str | Path],
         typer.Option(
             "--vocab-dir",
             "-vd",
@@ -237,7 +237,7 @@ def init(
 
     # Validate vocab directory
     if vocab_dir is None:
-        vocab_dir: Path = DEFAULT_VOCAB_DIR
+        vocab_dir = DEFAULT_VOCAB_DIR
     else:
         vocab_dir = Path(vocab_dir)
         if not vocab_dir.exists():
@@ -352,7 +352,7 @@ def search_ui() -> None:
 @app.command("map", help="Run a terminology mapping task")
 def map(
     task_config_path: Annotated[
-        Optional[str],
+        Optional[str | Path],
         typer.Option(
             "--task-config-path",
             "-t",
@@ -501,9 +501,14 @@ def map(
 
         task_config = TerminologyMappingTask.from_config_file(task_config_path)
     else:
+        if input_file is None or output_dir is None:
+            console.print(
+                "[yellow]OOPS![/yellow] You must provide both `input_file` when not using a task config file.\n"
+            )
+            raise typer.Exit()
         task_config = TerminologyMappingTask(
-            input_file=Path(input_file) if input_file else None,
-            output_dir=Path(output_dir) if output_dir else None,
+            input_file=input_file,
+            output_dir=output_dir,
             translator_id=translator_id,
             retriever_id=retriever_id,
             selector_id=selector_id,
@@ -535,7 +540,7 @@ def amap() -> None:
 @app.command("serve", help="Serve a FastAPI application with AATM's functionality")
 def serve(
     host: Annotated[
-        Optional[str],
+        str,
         typer.Option(
             "--host",
             "-h",
@@ -561,7 +566,7 @@ def serve(
         ),
     ] = False,
     workers: Annotated[
-        Optional[str],
+        Optional[int],
         typer.Option(
             "--workers",
             "-w",
@@ -658,7 +663,7 @@ def serve(
         )
     elif workers:
         command.append("--workers")
-        command.append(workers)
+        command.append(str(workers))
 
     if reload and mode == "dev":
         command.append("--reload")
