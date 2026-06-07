@@ -25,6 +25,9 @@ Once this connection is made, every link associated with that standard concept b
 
 The full documentation is available at: https://precisiondata.github.io/aatm
 
+## Contributing
+
+If you want to contribute to this project, please refer to our [Contributing guide](./CONTRIBUTING.md)
 
 ## Installation
 
