@@ -12,7 +12,7 @@ Selectors are designed to operate as pipeline stages that consume
 """
 
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Optional, Any, Dict, List
 import dotenv
 from abc import ABC, abstractmethod
 from google import genai
@@ -126,10 +126,13 @@ class FirstResultSelector(BaseSelector):
             A ``SelectorResults`` object containing either a selected
                 expression or an empty selection for each query.
         """
-        selected_results = []
+        selected_results: List[SelectedExpressionMetadata | EmptySelectionMetadata] = []
         for idx, r in enumerate(results.results):
             try:
-                if r[0].distance < self.selection_threshold:
+                if (
+                    r[0].distance is not None
+                    and r[0].distance < self.selection_threshold
+                ):
                     selected_results.append(
                         SelectedExpressionMetadata(
                             **r[0].model_dump(), result_list_index=0
@@ -171,7 +174,7 @@ class OpenAILLMSelector(BaseSelector):
     def __init__(
         self,
         model_id: str,
-        prompt_template: List[Dict[str, str]] = None,
+        prompt_template: List[Dict[str, str]] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -197,10 +200,9 @@ class OpenAILLMSelector(BaseSelector):
                 ``OpenAILLMModels``.
         """
         self.model_id = OpenAILLMModels(model_id).value
-        self.prompt_template = prompt_template
         self.client = OpenAI()
 
-        if self.prompt_template is None:
+        if prompt_template is None:
             self.prompt_template = [
                 {
                     "role": "system",
@@ -211,6 +213,8 @@ class OpenAILLMSelector(BaseSelector):
                     "content": "Query: '{query}'\n\nExpressions: {expressions}",
                 },
             ]
+        else:
+            self.prompt_template = prompt_template
 
     def select(self, results: RetrieverResults) -> SelectorResults:
         """Select the best candidate for each query using an OpenAI model.
@@ -232,6 +236,7 @@ class OpenAILLMSelector(BaseSelector):
             AssertionError: If the parsed response is not a ``SelectedResult``
                 instance.
         """
+        assert self.prompt_template is not None, "Prompt template is not set."
         selector_results = SelectorResults(results=[], queries=results.queries)
         for query_id, query in enumerate(results.queries):
             prompt = format_prompt(
@@ -250,7 +255,7 @@ class OpenAILLMSelector(BaseSelector):
 
             response = self.client.responses.parse(
                 model=self.model_id,
-                input=prompt,
+                input=prompt,  # type: ignore[arg-type]
                 text_format=SelectedResult,
             )
 
@@ -258,7 +263,7 @@ class OpenAILLMSelector(BaseSelector):
                 logger.debug(response)
                 logger.debug(response.output_parsed)
 
-            selected_result: SelectedResult = response.output_parsed
+            selected_result: SelectedResult | None = response.output_parsed
             assert isinstance(selected_result, SelectedResult), (
                 f"Expected SelectedResult object from OpenAI, but got {type(selected_result)}"
             )
@@ -319,7 +324,7 @@ class GeminiLLMSelector(BaseSelector):
     def __init__(
         self,
         model_id: str,
-        prompt_template: List[Dict[str, str]] = None,
+        prompt_template: Optional[List[Dict[str, str]]] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -346,9 +351,8 @@ class GeminiLLMSelector(BaseSelector):
         """
         self.model_id = GeminiLLMModels(model_id).value
         self.client = genai.Client()
-        self.prompt_template = prompt_template
 
-        if self.prompt_template is None:
+        if prompt_template is None:
             self.prompt_template = [
                 {
                     "role": "system",
@@ -359,6 +363,8 @@ class GeminiLLMSelector(BaseSelector):
                     "content": "Query: '{query}'\n\nExpressions: {expressions}",
                 },
             ]
+        else:
+            self.prompt_template = prompt_template
 
     def select(self, results: RetrieverResults) -> SelectorResults:
         """Select the best candidate for each query using a Gemini model.
@@ -381,6 +387,7 @@ class GeminiLLMSelector(BaseSelector):
                 instance.
         """
         selector_results = SelectorResults(results=[], queries=results.queries)
+        assert self.prompt_template is not None, "Prompt template not set"
         for query_id, query in enumerate(results.queries):
             prompt = format_prompt(
                 self.prompt_template,
@@ -402,7 +409,7 @@ class GeminiLLMSelector(BaseSelector):
 
             response = self.client.models.generate_content(
                 model=self.model_id,
-                contents=gemini_formatted_prompt,
+                contents=gemini_formatted_prompt,  # type: ignore[arg-type]
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=SelectedResult,
@@ -412,10 +419,13 @@ class GeminiLLMSelector(BaseSelector):
             if debug_mode == DebugMode.GEMINI_LLM_SELECTOR:
                 logger.debug(response)
                 logger.debug(response.text)
+                assert isinstance(response.text, str), (
+                    "Expected response text to be a string"
+                )
                 logger.debug(SelectedResult.model_validate_json(response.text))
 
             selected_result: SelectedResult = SelectedResult.model_validate_json(
-                response.text
+                response.text  # type: ignore[arg-type]
             )
             assert isinstance(selected_result, SelectedResult), (
                 f"Expected SelectedResult object from OpenAI, but got {type(selected_result)}"

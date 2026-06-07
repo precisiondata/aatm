@@ -17,7 +17,7 @@ import google.genai as genai
 from google.genai import types
 import dotenv
 from abc import ABC, abstractmethod
-from typing import Any, List
+from typing import Any, Dict, List, Optional
 
 from openai import OpenAI
 
@@ -41,7 +41,7 @@ class BaseTranslator(PipelineBaseClass, ABC):
     """
 
     @abstractmethod
-    def translate(self, texts: List[str]) -> Translation:
+    def translate(self, texts: List[str]) -> List[Translation]:
         """Translate one or more input texts.
 
         Subclasses must implement this method to perform the actual translation
@@ -84,8 +84,11 @@ class BaseTranslator(PipelineBaseClass, ABC):
         if isinstance(text, str):
             text = [text]
 
-        if isinstance(text, list) and isinstance(text[0], SourceConcept):
-            text = [t.source_code_description for t in text]
+        elif isinstance(text, list) and all(isinstance(t, str) for t in text):
+            pass
+
+        elif isinstance(text, list) and all(isinstance(t, SourceConcept) for t in text):
+            text = [t.source_code_description for t in text]  # type: ignore[assignment,union-attr]
 
         assert isinstance(text, list) and isinstance(text[0], str), (
             f"text must be a string, a list of strings, or a list of SourceConcept objects. Got {text}."
@@ -128,7 +131,7 @@ class GeminiTranslator(BaseTranslator):
     def __init__(
         self,
         model: str,
-        prompt_template: str = None,
+        prompt_template: Optional[str] = None,
         n_retries: int = 3,
         *args: Any,
         **kwargs: Any,
@@ -154,11 +157,12 @@ class GeminiTranslator(BaseTranslator):
         """
         self.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
         self.model = model
-        self.prompt_template = prompt_template
         self.n_retries = n_retries
 
-        if self.prompt_template is None:
+        if prompt_template is None:
             self.prompt_template = 'Translate the following text into English: "{text}"'
+        else:
+            self.prompt_template = prompt_template
 
     def translate(self, texts: List[str]) -> List[Translation]:
         """Translate a list of texts into English using Gemini.
@@ -188,6 +192,9 @@ class GeminiTranslator(BaseTranslator):
                             response_schema=Translation,
                         ),
                     )
+                    if response.text is None:
+                        raise ValueError("Gemini API returned null response.")
+
                     results.append(Translation(**json.loads(response.text)))
                     break
                 except Exception as e:
@@ -213,7 +220,7 @@ class OpenAITranslator(BaseTranslator):
     def __init__(
         self,
         model: str,
-        prompt_template: str = None,
+        prompt_template: Optional[List[Dict[str, str]]] = None,
         n_retries: int = 3,
         *args: Any,
         **kwargs: Any,
@@ -271,16 +278,20 @@ class OpenAITranslator(BaseTranslator):
         Returns:
             A list of ``Translation`` objects corresponding to the input texts.
         """
-        results = []
+        results: List[Translation] = []
         for t in texts:
             n_retries = 0
             while n_retries < self.n_retries:
                 try:
                     response = self.client.responses.parse(
                         model=self.model_id,
-                        input=format_prompt(self.prompt_template, {"text": t}),
+                        input=format_prompt(self.prompt_template, {"text": t}),  # type: ignore[arg-type]
                         text_format=Translation,
                     )
+
+                    if response.output_parsed is None:
+                        raise ValueError("OpenAI API returned null response.")
+
                     results.append(response.output_parsed)
                     break
                 except Exception as e:

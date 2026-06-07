@@ -12,12 +12,12 @@ from aatm.translators import BaseTranslator, GeminiTranslator, OpenAITranslator
 
 
 class EmptyTranslator(BaseTranslator):
-    async def translate(self, texts: List[str]) -> List[Translation]:
+    async def translate(self, texts: List[str]) -> List[Translation]:  # type: ignore[override]
         return [Translation(text=t) for t in texts]
 
 
 class AsyncGeminiTranslator(GeminiTranslator):
-    async def translate(self, texts: List[str]) -> List[Translation]:
+    async def translate(self, texts: List[str]) -> List[Translation]:  # type: ignore[override]
         async with asyncio.TaskGroup() as tg:
             tasks = [
                 tg.create_task(
@@ -38,6 +38,8 @@ class AsyncGeminiTranslator(GeminiTranslator):
         processed_results = []
         for result, t in zip(results, texts):
             try:
+                if result.text is None:
+                    raise ValueError("Gemini API returned null response.")
                 processed_results.append(Translation(**json.loads(result.text)))
             except Exception as e:
                 print(

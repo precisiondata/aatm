@@ -13,7 +13,7 @@ retrievers to be chained with other components such as rerankers and selectors.
 from abc import ABC, abstractmethod
 from typing import Any, List
 import chromadb
-from chromadb import EmbeddingFunction
+from chromadb import EmbeddingFunction, QueryResult
 
 from .data_models import RetrievedExpressionMetadata, RetrieverResults, Translation
 from .pipeline import PipelineBaseClass
@@ -47,7 +47,7 @@ class BaseRetriever(PipelineBaseClass, ABC):
         """
         pass
 
-    def __call__(
+    def __call__(  # type: ignore[override]
         self,
         queries: str | Translation | List[str] | List[Translation],
         *args: Any,
@@ -113,7 +113,7 @@ class ChromaDBRetriever(BaseRetriever):
         where: dict[str, Any] | None = None,
         *args: Any,
         **kwargs: Any,
-    ) -> Any:
+    ):
         """Initialize the ChromaDB retriever.
 
         This constructor stores the ChromaDB client configuration, creates or
@@ -176,7 +176,7 @@ class ChromaDBRetriever(BaseRetriever):
             Exception: Propagates errors raised by the underlying ChromaDB
                 client or collection query operation.
         """
-        results = self.collection.query(
+        results: QueryResult = self.collection.query(
             query_texts=queries,
             n_results=top_k if top_k is not None else self.top_k,
             where=where if where is not None else self.where,
@@ -185,12 +185,16 @@ class ChromaDBRetriever(BaseRetriever):
         processed_results = []
         for query_id, _ in enumerate(queries):
             query_results = []
+
+            assert results["distances"] is not None, "distances must not be None"
+            assert results["metadatas"] is not None, "metadatas must not be None"
+
             for distance, metadata in zip(
                 results["distances"][query_id],
                 results["metadatas"][query_id],
             ):
                 query_results.append(
-                    RetrievedExpressionMetadata(distance=distance, **metadata)
+                    RetrievedExpressionMetadata(distance=distance, **metadata)  # type: ignore[arg-type]
                 )
             processed_results.append(query_results)
 

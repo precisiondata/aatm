@@ -31,7 +31,7 @@ class TranslatorRegistryEntry:
     name: str
     """Unique registry name used to identify the translator."""
 
-    translator_class: BaseTranslator
+    translator_class: type[BaseTranslator]
     """Translator class or constructor used to create the translator instance."""
 
     kwargs: dict[str, Any]

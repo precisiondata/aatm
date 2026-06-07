@@ -147,7 +147,7 @@ class GeminiExtractor(BaseExtractor):
         end_index = start_index + len(prompt)
         return [start_index, end_index]
 
-    def extract(self, tasks: List[ExtractionTask]) -> List[ListOfExtractedConcepts]:
+    def extract(self, tasks: List[ExtractionTask]) -> List[List[ExtractedConcept]]:
         """Extract structured concepts from a batch of texts using Gemini.
 
         For each input text, this method formats the configured prompt template,
@@ -169,9 +169,9 @@ class GeminiExtractor(BaseExtractor):
                 occurrences.
         """
 
-        results = []
+        results: List[List[ExtractedConcept]] = []
         for task in tasks:
-            current_task_results = []
+            current_task_results: List[ExtractedConcept] = []
             assert isinstance(task, ExtractionTask), (
                 "Input must be a list of ExtractionTask instances."
             )
@@ -186,14 +186,18 @@ class GeminiExtractor(BaseExtractor):
                 prompt = task.prompt_template.format(text=text, **curr_prompt_args)
                 response = self.client.models.generate_content(
                     model=self.model_id,
-                    contents=prompt,
+                    contents=prompt,  # type: ignore[arg-type]
                     config={
                         "response_mime_type": "application/json",
                         "response_json_schema": task.data_model.model_json_schema(),
                     },
                 )
+
+                if response.text is None:
+                    raise ValueError("No response returned from Gemini model.")
+
                 result = task.data_model.model_validate_json(response.text)
-                current_task_results.append(result)
+                current_task_results.append(result)  # type: ignore[arg-type]
             results.append(current_task_results)
 
         return results

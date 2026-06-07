@@ -32,10 +32,10 @@ class AsyncOpenAILLMSelector(OpenAILLMSelector):
         super().__init__(*args, **kwargs)
         self.client = AsyncOpenAI()
 
-    async def select(self, results: RetrieverResults) -> SelectorResults:
+    async def select(self, results: RetrieverResults) -> SelectorResults:  # type: ignore[override]
         selector_results = SelectorResults(results=[], queries=results.queries)
         async with asyncio.TaskGroup() as tg:
-            tasks = []
+            tasks: List[asyncio.Task] = []
             for query_id, query in enumerate(results.queries):
                 prompt = format_prompt(
                     self.prompt_template,
@@ -50,9 +50,9 @@ class AsyncOpenAILLMSelector(OpenAILLMSelector):
 
                 tasks.append(
                     tg.create_task(
-                        self.client.responses.parse(
+                        self.client.responses.parse(  # type: ignore[arg-type]
                             model=self.model_id,
-                            input=prompt,
+                            input=prompt,  # type: ignore[arg-type]
                             text_format=SelectedResult,
                         )
                     )
@@ -94,7 +94,7 @@ class AsyncOpenAILLMSelector(OpenAILLMSelector):
 
 
 class AsyncGeminiLLMSelector(GeminiLLMSelector):
-    async def select(self, results: RetrieverResults) -> SelectorResults:
+    async def select(self, results: RetrieverResults) -> SelectorResults:  # type: ignore[override]
         selector_results = SelectorResults(results=[], queries=results.queries)
         async with asyncio.TaskGroup() as tg:
             tasks = []
@@ -122,7 +122,7 @@ class AsyncGeminiLLMSelector(GeminiLLMSelector):
                     tg.create_task(
                         self.client.aio.models.generate_content(
                             model=self.model_id,
-                            contents=gemini_formatted_prompt,
+                            contents=gemini_formatted_prompt,  # type: ignore[arg-type]
                             config=types.GenerateContentConfig(
                                 response_mime_type="application/json",
                                 response_schema=SelectedResult,
@@ -133,6 +133,9 @@ class AsyncGeminiLLMSelector(GeminiLLMSelector):
 
         responses: List[types.GenerateContentResponse] = [t.result() for t in tasks]
         for response, (query_id, query) in zip(responses, enumerate(results.queries)):
+            if response.text is None:
+                raise ValueError("Gemini API returned null response.")
+
             selected_result: SelectedResult = SelectedResult.model_validate_json(
                 response.text
             )

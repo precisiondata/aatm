@@ -12,13 +12,13 @@ the same results reordered by reranking scores.
 """
 
 from enum import Enum
-from typing import Any, List
+from typing import Any, List, Optional
 import dotenv
 from abc import ABC, abstractmethod
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from rank_bm25 import BM25Okapi
+from transformers import AutoModelForCausalLM, AutoTokenizer, BatchEncoding
+from rank_bm25 import BM25Okapi  # type: ignore[import-untyped]
 
 # Custom modules
 from aatm.data_models import RetrieverResults
@@ -123,7 +123,9 @@ class BM25Reranker(BaseReranker):
         """
         for query_index, query in enumerate(retriever_results.queries):
             corpus = retriever_results.results[query_index]
-            tokenized_corpus = [doc.expression.split(" ") for doc in corpus]
+            tokenized_corpus = [
+                doc.expression.split(" ") for doc in corpus if doc.expression
+            ]
             bm25 = BM25Okapi(tokenized_corpus)
             tokenized_query = query.split(" ")
             doc_scores = bm25.get_scores(tokenized_query)
@@ -136,7 +138,10 @@ class BM25Reranker(BaseReranker):
 
         # sort results based on scores
         for list_of_results in retriever_results.results:
-            list_of_results.sort(key=lambda x: x.rerank_score, reverse=True)
+            list_of_results.sort(
+                key=lambda x: x.rerank_score if x.rerank_score else float("-inf"),
+                reverse=True,
+            )
 
         return retriever_results
 
@@ -170,9 +175,9 @@ class Qwen3Reranker(BaseReranker):
         self,
         model_id: str,
         max_length: int = 8192,
-        task: str = None,
-        prefix: str = None,
-        suffix: str = None,
+        task: Optional[str] = None,
+        prefix: Optional[str] = None,
+        suffix: Optional[str] = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -214,22 +219,26 @@ class Qwen3Reranker(BaseReranker):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
         self.max_length = max_length
-        self.task = task
-        self.prefix = prefix
-        self.suffix = suffix
+
         self.token_false_id = self.tokenizer.convert_tokens_to_ids("no")
         self.token_true_id = self.tokenizer.convert_tokens_to_ids("yes")
 
-        if self.task is None:
+        if task is None:
             self.task = (
                 "Given a search query, retrieve relevant concepts that match the query."
             )
+        else:
+            self.task = task
 
-        if self.prefix is None:
+        if prefix is None:
             self.prefix = '<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be "yes" or "no".<|im_end|>\n<|im_start|>user\n'
+        else:
+            self.prefix = prefix
 
-        if self.suffix is None:
+        if suffix is None:
             self.suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        else:
+            self.suffix = suffix
 
         self.prefix_tokens = self.tokenizer.encode(
             self.prefix, add_special_tokens=False
@@ -261,7 +270,7 @@ class Qwen3Reranker(BaseReranker):
         )
         return output
 
-    def process_inputs(self, pairs: List[str]) -> dict[str, torch.Tensor]:
+    def process_inputs(self, pairs: List[str]) -> BatchEncoding:
         """Tokenize and pad formatted query-document pairs for model inference.
 
         This method tokenizes the provided text pairs, applies truncation while
@@ -275,7 +284,7 @@ class Qwen3Reranker(BaseReranker):
         Returns:
             A dictionary of model input tensors suitable for forward inference.
         """
-        inputs = self.tokenizer(
+        inputs: BatchEncoding = self.tokenizer(
             pairs,
             padding=False,
             truncation="longest_first",
@@ -294,9 +303,7 @@ class Qwen3Reranker(BaseReranker):
         return inputs
 
     @torch.no_grad()
-    def compute_logits(
-        self, inputs: dict[str, torch.Tensor], **kwargs: Any
-    ) -> list[float]:
+    def compute_logits(self, inputs: BatchEncoding, **kwargs: Any) -> list[float]:
         """Compute relevance scores from the model's final-token logits.
 
         This method runs the model in inference mode, extracts the logits for
@@ -345,6 +352,10 @@ class Qwen3Reranker(BaseReranker):
             retriever_results.queries, retriever_results.results
         ):
             for doc in retrieved_docs:
+                if doc.expression is None:
+                    raise ValueError(
+                        f"Document expression cannot be None. Got: {doc.model_dump()}"
+                    )
                 pairs.append(self.format_instruction(self.task, query, doc.expression))
 
         # compute scores
@@ -363,6 +374,9 @@ class Qwen3Reranker(BaseReranker):
 
         # sort results based on scores
         for list_of_results in retriever_results.results:
-            list_of_results.sort(key=lambda x: x.rerank_score, reverse=True)
+            list_of_results.sort(
+                key=lambda x: x.rerank_score if x.rerank_score else float("-inf"),
+                reverse=True,
+            )
 
         return retriever_results

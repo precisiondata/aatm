@@ -7,12 +7,12 @@ placeholder variables in string fields while preserving the original template
 structure.
 """
 
-from typing import Dict, List
+from typing import Any, Dict, List
 import copy
 
 
 def format_prompt(
-    prompt_template: List[Dict[str, str]], args: Dict[str, str]
+    prompt_template: List[Dict[str, str]], args: Dict[str, Any]
 ) -> List[Dict[str, str]]:
     """Format a prompt template by replacing placeholder variables.
 

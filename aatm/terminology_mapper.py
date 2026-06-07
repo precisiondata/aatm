@@ -12,7 +12,6 @@ concept files, process them in batches, and write the mapped output to disk.
 """
 
 from pathlib import Path
-from selectors import BaseSelector
 import time
 from typing import Any, List, Literal, Optional, Tuple
 from rich.console import Console
@@ -38,14 +37,14 @@ from aatm.registries.translators import load_translator
 from aatm.rerankers import BaseReranker
 from aatm.translators import BaseTranslator, EmptyTranslator
 from aatm.retrievers import BaseRetriever, ChromaDBRetriever
-from aatm.selectors import FirstResultSelector
+from aatm.selectors import FirstResultSelector, BaseSelector
 from aatm.embedding_functions import GoogleEmbeddingFunction
 
 
 console = Console()
 
 
-def rate_limit(n_docs: int, next_allowed_time: float, rate_limit: int) -> None:
+def rate_limit(n_docs: int, next_allowed_time: float, rate_limit: int) -> float:
     """Apply a document-based rate limit and return the next allowed time.
 
     This helper delays execution when necessary to ensure that processing does
@@ -91,7 +90,7 @@ class TerminologyMapper:
     def __init__(
         self,
         input_file: Optional[str | Path] = None,
-        output_dir: str | Path = Path("output"),
+        output_dir: str | Path | None = None,
         translator: Optional[BaseTranslator | str] = None,
         retriever: Optional[BaseRetriever | str] = None,
         selector: Optional[BaseSelector | str] = None,
@@ -133,13 +132,14 @@ class TerminologyMapper:
             None.
         """
         # Define translator
+        self.translator: BaseTranslator | EmptyTranslator
         if translator is None:
             self.translator = EmptyTranslator()
 
         elif isinstance(translator, str):
             self.translator = load_translator(translator)
 
-        elif isinstance(BaseTranslator, translator):
+        elif isinstance(translator, BaseTranslator):
             self.translator = translator
 
         else:
@@ -148,6 +148,7 @@ class TerminologyMapper:
             )
 
         # Define retriever
+        self.retriever: BaseRetriever
         if retriever is None:
             client = chromadb.PersistentClient()
             self.retriever = ChromaDBRetriever(
@@ -161,7 +162,7 @@ class TerminologyMapper:
         elif isinstance(retriever, str):
             self.retriever = load_retriever(retriever)
 
-        elif isinstance(BaseRetriever, retriever):
+        elif isinstance(retriever, BaseRetriever):
             self.retriever = retriever
 
         else:
@@ -170,13 +171,14 @@ class TerminologyMapper:
             )
 
         # Define selector
+        self.selector: BaseSelector
         if selector is None:
             self.selector = FirstResultSelector()
 
         elif isinstance(selector, str):
             self.selector = load_selector(selector)
 
-        elif isinstance(BaseSelector, selector):
+        elif isinstance(selector, BaseSelector):
             self.selector = selector
 
         else:
@@ -191,7 +193,7 @@ class TerminologyMapper:
         elif isinstance(reranker, str):
             self.reranker = load_reranker(reranker)
 
-        elif isinstance(BaseReranker, reranker):
+        elif isinstance(reranker, BaseReranker):
             self.reranker = reranker
 
         else:
@@ -202,6 +204,9 @@ class TerminologyMapper:
         # Other attributes
         if isinstance(output_dir, str):
             output_dir = Path(output_dir)
+
+        elif output_dir is None:
+            output_dir = Path("output")
 
         self.input_file: Optional[Path] = Path(input_file) if input_file else None
         self.output_dir: Path = output_dir
@@ -276,7 +281,7 @@ class TerminologyMapper:
     def from_task_request(
         cls,
         task_request: TerminologyMappingRequest,
-        api_config: APIConfig = None,
+        api_config: Optional[APIConfig] = None,
     ) -> "TerminologyMapper":
         return cls(
             translator=task_request.translator_id,
@@ -290,12 +295,12 @@ class TerminologyMapper:
     def map(
         self,
         expressions: Optional[List[str | SourceConcept]] = None,
-        file_path: str | Path = None,
-        limit_to: int = None,
-        output_dir: str | Path = None,
+        file_path: str | Path | None = None,
+        limit_to: Optional[int] = None,
+        output_dir: str | Path | None = None,
         return_as: Literal["df", "mapped_source_concepts"] = "df",
         save_to_disk: bool = True,
-    ) -> pd.DataFrame:
+    ) -> pd.DataFrame | List[SourceConcept] | List[MappedSourceConcept]:
         """Map source concepts from a file to standardized concepts.
 
         This method loads source concepts from a supported input file or from a list of strings or SourceConcept objects, processes them in batches through the pipeline, and returns the mapped results as a DataFrame. The resulting mappings are also written to a CSV file in the output directory.
@@ -407,10 +412,10 @@ class TerminologyMapper:
 
     async def amap(
         self,
-        file_path: str | Path = None,
-        limit_to: int = None,
+        file_path: str | Path | None = None,
+        limit_to: Optional[int] = None,
         return_confidence_scores: bool = True,
-        output_dir: str | Path = None,
+        output_dir: str | Path | None = None,
     ) -> Tuple[pd.DataFrame, List[float]] | pd.DataFrame:
         """Asynchronously map source concepts from a file to standardized concepts.
 
@@ -504,7 +509,7 @@ class TerminologyMapper:
         return mapped_source_concepts_df
 
     def map_csv_to_source_concepts(
-        self, file_path: Path, limit_to: int = None
+        self, file_path: Path, limit_to: Optional[int] = None
     ) -> List[SourceConcept]:
         """Load source concepts from a CSV file and convert them to model objects.
 
@@ -553,19 +558,22 @@ class TerminologyMapper:
         df = df.astype(str).fillna("")
         # Convert to SourceConcept objects
         source_concepts: List[SourceConcept] = [
-            SourceConcept(**row) for row in df.to_dict("records")
+            SourceConcept(**row)  # type: ignore[arg-type]
+            for row in df.to_dict("records")
         ]
 
         return source_concepts
 
-    def __call__(self, expression: str) -> str:
+    def __call__(
+        self, expression: str | SourceConcept | List[str | SourceConcept]
+    ) -> pd.DataFrame | List[SourceConcept] | List[MappedSourceConcept]:
         """Invoke the mapper as a callable object.
 
         This method delegates to ``map()`` so that mapper instances can be used
         like callable pipeline components.
 
         Args:
-            expression: Input expression or file reference to map.
+            expression: One or more input expressions to map either as strings or SourceConcept objects.
 
         Returns:
             The result of calling ``map()`` with the provided input.
@@ -575,6 +583,8 @@ class TerminologyMapper:
             output, but the underlying ``map()`` method expects file-based
             input and returns a DataFrame.
         """
+        if isinstance(expression, str) or isinstance(expression, SourceConcept):
+            expression = [expression]
         return self.map(expression)
 
     def __repr__(self) -> str:

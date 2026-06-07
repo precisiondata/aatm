@@ -34,7 +34,7 @@ class SelectorRegistryEntry:
     name: str
     """Unique registry name used to identify the selector."""
 
-    selector_class: BaseSelector
+    selector_class: type[BaseSelector]
     """Selector class or constructor used to create the selector instance."""
 
     kwargs: dict[str, Any]

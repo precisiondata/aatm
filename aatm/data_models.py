@@ -214,15 +214,15 @@ class SourceConcept(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     # fields
-    source_code: Optional[str] = Field(None, examples=["I63"])
-    source_concept_id: Optional[str] = Field(None, examples=["45543186"])
-    source_vocabulary_id: Optional[str] = Field(None, examples=["ICD10"])
+    source_code: Optional[str] = Field(default=None, examples=["I63"])
+    source_concept_id: Optional[str] = Field(default=None, examples=["45543186"])
+    source_vocabulary_id: Optional[str] = Field(default=None, examples=["ICD10"])
     source_code_description: Optional[str] = Field(
-        None, examples=["Cerebral infarction"]
+        default=None, examples=["Cerebral infarction"]
     )
-    valid_start_date: Optional[str] = Field(None, examples=["1990-05-01"])
-    valid_end_date: Optional[str] = Field(None, examples=["2099-12-31"])
-    invalid_reason: Optional[str] = Field(None, examples=[None])
+    valid_start_date: Optional[str] = Field(default=None, examples=["1990-05-01"])
+    valid_end_date: Optional[str] = Field(default=None, examples=["2099-12-31"])
+    invalid_reason: Optional[str] = Field(default=None, examples=[None])
 
     @field_validator(
         "source_code", "source_concept_id", "source_vocabulary_id", mode="before"
@@ -555,7 +555,7 @@ class SelectorResults(BaseModel):
         queries: List of query strings associated with the selections.
     """
 
-    results: List[SelectedExpressionMetadata]
+    results: List[SelectedExpressionMetadata | EmptySelectionMetadata]
     queries: List[str]
 
 

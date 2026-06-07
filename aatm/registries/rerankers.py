@@ -34,7 +34,7 @@ class RerankerRegistryEntry:
 
     name: str
     """Unique registry name used to identify the reranker."""
-    reranker_class: BaseReranker
+    reranker_class: type[BaseReranker]
     """Reranker class or constructor used to create the reranker instance."""
     kwargs: dict[str, Any]
     """Default keyword arguments passed when instantiating the reranker."""
