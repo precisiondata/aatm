@@ -80,28 +80,19 @@ Note:
 """
 
 import logging
-import subprocess
-import sys
-from typing import Annotated, List, Literal, Optional
-from rich.json import JSON
-
+import dotenv
 import typer
 from rich.console import Console
 from pathlib import Path
+from typing import Annotated, List, Literal, Optional
 import questionary
 from questionary import Choice
-import dotenv
+import subprocess
+import sys
+from rich.json import JSON
 
-from aatm.api.config import APIConfig
-from aatm.terminology_mapper import TerminologyMapper
+from aatm.logs import get_logger
 
-from .data_models import TerminologyMappingTask
-from .logs import get_logger
-from .local_database_utils import (
-    build_local_sqlite_vocab_database,
-    build_local_vector_database,
-    build_mapping_datasets,
-)
 
 dotenv.load_dotenv()  # Load environment variables
 logger = get_logger(__name__, level=logging.INFO)
@@ -280,6 +271,10 @@ def init(
     console.print("[blue]1) Building local OMOP vocabulary database[/blue]")
     console.print(f"Using vocabulary files from: '{vocab_dir}'")
 
+    # Lazy import
+    console.print("Preparing local database builder...")
+    from aatm.local_database_utils import build_local_sqlite_vocab_database
+
     build_local_sqlite_vocab_database(vocab_dir)
     console.print("[green]Done![/green]\n")
 
@@ -315,7 +310,15 @@ def init(
         console.print(f"Using standard vocabularies: {standard_vocabs}")
         selected_standard_vocabularies = standard_vocabs
 
+    # Lazy import
+    console.print("Preparing mapping datasets...")
+    from aatm.local_database_utils import build_mapping_datasets
+
     build_mapping_datasets(selected_standard_vocabularies)
+
+    # Lazy import
+    console.print("Preparing local vector database builder...")
+    from aatm.local_database_utils import build_local_vector_database
 
     build_local_vector_database(selected_embedding_model)
     console.print("[green]Done![/green]\n")
@@ -483,6 +486,11 @@ def map(
             $ aatm map --input-file concepts.csv --output-dir outputs \\
                 --limit-to 20
     """
+
+    # Lazy import
+    from aatm.terminology_mapper import TerminologyMapper
+    from .data_models import TerminologyMappingTask
+
     if task_config_path is not None:
         task_config_path = Path(task_config_path)
         if not task_config_path.exists():
@@ -618,6 +626,9 @@ def serve(
         )
 
     print_logo()
+
+    # Lazy import
+    from aatm.api.config import APIConfig
 
     # Save API configuration to disk
     api_config = APIConfig(

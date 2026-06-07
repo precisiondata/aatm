@@ -47,6 +47,16 @@ git clone https://github.com/precisiondata/aatm.git
 uv sync
 ```
 
+If you plan to run language models locally with CUDA acceleration, you must also install CUDA extensions for PyTorch. 
+
+```bash
+pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
+```
+
+```bash
+uv pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
+```
+
 ## 1. Prepare your OMOP vocabularies directory
 
 Before running `aatm init`, download the OMOP vocabularies you want to use and place them in a directory. You can find them at https://athena.ohdsi.org/vocabulary/list

@@ -243,7 +243,6 @@ def build_local_vector_database(
         creation.
     """
     # lazy loading for performance
-    import chromadb
     from aatm.registries.retrievers import (
         CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry,
     )
@@ -279,6 +278,9 @@ def build_local_vector_database(
 
     if rate_limit is not None:
         next_allowed_time = time.monotonic()
+
+    # lazy import for performance
+    import chromadb
 
     console.print("Creating local vector database...")
     client = chromadb.PersistentClient(
