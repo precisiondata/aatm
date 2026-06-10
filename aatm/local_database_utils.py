@@ -21,7 +21,7 @@ from typing import Any, Hashable, List, Tuple
 import pandas as pd
 import questionary
 import torch
-from chromadb import Collection
+from chromadb import Collection, Embeddings
 from rich.console import Console
 from rich.progress import track
 
@@ -124,7 +124,7 @@ def list_live_cuda_tensors(limit: int = 20) -> None:
         )
 
 
-def ensure_cpu_embeddings(embeddings: Any) -> list[list[float]]:
+def ensure_cpu_embeddings(embeddings: Embeddings) -> Embeddings:
     """Ensure embeddings are converted to CPU-side Python lists.
 
     ChromaDB should receive CPU objects, not CUDA tensors. If the embedding
@@ -373,7 +373,7 @@ def estimate_batch_size(embedding_model_name: str) -> int:
     if not getattr(embedding_function, "is_local", False):
         raise ValueError(f"Embedding model {embedding_model_name} is not a local model")
 
-    model = embedding_function.model
+    model = embedding_function.model  # type: ignore[attr-defined]
 
     measurements = []
 
@@ -514,7 +514,7 @@ def build_local_vector_database(
         with profiler.time_block("estimate_batch_size"):
             batch_size = estimate_batch_size(embedding_model_name)
 
-    embedding_function.batch_size = batch_size
+    embedding_function.batch_size = batch_size  # type: ignore[attr-defined]
 
     with profiler.time_block("get_or_create_collection"):
         collection: Collection = client.get_or_create_collection(
@@ -557,6 +557,11 @@ def build_local_vector_database(
                 for metadata in expression_metadatas:
                     if metadata.expression_id in seen:
                         continue
+
+                    if metadata.expression_id is None:
+                        raise ValueError(
+                            f"expression_id cannot be None. Given: {metadata.model_dump()}"
+                        )
 
                     seen.add(metadata.expression_id)
                     unique_pairs.append((metadata.expression_id, metadata))
@@ -648,9 +653,9 @@ def build_local_vector_database(
             with profiler.time_block("chromadb_add"):
                 collection.add(
                     ids=add_ids,
-                    documents=add_documents,  # type: ignore[misc]
+                    documents=add_documents,  # type: ignore[misc,arg-type]
                     embeddings=embeddings,
-                    metadatas=add_metadatas,
+                    metadatas=add_metadatas,  # type: ignore[arg-type]
                 )
 
             with profiler.time_block("delete_batch_objects"):

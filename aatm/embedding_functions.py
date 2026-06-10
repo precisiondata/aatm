@@ -44,7 +44,7 @@ Notes:
 """
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from chromadb import Documents, EmbeddingFunction, Embeddings
 from google import genai
 import os
