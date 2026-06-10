@@ -120,7 +120,6 @@ MODEL_SPECS: list[ChromaRetrieverModelSpec] = [
         name="embeddinggemma-300M",
         model_id=GemmaEmbeddingModels.EMBEDDING_GEMMA_300M.value,
         embedding_function_cls=GemmaEmbeddingFunction,  # noqa: F821
-        rate_limit=1000,
     ),
     ChromaRetrieverModelSpec(
         name="text-embedding-3-small",
