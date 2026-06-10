@@ -16,6 +16,31 @@ from aatm.prompt_helpers import format_prompt
             },
         ),
         (
+            [
+                {"role": "user", "content": "Hello, {name}!"},
+                {
+                    "role": "assistant",
+                    "content": "Hello, {name}! I'm {assistant_name}! How can I help you today?",
+                },
+                {"role": "user", "content": "I need help with my {problem_type}."},
+            ],
+            {"name": "Alice", "assistant_name": "Bob", "problem_type": "math"},
+            {
+                "success": True,
+                "expected_result": [
+                    {"role": "user", "content": "Hello, Alice!"},
+                    {
+                        "role": "assistant",
+                        "content": "Hello, Alice! I'm Bob! How can I help you today?",
+                    },
+                    {
+                        "role": "user",
+                        "content": "I need help with my math.",
+                    },
+                ],
+            },
+        ),
+        (
             [{"role": "user", "content": "Hello, {name}!"}],
             {"gender": "male"},
             {
