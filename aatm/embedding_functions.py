@@ -169,8 +169,10 @@ class Qwen3EmbeddingFunction(EmbeddingFunction):
         Returns:
             Embeddings for the provided documents as a list of vectors.
         """
-        embeddings = self.model.encode(input, prompt_name="query")
-        return embeddings.tolist()
+        with torch.inference_mode():
+            self.model = self.model.eval()
+            embeddings = self.model.encode(input, prompt_name="query")
+            return embeddings.tolist()
 
 
 class GemmaEmbeddingModels(Enum):
@@ -197,7 +199,9 @@ class GemmaEmbeddingFunction(EmbeddingFunction):
         model: SentenceTransformer instance used to encode documents.
     """
 
-    def __init__(self, model: str, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self, model: str, batch_size: int = 32, *args: Any, **kwargs: Any
+    ) -> None:
         """Initialize the Gemma embedding function.
 
         Args:
@@ -221,6 +225,8 @@ class GemmaEmbeddingFunction(EmbeddingFunction):
             model_kwargs={"device_map": "cuda" if torch.cuda.is_available() else "cpu"},
             tokenizer_kwargs={"padding_side": "left"},
         )
+        self.is_local = True
+        self.batch_size = batch_size
 
     def __call__(self, input: Documents) -> Embeddings:
         """Generate embeddings for the provided documents.
@@ -231,8 +237,9 @@ class GemmaEmbeddingFunction(EmbeddingFunction):
         Returns:
             Embeddings for the provided documents as a list of vectors.
         """
-        embeddings = self.model.encode(input)
-        return embeddings.tolist()
+        with torch.inference_mode():
+            embeddings = self.model.encode(input, batch_size=self.batch_size)
+            return embeddings.tolist()
 
 
 class OpenAIEmbeddingModels(Enum):

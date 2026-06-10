@@ -1,5 +1,12 @@
 # Any-to-Any Terminology Mapping
 
+[![PyPI version](https://img.shields.io/pypi/v/aatm)](https://pypi.org/project/aatm/)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%20%203.11%20%7C%203.12-blue)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![License MIT](https://img.shields.io/github/license/precisiondata/aatm)](https://opensource.org/licenses/MIT)
+
 **Any-to-Any Terminology Mapping** is an open-source Python framework designed to facilitate terminology mapping tasks. The library organizes this process in a modular and extensible way to support multiple use cases and incorporate new techniques as they emerge.
 
 In simple terms, mapping a new expression to a specific terminology involves considering many possible expressions, retrieving the best candidate target terms, and selecting them manually, which can be effortful and time-consuming.

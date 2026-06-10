@@ -143,7 +143,7 @@ def main(ctx: typer.Context) -> None:
 )
 def init(
     vocab_dir: Annotated[
-        Optional[str | Path],
+        Optional[Path],
         typer.Option(
             "--vocab-dir",
             "-vd",
@@ -273,6 +273,7 @@ def init(
 
     # Lazy import
     console.print("Preparing local database builder...")
+
     from aatm.local_database_utils import build_local_sqlite_vocab_database
 
     build_local_sqlite_vocab_database(vocab_dir)
@@ -352,7 +353,7 @@ def search_ui() -> None:
 @app.command("map", help="Run a terminology mapping task")
 def map(
     task_config_path: Annotated[
-        Optional[str | Path],
+        Optional[Path],
         typer.Option(
             "--task-config-path",
             "-t",
@@ -560,7 +561,7 @@ def serve(
         typer.Option("--mode", "-m", help="Serving mode: 'prod' or 'dev'"),
     ] = "dev",
     reload: Annotated[
-        bool | None,
+        bool,
         typer.Option(
             "--reload", help="Enables hot reload. Compatible with 'dev' mode only."
         ),
