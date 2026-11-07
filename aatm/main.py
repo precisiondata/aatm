@@ -79,23 +79,28 @@ Note:
     details to lower-level utilities and domain-specific components.
 """
 
-import logging
 import dotenv
 import typer
 from rich.console import Console
 from pathlib import Path
 from typing import Annotated, List, Literal, Optional
+import os
 import questionary
 from questionary import Choice
 import subprocess
 import sys
 from rich.json import JSON
 
-from aatm.logs import get_logger
+from aatm.logs import (
+    LOG_LEVEL_ENV_VAR,
+    configure_logging,
+    get_logger,
+    resolve_log_level,
+)
 
 
 dotenv.load_dotenv()  # Load environment variables
-logger = get_logger(__name__, level=logging.INFO)
+logger = get_logger(__name__)
 
 app = typer.Typer()
 console = Console()
@@ -124,6 +129,29 @@ AATM_LOGO = r"""
 """
 
 
+def ensure_utf8_output() -> None:
+    """Make the CLI's output streams UTF-8 so non-ASCII output cannot crash it.
+
+    On Windows, Python uses the legacy code page (e.g. cp1252) when stdout/stderr are
+    redirected to a file or pipe, and printing the logo or other non-ASCII text then
+    raises `UnicodeEncodeError`. Interactive consoles already use UTF-8 and are left
+    as they are. `PYTHONIOENCODING` is set so that subprocesses started by the CLI
+    (`serve`, `search-ui`) behave the same, unless the user already set it.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        encoding = (getattr(stream, "encoding", None) or "").replace("-", "").lower()
+        reconfigure = getattr(stream, "reconfigure", None)
+        if encoding != "utf8" and reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8")
+            except (ValueError, OSError):
+                # Not reconfigurable (e.g. already written to in a way that
+                # prevents it); keep the original stream.
+                pass
+
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
+
 def print_logo() -> None:
     console.print(f"[bold bright_blue]{AATM_LOGO}[/bold bright_blue]")
     console.print(
@@ -132,7 +160,30 @@ def print_logo() -> None:
 
 
 @app.callback(invoke_without_command=True)
-def main(ctx: typer.Context) -> None:
+def main(
+    ctx: typer.Context,
+    log_level: Annotated[
+        Optional[str],
+        typer.Option(
+            "--log-level",
+            "-l",
+            envvar=LOG_LEVEL_ENV_VAR,
+            help="Log level: DEBUG, INFO, WARNING, ERROR or CRITICAL. Logs go to stderr.",
+            show_default="INFO",
+        ),
+    ] = None,
+) -> None:
+    ensure_utf8_output()
+
+    try:
+        level = resolve_log_level(log_level)
+    except ValueError as e:
+        raise typer.BadParameter(str(e), param_hint="--log-level") from e
+
+    configure_logging(level)
+    # Pass the level on to subprocesses started by `serve` and `search-ui`.
+    os.environ[LOG_LEVEL_ENV_VAR] = str(level)
+
     if ctx.invoked_subcommand is None:
         print_logo()
         console.print("[dim]Use 'aatm --help' to see available commands.[/dim]")
@@ -325,13 +376,45 @@ def init(
     console.print("[green]Done![/green]\n")
 
 
+STREAMLIT_FILE_WATCHER_ENV_VAR = "STREAMLIT_SERVER_FILE_WATCHER_TYPE"
+
+
+def build_search_ui_command(
+    streamlit_app: Path, env: Optional[dict[str, str]] = None
+) -> List[str]:
+    """Build the command that starts the Streamlit search UI.
+
+    Streamlit's file watcher is disabled by default. It only reloads the app when its
+    source files change, which is not needed to use the UI, and while scanning loaded
+    modules it trips over `transformers`' lazily loaded submodules, flooding the log
+    with `ModuleNotFoundError` tracebacks (e.g. "No module named 'torchvision'").
+    Set `STREAMLIT_SERVER_FILE_WATCHER_TYPE` (e.g. to `auto`) to keep Streamlit's
+    own behaviour, for example while developing `search_ui.py`.
+
+    Args:
+        streamlit_app: Path to the Streamlit script.
+        env: Environment to check for a user-defined watcher setting. Defaults to
+            `os.environ`.
+
+    Returns:
+        The command as a list of arguments.
+    """
+    env = dict(os.environ) if env is None else env
+    command = [sys.executable, "-m", "streamlit", "run", str(streamlit_app)]
+    if not env.get(STREAMLIT_FILE_WATCHER_ENV_VAR):
+        command += ["--server.fileWatcherType", "none"]
+    return command
+
+
 @app.command("search-ui")
 def search_ui() -> None:
     """Launch the Streamlit-based search interface.
 
     This command locates the `search_ui.py` application in the same
     package directory as this module and starts it using the current
-    Python interpreter with Streamlit.
+    Python interpreter with Streamlit. Streamlit's file watcher is disabled
+    unless `STREAMLIT_SERVER_FILE_WATCHER_TYPE` is set (see
+    `build_search_ui_command`).
 
     Raises:
         typer.BadParameter: If the Streamlit application file cannot be
@@ -344,10 +427,7 @@ def search_ui() -> None:
     if not streamlit_app.exists():
         raise typer.BadParameter(f"Streamlit app not found: {streamlit_app}")
 
-    subprocess.run(
-        [sys.executable, "-m", "streamlit", "run", str(streamlit_app)],
-        check=True,
-    )
+    subprocess.run(build_search_ui_command(streamlit_app), check=True)
 
 
 @app.command("map", help="Run a terminology mapping task")

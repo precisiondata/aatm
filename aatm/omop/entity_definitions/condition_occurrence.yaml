@@ -1,0 +1,39 @@
+# Condition occurrence entity definitions
+#
+# This file contains the entity definitions for the extraction of relevant entities from clinical documents related to condition occurrences. The entities defined here are used to capture information about the conditions diagnosed or reported for patients, including the condition name, severity, and relevant dates.
+#
+# Not all information needed for the OMOP CDM condition_occurrence table is captured in this entity definition as it needs information not typically found in clinical documents. Those include:
+#
+# To be coded:
+# - condition_concept_id (can be derived from condition_source_value)
+# - condition_start_date (can be derived from verbatim_start_date)
+# - condition_end_date (can be derived from verbatim_end_date)
+# - condition_start_datetime (can be derived from verbatim_start_date)
+# - condition_end_datetime (can be derived from verbatim_end_date)
+#
+# To bring from other sources:
+# - condition_occurrence_id
+# - person_id
+# - condition_type_concept_id (can be derived from the source of the condition occurrence information)
+# - condition_status_concept_id
+# - stop_reason
+# - provider_id
+# - visit_detail_id
+# - visit_occurrence_id
+
+
+- name: Condition name
+  key: condition_name
+  definition: The name of the condition diagnosed or reported for the patient. For example, "Hypertension" or "Diabetes Mellitus". It is as specific as possible, including laterality, location or other characteristics if applicable. Does not include findings from physical examination, laboratory tests, imaging studies, or other diagnostic tests.
+
+- name: Condition start date
+  key: verbatim_start_date
+  definition: The date when a specific condition was first diagnosed or reported for the patient. For example, the date of the consultation in which the condition was first diagnosed or reported.
+  has_parent: true
+  parent_key: condition_name
+
+- name: Condition end date
+  key: verbatim_end_date
+  definition: The date when a specific condition was last diagnosed or reported for the patient. For example, the date of the consultation in which the condition was last diagnosed or reported.
+  has_parent: true
+  parent_key: condition_name

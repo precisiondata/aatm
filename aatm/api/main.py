@@ -12,10 +12,14 @@ from fastapi import FastAPI
 from aatm.api.config import APIConfig
 from aatm.api.data_models import SearchRequest, TerminologyMappingRequest
 from aatm.data_models import MappedSourceConcept, RetrieverResults
+from aatm.logs import configure_logging
 from aatm.pipeline import PipelineBaseClass
 from aatm.registries.retrievers import load_retriever
 from aatm.retrievers import BaseRetriever
 from aatm.terminology_mapper import TerminologyMapper
+
+# Level from AATM_LOG_LEVEL (set by `aatm --log-level ... serve`), default INFO.
+configure_logging()
 
 app = FastAPI()
 

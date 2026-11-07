@@ -1,7 +1,7 @@
 # Any-to-Any Terminology Mapping
 
 [![PyPI version](https://img.shields.io/pypi/v/aatm)](https://pypi.org/project/aatm/)
-![Python](https://img.shields.io/badge/python-3.10%20%7C%20%203.11%20%7C%203.12-blue)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
@@ -214,3 +214,23 @@ aatm map \
 ```
 
 The CLI accepts all of these options directly.
+
+## 5. Extract information from clinical documents
+
+AATM can also extract entities such as conditions, drugs and their dates from clinical notes with an LLM. Every extracted span is checked against the note and linked to the entity it belongs to.
+
+```python
+from aatm.data_models.extractors import EntityDefinitions
+from aatm.extractors import SimpleLLMExtractor
+
+extractor = SimpleLLMExtractor(
+    model_id="openai/gpt-5",  # requires OPENAI_API_KEY
+    entity_definitions=EntityDefinitions.from_predefined("condition_occurrence"),
+)
+results = await extractor([clinical_note])
+
+for record in results[0].to_records():
+    print(record.text, {k: [c.text for c in v] for k, v in record.children.items()})
+```
+
+See the [Information extraction quick start](https://precisiondata.github.io/aatm/getting-started/quick_start_extraction/) for entity definitions, validation and working with the results.

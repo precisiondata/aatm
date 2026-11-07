@@ -1,0 +1,61 @@
+# Drug exposure entity definitions
+#
+# This file contains the entity definitions for the extraction of relevant entities from clinical documents related to drug exposure. The entities defined here are used to capture information about the drugs prescribed or used by patients, including the drug name, dosage, route of administration, and relevant dates.
+#
+# Not all information needed for the OMOP CDM drug_exposure table is captured in this entity definition as it needs information not typically found in clinical documents. Those include:
+#
+# To be coded:
+# - drug_concept_id (can be derived from drug_name)
+# - drug_source_concept_id (can be derived from drug_name)
+# - route_concept_id (can be derived from route_source_value)
+# - drug_exposure_start_date (can be derived from verbatim_start_date)
+# - drug_exposure_end_date (can be derived from verbatim_end_date)
+#
+# To bring from other sources:
+# - drug_type_concept_id (can be derived from the source of the drug exposure information)
+# - drug_exposure_id
+# - person_id
+# - provider_id
+# - visit_occurrence_id
+# - visit_detail_id
+# - quantity
+# - refills
+# - days_supply
+# - lot_number
+# - stop_reason (will be deprecated in OMOP CDM v6.0)
+
+
+- name: Drug name
+  key: drug_name
+  definition: The name and dose form of a drug prescribed to the patient or being used by the patient. For example, "Aspirin 81 mg oral tablet" or "Aspirin 325 mg oral tablet". If the dose form is not known, the drug name can be recorded without it. For example, "Aspirin 325 mg" or "Aspirin" if the dose form is not provided.
+
+- name: Drug exposure start date
+  key: verbatim_start_date
+  definition: The date when a specific drug started or was prescribed for the patient. For example, the date of the consultation in which the drug was prescribed.
+  has_parent: true
+  parent_key: drug_name
+
+- name: Drug exposure end date
+  key: verbatim_end_date
+  definition: The date when a specific drug use ended for the patient. For example, the date of the consultation in which the drug was discontinued or the date informed by the patient during a consultation.
+  has_parent: true
+  parent_key: drug_name
+
+- name: Drug route
+  key: route_source_value
+  definition: The route by which a drug is administered or prescribed to the patient. For example, "oral", "intravenous", "topical".
+  has_parent: true
+  parent_key: drug_name
+
+- name: Drug dose unit
+  key: dose_unit_source_value
+  definition: A single measured quantity of a medicine, packaged for administration to a patient at one time. For example, a tablet or a vial to be injected.
+  has_parent: true
+  parent_key: drug_name
+
+- name: Drug dosage
+  key: sig # from OMOP CDM drug_exposure table
+  definition: The amount of a drug prescribed including the frequency and duration of the treatment. This is the verbatim instruction for the drug as written by the provider. For example, "1 tablet per day for 14 days".
+  has_parent: true
+  parent_key: drug_name
+

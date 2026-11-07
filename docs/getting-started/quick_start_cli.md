@@ -233,7 +233,7 @@ You can also launch the Streamlit-based search interface directly from the CLI:
 aatm search-ui
 ```
 
-The CLI resolves the packaged `search_ui.py` file and launches it through Streamlit using the current Python interpreter. 
+The CLI resolves the packaged `search_ui.py` file and launches it through Streamlit using the current Python interpreter. Streamlit's file watcher is turned off, since it is only needed while editing the UI; set `STREAMLIT_SERVER_FILE_WATCHER_TYPE=auto` to turn it back on.
 
 ![Streamlit search UI screenshot.](../assets/search-ui-screenshot.png)
 /// caption
@@ -340,3 +340,17 @@ Make sure you ran `aatm init` first and successfully built the local vector data
 ### API-backed components fail
 
 Check that your `.env` file contains the required API keys.
+
+### Seeing more (or fewer) log messages
+
+Every command accepts a global `--log-level` option (or `-l`), placed before the command name. Logs are written to stderr:
+
+```bash
+aatm --log-level DEBUG map --task-config-path task.yaml
+```
+
+The level can also be set with the `AATM_LOG_LEVEL` environment variable. It is passed on to `aatm serve` and `aatm search-ui`.
+
+### Output redirected to a file looks garbled or fails
+
+The CLI writes UTF-8 to files and pipes (for example `aatm serve > server.log`), so open such files as UTF-8.

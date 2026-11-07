@@ -14,12 +14,17 @@ import streamlit as st
 import chromadb
 import dotenv
 
+from aatm.logs import configure_logging
 from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY, load_retriever
 from aatm.retrievers import (
     ChromaDBRetriever,
 )
 
 dotenv.load_dotenv()
+
+# Level from AATM_LOG_LEVEL (set by `aatm --log-level ... search-ui`), default INFO.
+# Safe on Streamlit reruns: the handler is only added once.
+configure_logging()
 
 client = chromadb.PersistentClient()
 

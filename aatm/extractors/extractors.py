@@ -115,8 +115,6 @@ class GeminiExtractor(BaseExtractor):
             model_id: Identifier of the Gemini model to be used for extraction.
             api_key: Optional Google API key used to initialize the Gemini client.
                 If omitted, authentication may rely on environment configuration.
-            labels: Optional list of allowed labels. When provided, extracted concepts
-                whose labels are not in this list are discarded.
 
         Raises:
             AssertionError: If the prompt template does not contain the `{text}`

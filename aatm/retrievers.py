@@ -131,9 +131,6 @@ class ChromaDBRetriever(BaseRetriever):
                 overridden at retrieval time.
             *args: Additional positional arguments reserved for compatibility.
             **kwargs: Additional keyword arguments reserved for compatibility.
-
-        Returns:
-            None.
         """
         self.client = client
         self.collection_name = collection_name

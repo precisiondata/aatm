@@ -1,4 +1,4 @@
-"""Data models and enums for terminology mapping workflows.
+"""General data models and enums for terminology mapping workflows.
 
 This module defines the core structured data models used throughout the
 AATM package to represent source concepts, retrieved expressions,
