@@ -1,5 +1,5 @@
 site_name: Any-to-Any Terminology Mapping
-site_url: 
+site_url: https://precisiondata.github.io/aatm/
 repo_url: https://github.com/precisiondata/aatm
 repo_name: precisiondata/aatm
 site_description: Any-to-Any Terminology Mapping, a tool for mapping between different terminologies in the healthcare domain.
@@ -39,6 +39,7 @@ nav:
       - Data Models: 'reference/data_models.md'
       - Extraction data models: 'reference/extraction_data_models.md'
       - Debug: 'reference/debug.md'
+      - Device selection: 'reference/device.md'
       - Local database utilities: 'reference/local_database_utils.md'
       - Logs: 'reference/logs.md'
       - Prompt helpers: 'reference/prompt_helpers.md'

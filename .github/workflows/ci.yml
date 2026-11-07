@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+# Cancel superseded runs of the same PR/branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Keep `uv run` from re-syncing to the default (CUDA) dependency groups.
+  UV_NO_SYNC: "1"
+
+jobs:
+  lint:
+    name: Lint and type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          # Keep downloaded wheels: with CPU-only torch the cache is small,
+          # and pruning them made every cache save useless.
+          prune-cache: false
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --no-group cu128 --group cpu
+
+      - name: Run ruff check
+        run: uv run ruff check aatm/ tests/
+
+      - name: Run ruff format
+        run: uv run ruff format --check aatm/ tests/
+
+      - name: Run mypy
+        run: uv run mypy aatm/
+
+  tests:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
+          - "3.13"
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          prune-cache: false
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --no-group cu128 --group cpu
+
+      - name: Run pytest
+        run: uv run pytest --cov

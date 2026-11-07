@@ -11,7 +11,7 @@ We use modern packaging standards with configurations centralized in `pyproject.
 ### Prerequisites
 
 * Python 3.11+
-* [uv](https://github.com) (recommended) or `pip` / `virtualenv`
+* [uv](https://github.com/astral-sh/uv) (recommended) or `pip` / `virtualenv`
 
 ### Step-by-Step Environment Setup
 
@@ -21,14 +21,19 @@ We use modern packaging standards with configurations centralized in `pyproject.
    git clone https://github.com/{your-username}/aatm.git
    cd aatm
    ```
-3. **Create and activate a virtual environment**:
+3. **Install the project and development dependencies** from the lockfile
+   (the same environment CI uses):
    ```bash
-   uv venv
-   source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+   uv sync --all-extras
    ```
-4. **Install development dependencies** in editable mode:
+   This installs the CUDA 12.8 build of PyTorch. On a machine without an
+   NVIDIA GPU, use the CPU-only build instead:
    ```bash
-   uv pip install -e ".[dev]"
+   uv sync --all-extras --no-group cu128 --group cpu
+   ```
+4. **Before pushing**, run the same checks as CI:
+   ```bash
+   sh scripts/precommit.sh
    ```
 
 ---
@@ -37,14 +42,14 @@ We use modern packaging standards with configurations centralized in `pyproject.
 
 To maintain code consistency, we enforce strict linting and formatting rules on our CI/CD pipeline.
 
-* **Formatting & Linting**: We use [Ruff](https://github.com). Run checks locally via:
+* **Formatting & Linting**: We use [Ruff](https://github.com/astral-sh/ruff). Run checks locally via:
   ```bash
-  ruff format .
-  ruff check .
+  uv run ruff format aatm/ tests/
+  uv run ruff check aatm/ tests/
   ```
 * **Type Hinting**: All new public APIs must include static type hints verified by `mypy`.
   ```bash
-  mypy aatm/
+  uv run mypy aatm/
   ```
 * **Style Constraints**: Use `snake_case` for function and variable names, and `PascalCase` for classes.
 
@@ -55,10 +60,12 @@ To maintain code consistency, we enforce strict linting and formatting rules on 
 We use [pytest](https://pytest.org) for our test suite. 
 
 * Every feature addition or bug fix must include corresponding tests.
-* We target a minimum test coverage of **80%**.
+* We target a test coverage of **80%**. CI fails if total coverage drops below the
+  floor set in `[tool.coverage.report] fail_under` in `pyproject.toml`; raise that
+  floor when your change increases coverage.
 * Run the test suite locally with coverage reporting:
   ```bash
-  pytest tests/
+  uv run pytest --cov
   ```
 
 ---
@@ -91,6 +98,19 @@ Ready to submit your changes? Follow this standard workflow:
    ```
 4. **Open a Pull Request (PR)** against our `main` branch.
 5. **Ensure all CI checks pass** (tests, linting, type checks). A maintainer will review your code shortly.
+
+---
+
+## Releasing (maintainers)
+
+Docs are deployed to GitHub Pages automatically on every push to `main`.
+To publish a new version to PyPI, bump `version` in `pyproject.toml`, merge
+it to `main`, then push a matching tag:
+
+```bash
+git tag v0.1.8
+git push origin v0.1.8
+```
 
 ---
 

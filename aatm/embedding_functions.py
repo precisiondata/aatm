@@ -37,8 +37,9 @@ Classes:
         embeddings API.
 
 Notes:
-    Qwen3 and Gemma embedding models are loaded onto CUDA when a GPU is
-    available and otherwise fall back to CPU. SentenceTransformers-based
+    Qwen3 and Gemma embedding models are loaded onto the device returned by
+    `aatm.device.get_device()`: an NVIDIA GPU (CUDA) or Apple GPU (MPS) when
+    available, otherwise CPU. SentenceTransformers-based
     models are initialized with left-padding tokenizer behavior in this
     module.
 """
@@ -53,6 +54,8 @@ import numpy as np
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 import torch
+
+from aatm.device import get_device
 
 dotenv.load_dotenv()
 
@@ -123,8 +126,8 @@ class Qwen3EmbeddingFunction(EmbeddingFunction):
 
     This embedding function adapts Qwen3 embedding models loaded through
     SentenceTransformers to the ChromaDB `EmbeddingFunction` interface.
-    The selected model is loaded onto CUDA when available and otherwise
-    onto CPU.
+    The selected model is loaded onto the device returned by
+    `aatm.device.get_device()` (CUDA, MPS or CPU).
 
     Attributes:
         model_id: Fully qualified identifier of the selected Qwen3
@@ -153,7 +156,7 @@ class Qwen3EmbeddingFunction(EmbeddingFunction):
         self.model_id = Qwen3EmbeddingModels(model).value
         self.model = SentenceTransformer(
             self.model_id,
-            model_kwargs={"device_map": "cuda" if torch.cuda.is_available() else "cpu"},
+            model_kwargs={"device_map": get_device()},
             tokenizer_kwargs={"padding_side": "left"},
         )
 
@@ -190,8 +193,8 @@ class GemmaEmbeddingFunction(EmbeddingFunction):
 
     This embedding function adapts Gemma embedding models loaded through
     SentenceTransformers to the ChromaDB `EmbeddingFunction` interface.
-    The selected model is loaded onto CUDA when available and otherwise
-    onto CPU.
+    The selected model is loaded onto the device returned by
+    `aatm.device.get_device()` (CUDA, MPS or CPU).
 
     Attributes:
         model_id: Fully qualified identifier of the selected Gemma
@@ -222,7 +225,7 @@ class GemmaEmbeddingFunction(EmbeddingFunction):
         self.model_id = GemmaEmbeddingModels(model).value
         self.model = SentenceTransformer(
             self.model_id,
-            model_kwargs={"device_map": "cuda" if torch.cuda.is_available() else "cpu"},
+            model_kwargs={"device_map": get_device()},
             tokenizer_kwargs={"padding_side": "left"},
         )
         self.is_local = True
