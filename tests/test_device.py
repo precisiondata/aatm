@@ -73,7 +73,7 @@ def test_cpu_fallback_logs_install_hint(available, caplog, monkeypatch):
         get_device()
     (message,) = [r.getMessage() for r in caplog.records]
     assert "no CUDA support" in message
-    assert device_module.PYTORCH_INSTALL_URL in message
+    assert "aatm doctor" in message
 
 
 def test_cpu_with_cuda_build_suggests_driver_check(available, caplog, monkeypatch):
@@ -83,7 +83,8 @@ def test_cpu_with_cuda_build_suggests_driver_check(available, caplog, monkeypatc
     with caplog.at_level("INFO", logger="aatm.device"):
         get_device()
     (message,) = [r.getMessage() for r in caplog.records]
-    assert "nvidia-smi" in message
+    assert "cannot see a usable NVIDIA GPU" in message
+    assert "aatm doctor" in message
 
 
 def test_forced_cpu_has_no_hint(available, caplog, monkeypatch):

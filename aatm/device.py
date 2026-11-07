@@ -39,7 +39,7 @@ DEVICE_ENV_VAR = "AATM_DEVICE"
 Device = Literal["cuda", "mps", "cpu"]
 SUPPORTED_DEVICES: tuple[Device, ...] = ("cuda", "mps", "cpu")
 
-PYTORCH_INSTALL_URL = "https://pytorch.org/get-started/locally/"
+DOCTOR_HINT = "If you have an NVIDIA GPU, run `aatm doctor` to see how to enable it."
 
 _logged_device: Device | None = None
 
@@ -98,15 +98,13 @@ def cpu_fallback_hint() -> str:
     if sys.platform == "darwin":
         return "No Apple GPU (MPS) is available to PyTorch."
     if torch.version.cuda is None:
-        return (
-            "The installed PyTorch build has no CUDA support. If you have an NVIDIA "
-            f"GPU, install a CUDA build of PyTorch: {PYTORCH_INSTALL_URL}"
+        reason = "The installed PyTorch build has no CUDA support."
+    else:
+        reason = (
+            f"PyTorch was built with CUDA {torch.version.cuda} but cannot see a "
+            "usable NVIDIA GPU."
         )
-    return (
-        f"PyTorch was built with CUDA {torch.version.cuda} but cannot see a usable "
-        "NVIDIA GPU. Check that a GPU is present and its driver supports this CUDA "
-        "version (`nvidia-smi`)."
-    )
+    return f"{reason} {DOCTOR_HINT}"
 
 
 def _log_selection(device: Device, source: str) -> None:
