@@ -39,6 +39,7 @@ nav:
       - Data Models: 'reference/data_models.md'
       - Extraction data models: 'reference/extraction_data_models.md'
       - Debug: 'reference/debug.md'
+      - Device selection: 'reference/device.md'
       - Local database utilities: 'reference/local_database_utils.md'
       - Logs: 'reference/logs.md'
       - Prompt helpers: 'reference/prompt_helpers.md'

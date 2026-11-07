@@ -22,6 +22,7 @@ from rank_bm25 import BM25Okapi  # type: ignore[import-untyped]
 
 # Custom modules
 from aatm.data_models import RetrieverResults
+from aatm.device import get_device
 from aatm.pipeline import PipelineBaseClass
 
 # Load environment variables
@@ -167,8 +168,8 @@ class Qwen3Reranker(BaseReranker):
     reranking score.
 
     The class supports custom task instructions, prompt prefix and suffix
-    templates, configurable sequence length, and automatic placement on CPU or
-    CUDA when available.
+    templates, configurable sequence length, and automatic placement on the
+    device returned by ``aatm.device.get_device()`` (CUDA, MPS or CPU).
     """
 
     def __init__(
@@ -216,7 +217,7 @@ class Qwen3Reranker(BaseReranker):
             self.model_id, padding_side="left"
         )
         self.model = AutoModelForCausalLM.from_pretrained(self.model_id).eval()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(get_device())
         self.model.to(self.device)
         self.max_length = max_length
 
