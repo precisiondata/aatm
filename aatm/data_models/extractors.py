@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Literal, Optional, Self
+import logging
 import re
 import unicodedata
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -8,7 +9,7 @@ from importlib.resources import files
 
 from aatm.logs import get_logger
 
-logger = get_logger(__name__, level="DEBUG")
+logger = get_logger(__name__, level=logging.DEBUG)
 
 
 def make_entity_key(name: str) -> str:
@@ -35,17 +36,31 @@ class EntityDefinition(BaseModel):
         name (str): The name of the entity.
         key (str): The key of the entity. If not provided, the name will be used with all letters lowercased and spaces replaced by underscores.
         definition (str): The definition of the entity.
+        has_parent (bool): Whether extracted spans of this entity must reference a parent span.
+        parent_key (Optional[str]): The key of the parent entity. Required when `has_parent` is True.
     """
 
     name: str
     key: str = Field(default_factory=lambda data: make_entity_key(data["name"]))
     definition: str
     has_parent: bool = False
-    parent_key: Optional[str] = Field(
-        default_factory=lambda data: data["key"] if data["has_parent"] else None
-    )
+    parent_key: Optional[str] = None
 
-    def to_prompt_str(self):
+    @model_validator(mode="after")
+    def validate_parent(self) -> Self:
+        if self.has_parent and not self.parent_key:
+            raise ValueError(
+                f"Entity {self.key!r} has has_parent=True but no parent_key"
+            )
+        if not self.has_parent and self.parent_key:
+            raise ValueError(
+                f"Entity {self.key!r} defines parent_key but has_parent is False"
+            )
+        if self.parent_key == self.key:
+            raise ValueError(f"Entity {self.key!r} cannot be its own parent")
+        return self
+
+    def to_prompt_str(self) -> str:
         return f"{self.name} (key: `{self.key}`, has_parent: {self.has_parent}, parent_key: `{self.parent_key}`): {self.definition}"
 
 
@@ -59,18 +74,42 @@ class EntityDefinitions(BaseModel):
 
     entities: List[EntityDefinition]
 
+    @model_validator(mode="after")
+    def validate_keys(self) -> Self:
+        keys = [entity.key for entity in self.entities]
+        duplicates = {k for k in keys if keys.count(k) > 1}
+        if duplicates:
+            raise ValueError(f"Duplicate entity keys: {sorted(duplicates)}")
+
+        for entity in self.entities:
+            if entity.parent_key is not None and entity.parent_key not in keys:
+                raise ValueError(
+                    f"Entity {entity.key!r} references unknown parent_key "
+                    f"{entity.parent_key!r}"
+                )
+        return self
+
     @property
     def keys(self) -> set[str]:
-        return {entity.key for entity in self.entities if entity.key is not None}
+        return {entity.key for entity in self.entities}
 
-    def to_prompt_str(self):
+    @property
+    def parent_keys(self) -> dict[str, str]:
+        """Mapping from entity key to its parent key, for entities that require a parent."""
+        return {
+            entity.key: entity.parent_key
+            for entity in self.entities
+            if entity.has_parent and entity.parent_key is not None
+        }
+
+    def to_prompt_str(self) -> str:
         return "\n".join([ent.to_prompt_str() for ent in self.entities])
 
     @classmethod
     def from_predefined(cls, key: str) -> Self:
         available_defs = {
             p.stem: p
-            for p in Path(files("aatm").joinpath("omop/entity_definitions")).glob(
+            for p in Path(str(files("aatm").joinpath("omop/entity_definitions"))).glob(
                 "*.yaml"
             )
         }
@@ -125,6 +164,7 @@ RejectionReason = Literal[
     "invalid_key",
     "invalid_text",
     "required_parent_missing",
+    "invalid_parent",
 ]
 
 
@@ -137,10 +177,9 @@ class RejectedEntityCandidate(ExtractedEntityCandidate):
     def validate_span(self) -> Self:
         start, end = self.start, self.end
 
-        if (start is None) != (end is None):
-            raise ValueError("start and end must be provided together")
-
-        if start is None and end is None:
+        if start is None or end is None:
+            if start is not None or end is not None:
+                raise ValueError("start and end must be provided together")
             return self
 
         if start >= end:
@@ -188,7 +227,12 @@ def validate_extracted_entity(
     extracted_entities: ExtractedEntityCandidates,
 ) -> EntityValidationResult:
     """
-    Validate a list of extracted entities against a text. Returns a list of ExtractedEntity objects, which includes spans that are exact matches in the text. Matched entities are deduplicated based on span indices, span text and key.
+    Validate a list of extracted entities against a text. Returns a list of ExtractedEntity objects, which includes spans that are exact matches in the text. Matched entities are deduplicated based on span indices, span text, key and parents.
+
+    Entities whose definition requires a parent must list at least one parent span, and every
+    parent span must appear verbatim in the text and be extracted itself under the parent key
+    defined in `entity_definitions`. Otherwise the entity is rejected with `required_parent_missing`
+    or `invalid_parent`.
 
     Args:
         text (str): The text to validate against.
@@ -205,17 +249,21 @@ def validate_extracted_entity(
         raise ValueError("text must not be empty")
 
     allowed_keys = entity_definitions.keys
+    parent_keys = entity_definitions.parent_keys
     results = EntityValidationResult()
-    seen: set[tuple[int, int, str, str]] = set()
+    seen: set[tuple[int, int, str, str, Optional[str]]] = set()
     seen_keys: set[str] = set()
-    entity_keys_with_required_parents: set[str] = {
-        e.key for e in entity_definitions.entities if e.has_parent
-    }
+
+    # Texts of candidates that can act as parents: valid key and present in the text.
+    texts_by_key: dict[str, set[str]] = {}
+    for ent in extracted_entities.entities:
+        if ent.key in allowed_keys and ent.text in text:
+            texts_by_key.setdefault(ent.key, set()).add(ent.text)
 
     logger.debug(f"Validating {len(extracted_entities.entities)} entities")
-    logger.debug(f"""Allowed keys: {", ".join(allowed_keys)}""")
+    logger.debug(f"""Allowed keys: {", ".join(sorted(allowed_keys))}""")
     logger.debug(
-        f"""Entity keys with required parents: {", ".join(entity_keys_with_required_parents)}"""
+        f"""Entity keys with required parents: {", ".join(sorted(parent_keys))}"""
     )
 
     for ent in extracted_entities.entities:
@@ -225,13 +273,16 @@ def validate_extracted_entity(
         if not matches:
             rejection_reasons.append("invalid_text")
 
-        if allowed_keys is not None and ent.key not in allowed_keys:
+        if ent.key not in allowed_keys:
             rejection_reasons.append("invalid_key")
 
-        if ent.key in entity_keys_with_required_parents and (
-            ent.parents is None or len(ent.parents) == 0
-        ):
-            rejection_reasons.append("required_parent_missing")
+        if ent.key in parent_keys:
+            if not ent.parents:
+                rejection_reasons.append("required_parent_missing")
+            else:
+                valid_parents = texts_by_key.get(parent_keys[ent.key], set())
+                if any(p not in valid_parents for p in ent.parents):
+                    rejection_reasons.append("invalid_parent")
 
         if rejection_reasons:
             results.unmatched_entities.append(

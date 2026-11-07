@@ -10,7 +10,7 @@ We use modern packaging standards with configurations centralized in `pyproject.
 
 ### Prerequisites
 
-* Python 3.10+
+* Python 3.11+
 * [uv](https://github.com) (recommended) or `pip` / `virtualenv`
 
 ### Step-by-Step Environment Setup
