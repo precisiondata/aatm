@@ -11,22 +11,19 @@ from aatm.data_models.extractors import EntityDefinitions
 from aatm.extractors import SimpleLLMExtractor
 
 extractor = SimpleLLMExtractor(
-    model_id="openai/gpt-5",
+    model_id="openai/gpt-5",  # or "gemini/...", "anthropic/...", "ollama/...", ...
     entity_definitions=EntityDefinitions.from_predefined("condition_occurrence"),
 )
 results = await extractor([clinical_note])
 records = results[0].to_records()
 ```
 
-Only OpenAI models (``openai/<model>``) are supported for now. The API key is read
-from ``OPENAI_API_KEY`` unless passed explicitly.
+Model ids are prefixed with a provider; see `aatm.llm.create_llm` for the list. The API
+key is read from the provider's usual environment variable unless passed explicitly.
 """
 
 import asyncio
 from typing import Any, List, Optional
-from agents import Agent, ModelSettings, OpenAIResponsesModel, Runner
-from openai import AsyncOpenAI
-from pydantic import BaseModel
 
 from aatm.data_models.extractors import (
     EntityDefinitions,
@@ -36,6 +33,7 @@ from aatm.data_models.extractors import (
     segment_text,
     validate_extracted_entity,
 )
+from aatm.llm import LLMSettings, StructuredLLM, create_llm
 
 DEFAULT_INSTRUCTION = """
 # Goal
@@ -72,7 +70,7 @@ Your response must be in JSON format following the schema below:
 
 
 class SimpleLLMExtractor:
-    """Extract entities from texts with a single LLM agent call per text.
+    """Extract entities from texts with a single structured-output LLM call per text.
 
     The text is split into numbered lines (`segment_text`) before being sent to the
     model, which must return the line id of each mention. The output is validated with
@@ -80,102 +78,75 @@ class SimpleLLMExtractor:
     checks keys and parent references.
 
     Args:
-        model_id: Provider-prefixed model id, e.g. ``"openai/gpt-5"``. Only the
-            ``openai/`` provider is currently supported.
+        model_id: Provider-prefixed model id, e.g. ``"openai/gpt-5"``,
+            ``"gemini/gemini-3-flash-preview"``, ``"anthropic/claude-opus-5-5"`` or
+            ``"ollama/llama3.3"``. See `aatm.llm.create_llm`. Ignored when ``llm`` is
+            given.
         entity_definitions: Definitions of the entities to extract.
         instructions: System prompt template. The placeholders ``{output_format}`` and
             ``{entity_definitions}`` are replaced; other braces are kept as-is.
-        output_type: Structured output model for the agent.
-        name: Name given to the agent.
+        output_type: Structured output model requested from the LLM.
         api_key: Optional API key. If omitted, the provider's default environment
             variable (e.g. ``OPENAI_API_KEY``) is used.
-        model_settings: Agent model settings, as a `ModelSettings` or a compatible dict.
+        base_url: Server URL for OpenAI-compatible providers (vLLM, Ollama, ...).
+        settings: Generation settings, as an `aatm.llm.LLMSettings` or a compatible
+            dict, e.g. ``{"temperature": 0, "max_tokens": 8000}``.
         max_concurrency: Maximum number of concurrent model calls.
         max_segment_chars: If set, lines longer than this are split at sentence
             boundaries into separately numbered segments before being sent to the
             model. ``None`` (default) keeps every line whole.
-        agent_args: Extra keyword arguments forwarded to `agents.Agent`.
+        llm: A ready-made `aatm.llm.StructuredLLM` to use instead of building one
+            from ``model_id``, e.g. a custom provider.
     """
 
     def __init__(
         self,
-        model_id: str,
-        entity_definitions: EntityDefinitions,
+        model_id: Optional[str] = None,
+        entity_definitions: Optional[EntityDefinitions] = None,
         instructions: str = DEFAULT_INSTRUCTION,
         output_type: type[ExtractedEntityCandidates] = ExtractedEntityCandidates,
-        name: str = "Extractor",
         api_key: Optional[str] = None,
-        model_settings: Optional[ModelSettings | dict[str, Any]] = None,
+        base_url: Optional[str] = None,
+        settings: Optional[LLMSettings | dict[str, Any]] = None,
         max_concurrency: int = 1,
         max_segment_chars: Optional[int] = None,
-        agent_args: Optional[dict[str, Any]] = None,
+        llm: Optional[StructuredLLM] = None,
     ):
-        if "/" not in model_id:
-            raise ValueError(
-                f"model_id must be prefixed with a provider, e.g. 'openai/<model>'. Got {model_id!r}"
-            )
-        self.provider, self.model_name = model_id.split("/", 1)
-        if self.provider != "openai":
-            raise NotImplementedError(
-                "Support for providers other than OpenAI is not implemented yet."
+        if entity_definitions is None:
+            raise ValueError("entity_definitions is required")
+        if llm is None:
+            if model_id is None:
+                raise ValueError("Either model_id or llm must be given")
+            llm = create_llm(
+                model_id, api_key=api_key, base_url=base_url, settings=settings
             )
 
-        self.model_id = model_id
-        self.api_key = api_key
+        self.llm = llm
+        self.model_id = llm.model_id
         self.semaphore = asyncio.Semaphore(max_concurrency)
         self.entity_definitions = entity_definitions
-        self.name = name
         self.max_segment_chars = max_segment_chars
-
-        self.model_settings: ModelSettings
-        if isinstance(model_settings, dict):
-            self.model_settings = ModelSettings(**model_settings)
-        elif isinstance(model_settings, ModelSettings):
-            self.model_settings = model_settings
-        elif model_settings is None:
-            self.model_settings = ModelSettings()
-        else:
-            raise ValueError(
-                "model_settings must be a ModelSettings object or a compatible dict"
-            )
 
         # Plain replacement instead of str.format so that literal braces in custom
         # instructions do not break prompt construction.
         self.instructions = instructions.replace(
             "{output_format}", str(output_type.model_json_schema())
         ).replace("{entity_definitions}", entity_definitions.to_prompt_str())
-        self.output_type: type[BaseModel] = output_type
-        self.agent_args: dict[str, Any] = agent_args or {}
-
-    def make_agent(self) -> Agent:
-        model: str | OpenAIResponsesModel = self.model_name
-        if self.api_key is not None:
-            model = OpenAIResponsesModel(
-                model=self.model_name,
-                openai_client=AsyncOpenAI(api_key=self.api_key),
-            )
-
-        return Agent(
-            name=self.name,
-            instructions=self.instructions,
-            model=model,
-            model_settings=self.model_settings,
-            output_type=self.output_type,
-            **self.agent_args,
-        )
+        self.output_type = output_type
 
     async def extract(self, text: str) -> EntityValidationResult:
         segments = segment_text(text, max_segment_chars=self.max_segment_chars)
 
         async with self.semaphore:
-            agent = self.make_agent()
-            run_result = await Runner.run(
-                agent, input=format_segments_for_prompt(segments)
+            candidates = await self.llm.generate(
+                system=self.instructions,
+                user=format_segments_for_prompt(segments),
+                output_type=self.output_type,
             )
 
         return validate_extracted_entity(
             text=text,
-            extracted_entities=run_result.final_output_as(ExtractedEntityCandidates),
+            extracted_entities=candidates,
             entity_definitions=self.entity_definitions,
             segments=segments,
         )

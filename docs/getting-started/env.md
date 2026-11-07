@@ -7,11 +7,13 @@ Example:
 ```env
 GOOGLE_API_KEY=your_google_api_key
 OPENAI_API_KEY=your_openai_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
 AATM loads environment variables automatically with `python-dotenv`.
 
-`OPENAI_API_KEY` is required by the [information extraction](quick_start_extraction.md) pipeline and by OpenAI-based components.
+The [information extraction](quick_start_extraction.md) pipeline needs the key of the provider you use: `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY` or `OPENROUTER_API_KEY`. Local OpenAI-compatible servers such as Ollama usually need none. `OPENAI_API_KEY` and `GOOGLE_API_KEY` are also used by the OpenAI- and Gemini-based mapping components.
 
 ## Optional settings
 
