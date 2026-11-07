@@ -9,6 +9,9 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    env:
+      # Keep `uv run` from re-syncing to the default (CUDA) dependency groups.
+      UV_NO_SYNC: "1"
     strategy:
       matrix:
         python-version:
@@ -33,7 +36,7 @@ jobs:
             enable-cache: true
     
       - name: Install the project
-        run: uv sync --locked --all-extras --dev
+        run: uv sync --locked --all-extras --no-group cu128 --group cpu
 
       - name: Run mypy
         run: uv run mypy aatm/

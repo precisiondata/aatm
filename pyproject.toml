@@ -74,13 +74,19 @@ source-include = ["aatm/*.yaml"]
 packages = ["aatm"]
 
 [[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+  { index = "pytorch-cpu", group = "cpu" },
+  { index = "pytorch-cu128", group = "cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
 ]
 torchvision = [
   { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
@@ -94,6 +100,15 @@ entrypoint = "aatm.api.main:app"
 dev = [
     "aatm[dev]",
 ]
+# PyTorch build selection. `cu128` (CUDA 12.8) is installed by default;
+# CI uses `cpu` to avoid downloading ~3.5 GB of CUDA wheels:
+#   uv sync --no-group cu128 --group cpu
+cpu = ["torch>=2.10.0"]
+cu128 = ["torch>=2.10.0"]
+
+[tool.uv]
+default-groups = ["dev", "cu128"]
+conflicts = [[{ group = "cpu" }, { group = "cu128" }]]
 
 [tool.coverage.run]
 source = ["aatm"]
