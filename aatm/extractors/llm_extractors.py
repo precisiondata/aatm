@@ -27,6 +27,8 @@ You must extract spans that are directly correlated with one of the entities and
 If the entity definition has a parent entity key, you must include the spans of the parent entity in the extracted entities.
 
 For every extracted span:
+- `id` is a short id that is unique within your response, for example `e1`, `e2`, `e3`.
+- `parents` is the list of ids of the parent entities of this span. Each mention of a parent entity is a separate entity with its own id, so link each span to the specific mention it belongs to. A span may have several parents when it applies to several of them, for example one date for two conditions. Leave `parents` empty for entities without a parent key.
 - `line` is the id of the line where this specific mention appears, for example `L12`. When the same text appears on several lines, choose the line of the mention you mean, and extract it once per line if several mentions are relevant.
 - `text` must be copied exactly from that line, character by character. Do not include the `[L12]` line id in the text.
 - `occurrence` is only needed when the same text appears more than once on that same line: it is the 1-based position of the mention you mean. Otherwise leave it null.
