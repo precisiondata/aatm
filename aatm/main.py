@@ -34,6 +34,10 @@ The CLI is responsible for orchestrating high-level workflows such as:
 - `serve`:
     Serves a minimal FastAPI application with AATM's functionality.
 
+- `doctor`:
+    Check whether local models can use a GPU and print the commands that
+    enable it.
+
 Attributes:
     LOCAL_HELPER_PATH (Path): Path to the local helper directory used by AATM
         to store generated artifacts and local resources.
@@ -72,6 +76,10 @@ Examples:
     Launch the search UI:
 
         $ aatm search-ui
+
+    Check GPU support:
+
+        $ aatm doctor
 
 Note:
     This module is intended to serve as the main CLI entrypoint for the
@@ -753,3 +761,71 @@ def serve(
         command,
         check=True,
     )
+
+
+@app.command(
+    "doctor",
+    help="Check whether local models can use a GPU, and print how to enable it.",
+)
+def doctor() -> None:
+    """Diagnose GPU support for local models.
+
+    Compares the NVIDIA driver (via ``nvidia-smi``) with the installed PyTorch
+    build and prints the commands that enable GPU acceleration. It does not
+    change the environment.
+
+    Raises:
+        typer.Exit: With code 1 when an action is needed to enable the GPU.
+    """
+    from rich.table import Table
+
+    from aatm.device import DEVICE_ENV_VAR, get_device
+    from aatm.doctor import collect_driver_info, collect_torch_info, diagnose
+
+    driver = collect_driver_info()
+    torch_info = collect_torch_info()
+
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold", no_wrap=True)
+    table.add_column(overflow="fold")
+    table.add_row("Python", sys.executable)
+    table.add_row(
+        "PyTorch",
+        f"{torch_info.version} "
+        + (f"(CUDA {torch_info.cuda})" if torch_info.cuda else "(CPU-only build)"),
+    )
+    if driver is None:
+        table.add_row("NVIDIA driver", "not found")
+    else:
+        max_cuda = (
+            f"{driver.max_cuda[0]}.{driver.max_cuda[1]}" if driver.max_cuda else "?"
+        )
+        table.add_row("NVIDIA GPU", driver.gpu_name or "unknown")
+        table.add_row(
+            "NVIDIA driver",
+            f"{driver.driver_version or 'unknown'} (supports CUDA up to {max_cuda})",
+        )
+    try:
+        device_label: str = get_device()
+    except ValueError as e:
+        device_label = f"error: {e}"
+    table.add_row("AATM device", device_label)
+    if os.environ.get(DEVICE_ENV_VAR):
+        table.add_row(DEVICE_ENV_VAR, os.environ[DEVICE_ENV_VAR])
+
+    console.print(table)
+    console.print()
+
+    diagnosis = diagnose(driver, torch_info)
+    style = {"ok": "green", "info": "blue", "action": "yellow"}[diagnosis.status]
+    console.print(f"[bold {style}]{diagnosis.summary}[/bold {style}]")
+    for line in diagnosis.details:
+        console.print(line)
+    if diagnosis.commands:
+        console.print()
+        for command in diagnosis.commands:
+            # Print commands verbatim (no markup, no wrapping) so they can be copied.
+            console.print(command, markup=False, highlight=False, soft_wrap=True)
+
+    if diagnosis.status == "action":
+        raise typer.Exit(code=1)
