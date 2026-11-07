@@ -1,3 +1,27 @@
+"""LLM-based entity extractors.
+
+`SimpleLLMExtractor` extracts entities described by `EntityDefinitions` from clinical
+documents with one structured-output LLM call per document, then validates the result
+with `aatm.data_models.extractors.validate_extracted_entity`.
+
+Extraction is asynchronous; await the extractor (or use `asyncio.run` in scripts):
+
+```python
+from aatm.data_models.extractors import EntityDefinitions
+from aatm.extractors import SimpleLLMExtractor
+
+extractor = SimpleLLMExtractor(
+    model_id="openai/gpt-5",
+    entity_definitions=EntityDefinitions.from_predefined("condition_occurrence"),
+)
+results = await extractor([clinical_note])
+records = results[0].to_records()
+```
+
+Only OpenAI models (``openai/<model>``) are supported for now. The API key is read
+from ``OPENAI_API_KEY`` unless passed explicitly.
+"""
+
 import asyncio
 from typing import Any, List, Optional
 from agents import Agent, ModelSettings, OpenAIResponsesModel, Runner

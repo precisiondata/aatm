@@ -1,3 +1,28 @@
+"""Data models and validation for LLM-based entity extraction.
+
+This module holds everything the extraction pipeline needs that does not depend on
+a particular LLM provider:
+
+- **Entity definitions** (`EntityDefinition`, `EntityDefinitions`): which entities
+  to extract, loaded from YAML. Entities may require a parent entity through
+  `parent_key` (for example, a start date that belongs to a condition), at any depth.
+- **Line segmentation** (`segment_text`, `format_segments_for_prompt`): the note is
+  shown to the model as numbered lines (``[L1] ...``) so that every extracted span can
+  be tied to one exact position.
+- **Model output** (`ExtractedEntityCandidate`, `ExtractedEntityCandidates`): what the
+  model returns: a local id, the exact text, the entity key, the line id and the ids
+  of its parents.
+- **Validation** (`validate_extracted_entity`): grounds each candidate to a single
+  character span, checks keys and parent links, merges duplicates, and returns an
+  `EntityValidationResult` with validated entities, rejected candidates and their
+  rejection reasons.
+- **Records view** (`EntityValidationResult.to_records`): validated entities nested
+  under their parents, ready to be turned into rows such as OMOP
+  `condition_occurrence`.
+
+See the "Information extraction" guide for a walkthrough.
+"""
+
 from pathlib import Path
 from typing import List, Literal, Optional, Self
 import re
@@ -37,7 +62,7 @@ class EntityDefinition(BaseModel):
     """
     A definition of an entity.
 
-    Args:
+    Attributes:
         name (str): The name of the entity.
         key (str): The key of the entity. If not provided, the name will be used with all letters lowercased and spaces replaced by underscores.
         definition (str): The definition of the entity.
@@ -94,7 +119,7 @@ class EntityDefinitions(BaseModel):
     """
     A list of entity definitions.
 
-    Args:
+    Attributes:
         entities (List[EntityDefinition]): A list of entity definitions.
     """
 
@@ -156,7 +181,14 @@ class EntityDefinitions(BaseModel):
         return cls.from_yaml(path)
 
     @classmethod
-    def from_yaml(cls, path: Path) -> Self:
+    def from_yaml(cls, path: str | Path) -> Self:
+        """Load entity definitions from a YAML file containing a list of definitions.
+
+        Raises:
+            ValueError: If the file is missing, is not a .yaml/.yml file, is not valid
+                YAML, or contains invalid definitions. The message names the file.
+        """
+        path = Path(path)
         if not path.exists():
             raise ValueError(f"File not found: {path}")
 
@@ -183,7 +215,7 @@ class TextSegment(BaseModel):
     """
     A non-empty line (or part of a long line) of a source text, identified by a line id.
 
-    Args:
+    Attributes:
         id (str): The line id shown to the model, e.g. ``"L12"``.
         start (int): Start index of the segment in the source text.
         end (int): End index of the segment in the source text.
@@ -292,7 +324,7 @@ class ExtractedEntityCandidate(BaseModel):
     """
     An entity extracted from a text without any post-processing or validation.
 
-    Args:
+    Attributes:
         id (str): A local id for this entity, unique within one extraction, e.g. ``"e1"``.
         text (str): The exact text of the entity, copied from the line it appears in.
         key (str): The key of the entity.
@@ -391,7 +423,7 @@ class ExtractedEntity(ExtractedEntityCandidate):
     """
     An entity extracted from a text after post-processing and validation.
 
-    Args:
+    Attributes:
         id (str): The local id of the entity. Inherited from ExtractedEntityCandidate.
         text (str): The text of the entity. Inherited from ExtractedEntityCandidate.
         key (str): The key of the entity. Inherited from ExtractedEntityCandidate.

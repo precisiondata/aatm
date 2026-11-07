@@ -358,7 +358,7 @@ def estimate_batch_size(embedding_model_name: str) -> int:
 
     Raises:
         ValueError: If the model is unknown, non-local, or batch size cannot be
-        estimated.
+            estimated.
     """
     retriever_spec = CHROMADB_RETRIEVER_MODEL_REGISTRY.get(embedding_model_name)
 

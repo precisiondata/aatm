@@ -25,6 +25,8 @@ Once this connection is made, every link associated with that standard concept b
 Terminology mapping pipeline
 ///
 
+AATM also includes an **information extraction** pipeline that finds entities such as conditions, drugs and their dates in clinical documents with an LLM, and validates every extracted span against the source text. The extracted expressions can then be mapped with the terminology mapping pipeline. See the [Information extraction quick start](getting-started/quick_start_extraction.md).
+
 ## Design principles
 
 **Modularity**

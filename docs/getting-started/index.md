@@ -33,3 +33,19 @@ source concept
 ```
 
 The default workflow is centered on OMOP-style terminology mapping.
+
+---
+
+## Information extraction
+
+AATM can also extract structured information from clinical documents, such as conditions, drugs, dates and routes, before it is mapped:
+
+```text
+clinical note
+  -> numbered lines
+  -> LLM extraction (guided by entity definitions)
+  -> validation against the note
+  -> validated entities and records
+```
+
+See the [Information extraction quick start](quick_start_extraction.md).

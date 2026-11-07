@@ -214,3 +214,23 @@ aatm map \
 ```
 
 The CLI accepts all of these options directly.
+
+## 5. Extract information from clinical documents
+
+AATM can also extract entities such as conditions, drugs and their dates from clinical notes with an LLM. Every extracted span is checked against the note and linked to the entity it belongs to.
+
+```python
+from aatm.data_models.extractors import EntityDefinitions
+from aatm.extractors import SimpleLLMExtractor
+
+extractor = SimpleLLMExtractor(
+    model_id="openai/gpt-5",  # requires OPENAI_API_KEY
+    entity_definitions=EntityDefinitions.from_predefined("condition_occurrence"),
+)
+results = await extractor([clinical_note])
+
+for record in results[0].to_records():
+    print(record.text, {k: [c.text for c in v] for k, v in record.children.items()})
+```
+
+See the [Information extraction quick start](https://precisiondata.github.io/aatm/getting-started/quick_start_extraction/) for entity definitions, validation and working with the results.
