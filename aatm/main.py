@@ -79,23 +79,28 @@ Note:
     details to lower-level utilities and domain-specific components.
 """
 
-import logging
 import dotenv
 import typer
 from rich.console import Console
 from pathlib import Path
 from typing import Annotated, List, Literal, Optional
+import os
 import questionary
 from questionary import Choice
 import subprocess
 import sys
 from rich.json import JSON
 
-from aatm.logs import get_logger
+from aatm.logs import (
+    LOG_LEVEL_ENV_VAR,
+    configure_logging,
+    get_logger,
+    resolve_log_level,
+)
 
 
 dotenv.load_dotenv()  # Load environment variables
-logger = get_logger(__name__, level=logging.INFO)
+logger = get_logger(__name__)
 
 app = typer.Typer()
 console = Console()
@@ -132,7 +137,28 @@ def print_logo() -> None:
 
 
 @app.callback(invoke_without_command=True)
-def main(ctx: typer.Context) -> None:
+def main(
+    ctx: typer.Context,
+    log_level: Annotated[
+        Optional[str],
+        typer.Option(
+            "--log-level",
+            "-l",
+            envvar=LOG_LEVEL_ENV_VAR,
+            help="Log level: DEBUG, INFO, WARNING, ERROR or CRITICAL. Logs go to stderr.",
+            show_default="INFO",
+        ),
+    ] = None,
+) -> None:
+    try:
+        level = resolve_log_level(log_level)
+    except ValueError as e:
+        raise typer.BadParameter(str(e), param_hint="--log-level") from e
+
+    configure_logging(level)
+    # Pass the level on to subprocesses started by `serve` and `search-ui`.
+    os.environ[LOG_LEVEL_ENV_VAR] = str(level)
+
     if ctx.invoked_subcommand is None:
         print_logo()
         console.print("[dim]Use 'aatm --help' to see available commands.[/dim]")

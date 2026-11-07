@@ -1,6 +1,5 @@
 from pathlib import Path
 from typing import List, Literal, Optional, Self
-import logging
 import re
 import unicodedata
 from pydantic import (
@@ -15,10 +14,7 @@ from importlib.resources import files
 
 from aatm.logs import get_logger
 
-# The package logger is set to DEBUG on import (see aatm.logs.configure_logging);
-# keep validation quiet unless explicitly enabled with
-# logging.getLogger("aatm.data_models.extractors").setLevel(logging.DEBUG).
-logger = get_logger(__name__, level=logging.INFO)
+logger = get_logger(__name__)
 
 
 def make_entity_key(name: str) -> str:

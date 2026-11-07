@@ -11,7 +11,6 @@ artifacts.
 """
 
 import gc
-import logging
 import shutil
 import sqlite3
 import time
@@ -30,7 +29,7 @@ from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY
 from aatm.data_models import ExpressionMetadata
 from aatm.timing_profiler import TimingProfiler
 
-logger = get_logger(__name__, level=logging.DEBUG)
+logger = get_logger(__name__)
 console = Console()
 
 

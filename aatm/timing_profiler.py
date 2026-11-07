@@ -1,13 +1,12 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-import logging
 import torch
 import time
 
 from aatm.logs import get_logger
 
-logger = get_logger(__name__, level=logging.DEBUG)
+logger = get_logger(__name__)
 
 
 @dataclass
