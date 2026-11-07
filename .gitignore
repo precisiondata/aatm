@@ -17,4 +17,5 @@ site
 notebooks
 draft.md
 output
-.mypy_cache.coverage
+.mypy_cache
+.coverage
