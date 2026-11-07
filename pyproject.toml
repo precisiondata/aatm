@@ -12,7 +12,6 @@ dependencies = [
     "gdown>=5.2.0",
     "google-genai[aiohttp]>=1.60.0",
     "jsonlines>=4.0.0",
-    "nvidia-ml-py>=13.590.48",
     "openai>=2.16.0",
     "pandas>=2.3.1",
     "peft>=0.18.0",
