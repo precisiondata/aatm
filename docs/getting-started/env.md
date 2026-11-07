@@ -32,3 +32,11 @@ aatm.configure_logging()               # INFO and above, on stderr
 aatm.configure_logging(logging.DEBUG)  # everything
 logging.getLogger("aatm.data_models.extractors").setLevel(logging.DEBUG)  # one module only
 ```
+
+## Device selection
+
+| Variable | Values | Effect |
+|---|---|---|
+| `AATM_DEVICE` | `cuda`, `mps`, `cpu` | Forces the device local models run on. If unset, AATM uses CUDA, then MPS, then CPU, whichever PyTorch can see first. AATM raises an error if the requested device is not available. |
+
+At `INFO` level, AATM logs the device local models run on (see the logging settings above).

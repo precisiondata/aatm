@@ -57,15 +57,25 @@ git clone https://github.com/precisiondata/aatm.git
 uv sync
 ```
 
-If you plan to run language models locally with CUDA acceleration, you must also install CUDA extensions for PyTorch. 
+### GPU acceleration (optional)
+
+A GPU is not required. Local models run on an NVIDIA GPU (CUDA) or an Apple Silicon GPU
+(MPS) when PyTorch can see one, and on the CPU otherwise. AATM logs which device it uses.
+
+On Linux and macOS the default PyTorch from PyPI already supports your GPU. On Windows,
+or to choose a specific CUDA version, install PyTorch first with the
+[PyTorch install selector](https://pytorch.org/get-started/locally/), then install AATM:
 
 ```bash
-pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+pip install aatm
 ```
 
-```bash
-uv pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128
-```
+With uv, `uv pip install aatm --torch-backend=auto` detects your GPU driver and picks a
+matching PyTorch build. Set `AATM_DEVICE=cpu` (or `cuda` / `mps`) to override the
+automatic choice. See the
+[installation guide](https://precisiondata.github.io/aatm/getting-started/installation/)
+for details.
 
 ## 1. Prepare your OMOP vocabularies directory
 
