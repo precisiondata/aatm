@@ -45,4 +45,4 @@ jobs:
         run: uv run ruff format --check aatm/ tests/
 
       - name: Run pytest
-        run: uv run pytest
+        run: uv run pytest --cov

@@ -55,10 +55,12 @@ To maintain code consistency, we enforce strict linting and formatting rules on 
 We use [pytest](https://pytest.org) for our test suite. 
 
 * Every feature addition or bug fix must include corresponding tests.
-* We target a minimum test coverage of **80%**.
+* We target a test coverage of **80%**. CI fails if total coverage drops below the
+  floor set in `[tool.coverage.report] fail_under` in `pyproject.toml`; raise that
+  floor when your change increases coverage.
 * Run the test suite locally with coverage reporting:
   ```bash
-  pytest tests/
+  uv run pytest --cov
   ```
 
 ---

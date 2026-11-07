@@ -49,6 +49,7 @@ dev = [
     "types-pyyaml>=6.0.12.20260518",
     "pandas-stubs>=3.0.3.260530",
     "types-tqdm>=4.67.3.20260518",
+    "pytest-cov>=7.0.0",
 ]
 
 [project.scripts]
@@ -93,3 +94,11 @@ entrypoint = "aatm.api.main:app"
 dev = [
     "aatm[dev]",
 ]
+
+[tool.coverage.run]
+source = ["aatm"]
+
+[tool.coverage.report]
+# Floor that CI enforces. Raise it as coverage improves; the target is 80%.
+fail_under = 35
+show_missing = true
