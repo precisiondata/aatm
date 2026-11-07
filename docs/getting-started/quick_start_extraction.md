@@ -38,10 +38,30 @@ mapped to standard concepts with the terminology mapping pipeline.
 
 ## 1. Requirements
 
-- An OpenAI API key in `OPENAI_API_KEY` (see [Environment variables](env.md)), or passed
-  with `api_key=...`.
-- Only OpenAI models are supported for now. Model ids are prefixed with the provider:
-  `openai/<model name>`. Use a model that supports structured outputs.
+- A model that supports structured outputs, from one of the providers below. Model ids
+  are prefixed with the provider: `<provider>/<model name>`.
+- The provider's API key in its environment variable (see [Environment variables](env.md)),
+  or passed with `api_key=...`.
+
+| Provider | `model_id` example | Key | Notes |
+|---|---|---|---|
+| OpenAI | `openai/gpt-5` | `OPENAI_API_KEY` | |
+| Google Gemini | `gemini/gemini-3-flash-preview` | `GOOGLE_API_KEY` | |
+| Anthropic | `anthropic/claude-opus-5-5` | `ANTHROPIC_API_KEY` | Install with `pip install "aatm[anthropic]"` |
+| Ollama | `ollama/llama3.3` | none | Uses `http://localhost:11434/v1` unless `base_url` is given |
+| OpenRouter | `openrouter/qwen/qwen3-235b-a22b` | `OPENROUTER_API_KEY` | |
+| Any OpenAI-compatible server (vLLM, LM Studio, Together, ...) | `openai-compatible/<model>` | `api_key=...` if needed | Requires `base_url=...` |
+
+```python
+extractor = SimpleLLMExtractor(
+    model_id="openai-compatible/Qwen/Qwen3-32B",
+    base_url="http://localhost:8000/v1",  # e.g. a local vLLM server
+    entity_definitions=entity_definitions,
+)
+```
+
+Other providers can be added with `aatm.llm.register_provider`, or by passing any object
+with an async `generate(system=..., user=..., output_type=...)` method as `llm=...`.
 
 ---
 
@@ -54,7 +74,7 @@ from aatm.extractors import SimpleLLMExtractor
 entity_definitions = EntityDefinitions.from_predefined("condition_occurrence")
 
 extractor = SimpleLLMExtractor(
-    model_id="openai/gpt-5",  # any OpenAI model with structured outputs
+    model_id="openai/gpt-5",  # or "gemini/...", "anthropic/...", "ollama/...", ...
     entity_definitions=entity_definitions,
 )
 
@@ -356,15 +376,20 @@ segments=segment_text(note, max_segment_chars=400))`.
 
 | Argument | Default | Purpose |
 |---|---|---|
-| `model_id` | required | `openai/<model>` |
+| `model_id` | required unless `llm` is given | `<provider>/<model>`, see [Requirements](#1-requirements) |
 | `entity_definitions` | required | What to extract |
-| `api_key` | `None` | OpenAI key; `OPENAI_API_KEY` is used when omitted |
-| `model_settings` | `None` | `agents.ModelSettings` or a dict, e.g. `{"temperature": 0}` |
+| `api_key` | `None` | Provider key; the provider's environment variable is used when omitted |
+| `base_url` | `None` | Server URL for OpenAI-compatible providers |
+| `settings` | `None` | `aatm.llm.LLMSettings` or a dict, e.g. `{"temperature": 0, "max_tokens": 8000}` |
+| `llm` | `None` | A ready-made `aatm.llm.StructuredLLM`, used instead of `model_id` |
 | `max_concurrency` | `1` | Parallel model calls |
 | `max_segment_chars` | `None` | Split lines longer than this at sentence boundaries |
 | `instructions` | built-in prompt | Custom system prompt; `{output_format}` and `{entity_definitions}` are filled in |
-| `name` | `"Extractor"` | Agent name |
-| `agent_args` | `None` | Extra keyword arguments for `agents.Agent` |
+
+`settings` accepts `temperature`, `max_tokens`, `reasoning_effort` (`"minimal"` to
+`"max"`), `timeout` (seconds) and `provider_kwargs` (extra arguments passed as-is to the
+provider's API call). Settings left unset use the provider's defaults. Current Anthropic
+models do not accept `temperature`, so it is ignored there with a warning.
 
 When writing custom instructions, keep the explanation of line ids, ids and parents from
 the built-in prompt (`aatm.extractors.llm_extractors.DEFAULT_INSTRUCTION`); validation
@@ -392,7 +417,6 @@ extraction: many `text_not_in_line` rejections point to line-id mistakes, and ma
 
 ## 10. Current limitations
 
-- Only OpenAI models are supported.
 - Matching is exact; spans with different case or spacing than the note are rejected.
 - Negation, uncertainty and family history are not captured as attributes. Mentions
   such as "denies chest pain" are only excluded if the entity definitions say so.

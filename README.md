@@ -225,7 +225,7 @@ from aatm.data_models.extractors import EntityDefinitions
 from aatm.extractors import SimpleLLMExtractor
 
 extractor = SimpleLLMExtractor(
-    model_id="openai/gpt-5",  # requires OPENAI_API_KEY
+    model_id="openai/gpt-5",  # or "gemini/...", "anthropic/...", "ollama/...", ...
     entity_definitions=EntityDefinitions.from_predefined("condition_occurrence"),
 )
 results = await extractor([clinical_note])
