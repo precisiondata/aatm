@@ -1,7 +1,10 @@
+import logging
+
 import pytest
 from typer.testing import CliRunner
 
 from aatm import doctor, main
+from aatm.logs import LOG_LEVEL_ENV_VAR
 from aatm.doctor import (
     DriverInfo,
     TorchInfo,
@@ -16,6 +19,23 @@ PY = "/env/bin/python"
 CPU_TORCH = TorchInfo("2.15.0+cpu", None, False, False)
 CUDA_TORCH_UNUSABLE = TorchInfo("2.15.0+cu130", "13.0", False, False)
 RTX = DriverInfo("NVIDIA GeForce RTX 4090", "610.88", (13, 3))
+
+
+@pytest.fixture
+def cli(monkeypatch):
+    """Invoke the CLI without leaking its logging setup into other tests.
+
+    The CLI callback attaches a handler bound to CliRunner's temporary stderr and
+    exports AATM_LOG_LEVEL; both must be undone once the test ends.
+    """
+    logger = logging.getLogger("aatm")
+    handlers, level = list(logger.handlers), logger.level
+    monkeypatch.setenv(LOG_LEVEL_ENV_VAR, "INFO")
+    # Keep get_device() from probing real hardware in the table row.
+    monkeypatch.setenv("AATM_DEVICE", "cpu")
+    yield lambda *args: CliRunner().invoke(main.app, list(args))
+    logger.handlers[:] = handlers
+    logger.setLevel(level)
 
 
 @pytest.mark.parametrize(
@@ -132,26 +152,24 @@ def test_macos_reports_mps(mps, status):
     assert result.status == status
 
 
-def test_doctor_command_prints_fix_and_exits_1(monkeypatch):
+def test_doctor_command_prints_fix_and_exits_1(cli, monkeypatch):
     monkeypatch.setattr(doctor, "collect_driver_info", lambda: RTX)
     monkeypatch.setattr(doctor, "collect_torch_info", lambda: CPU_TORCH)
-    monkeypatch.setenv("AATM_DEVICE", "cpu")
 
-    result = CliRunner().invoke(main.app, ["doctor"])
+    result = cli("doctor")
 
     assert result.exit_code == 1, result.output
     assert "CPU-only build" in result.output
     assert "https://download.pytorch.org/whl/cu130" in result.output
 
 
-def test_doctor_command_exits_0_when_gpu_works(monkeypatch):
+def test_doctor_command_exits_0_when_gpu_works(cli, monkeypatch):
     monkeypatch.setattr(doctor, "collect_driver_info", lambda: RTX)
     monkeypatch.setattr(
         doctor, "collect_torch_info", lambda: TorchInfo("2.11", "12.8", True, False)
     )
-    monkeypatch.setenv("AATM_DEVICE", "cpu")
 
-    result = CliRunner().invoke(main.app, ["doctor"])
+    result = cli("doctor")
 
     assert result.exit_code == 0, result.output
     assert "Nothing to do" in result.output
