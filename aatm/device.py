@@ -11,6 +11,9 @@ the best accelerator PyTorch can see, in this order:
 Set the ``AATM_DEVICE`` environment variable to ``cuda``, ``mps`` or ``cpu`` to
 override the automatic choice, for example to force CPU on a machine with a GPU.
 
+The first selection is logged at ``INFO`` level (see `aatm.logs`), with a hint on how
+to enable GPU acceleration when only the CPU is used.
+
 ```python
 from aatm.device import get_device
 
@@ -21,15 +24,24 @@ device = get_device()  # "cuda", "mps" or "cpu"
 from __future__ import annotations
 
 import os
+import sys
 from typing import Literal
 
 import torch
+
+from aatm.logs import get_logger
+
+logger = get_logger(__name__)
 
 DEVICE_ENV_VAR = "AATM_DEVICE"
 """Environment variable that overrides automatic device selection."""
 
 Device = Literal["cuda", "mps", "cpu"]
 SUPPORTED_DEVICES: tuple[Device, ...] = ("cuda", "mps", "cpu")
+
+PYTORCH_INSTALL_URL = "https://pytorch.org/get-started/locally/"
+
+_logged_device: Device | None = None
 
 
 def is_device_available(device: Device) -> bool:
@@ -61,6 +73,55 @@ def detect_device() -> Device:
     return "cpu"
 
 
+def describe_device(device: Device) -> str:
+    """Return a human-readable description of a device.
+
+    Args:
+        device: Device name.
+
+    Returns:
+        For CUDA, the GPU name; otherwise the device name.
+    """
+    if device == "cuda":
+        return f"cuda ({torch.cuda.get_device_name(0)})"
+    if device == "mps":
+        return "mps (Apple GPU)"
+    return "cpu"
+
+
+def cpu_fallback_hint() -> str:
+    """Explain why local models run on CPU and how to enable a GPU.
+
+    Returns:
+        A short hint suitable for a log message.
+    """
+    if sys.platform == "darwin":
+        return "No Apple GPU (MPS) is available to PyTorch."
+    if torch.version.cuda is None:
+        return (
+            "The installed PyTorch build has no CUDA support. If you have an NVIDIA "
+            f"GPU, install a CUDA build of PyTorch: {PYTORCH_INSTALL_URL}"
+        )
+    return (
+        f"PyTorch was built with CUDA {torch.version.cuda} but cannot see a usable "
+        "NVIDIA GPU. Check that a GPU is present and its driver supports this CUDA "
+        "version (`nvidia-smi`)."
+    )
+
+
+def _log_selection(device: Device, source: str) -> None:
+    """Log the selected device once per process, and again if it changes."""
+    global _logged_device
+    if device == _logged_device:
+        return
+    _logged_device = device
+
+    message = f"Running local models on {describe_device(device)} ({source})."
+    if device == "cpu" and source == "auto-detected":
+        message += " " + cpu_fallback_hint()
+    logger.info(message)
+
+
 def get_device() -> Device:
     """Return the device local models should run on.
 
@@ -77,7 +138,9 @@ def get_device() -> Device:
     requested = os.environ.get(DEVICE_ENV_VAR, "").strip().lower()
 
     if not requested:
-        return detect_device()
+        device = detect_device()
+        _log_selection(device, "auto-detected")
+        return device
 
     if requested not in SUPPORTED_DEVICES:
         raise ValueError(
@@ -85,10 +148,11 @@ def get_device() -> Device:
             f"use one of {', '.join(SUPPORTED_DEVICES)}."
         )
 
-    device: Device = requested  # type: ignore[assignment]
+    device = requested  # type: ignore[assignment]
     if not is_device_available(device):
         raise ValueError(
             f"{DEVICE_ENV_VAR}={requested!r} was requested, but PyTorch cannot use "
             f"that device on this machine."
         )
+    _log_selection(device, f"set by {DEVICE_ENV_VAR}")
     return device

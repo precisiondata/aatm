@@ -17,6 +17,8 @@ def available(monkeypatch):
         )
 
     monkeypatch.delenv(DEVICE_ENV_VAR, raising=False)
+    monkeypatch.setattr(device_module, "_logged_device", None)
+    monkeypatch.setattr(device_module.torch.cuda, "get_device_name", lambda _: "GPU X")
     return set_available
 
 
@@ -52,3 +54,42 @@ def test_env_var_rejects_unavailable_device(available, monkeypatch):
     monkeypatch.setenv(DEVICE_ENV_VAR, "cuda")
     with pytest.raises(ValueError, match="cannot use"):
         get_device()
+
+
+def test_logs_selected_device_once(available, caplog):
+    available("cuda")
+    with caplog.at_level("INFO", logger="aatm.device"):
+        get_device()
+        get_device()
+    messages = [r.getMessage() for r in caplog.records]
+    assert messages == ["Running local models on cuda (GPU X) (auto-detected)."]
+
+
+def test_cpu_fallback_logs_install_hint(available, caplog, monkeypatch):
+    available()
+    monkeypatch.setattr(device_module.sys, "platform", "linux")
+    monkeypatch.setattr(device_module.torch.version, "cuda", None)
+    with caplog.at_level("INFO", logger="aatm.device"):
+        get_device()
+    (message,) = [r.getMessage() for r in caplog.records]
+    assert "no CUDA support" in message
+    assert device_module.PYTORCH_INSTALL_URL in message
+
+
+def test_cpu_with_cuda_build_suggests_driver_check(available, caplog, monkeypatch):
+    available()
+    monkeypatch.setattr(device_module.sys, "platform", "linux")
+    monkeypatch.setattr(device_module.torch.version, "cuda", "12.8")
+    with caplog.at_level("INFO", logger="aatm.device"):
+        get_device()
+    (message,) = [r.getMessage() for r in caplog.records]
+    assert "nvidia-smi" in message
+
+
+def test_forced_cpu_has_no_hint(available, caplog, monkeypatch):
+    available("cuda")
+    monkeypatch.setenv(DEVICE_ENV_VAR, "cpu")
+    with caplog.at_level("INFO", logger="aatm.device"):
+        get_device()
+    (message,) = [r.getMessage() for r in caplog.records]
+    assert message == f"Running local models on cpu (set by {DEVICE_ENV_VAR})."
