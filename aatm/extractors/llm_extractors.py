@@ -8,6 +8,8 @@ from aatm.data_models.extractors import (
     EntityDefinitions,
     EntityValidationResult,
     ExtractedEntityCandidates,
+    format_segments_for_prompt,
+    segment_text,
     validate_extracted_entity,
 )
 
@@ -18,13 +20,18 @@ Your task is to extract relevant entities from a clinical note according to the 
 
 # Instructions
 
-You will receive the text related to a clinical document.
+You will receive the text of a clinical document split into numbered lines. Each line starts with its line id in brackets, for example `[L12]`.
 
 You must extract spans that are directly correlated with one of the entities and the definition provided below. Each with a name, a key and a definition.
 
 If the entity definition has a parent entity key, you must include the spans of the parent entity in the extracted entities.
 
-The span must match exactly with a span from the clinical document provided. Spans that cannot be found in the document text will be considered invalid.
+For every extracted span:
+- `line` is the id of the line where this specific mention appears, for example `L12`. When the same text appears on several lines, choose the line of the mention you mean, and extract it once per line if several mentions are relevant.
+- `text` must be copied exactly from that line, character by character. Do not include the `[L12]` line id in the text.
+- `occurrence` is only needed when the same text appears more than once on that same line: it is the 1-based position of the mention you mean. Otherwise leave it null.
+
+Spans that cannot be found on the given line will be considered invalid.
 
 # Response format
 
@@ -41,8 +48,10 @@ Your response must be in JSON format following the schema below:
 class SimpleLLMExtractor:
     """Extract entities from texts with a single LLM agent call per text.
 
-    The model output is validated with `validate_extracted_entity`, which keeps only
-    spans found verbatim in the text and checks keys and parent references.
+    The text is split into numbered lines (`segment_text`) before being sent to the
+    model, which must return the line id of each mention. The output is validated with
+    `validate_extracted_entity`, which grounds each span to one position on its line and
+    checks keys and parent references.
 
     Args:
         model_id: Provider-prefixed model id, e.g. ``"openai/gpt-5"``. Only the
@@ -56,6 +65,9 @@ class SimpleLLMExtractor:
             variable (e.g. ``OPENAI_API_KEY``) is used.
         model_settings: Agent model settings, as a `ModelSettings` or a compatible dict.
         max_concurrency: Maximum number of concurrent model calls.
+        max_segment_chars: If set, lines longer than this are split at sentence
+            boundaries into separately numbered segments before being sent to the
+            model. ``None`` (default) keeps every line whole.
         agent_args: Extra keyword arguments forwarded to `agents.Agent`.
     """
 
@@ -69,6 +81,7 @@ class SimpleLLMExtractor:
         api_key: Optional[str] = None,
         model_settings: Optional[ModelSettings | dict[str, Any]] = None,
         max_concurrency: int = 1,
+        max_segment_chars: Optional[int] = None,
         agent_args: Optional[dict[str, Any]] = None,
     ):
         if "/" not in model_id:
@@ -86,6 +99,7 @@ class SimpleLLMExtractor:
         self.semaphore = asyncio.Semaphore(max_concurrency)
         self.entity_definitions = entity_definitions
         self.name = name
+        self.max_segment_chars = max_segment_chars
 
         self.model_settings: ModelSettings
         if isinstance(model_settings, dict):
@@ -125,14 +139,19 @@ class SimpleLLMExtractor:
         )
 
     async def extract(self, text: str) -> EntityValidationResult:
+        segments = segment_text(text, max_segment_chars=self.max_segment_chars)
+
         async with self.semaphore:
             agent = self.make_agent()
-            run_result = await Runner.run(agent, input=text)
+            run_result = await Runner.run(
+                agent, input=format_segments_for_prompt(segments)
+            )
 
         return validate_extracted_entity(
             text=text,
             extracted_entities=run_result.final_output_as(ExtractedEntityCandidates),
             entity_definitions=self.entity_definitions,
+            segments=segments,
         )
 
     async def __call__(self, texts: List[str]) -> List[EntityValidationResult]:
