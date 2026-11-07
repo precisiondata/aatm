@@ -5,6 +5,8 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  # Lets release.yml run the full suite before publishing.
+  workflow_call:
 
 permissions:
   contents: read
