@@ -38,44 +38,35 @@ If you want to contribute to this project, please refer to our [Contributing gui
 
 ## Installation
 
+The recommended way is with [uv](https://docs.astral.sh/uv/), which also picks the right
+PyTorch build for your hardware (NVIDIA GPU, Apple GPU or CPU):
 
-Install the package in your environment.
+```bash
+uv pip install aatm --torch-backend=auto
+```
+
+With pip:
 
 ```bash
 pip install aatm
+aatm doctor
 ```
 
-If you want to build from the source, clone the repository and install it locally:
-
-```bash
-git clone https://github.com/precisiondata/aatm.git
-pip install -e . 
-```
-
-```bash
-git clone https://github.com/precisiondata/aatm.git
-uv sync
-```
-
-### GPU acceleration (optional)
-
-A GPU is not required. Local models run on an NVIDIA GPU (CUDA) or an Apple Silicon GPU
-(MPS) when PyTorch can see one, and on the CPU otherwise. AATM logs which device it uses.
-
-On Linux and macOS the default PyTorch from PyPI already supports your GPU. On Windows,
-or to choose a specific CUDA version, install PyTorch first with the
-[PyTorch install selector](https://pytorch.org/get-started/locally/), then install AATM:
-
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu128
-pip install aatm
-```
-
-With uv, `uv pip install aatm --torch-backend=auto` detects your GPU driver and picks a
-matching PyTorch build. Set `AATM_DEVICE=cpu` (or `cuda` / `mps`) to override the
-automatic choice. See the
+A GPU is optional. Local models run on an NVIDIA GPU (CUDA) or an Apple Silicon GPU
+(MPS) when PyTorch can see one, and on the CPU otherwise. `aatm doctor` tells you
+whether your GPU is being used and, if not, prints the exact commands to fix it (for
+example, installing a CUDA build of PyTorch on Windows). Set `AATM_DEVICE=cpu` (or
+`cuda` / `mps`) to override the automatic choice. See the
 [installation guide](https://precisiondata.github.io/aatm/getting-started/installation/)
 for details.
+
+To build from source, clone the repository and install it locally:
+
+```bash
+git clone https://github.com/precisiondata/aatm.git
+cd aatm
+uv sync
+```
 
 ## 1. Prepare your OMOP vocabularies directory
 
