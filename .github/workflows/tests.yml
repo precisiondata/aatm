@@ -42,7 +42,7 @@ jobs:
         run: uv run ruff check aatm/
       
       - name: Run ruff format
-        run: uv run ruff format aatm/
+        run: uv run ruff format --check aatm/
 
       - name: Run pytest
         run: uv run pytest
