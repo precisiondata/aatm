@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 env:
   # Keep `uv run` from re-syncing to the default (CUDA) dependency groups.
   UV_NO_SYNC: "1"
