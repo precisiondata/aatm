@@ -104,13 +104,52 @@ Ready to submit your changes? Follow this standard workflow:
 ## Releasing (maintainers)
 
 Docs are deployed to GitHub Pages automatically on every push to `main`.
-To publish a new version to PyPI, bump `version` in `pyproject.toml`, merge
-it to `main`, then push a matching tag:
+PyPI releases are published by `.github/workflows/release.yml` when a `v*`
+tag is pushed. Only repository admins can create `v*` tags.
 
-```bash
-git tag v0.1.8
-git push origin v0.1.8
-```
+### Bumping the version
+
+The version lives only in `pyproject.toml` (and is mirrored in `uv.lock`).
+We follow [Semantic Versioning](https://semver.org): `patch` for fixes,
+`minor` for new features, `major` for breaking changes.
+
+1. **Branch off an up-to-date `main`:**
+   ```bash
+   git checkout main
+   git pull
+   git checkout -b chore/release-X.Y.Z
+   ```
+2. **Bump the version** with uv, which updates both `pyproject.toml` and
+   `uv.lock`:
+   ```bash
+   uv version --bump patch   # or minor / major, or an exact version: uv version X.Y.Z
+   ```
+3. **Commit, push and open a PR:**
+   ```bash
+   git commit -am "chore: bump version to X.Y.Z"
+   git push -u origin chore/release-X.Y.Z
+   gh pr create --title "chore: release X.Y.Z"
+   ```
+   `main` is protected: the PR needs passing CI and one approval (admins
+   can bypass).
+4. **After the PR merges, tag the merge commit on `main` and push the tag:**
+   ```bash
+   git checkout main
+   git pull
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+5. **Approve the publish.** The release workflow runs CI and checks that the
+   tagged commit is on `main` and that the tag matches the project version.
+   It then builds the package and pauses at the `pypi` environment. Open the
+   run in the Actions tab, click **Review deployments** and approve it. The
+   new version then appears on <https://pypi.org/project/aatm/>.
+
+If the workflow fails before publishing, fix the problem on a new PR.
+Then delete and re-push the tag (`git tag -d vX.Y.Z`,
+`git push origin :refs/tags/vX.Y.Z`, then repeat step 4). Once a version
+has been uploaded to PyPI it can't be reused: bump to the next version
+instead.
 
 ---
 
