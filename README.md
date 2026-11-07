@@ -1,7 +1,7 @@
 # Any-to-Any Terminology Mapping
 
 [![PyPI version](https://img.shields.io/pypi/v/aatm)](https://pypi.org/project/aatm/)
-![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
