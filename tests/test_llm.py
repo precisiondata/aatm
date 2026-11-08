@@ -220,6 +220,7 @@ def test_gemini_schema_drops_unsupported_keywords():
         "line",
         "occurrence",
         "parents",
+        "attributes",
     }
     flat = str(schema)
     for keyword in ("minLength", "pattern", "'default'"):

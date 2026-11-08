@@ -48,4 +48,6 @@ clinical note
   -> validated entities and records
 ```
 
-See the [Information extraction quick start](quick_start_extraction.md).
+See the [Information extraction quick start](quick_start_extraction.md), and
+[Writing entity definitions](entity_definitions.md) to describe your own entities in
+YAML.

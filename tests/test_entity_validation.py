@@ -69,6 +69,24 @@ def test_make_entity_key_normalizes_accents_and_punctuation():
         make_entity_key("!!!")
 
 
+@pytest.mark.parametrize("key", ["BRCA-Test", "Brca_test", "brca__test", "_brca", "!!"])
+def test_definition_rejects_keys_the_model_cannot_return(key):
+    with pytest.raises(ValidationError, match="must use only lowercase letters"):
+        EntityDefinition(name="BRCA test", key=key, definition="d")
+
+
+def test_definition_key_error_suggests_a_valid_key():
+    with pytest.raises(ValidationError, match="Use 'brca_test' instead"):
+        EntityDefinition(name="BRCA test", key="BRCA-Test", definition="d")
+
+
+def test_definition_accepts_valid_and_generated_keys():
+    assert EntityDefinition(name="x", key="brca_test2", definition="d").key == (
+        "brca_test2"
+    )
+    assert EntityDefinition(name="BRCA-Test", definition="d").key == "brca_test"
+
+
 def test_definition_requires_parent_key_when_has_parent():
     with pytest.raises(ValidationError):
         EntityDefinition(name="Date", definition="d", has_parent=True)
