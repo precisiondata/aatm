@@ -17,6 +17,7 @@ nav:
       - Command Line Interface: 'getting-started/quick_start_cli.md'
       - Python API: 'getting-started/quick_start_python_api.md'
       - Information extraction: 'getting-started/quick_start_extraction.md'
+    - Writing entity definitions: 'getting-started/entity_definitions.md'
   - API Reference:
     - Command Line Interface: 'reference/cli.md'
     - Pipeline components:

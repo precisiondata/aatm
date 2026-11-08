@@ -128,6 +128,28 @@ def test_attributes_load_from_yaml(tmp_path):
     assert [label.value for label in attribute.labels] == ["positive", "negative"]
 
 
+def test_folded_yaml_text_is_stripped(tmp_path):
+    path = tmp_path / "folded.yaml"
+    path.write_text(
+        "- name: BRCA test\n"
+        "  definition: >\n"
+        "    A BRCA test.\n"
+        "  attributes:\n"
+        "    - key: result\n"
+        "      description: >\n"
+        "        The test result.\n"
+        "      labels:\n"
+        "        - value: positive\n"
+        "          description: |\n"
+        "            Pathogenic variant.\n",
+        encoding="utf-8",
+    )
+    (entity,) = EntityDefinitions.from_yaml(path).entities
+    assert entity.definition == "A BRCA test."
+    assert entity.attributes[0].description == "The test result."
+    assert entity.attributes[0].labels[0].description == "Pathogenic variant."
+
+
 def test_prompt_lists_attributes_and_labels():
     prompt = make_definitions(result_required=True).to_prompt_str()
     assert "`result` (required): The test result." in prompt

@@ -119,7 +119,9 @@ results = await extractor(list_of_notes)
 
 Entity definitions tell the model **what** to extract. Each definition has a name, a
 key, a definition text (this is what the model reads, so write it carefully) and,
-optionally, a parent.
+optionally, a parent and attributes. This section is a summary; see
+[Writing entity definitions](entity_definitions.md) for every field, how to choose
+between them, YAML pitfalls and how to check a file before using it.
 
 ### Predefined definitions
 
@@ -209,14 +211,6 @@ The label does not have to appear in the text.
           description: No pathogenic or likely pathogenic variant was found.
         - value: uncertain
           description: Only a variant of uncertain significance (VUS) was reported.
-    - key: origin
-      description: Whether germline or tumour (somatic) DNA was tested.
-      required: false
-      labels:
-        - value: germline
-          description: Germline testing, e.g. blood or saliva.
-        - value: somatic
-          description: Testing of tumour tissue.
 ```
 
 - **Write a description for every label.** The model reads them to decide, so they are
@@ -225,9 +219,11 @@ The label does not have to appear in the text.
   the attribute out and the mention is kept without it. It is told never to guess, so
   "not stated" and a real `uncertain` result stay distinct.
 - **`required: true`** means a mention is only useful with this attribute: a mention
-  without a valid label for it is rejected (see [Validation](#5-validation)).
-- Attribute keys must be unique within an entity, and labels unique within an
-  attribute (ignoring case). Each attribute needs at least one label.
+  without a valid label for it is rejected, with its children (see
+  [Attribute issues](#attribute-issues)).
+
+See [Attributes](entity_definitions.md#attributes-what-the-note-says-about-a-mention)
+for when to use an attribute instead of a child entity, and how to write labels.
 
 ---
 
@@ -334,8 +330,7 @@ causes trouble:
 | `conflicting_values` | The same attribute was given twice with different values | The first valid value |
 | `conflicting_duplicate` | A duplicate mention gave a different value | The first mention's value (`kept_entity_id`, `kept_value`) |
 
-Labels are matched ignoring case and surrounding spaces, and stored as defined. Issues
-are split by the attribute's definition:
+Issues are split by the attribute's definition:
 
 - `result.required_attribute_issues`: issues on required attributes. A
   `missing_required` or `invalid_label` here means the mention was rejected (and its
@@ -343,9 +338,18 @@ are split by the attribute's definition:
 - `result.optional_attribute_issues`: issues on optional or unknown attributes. The
   mention was kept.
 
-Attributes are only checked for candidates that pass every other check, so a span
-rejected for its text or line does not add attribute issues. When a duplicate brings
-an attribute the kept mention lacks, it is copied over.
+Three more rules decide what is reported:
+
+- **Case and surrounding spaces are ignored.** A model answer of `" Negative "` is
+  accepted as `negative`, stored exactly as defined, and not reported. Only values
+  that match no label become `invalid_label`.
+- **Attributes are checked only for candidates that pass every other check.** A
+  candidate rejected for its text, line, key or parent adds no attribute issues, so
+  the issue counts cover only mentions that were really found.
+- **Duplicates keep the first mention's labels.** A label the kept mention lacks is
+  copied from the duplicate, a different label is reported as
+  `conflicting_duplicate`, and a duplicate that is missing a required attribute is
+  not reported, since the kept mention already has it.
 
 To find the attributes that cause the most problems across many notes:
 
@@ -479,9 +483,9 @@ segments=segment_text(note, max_segment_chars=400))`.
 provider's API call). Settings left unset use the provider's defaults. Current Anthropic
 models do not accept `temperature`, so it is ignored there with a warning.
 
-When writing custom instructions, keep the explanation of line ids, ids and parents from
-the built-in prompt (`aatm.extractors.llm_extractors.DEFAULT_INSTRUCTION`); validation
-expects them.
+When writing custom instructions, keep the explanation of line ids, ids, parents and
+attributes from the built-in prompt
+(`aatm.extractors.llm_extractors.DEFAULT_INSTRUCTION`); validation expects them.
 
 ---
 
@@ -506,7 +510,12 @@ extraction: many `text_not_in_line` rejections point to line-id mistakes, and ma
 ## 10. Current limitations
 
 - Matching is exact; spans with different case or spacing than the note are rejected.
-- Negation, uncertainty and family history are not captured as attributes. Mentions
-  such as "denies chest pain" are only excluded if the entity definitions say so.
+- The predefined definitions have no attributes, so negation, uncertainty and family
+  history are not captured by them: "denies chest pain" is only excluded if the
+  definition says so. You can capture them with your own
+  [attributes](entity_definitions.md#attributes-what-the-note-says-about-a-mention),
+  e.g. an `assertion` attribute with `present`, `absent` and `possible`.
+- Attribute labels come from a single extraction call; there is no separate
+  classification pass per mention yet.
 - `GeminiExtractor` (also in `aatm.extractors`) is an older interface based on
   `ExtractionTask` and does not use entity definitions or this validation.

@@ -26,12 +26,13 @@ See the "Information extraction" guide for a walkthrough.
 """
 
 from pathlib import Path
-from typing import List, Literal, Optional, Self
+from typing import Annotated, List, Literal, Optional, Self
 import re
 import unicodedata
 from pydantic import (
     BaseModel,
     Field,
+    StringConstraints,
     ValidationError,
     field_validator,
     model_validator,
@@ -62,6 +63,9 @@ def make_entity_key(name: str) -> str:
 
 _KEY_PATTERN = r"^[a-z0-9]+(?:_[a-z0-9]+)*$"
 
+# Text the model reads. Stripped so YAML block scalars (`>` or `|`) leave no trailing newline.
+_PromptText = Annotated[str, StringConstraints(strip_whitespace=True)]
+
 
 class AttributeLabel(BaseModel):
     """
@@ -73,7 +77,7 @@ class AttributeLabel(BaseModel):
     """
 
     value: str = Field(min_length=1)
-    description: str
+    description: _PromptText
 
     @field_validator("value")
     @classmethod
@@ -100,7 +104,7 @@ class AttributeDefinition(BaseModel):
     """
 
     key: str = Field(pattern=_KEY_PATTERN)
-    description: str
+    description: _PromptText
     required: bool = False
     labels: List[AttributeLabel] = Field(min_length=1)
 
@@ -147,7 +151,7 @@ class EntityDefinition(BaseModel):
 
     name: str
     key: str = Field(default_factory=lambda data: make_entity_key(data["name"]))
-    definition: str
+    definition: _PromptText
     has_parent: bool = False
     parent_key: Optional[str] = None
     attributes: List[AttributeDefinition] = Field(default_factory=list)
