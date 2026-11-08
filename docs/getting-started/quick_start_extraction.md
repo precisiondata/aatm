@@ -176,12 +176,12 @@ Rules:
 
 - **`key`** is optional. If omitted, it is generated from the name: lowercase, accents
   removed, other characters replaced by `_` (`"Condição — Início"` becomes
-  `condicao_inicio`).
+  `condicao_inicio`). A key you write yourself must already be in that form.
 - **Parents**: an entity with `has_parent: true` must set `parent_key` to the key of
   another definition, and every extracted mention of it must be linked to a mention of
   that parent. Hierarchies can have any depth (drug → dose → unit).
 - **Invalid files fail when loaded**, before any model call, with a message that names
-  the file: duplicate keys, a `parent_key` that does not exist, an entity that is its
+  the file: keys that are not lowercase `snake_case`, duplicate keys, a `parent_key` that does not exist, an entity that is its
   own parent, `has_parent` without `parent_key` (or the reverse), and loops such as
   `a -> b -> a`. For example:
 

@@ -156,6 +156,23 @@ class EntityDefinition(BaseModel):
     parent_key: Optional[str] = None
     attributes: List[AttributeDefinition] = Field(default_factory=list)
 
+    @field_validator("key")
+    @classmethod
+    def validate_key(cls, value: str) -> str:
+        # Generated keys always match; this catches keys written by hand. The model must
+        # return keys in this form (see ExtractedEntityCandidate.key), so a key such as
+        # "BRCA-Test" would otherwise make every model response fail to parse.
+        if not re.fullmatch(_KEY_PATTERN, value):
+            try:
+                hint = f" Use {make_entity_key(value)!r} instead."
+            except ValueError:
+                hint = ""
+            raise ValueError(
+                f"Entity key {value!r} must use only lowercase letters, digits and "
+                f"single underscores between them.{hint}"
+            )
+        return value
+
     @model_validator(mode="after")
     def validate_attributes(self) -> Self:
         keys = [attribute.key for attribute in self.attributes]

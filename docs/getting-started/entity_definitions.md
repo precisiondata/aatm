@@ -91,7 +91,7 @@ A definition file is a YAML **list**. Each item is one entity.
 | Field | Required | Default | Meaning |
 |---|---|---|---|
 | `name` | yes | | Human-readable name, shown to the model |
-| `key` | no | generated from `name` | Identifier used in the model output and in your results |
+| `key` | no | generated from `name` | Identifier used in the model output and in your results. Lowercase letters, digits and `_` only |
 | `definition` | yes | | What counts as a mention. **The model reads this**, so it decides quality |
 | `has_parent` | no | `false` | Every mention must be linked to a mention of `parent_key` |
 | `parent_key` | when `has_parent` is true | | Key of the parent entity |
@@ -123,11 +123,16 @@ results (`entity.key`, `record.children["test_date"]`).
 - **Entity keys** are optional. When omitted, the key is generated from the name:
   lowercase, accents removed, any other character replaced by `_`. `"Test date"`
   becomes `test_date`, `"Condição — Início"` becomes `condicao_inicio`.
-- When you set a key yourself, use **lowercase letters, digits and underscores**
-  (`brca_test`), the same form the generated keys have. The model must return keys
-  in this form.
-- **Attribute keys** are always written by you and must follow that form; anything else
-  fails when the file is loaded.
+- When you set a key yourself, it must use **lowercase letters, digits and single
+  underscores between them** (`brca_test`), the same form the generated keys have,
+  because the model must return keys in this form. Anything else (`BRCA-Test`,
+  `brca__test`, `_brca`) fails when the file is loaded, with a suggested key:
+
+    ```text
+    Value error, Entity key 'BRCA-Test' must use only lowercase letters, digits and single underscores between them. Use 'brca_test' instead.
+    ```
+
+- **Attribute keys** are always written by you and follow the same rule.
 - Keys must be unique: entity keys within the file, attribute keys within their entity.
 
 Set the key explicitly when other entities refer to it as `parent_key`. Renaming the
@@ -289,12 +294,12 @@ choices to the next developer.
 Invalid files fail when loaded, **before any model call**, with a message that names
 the file:
 
+- an entity or attribute key that is not lowercase `snake_case`
 - duplicate entity keys, or duplicate attribute keys in one entity
 - `has_parent: true` without `parent_key`, or the reverse
 - a `parent_key` that does not exist, an entity that is its own parent, or a loop such
   as `a -> b -> a`
-- an attribute key that is not lowercase `snake_case`, an attribute without labels, or
-  two labels that differ only in case
+- an attribute without labels, or two labels that differ only in case
 - a missing `name`, `definition`, `description` or label `value`, or a value of the
   wrong type (see [YAML pitfalls](#yaml-pitfalls))
 
