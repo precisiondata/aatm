@@ -6,6 +6,8 @@ a particular LLM provider:
 - **Entity definitions** (`EntityDefinition`, `EntityDefinitions`): which entities
   to extract, loaded from YAML. Entities may require a parent entity through
   `parent_key` (for example, a start date that belongs to a condition), at any depth.
+  Entities may also define `attributes` (`AttributeDefinition`): classifications with a
+  fixed set of labels, such as the result of a test, assigned to each mention.
 - **Line segmentation** (`segment_text`, `format_segments_for_prompt`): the note is
   shown to the model as numbered lines (``[L1] ...``) so that every extracted span can
   be tied to one exact position.
@@ -58,6 +60,77 @@ def make_entity_key(name: str) -> str:
     return key
 
 
+_KEY_PATTERN = r"^[a-z0-9]+(?:_[a-z0-9]+)*$"
+
+
+class AttributeLabel(BaseModel):
+    """
+    One allowed value of an attribute.
+
+    Attributes:
+        value (str): The label, e.g. ``"positive"``. This is what the model returns.
+        description (str): When this label applies. The model reads it.
+    """
+
+    value: str = Field(min_length=1)
+    description: str
+
+    @field_validator("value")
+    @classmethod
+    def strip_value(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("label value must not be blank")
+        return value
+
+
+class AttributeDefinition(BaseModel):
+    """
+    A classification attached to each mention of an entity, e.g. the result of a test.
+
+    The model picks one label per attribute, based on what the note states about that
+    mention. It is not a span: the label does not have to appear in the text.
+
+    Attributes:
+        key (str): The key of the attribute, e.g. ``"result"``. Unique within the entity.
+        description (str): What the attribute describes. The model reads it.
+        required (bool): If True, a mention without a valid label for this attribute is
+            rejected. If False (default), the mention is kept without the attribute.
+        labels (List[AttributeLabel]): The allowed labels.
+    """
+
+    key: str = Field(pattern=_KEY_PATTERN)
+    description: str
+    required: bool = False
+    labels: List[AttributeLabel] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_labels(self) -> Self:
+        values = [label.value.casefold() for label in self.labels]
+        duplicates = {v for v in values if values.count(v) > 1}
+        if duplicates:
+            raise ValueError(
+                f"Attribute {self.key!r} has duplicate labels: {sorted(duplicates)}"
+            )
+        return self
+
+    def match_label(self, value: str) -> Optional[str]:
+        """Return the defined label matching `value` (ignoring case and surrounding spaces), or ``None``."""
+        wanted = value.strip().casefold()
+        return next(
+            (label.value for label in self.labels if label.value.casefold() == wanted),
+            None,
+        )
+
+    def to_prompt_str(self) -> str:
+        requirement = "required" if self.required else "optional"
+        lines = [f"  - `{self.key}` ({requirement}): {self.description}"]
+        lines += [
+            f"    - `{label.value}`: {label.description}" for label in self.labels
+        ]
+        return "\n".join(lines)
+
+
 class EntityDefinition(BaseModel):
     """
     A definition of an entity.
@@ -68,6 +141,8 @@ class EntityDefinition(BaseModel):
         definition (str): The definition of the entity.
         has_parent (bool): Whether extracted spans of this entity must reference a parent span.
         parent_key (Optional[str]): The key of the parent entity. Required when `has_parent` is True.
+        attributes (List[AttributeDefinition]): Classifications the model assigns to each
+            mention of this entity, e.g. the result of a test.
     """
 
     name: str
@@ -75,6 +150,22 @@ class EntityDefinition(BaseModel):
     definition: str
     has_parent: bool = False
     parent_key: Optional[str] = None
+    attributes: List[AttributeDefinition] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_attributes(self) -> Self:
+        keys = [attribute.key for attribute in self.attributes]
+        duplicates = {k for k in keys if keys.count(k) > 1}
+        if duplicates:
+            raise ValueError(
+                f"Entity {self.key!r} has duplicate attribute keys: {sorted(duplicates)}"
+            )
+        return self
+
+    def get_attribute(self, key: str) -> Optional[AttributeDefinition]:
+        """Return the attribute definition with this key (ignoring case and surrounding spaces), or ``None``."""
+        wanted = key.strip().casefold()
+        return next((a for a in self.attributes if a.key == wanted), None)
 
     @model_validator(mode="after")
     def validate_parent(self) -> Self:
@@ -91,7 +182,11 @@ class EntityDefinition(BaseModel):
         return self
 
     def to_prompt_str(self) -> str:
-        return f"{self.name} (key: `{self.key}`, has_parent: {self.has_parent}, parent_key: `{self.parent_key}`): {self.definition}"
+        line = f"{self.name} (key: `{self.key}`, has_parent: {self.has_parent}, parent_key: `{self.parent_key}`): {self.definition}"
+        if not self.attributes:
+            return line
+        attributes = "\n".join(a.to_prompt_str() for a in self.attributes)
+        return f"{line}\n  Attributes:\n{attributes}"
 
 
 def _compute_key_depths(entities: List[EntityDefinition]) -> dict[str, int]:
@@ -151,6 +246,10 @@ class EntityDefinitions(BaseModel):
     def key_depths(self) -> dict[str, int]:
         """Depth of each key in the parent hierarchy: 0 for roots, 1 for their children, etc."""
         return _compute_key_depths(self.entities)
+
+    def get(self, key: str) -> Optional[EntityDefinition]:
+        """Return the entity definition with this key, or ``None``."""
+        return next((e for e in self.entities if e.key == key), None)
 
     @property
     def parent_keys(self) -> dict[str, str]:
@@ -320,6 +419,20 @@ def format_segments_for_prompt(segments: List[TextSegment]) -> str:
     return "\n".join(f"[{s.id}] {s.text}" for s in segments)
 
 
+class ExtractedAttribute(BaseModel):
+    """
+    A label the model assigned to one attribute of an extracted entity.
+
+    Attributes:
+        key (str): The attribute key, e.g. ``"result"``.
+        value (Optional[str]): The chosen label, e.g. ``"negative"``. ``None`` means the
+            note does not state it, the same as leaving the attribute out.
+    """
+
+    key: str
+    value: Optional[str] = None
+
+
 class ExtractedEntityCandidate(BaseModel):
     """
     An entity extracted from a text without any post-processing or validation.
@@ -334,14 +447,17 @@ class ExtractedEntityCandidate(BaseModel):
         parents (Optional[List[str]]): Ids of the parent entities of this entity. Each parent
             must have the `parent_key` defined for this entity's key. An entity may have
             several parents, e.g. one date that applies to two conditions.
+        attributes (List[ExtractedAttribute]): Labels for the attributes defined for this
+            entity's key. Attributes the note does not state are left out.
     """
 
     id: str = Field(min_length=1)
     text: str = Field(min_length=1)
-    key: str = Field(min_length=1, pattern=r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
+    key: str = Field(min_length=1, pattern=_KEY_PATTERN)
     line: str = Field(min_length=1)
     occurrence: Optional[int] = Field(default=None, ge=1)
     parents: Optional[List[str]] = Field(default_factory=list)
+    attributes: List[ExtractedAttribute] = Field(default_factory=list)
 
     @field_validator("id")
     @classmethod
@@ -393,7 +509,54 @@ RejectionReason = Literal[
     "unexpected_parent",
     "invalid_parent",
     "parent_rejected",
+    "required_attribute_missing",
+    "invalid_required_attribute",
 ]
+
+
+AttributeIssueReason = Literal[
+    "unknown_attribute",
+    "invalid_label",
+    "missing_required",
+    "conflicting_values",
+    "conflicting_duplicate",
+]
+
+
+class AttributeIssue(BaseModel):
+    """
+    A problem with an attribute the model returned (or failed to return) for one candidate.
+
+    Attributes:
+        entity_id (str): The id of the candidate the attribute belongs to.
+        entity_key (str): The key of that candidate.
+        attribute_key (str): The attribute key, as returned by the model or as defined
+            (for ``missing_required``).
+        value (Optional[str]): The value the model returned, if any.
+        reason (AttributeIssueReason): What went wrong:
+
+            - ``unknown_attribute``: the entity has no attribute with this key.
+            - ``invalid_label``: the value is not one of the attribute's labels.
+            - ``missing_required``: a required attribute was not given.
+            - ``conflicting_values``: the attribute was given twice for the same
+              candidate with different values; the first valid one is kept.
+            - ``conflicting_duplicate``: a duplicate mention gave a different value than
+              the mention it duplicates; the first mention's value is kept.
+        required (bool): Whether the attribute is required by its definition.
+        kept_entity_id (Optional[str]): For ``conflicting_duplicate``, the id of the
+            validated entity whose value was kept.
+        kept_value (Optional[str]): For ``conflicting_values`` and
+            ``conflicting_duplicate``, the value that was kept.
+    """
+
+    entity_id: str
+    entity_key: str
+    attribute_key: str
+    value: Optional[str] = None
+    reason: AttributeIssueReason
+    required: bool = False
+    kept_entity_id: Optional[str] = None
+    kept_value: Optional[str] = None
 
 
 class RejectedEntityCandidate(ExtractedEntityCandidate):
@@ -430,12 +593,18 @@ class ExtractedEntity(ExtractedEntityCandidate):
         line (str): The line id the entity was grounded in. Inherited from ExtractedEntityCandidate.
         parents (List[str]): Ids of validated parent entities. Ids of dropped duplicates are
             replaced by the id of the entity they duplicate.
+        attributes (List[ExtractedAttribute]): Only valid attributes, each once, with the
+            label spelled as defined. Invalid ones are reported as `AttributeIssue`.
         start (int): The start index of the entity in the text.
         end (int): The end index of the entity in the text.
     """
 
     start: int = Field(ge=0)
     end: int = Field(ge=0)
+
+    def get_attribute(self, key: str) -> Optional[str]:
+        """Return the label of attribute `key`, or ``None`` if it was not given."""
+        return next((a.value for a in self.attributes if a.key == key), None)
 
     @model_validator(mode="after")
     def validate_span(self) -> Self:
@@ -461,13 +630,30 @@ class EntityRecord(BaseModel):
     line: str
     start: int
     end: int
+    attributes: dict[str, str] = Field(default_factory=dict)
     children: dict[str, List["EntityRecord"]] = Field(default_factory=dict)
 
 
 class EntityValidationResult(BaseModel):
+    """
+    The outcome of validating one extraction.
+
+    Attributes:
+        validated_entities: Validated entities in document order.
+        unmatched_entities: Rejected candidates with their reasons, in input order.
+        unmatched_keys: Definition keys with no validated entity.
+        required_attribute_issues: Problems with attributes defined as required. A
+            ``missing_required`` or ``invalid_label`` issue here means the candidate was
+            rejected.
+        optional_attribute_issues: Problems with optional or unknown attributes. The
+            candidate is kept, without the faulty attribute.
+    """
+
     validated_entities: list[ExtractedEntity] = Field(default_factory=list)
     unmatched_entities: list[RejectedEntityCandidate] = Field(default_factory=list)
     unmatched_keys: list[str] = Field(default_factory=list)
+    required_attribute_issues: list[AttributeIssue] = Field(default_factory=list)
+    optional_attribute_issues: list[AttributeIssue] = Field(default_factory=list)
 
     def get_entity(self, entity_id: str) -> Optional[ExtractedEntity]:
         """Return the validated entity with this id, or ``None``."""
@@ -493,6 +679,9 @@ class EntityValidationResult(BaseModel):
                 line=entity.line,
                 start=entity.start,
                 end=entity.end,
+                attributes={
+                    a.key: a.value for a in entity.attributes if a.value is not None
+                },
             )
             for child in children_of.get(entity.id, []):
                 if child.id in ancestors:
@@ -530,6 +719,119 @@ def _ground_entity(
     return (start, start + len(ent.text)), []
 
 
+def _check_attributes(
+    ent: ExtractedEntityCandidate,
+    definition: EntityDefinition,
+) -> tuple[List[ExtractedAttribute], List[AttributeIssue], List[RejectionReason]]:
+    """Check a candidate's attributes against its entity definition.
+
+    Returns the valid attributes (in definition order, labels spelled as defined), the
+    issues found, and the rejection reasons caused by required attributes.
+    """
+    chosen: dict[str, str] = {}
+    issues: List[AttributeIssue] = []
+    invalid_keys: set[str] = set()
+
+    def issue(
+        attribute_key: str,
+        value: Optional[str],
+        reason: AttributeIssueReason,
+        required: bool,
+        kept_value: Optional[str] = None,
+    ) -> None:
+        issues.append(
+            AttributeIssue(
+                entity_id=ent.id,
+                entity_key=ent.key,
+                attribute_key=attribute_key,
+                value=value,
+                reason=reason,
+                required=required,
+                kept_value=kept_value,
+            )
+        )
+
+    for attribute in ent.attributes:
+        # A null or blank value means "not stated", the same as leaving it out.
+        if attribute.value is None or not attribute.value.strip():
+            continue
+        attribute_def = definition.get_attribute(attribute.key)
+        if attribute_def is None:
+            issue(attribute.key, attribute.value, "unknown_attribute", False)
+            continue
+        label = attribute_def.match_label(attribute.value)
+        if label is None:
+            invalid_keys.add(attribute_def.key)
+            issue(
+                attribute_def.key,
+                attribute.value,
+                "invalid_label",
+                attribute_def.required,
+            )
+            continue
+        kept = chosen.get(attribute_def.key)
+        if kept is None:
+            chosen[attribute_def.key] = label
+        elif kept != label:
+            issue(
+                attribute_def.key,
+                attribute.value,
+                "conflicting_values",
+                attribute_def.required,
+                kept_value=kept,
+            )
+
+    reasons: List[RejectionReason] = []
+    for attribute_def in definition.attributes:
+        if not attribute_def.required or attribute_def.key in chosen:
+            continue
+        if attribute_def.key in invalid_keys:
+            reason: RejectionReason = "invalid_required_attribute"
+        else:
+            reason = "required_attribute_missing"
+            issue(attribute_def.key, None, "missing_required", True)
+        if reason not in reasons:
+            reasons.append(reason)
+
+    valid = [
+        ExtractedAttribute(key=a.key, value=chosen[a.key])
+        for a in definition.attributes
+        if a.key in chosen
+    ]
+    return valid, issues, reasons
+
+
+def _merge_duplicate_attributes(
+    existing: ExtractedEntity,
+    duplicate_id: str,
+    attributes: List[ExtractedAttribute],
+    definition: EntityDefinition,
+) -> List[AttributeIssue]:
+    """Add a duplicate's attributes to the kept entity; the kept entity wins conflicts."""
+    issues: List[AttributeIssue] = []
+    for attribute in attributes:
+        kept = existing.get_attribute(attribute.key)
+        if kept is None:
+            existing.attributes.append(attribute)
+        elif kept != attribute.value:
+            attribute_def = definition.get_attribute(attribute.key)
+            issues.append(
+                AttributeIssue(
+                    entity_id=duplicate_id,
+                    entity_key=existing.key,
+                    attribute_key=attribute.key,
+                    value=attribute.value,
+                    reason="conflicting_duplicate",
+                    required=attribute_def.required if attribute_def else False,
+                    kept_entity_id=existing.id,
+                    kept_value=kept,
+                )
+            )
+    order = [a.key for a in definition.attributes]
+    existing.attributes.sort(key=lambda a: order.index(a.key))
+    return issues
+
+
 def validate_extracted_entity(
     text: str,
     entity_definitions: EntityDefinitions,
@@ -558,6 +860,16 @@ def validate_extracted_entity(
     Duplicates: candidates with the same span and key as an already validated entity are
     rejected with `duplicate`; their parents are merged into the kept entity, and children
     pointing to the duplicate are relinked to the kept entity.
+
+    Attributes: checked only for candidates that pass the checks above. Labels are matched
+    ignoring case and surrounding spaces. An unknown attribute, an invalid label or a
+    second, different value for the same attribute is dropped and reported as an
+    `AttributeIssue`; the span is kept. A required attribute without a valid label rejects
+    the candidate (`required_attribute_missing` or `invalid_required_attribute`), and its
+    children with it. For duplicates, attributes missing on the kept entity are copied
+    from the duplicate, and different values are reported as `conflicting_duplicate`
+    (the kept entity's value wins). Issues on required attributes go to
+    `required_attribute_issues`, all others to `optional_attribute_issues`.
 
     Args:
         text (str): The text to validate against.
@@ -590,7 +902,15 @@ def validate_extracted_entity(
         f"""Entity keys with required parents: {", ".join(sorted(parent_keys))}"""
     )
 
+    definitions_by_key = {e.key: e for e in entity_definitions.entities}
+
     rejected: List[tuple[int, RejectedEntityCandidate]] = []
+    required_issues: List[AttributeIssue] = []
+    optional_issues: List[AttributeIssue] = []
+
+    def record_attribute_issues(issues: List[AttributeIssue]) -> None:
+        for issue in issues:
+            (required_issues if issue.required else optional_issues).append(issue)
 
     def reject(
         index: int,
@@ -660,18 +980,38 @@ def validate_extracted_entity(
             continue
 
         assert span is not None
+        definition = definitions_by_key[ent.key]
+        attributes, attribute_issues, attribute_reasons = _check_attributes(
+            ent, definition
+        )
+
         identity = (span[0], span[1], ent.key)
         existing = validated_by_span.get(identity)
         if existing is not None:
             merged = list(existing.parents or [])
             merged += [p for p in resolved_parents if p not in merged]
             existing.parents = merged
+            # The kept entity already has every required attribute, so a duplicate
+            # missing one is not a problem worth reporting.
+            record_attribute_issues(
+                [i for i in attribute_issues if i.reason != "missing_required"]
+                + _merge_duplicate_attributes(existing, ent.id, attributes, definition)
+            )
             resolved[ent.id] = existing.id
             reject(index, ent, span, ["duplicate"])
             continue
 
+        record_attribute_issues(attribute_issues)
+        if attribute_reasons:
+            reject(index, ent, span, attribute_reasons)
+            continue
+
         entity = ExtractedEntity(
-            **{**ent.model_dump(), "parents": resolved_parents},
+            **{
+                **ent.model_dump(),
+                "parents": resolved_parents,
+                "attributes": [a.model_dump() for a in attributes],
+            },
             start=span[0],
             end=span[1],
         )
@@ -683,4 +1023,6 @@ def validate_extracted_entity(
         validated_entities=validated,
         unmatched_entities=[r for _, r in sorted(rejected, key=lambda item: item[0])],
         unmatched_keys=sorted(allowed_keys - {e.key for e in validated}),
+        required_attribute_issues=required_issues,
+        optional_attribute_issues=optional_issues,
     )

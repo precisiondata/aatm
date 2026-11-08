@@ -189,6 +189,46 @@ ValueError: Invalid entity definitions in my_definitions.yaml:
   Value error, Cycle in entity parent keys: drug_name -> unit -> dose -> drug_name
 ```
 
+### Attributes: classifying each mention
+
+Sometimes you need more than the span: you also want to know what the note says
+*about* it. Attributes let the model assign one label from a fixed list to each mention.
+The label does not have to appear in the text.
+
+```yaml title="brca.yaml"
+- name: BRCA gene test
+  key: brca_test
+  definition: A mention of BRCA1 and/or BRCA2 genetic testing performed for the patient.
+  attributes:
+    - key: result
+      description: The result of the test as stated in the note.
+      labels:
+        - value: positive
+          description: A pathogenic or likely pathogenic variant was reported.
+        - value: negative
+          description: No pathogenic or likely pathogenic variant was found.
+        - value: uncertain
+          description: Only a variant of uncertain significance (VUS) was reported.
+    - key: origin
+      description: Whether germline or tumour (somatic) DNA was tested.
+      required: false
+      labels:
+        - value: germline
+          description: Germline testing, e.g. blood or saliva.
+        - value: somatic
+          description: Testing of tumour tissue.
+```
+
+- **Write a description for every label.** The model reads them to decide, so they are
+  where you settle edge cases (is a VUS "uncertain" or "negative"?).
+- **Attributes are optional by default.** When the note does not say, the model leaves
+  the attribute out and the mention is kept without it. It is told never to guess, so
+  "not stated" and a real `uncertain` result stay distinct.
+- **`required: true`** means a mention is only useful with this attribute: a mention
+  without a valid label for it is rejected (see [Validation](#5-validation)).
+- Attribute keys must be unique within an entity, and labels unique within an
+  attribute (ignoring case). Each attribute needs at least one label.
+
 ---
 
 ## 4. What the model sees and returns
@@ -214,6 +254,7 @@ For every mention, the model returns:
 | `line` | The line the mention is on, e.g. `L2` |
 | `occurrence` | Only when the same text appears more than once on that line: which one (1-based) |
 | `parents` | The ids of the parent mentions, e.g. `["e1"]`; several parents are allowed |
+| `attributes` | Labels for the entity's attributes, e.g. `[{"key": "result", "value": "negative"}]`; attributes the note does not state are left out |
 
 Because each mention has a line and each link points to an id, the result is
 unambiguous: the `2015` above belongs to the `Hypertension` on line 2, not the one on
@@ -249,6 +290,8 @@ fail are kept in `result.unmatched_entities` with the reasons:
 | `unexpected_parent` | An entity without a parent definition lists parents |
 | `duplicate_id` | An id was reused; the first entity keeps it |
 | `duplicate` | The same mention (same span and key) was extracted twice |
+| `required_attribute_missing` | A required attribute was not given |
+| `invalid_required_attribute` | A required attribute was given with a label that is not defined |
 
 Matching is exact: case, spacing and punctuation must be identical to the note. Small
 formatting slips are tolerated: `line` may be written `L4`, `[L4]` or `4`, and a copied
@@ -276,6 +319,46 @@ Rejected:
 `result.unmatched_keys` lists the definition keys with no validated entity (here
 `['verbatim_end_date']`), which helps spot what the model never found.
 
+### Attribute issues
+
+A wrong label never throws away a valid span unless the attribute is required. Every
+problem is recorded as an `AttributeIssue` with the candidate id, the entity key, the
+attribute key, the value the model gave and a reason, so you can see which attribute
+causes trouble:
+
+| Reason | Meaning | What is kept |
+|---|---|---|
+| `unknown_attribute` | The entity has no attribute with this key | The span, without it |
+| `invalid_label` | The value is not one of the defined labels | The span, without it (rejected if the attribute is required) |
+| `missing_required` | A required attribute was not given | Nothing: the span is rejected |
+| `conflicting_values` | The same attribute was given twice with different values | The first valid value |
+| `conflicting_duplicate` | A duplicate mention gave a different value | The first mention's value (`kept_entity_id`, `kept_value`) |
+
+Labels are matched ignoring case and surrounding spaces, and stored as defined. Issues
+are split by the attribute's definition:
+
+- `result.required_attribute_issues`: issues on required attributes. A
+  `missing_required` or `invalid_label` here means the mention was rejected (and its
+  children, with `parent_rejected`).
+- `result.optional_attribute_issues`: issues on optional or unknown attributes. The
+  mention was kept.
+
+Attributes are only checked for candidates that pass every other check, so a span
+rejected for its text or line does not add attribute issues. When a duplicate brings
+an attribute the kept mention lacks, it is copied over.
+
+To find the attributes that cause the most problems across many notes:
+
+```python
+from collections import Counter
+
+counts = Counter(
+    (issue.entity_key, issue.attribute_key, issue.reason)
+    for result in results
+    for issue in result.required_attribute_issues + result.optional_attribute_issues
+)
+```
+
 ---
 
 ## 6. Working with the results
@@ -284,9 +367,11 @@ Rejected:
 
 | Attribute / method | Content |
 |---|---|
-| `validated_entities` | Validated entities in document order, each with `id`, `key`, `text`, `line`, `start`, `end` and `parents` (ids) |
+| `validated_entities` | Validated entities in document order, each with `id`, `key`, `text`, `line`, `start`, `end`, `parents` (ids) and valid `attributes`; `entity.get_attribute("result")` returns one label |
 | `unmatched_entities` | Rejected candidates with their `reasons` |
 | `unmatched_keys` | Definition keys with no validated entity |
+| `required_attribute_issues` | Problems with required attributes |
+| `optional_attribute_issues` | Problems with optional or unknown attributes |
 | `get_entity(id)` | One validated entity by id |
 | `to_records()` | Entities nested under their parents |
 
@@ -317,6 +402,9 @@ Type 2 diabetes mellitus L3 {'verbatim_start_date': ['2019']}
 CKD stage 3 L3 {'verbatim_start_date': ['2019']}
 Hypertension L5 {}
 ```
+
+Each record also has `attributes`, a plain `{key: label}` dict, e.g.
+`{"result": "negative"}`.
 
 ### Building table rows
 

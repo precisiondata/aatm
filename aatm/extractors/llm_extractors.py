@@ -54,6 +54,7 @@ For every extracted span:
 - `line` is the id of the line where this specific mention appears, for example `L12`. When the same text appears on several lines, choose the line of the mention you mean, and extract it once per line if several mentions are relevant.
 - `text` must be copied exactly from that line, character by character. Do not include the `[L12]` line id in the text.
 - `occurrence` is only needed when the same text appears more than once on that same line: it is the 1-based position of the mention you mean. Otherwise leave it null.
+- `attributes` is only used for entities whose definition lists attributes. For each attribute the note states for this specific mention, give its `key` and, as `value`, the one label whose description matches best, written exactly as defined. Leave out any attribute the note does not state; never guess. Leave `attributes` empty for entities without attributes.
 
 Spans that cannot be found on the given line will be considered invalid.
 
