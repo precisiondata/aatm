@@ -42,3 +42,16 @@ logging.getLogger("aatm.data_models.extractors").setLevel(logging.DEBUG)  # one 
 | `AATM_DEVICE` | `cuda`, `mps`, `cpu` | Forces the device local models run on. If unset, AATM uses CUDA, then MPS, then CPU, whichever PyTorch can see first. AATM raises an error if the requested device is not available. |
 
 At `INFO` level, AATM logs the device local models run on (see the logging settings above).
+
+## Embedding precision
+
+| Variable | Values | Effect |
+|---|---|---|
+| `AATM_EMBEDDING_DTYPE` | `float32`, `bfloat16`, `float16` | Precision local embedding models run in when building the vector database. Defaults to `float32`. Half precision (`bfloat16` or `float16`) needs an NVIDIA GPU; it roughly halves GPU memory use and encodes faster. `bfloat16` needs an Ampere or newer GPU, and EmbeddingGemma does not support `float16`. `aatm init --embedding-dtype` overrides this variable. |
+
+Half precision changes the embeddings slightly, so AATM never mixes precisions in one vector database. It records the precision in the database and:
+
+- refuses to repair a database with a different precision than the one requested. Choose **Overwrite** to rebuild it instead;
+- when no precision is requested, repairs a database in the precision it was built with;
+- refuses to repair a database built before AATM recorded precision, since its precision cannot be checked;
+- encodes search queries in the database's precision, falling back to `float32` with a warning if this machine cannot run it.

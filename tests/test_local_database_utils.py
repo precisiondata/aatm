@@ -3,6 +3,7 @@ from chromadb import EmbeddingFunction
 import pytest
 
 from aatm import local_database_utils as ldu
+from aatm.precision import EmbeddingPrecisionError
 
 
 class FakeLocalEmbeddingFunction:
@@ -210,3 +211,130 @@ def test_errors_while_encoding_stop_the_build(fake_project, monkeypatch):
 
     with pytest.raises(RuntimeError, match="GPU fell over"):
         ldu.build_local_vector_database("fake-model", chunk_size=100)
+
+
+class FakeLocalModel(FakeEmbeddingFunction):
+    """Local-model stand-in that records the precision it was loaded in."""
+
+    is_local = True
+    loaded_dtypes: list[str] = []
+
+    def __init__(self, model, dtype="float32", *args, **kwargs):
+        FakeLocalModel.loaded_dtypes.append(dtype)
+        self.batch_size = 8
+
+
+@pytest.fixture
+def fake_local_project(tmp_path, monkeypatch):
+    from aatm import precision
+    from aatm.registries import retrievers
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("AATM_EMBEDDING_DTYPE", raising=False)
+    # Pretend to be a bfloat16-capable GPU so half precision passes validation.
+    monkeypatch.setattr(ldu, "get_device", lambda: "cuda")
+    monkeypatch.setattr(
+        precision.torch.cuda,
+        "is_bf16_supported",
+        lambda including_emulation=True: True,
+    )
+    FakeLocalModel.loaded_dtypes = []
+    spec = retrievers.ChromaRetrieverModelSpec(
+        name="fake-local",
+        model_id="fake-local",
+        embedding_function_cls=FakeLocalModel,  # type: ignore[arg-type]
+    )
+    monkeypatch.setitem(
+        retrievers.CHROMADB_RETRIEVER_MODEL_REGISTRY, "fake-local", spec
+    )
+    write_dataset(tmp_path / ".aatm/datasets/standard_concept.csv", n_rows=20)
+    return tmp_path / spec.chromadb_path
+
+
+def stored_dtype(db_path):
+    import chromadb
+
+    collection = chromadb.PersistentClient(path=str(db_path)).get_collection(
+        "expressions"
+    )
+    try:
+        return (collection.metadata or {}).get("aatm_embedding_dtype")
+    finally:
+        del collection
+        ldu.release_chromadb_clients()
+
+
+def build_local(**kwargs):
+    ldu.build_local_vector_database("fake-local", encode_batch_size=8, **kwargs)
+
+
+def test_new_database_defaults_to_float32_and_records_it(fake_local_project):
+    build_local()
+    assert FakeLocalModel.loaded_dtypes == ["float32"]
+    assert stored_dtype(fake_local_project) == "float32"
+
+
+def test_new_database_records_requested_half_precision(fake_local_project):
+    build_local(embedding_dtype="bf16")
+    assert FakeLocalModel.loaded_dtypes == ["bfloat16"]
+    assert stored_dtype(fake_local_project) == "bfloat16"
+
+
+def test_repair_with_different_precision_fails_before_loading_model(
+    fake_local_project, monkeypatch
+):
+    build_local()
+    answer_prompt(monkeypatch, "Repair")
+    FakeLocalModel.loaded_dtypes = []
+
+    with pytest.raises(EmbeddingPrecisionError, match="built with float32"):
+        build_local(embedding_dtype="bfloat16")
+
+    assert FakeLocalModel.loaded_dtypes == []
+    assert stored_dtype(fake_local_project) == "float32"
+
+
+def test_repair_with_env_var_mismatch_fails(fake_local_project, monkeypatch):
+    build_local()
+    answer_prompt(monkeypatch, "Repair")
+    monkeypatch.setenv("AATM_EMBEDDING_DTYPE", "float16")
+
+    with pytest.raises(EmbeddingPrecisionError):
+        build_local()
+
+
+def test_repair_without_request_uses_stored_precision(fake_local_project, monkeypatch):
+    build_local(embedding_dtype="bfloat16")
+    answer_prompt(monkeypatch, "Repair")
+    FakeLocalModel.loaded_dtypes = []
+
+    build_local()
+
+    assert FakeLocalModel.loaded_dtypes == ["bfloat16"]
+
+
+def test_overwrite_may_change_precision(fake_local_project, monkeypatch):
+    build_local()
+    answer_prompt(monkeypatch, "Overwrite")
+
+    build_local(embedding_dtype="bfloat16")
+
+    assert stored_dtype(fake_local_project) == "bfloat16"
+
+
+def test_repair_of_untracked_database_fails(fake_local_project, monkeypatch):
+    import chromadb
+
+    client = chromadb.PersistentClient(path=str(fake_local_project))
+    client.create_collection("expressions", embedding_function=None)  # no metadata
+    del client
+    ldu.release_chromadb_clients()
+    answer_prompt(monkeypatch, "Repair")
+
+    with pytest.raises(EmbeddingPrecisionError, match="before AATM recorded"):
+        build_local()
+
+
+def test_embedding_dtype_is_rejected_for_api_models(fake_project):
+    with pytest.raises(ValueError, match="only applies to local models"):
+        ldu.build_local_vector_database("fake-model", embedding_dtype="bfloat16")

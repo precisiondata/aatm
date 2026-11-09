@@ -15,7 +15,9 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
+from chromadb.errors import NotFoundError
 
+from ..device import get_device
 from ..embedding_functions import (
     GemmaEmbeddingFunction,
     GemmaEmbeddingModels,
@@ -25,6 +27,7 @@ from ..embedding_functions import (
     Qwen3EmbeddingFunction,
     Qwen3EmbeddingModels,
 )
+from ..precision import COLLECTION_DTYPE_KEY, dtype_for_queries
 from ..retrievers import ChromaDBRetriever
 
 
@@ -166,9 +169,23 @@ def load_retriever(model_name: str) -> "ChromaDBRetriever":
 
     client = chromadb.PersistentClient(spec.chromadb_path)
 
+    # Encode queries in the precision the database was built with.
+    model_kwargs: dict[str, Any] = {}
+    if getattr(spec.embedding_function_cls, "is_local", False):
+        try:
+            metadata = client.get_collection(spec.collection_name).metadata or {}
+        except NotFoundError:
+            metadata = {}
+        dtype = dtype_for_queries(metadata.get(COLLECTION_DTYPE_KEY), get_device())
+        if dtype is not None:
+            model_kwargs["dtype"] = dtype
+
     retriever = ChromaDBRetriever(
         client=client,
         collection_name=spec.collection_name,
-        embedding_function=spec.embedding_function_cls(model=spec.model_id),
+        embedding_function=spec.embedding_function_cls(
+            model=spec.model_id,
+            **model_kwargs,  # type: ignore[call-arg]
+        ),
     )
     return retriever

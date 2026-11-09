@@ -28,7 +28,16 @@ from rich.console import Console
 from rich.progress import Progress, TaskID, track
 
 from aatm.background_iterator import BackgroundIterator
+from aatm.device import get_device
 from aatm.logs import get_logger
+from aatm.precision import (
+    COLLECTION_DTYPE_KEY,
+    DEFAULT_EMBEDDING_DTYPE,
+    EmbeddingDtype,
+    check_dtype_supported,
+    dtype_for_existing_collection,
+    requested_embedding_dtype,
+)
 from aatm.data_models import ExpressionMetadata
 from aatm.timing_profiler import TimingProfiler
 from aatm.vector_db_writer import ChromaWriterProcess, WriteAck
@@ -426,6 +435,16 @@ PREFETCH_CHUNKS = 2
 """How many prepared chunks may wait for the GPU while it encodes."""
 
 
+def get_existing_collection(client: Any, name: str) -> Any | None:
+    """Return the named ChromaDB collection, or ``None`` if it does not exist."""
+    from chromadb.errors import NotFoundError
+
+    try:
+        return client.get_collection(name)
+    except NotFoundError:
+        return None
+
+
 def release_chromadb_clients() -> None:
     """Drop this process's cached ChromaDB clients so another process can open the files."""
     from chromadb.api.shared_system_client import SharedSystemClient
@@ -632,6 +651,7 @@ def build_local_vector_database(
     rate_limit: int | None = None,
     chunk_size: int | None = None,
     encode_batch_size: int | None = None,
+    embedding_dtype: str | None = None,
     profile_timing: bool = False,
     profile_sync_cuda: bool = False,
     profile_summary_every_n_batches: int = 20,
@@ -653,6 +673,11 @@ def build_local_vector_database(
             pass. If not provided, it is estimated from free GPU memory on CUDA,
             and otherwise left at the embedding function's default. Ignored for
             API models.
+        embedding_dtype: Precision for local models: ``float32`` (default),
+            ``bfloat16`` or ``float16``. If not provided,
+            ``AATM_EMBEDDING_DTYPE`` is used. When repairing, the database's
+            recorded precision is used unless a different one is requested,
+            which raises `EmbeddingPrecisionError`. See `aatm.precision`.
         profile_timing: Whether to log per-stage timing information.
         profile_sync_cuda: Whether to synchronize CUDA around timed blocks.
             This makes GPU timings more accurate but adds overhead.
@@ -661,10 +686,30 @@ def build_local_vector_database(
 
     Returns:
         None.
+
+    Raises:
+        EmbeddingPrecisionError: If the requested precision cannot run on this
+            machine, or differs from the precision of the database being
+            repaired.
     """
     from aatm.registries.retrievers import (
         CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry,
     )
+
+    spec = model_registry[embedding_model_name]
+    is_local = bool(getattr(spec.embedding_function_cls, "is_local", False))
+
+    # Validate the requested precision before prompting or loading any weights.
+    requested_dtype: EmbeddingDtype | None = None
+    if is_local:
+        requested_dtype = requested_embedding_dtype(embedding_dtype)
+        if requested_dtype is not None:
+            check_dtype_supported(requested_dtype, get_device())
+    elif embedding_dtype is not None:
+        raise ValueError(
+            f"embedding_dtype only applies to local models; "
+            f"'{embedding_model_name}' is an API model."
+        )
 
     profiler = TimingProfiler(
         enabled=profile_timing,
@@ -675,7 +720,11 @@ def build_local_vector_database(
         raise ValueError("vector_db_dir does not exist")
 
     if vector_db_dir is None:
-        vector_db_dir = Path(model_registry[embedding_model_name].chromadb_path)
+        vector_db_dir = Path(spec.chromadb_path)
+
+    # ChromaDB caches clients by path string; an absolute path keeps a cached
+    # client from pointing at another directory after a change of cwd.
+    vector_db_dir = vector_db_dir.resolve()
 
     if vector_db_dir.exists():
         user_preference = questionary.select(
@@ -712,12 +761,29 @@ def build_local_vector_database(
     with profiler.time_block("chromadb_client_init"):
         client = chromadb.PersistentClient(path=str(vector_db_dir))
 
-    with profiler.time_block("embedding_function_init"):
-        embedding_function = model_registry[
-            embedding_model_name
-        ].embedding_function_cls(model=model_registry[embedding_model_name].model_id)
+    collection_name = spec.collection_name
+    existing_collection = get_existing_collection(client, collection_name)
 
-    is_local = getattr(embedding_function, "is_local", False)
+    model_kwargs: dict[str, Any] = {}
+    collection_metadata: dict[str, Any] | None = None
+
+    if is_local:
+        if existing_collection is None:
+            build_dtype = requested_dtype or DEFAULT_EMBEDDING_DTYPE
+        else:
+            build_dtype = dtype_for_existing_collection(
+                (existing_collection.metadata or {}).get(COLLECTION_DTYPE_KEY),
+                requested_dtype,
+            )
+        model_kwargs["dtype"] = build_dtype
+        collection_metadata = {COLLECTION_DTYPE_KEY: build_dtype}
+        console.print(f"Embedding precision: {build_dtype}")
+
+    with profiler.time_block("embedding_function_init"):
+        embedding_function = spec.embedding_function_cls(
+            model=spec.model_id,
+            **model_kwargs,  # type: ignore[call-arg]
+        )
 
     if is_local:
         if encode_batch_size is None and torch.cuda.is_available():
@@ -739,16 +805,17 @@ def build_local_vector_database(
         max_chromadb_batch_size=client.get_max_batch_size(),
     )
 
-    collection_name = model_registry[embedding_model_name].collection_name
-
-    with profiler.time_block("get_or_create_collection"):
-        client.get_or_create_collection(
-            collection_name,
-            embedding_function=embedding_function,
-        )
+    if existing_collection is None:
+        with profiler.time_block("create_collection"):
+            client.create_collection(
+                collection_name,
+                embedding_function=embedding_function,
+                metadata=collection_metadata,
+            )
 
     # From here on the writer process owns the database. Two clients in different
     # processes must not share one directory, so release this one first.
+    del existing_collection
     del client
     release_chromadb_clients()
 

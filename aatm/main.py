@@ -219,6 +219,19 @@ def init(
             show_default=False,
         ),
     ] = None,
+    embedding_dtype: Annotated[
+        Optional[str],
+        typer.Option(
+            "--embedding-dtype",
+            help=(
+                "Precision for local embedding models: float32 (default), "
+                "bfloat16 or float16. Half precision is faster and uses less GPU "
+                "memory, but requires an NVIDIA GPU. Overrides "
+                "AATM_EMBEDDING_DTYPE."
+            ),
+            show_default=False,
+        ),
+    ] = None,
     standard_vocabs: Annotated[
         Optional[List[str]],
         typer.Option(
@@ -248,6 +261,8 @@ def init(
         embedding_model: Name of the embedding model to use for building
             the local vector database. If not provided, the user is
             prompted to select one interactively.
+        embedding_dtype: Precision for local embedding models. If not
+            provided, `AATM_EMBEDDING_DTYPE` or `float32` is used.
         standard_vocabs: List of standard vocabularies to include in the
             mapping datasets. If not provided, the user is prompted to
             select one or more interactively.
@@ -269,6 +284,10 @@ def init(
         Initialize with an explicit embedding model:
 
             $ aatm init --embedding-model qwen3-4B
+
+        Build the vector database in half precision on an NVIDIA GPU:
+
+            $ aatm init --embedding-model qwen3-4B --embedding-dtype bfloat16
 
         Initialize with specific standard vocabularies:
 
@@ -380,7 +399,9 @@ def init(
     console.print("Preparing local vector database builder...")
     from aatm.local_database_utils import build_local_vector_database
 
-    build_local_vector_database(selected_embedding_model)
+    build_local_vector_database(
+        selected_embedding_model, embedding_dtype=embedding_dtype
+    )
     console.print("[green]Done![/green]\n")
 
 

@@ -59,6 +59,12 @@ from sentence_transformers import SentenceTransformer
 import torch
 
 from aatm.device import get_device
+from aatm.precision import (
+    EmbeddingDtype,
+    EmbeddingPrecisionError,
+    resolve_embedding_dtype,
+    to_torch_dtype,
+)
 
 dotenv.load_dotenv()
 
@@ -133,12 +139,15 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
     when the vector database is built.
 
     The model is loaded onto the device returned by `aatm.device.get_device()`
-    (CUDA, MPS or CPU).
+    (CUDA, MPS or CPU), in the precision chosen by
+    `aatm.precision.resolve_embedding_dtype`: ``float32`` unless half precision
+    is requested.
 
     Attributes:
         is_local: Always ``True``. Marks the class as a local model, which lets
             the vector database builder tune the GPU batch size for it.
         model_id: Fully qualified identifier of the loaded model.
+        dtype: Precision the model runs in.
         model: SentenceTransformer instance used to encode documents.
         batch_size: Number of texts encoded per forward pass.
     """
@@ -148,20 +157,41 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
     encode_kwargs: ClassVar[dict[str, Any]] = {}
     """Extra keyword arguments passed to every `SentenceTransformer.encode` call."""
 
-    def __init__(self, model_id: str, batch_size: int = 32) -> None:
+    unsupported_dtypes: ClassVar[frozenset[str]] = frozenset()
+    """Precisions known to produce broken embeddings with this model."""
+
+    def __init__(
+        self, model_id: str, batch_size: int = 32, dtype: str | None = None
+    ) -> None:
         """Load the model onto the selected device.
 
         Args:
             model_id: Fully qualified identifier of the model to load.
             batch_size: Number of texts encoded per forward pass.
+            dtype: Precision to load the model in (``float32``, ``bfloat16`` or
+                ``float16``). If not provided, ``AATM_EMBEDDING_DTYPE`` or the
+                default ``float32`` is used.
 
         Returns:
             None
+
+        Raises:
+            EmbeddingPrecisionError: If the precision is unsupported by the
+                device or the model.
         """
+        device = get_device()
+        self.dtype: EmbeddingDtype = resolve_embedding_dtype(dtype, device)
+        if self.dtype in self.unsupported_dtypes:
+            raise EmbeddingPrecisionError(
+                f"{model_id} does not support {self.dtype} precision."
+            )
+
         self.model_id = model_id
+        # Pass the dtype explicitly: recent transformers versions otherwise
+        # load the checkpoint's own dtype, which is bfloat16 for Qwen3.
         self.model = SentenceTransformer(
             self.model_id,
-            model_kwargs={"device_map": get_device()},
+            model_kwargs={"device_map": device, "dtype": to_torch_dtype(self.dtype)},
             tokenizer_kwargs={"padding_side": "left"},
         )
         self.model.eval()
@@ -195,7 +225,12 @@ class Qwen3EmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
     encode_kwargs: ClassVar[dict[str, Any]] = {"prompt_name": "query"}
 
     def __init__(
-        self, model: str, batch_size: int = 32, *args: Any, **kwargs: Any
+        self,
+        model: str,
+        batch_size: int = 32,
+        dtype: str | None = None,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize the Qwen3 embedding function.
 
@@ -203,6 +238,8 @@ class Qwen3EmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
             model: Enum key corresponding to a supported Qwen3 embedding
                 model.
             batch_size: Number of texts encoded per forward pass.
+            dtype: Precision to load the model in. See
+                `LocalSentenceTransformerEmbeddingFunction`.
             *args: Additional positional arguments accepted for interface
                 compatibility.
             **kwargs: Additional keyword arguments accepted for interface
@@ -215,7 +252,9 @@ class Qwen3EmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
             ValueError: If `model` is not a valid `Qwen3EmbeddingModels`
                 value.
         """
-        super().__init__(Qwen3EmbeddingModels(model).value, batch_size=batch_size)
+        super().__init__(
+            Qwen3EmbeddingModels(model).value, batch_size=batch_size, dtype=dtype
+        )
 
 
 class GemmaEmbeddingModels(Enum):
@@ -229,10 +268,21 @@ class GemmaEmbeddingModels(Enum):
 
 
 class GemmaEmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
-    """Embed documents using a Gemma SentenceTransformer model."""
+    """Embed documents using a Gemma SentenceTransformer model.
+
+    EmbeddingGemma does not support ``float16``; use ``bfloat16`` or
+    ``float32``.
+    """
+
+    unsupported_dtypes: ClassVar[frozenset[str]] = frozenset({"float16"})
 
     def __init__(
-        self, model: str, batch_size: int = 32, *args: Any, **kwargs: Any
+        self,
+        model: str,
+        batch_size: int = 32,
+        dtype: str | None = None,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize the Gemma embedding function.
 
@@ -240,6 +290,8 @@ class GemmaEmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
             model: Enum key corresponding to a supported Gemma embedding
                 model.
             batch_size: Number of texts encoded per forward pass.
+            dtype: Precision to load the model in. See
+                `LocalSentenceTransformerEmbeddingFunction`.
             *args: Additional positional arguments accepted for interface
                 compatibility.
             **kwargs: Additional keyword arguments accepted for interface
@@ -252,7 +304,9 @@ class GemmaEmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
             ValueError: If `model` is not a valid `GemmaEmbeddingModels`
                 value.
         """
-        super().__init__(GemmaEmbeddingModels(model).value, batch_size=batch_size)
+        super().__init__(
+            GemmaEmbeddingModels(model).value, batch_size=batch_size, dtype=dtype
+        )
 
 
 class OpenAIEmbeddingModels(Enum):

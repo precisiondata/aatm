@@ -73,3 +73,28 @@ def test_gemma_encodes_without_prompt(fake_st):
 def test_unknown_model_id_is_rejected(fake_st):
     with pytest.raises(ValueError):
         ef.Qwen3EmbeddingFunction(model="not-a-model")
+
+
+def test_models_load_in_float32_by_default(fake_st, monkeypatch):
+    monkeypatch.delenv("AATM_EMBEDDING_DTYPE", raising=False)
+    function = ef.Qwen3EmbeddingFunction(model=ef.Qwen3EmbeddingModels.QWEN3_06B.value)
+    assert function.dtype == "float32"
+    assert fake_st.instances[0].init_kwargs["model_kwargs"]["dtype"] is ef.torch.float32
+
+
+def test_models_load_in_requested_half_precision(fake_st, monkeypatch):
+    monkeypatch.setattr(ef, "get_device", lambda: "cuda")
+    function = ef.Qwen3EmbeddingFunction(
+        model=ef.Qwen3EmbeddingModels.QWEN3_06B.value, dtype="float16"
+    )
+    assert function.dtype == "float16"
+    assert fake_st.instances[0].init_kwargs["model_kwargs"]["dtype"] is ef.torch.float16
+
+
+def test_gemma_rejects_float16(fake_st, monkeypatch):
+    monkeypatch.setattr(ef, "get_device", lambda: "cuda")
+    with pytest.raises(ef.EmbeddingPrecisionError, match="does not support float16"):
+        ef.GemmaEmbeddingFunction(
+            model=ef.GemmaEmbeddingModels.EMBEDDING_GEMMA_300M.value, dtype="float16"
+        )
+    assert fake_st.instances == []  # rejected before loading weights
