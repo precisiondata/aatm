@@ -141,7 +141,7 @@ CHROMADB_RETRIEVER_MODEL_REGISTRY: dict[str, ChromaRetrieverModelSpec] = {
 }
 
 
-def load_retriever(model_name: str) -> "ChromaDBRetriever":
+def load_retriever(model_name: str, **retriever_kwargs: Any) -> "ChromaDBRetriever":
     """Instantiate a registered ChromaDB retriever by model name.
 
     This function looks up a retriever specification in the model registry,
@@ -151,6 +151,8 @@ def load_retriever(model_name: str) -> "ChromaDBRetriever":
 
     Args:
         model_name: Registry name of the retriever model to instantiate.
+        **retriever_kwargs: Passed on to ``ChromaDBRetriever``, e.g. ``top_k``,
+            ``filter_strategy`` or ``overfetch_factor``.
 
     Returns:
         A configured ``ChromaDBRetriever`` instance for the requested model.
@@ -187,5 +189,6 @@ def load_retriever(model_name: str) -> "ChromaDBRetriever":
             model=spec.model_id,
             **model_kwargs,  # type: ignore[call-arg]
         ),
+        **retriever_kwargs,
     )
     return retriever
