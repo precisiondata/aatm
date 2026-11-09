@@ -25,7 +25,6 @@ from rich.console import Console
 from rich.progress import track
 
 from aatm.logs import get_logger
-from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY
 from aatm.data_models import ExpressionMetadata
 from aatm.timing_profiler import TimingProfiler
 
@@ -347,32 +346,30 @@ def measure_embedding_vram(
     }
 
 
-def estimate_batch_size(embedding_model_name: str) -> int:
+def estimate_batch_size(embedding_function: Any) -> int:
     """Estimate a suitable batch size for local GPU embedding generation.
 
+    The estimate reuses the model that is already loaded for building the
+    database, so the weights are not loaded a second time and the free-memory
+    reading reflects what the build will actually have available.
+
     Args:
-        embedding_model_name: Registry key for the embedding model.
+        embedding_function: Loaded local embedding function. It must expose
+            ``is_local = True`` and a SentenceTransformer ``model`` attribute.
 
     Returns:
         Estimated maximum batch size.
 
     Raises:
-        ValueError: If the model is unknown, non-local, or batch size cannot be
-            estimated.
+        ValueError: If the embedding function is not a local model, or the batch
+            size cannot be estimated.
     """
-    retriever_spec = CHROMADB_RETRIEVER_MODEL_REGISTRY.get(embedding_model_name)
-
-    if retriever_spec is None:
-        raise ValueError(f"Unknown embedding model: {embedding_model_name}")
-
-    embedding_function = retriever_spec.embedding_function_cls(
-        model=retriever_spec.model_id
-    )
-
     if not getattr(embedding_function, "is_local", False):
-        raise ValueError(f"Embedding model {embedding_model_name} is not a local model")
+        raise ValueError(
+            f"{type(embedding_function).__name__} is not a local embedding model"
+        )
 
-    model = embedding_function.model  # type: ignore[attr-defined]
+    model = embedding_function.model
 
     measurements = []
 
@@ -399,7 +396,8 @@ def estimate_batch_size(embedding_model_name: str) -> int:
 
     if peak_reserved_gib_diff <= 0:
         raise ValueError(
-            f"Unable to estimate memory per batch item for {embedding_model_name}. "
+            "Unable to estimate memory per batch item for "
+            f"{type(embedding_function).__name__}. "
             f"Measured peak reserved memory did not increase."
         )
 
@@ -409,16 +407,13 @@ def estimate_batch_size(embedding_model_name: str) -> int:
         (free_bytes / 1024**3 - run_time_overhead_gib) / memory_per_batch_item_gib
     )
 
-    del model
-    del embedding_function
-
     gpu_memory_cleanup()
 
     if max_batch_size > 0:
         return max_batch_size
 
     raise ValueError(
-        f"Unable to estimate batch size for embedding model {embedding_model_name}"
+        f"Unable to estimate batch size for {type(embedding_function).__name__}"
     )
 
 
@@ -511,7 +506,7 @@ def build_local_vector_database(
 
     if getattr(embedding_function, "is_local", False) and torch.cuda.is_available():
         with profiler.time_block("estimate_batch_size"):
-            batch_size = estimate_batch_size(embedding_model_name)
+            batch_size = estimate_batch_size(embedding_function)
 
     embedding_function.batch_size = batch_size  # type: ignore[attr-defined]
 
