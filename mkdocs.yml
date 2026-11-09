@@ -105,3 +105,5 @@ markdown_extensions:
         kwds:
           case: lower
   - pymdownx.blocks.caption
+  - admonition
+  - pymdownx.details
