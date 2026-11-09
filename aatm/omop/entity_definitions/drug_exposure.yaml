@@ -1,61 +1,240 @@
 # Drug exposure entity definitions
 #
-# This file contains the entity definitions for the extraction of relevant entities from clinical documents related to drug exposure. The entities defined here are used to capture information about the drugs prescribed or used by patients, including the drug name, dosage, route of administration, and relevant dates.
+# This file contains the entity definitions for extracting the drugs a patient is
+# exposed to from clinical documents: drugs prescribed, administered or taken, with
+# their dates, planned duration and dosing instructions, e.g. "start amoxicillin 500 mg
+# PO TID for 7 days" or "on lisinopril 10 mg daily since 2020".
 #
-# Not all information needed for the OMOP CDM drug_exposure table is captured in this entity definition as it needs information not typically found in clinical documents. Those include:
+# Design choices, following the CDM table conventions
+# (https://ohdsi.github.io/CommonDataModel/cdm55.html#drug_exposure) and the THEMIS
+# conventions for drug_exposure (https://ohdsi.github.io/Themis/drug_exposure.html):
+# - The table holds prescription and over-the-counter medicines, vaccines and
+#   biologics. Negated drugs ("not on anticoagulation"), allergies and intolerances,
+#   drugs only considered or planned for later, drugs of relatives, and alcohol,
+#   tobacco and recreational substances are excluded.
+# - Drug classes without a drug ("antihypertensives", "statins") are excluded. The CDM
+#   records them with drug_concept_id = 0; coding class names would pick an arbitrary
+#   drug, and a row with no drug adds little.
+# - The mention is the drug as written with its strength and dose form when the note
+#   gives them ("metformin 500 mg tablet"), so it can be coded to the most detailed
+#   concept: the CDM prefers a clinical drug and allows an ingredient only when nothing
+#   more detailed is known.
+# - `kind` (required) says how the note records the drug: `administered` (given to the
+#   patient), `prescribed` (started, prescribed or changed in this note) or `taking`
+#   (the patient's medication list or reported use). It drives the end date and the
+#   visit, below.
+# - `route` (optional) is the route of administration.
+# - Start date, end date, planned duration and dosing instructions are children of the
+#   drug, so each is an exact span of the note.
 #
-# To be coded:
-# - drug_concept_id (can be derived from drug_name)
-# - drug_source_concept_id (can be derived from drug_name)
-# - route_concept_id (can be derived from route_source_value)
-# - drug_exposure_start_date (can be derived from verbatim_start_date)
-# - drug_exposure_end_date (can be derived from verbatim_end_date)
+# OMOP CDM mapping: each drug mention becomes a row of the DRUG_EXPOSURE table, built
+# by aatm.omop.OmopTableBuilder from the `omop` block below. The block is never sent to
+# the model.
 #
-# To bring from other sources:
-# - drug_type_concept_id (can be derived from the source of the drug exposure information)
-# - drug_exposure_id
-# - person_id
-# - provider_id
-# - visit_occurrence_id
-# - visit_detail_id
-# - quantity
-# - refills
-# - days_supply
-# - lot_number
-# - stop_reason (will be deprecated in OMOP CDM v6.0)
+# - drug_concept_id is coded from the mention with the terminology mapper
+#   (aatm.terminology_mapper.TerminologyMapper), restricted to standard concepts of the
+#   Drug domain, from any vocabulary (RxNorm, in practice). The builder needs a mapper
+#   for this file: OmopTableBuilder(definitions, mapper=TerminologyMapper(...)).
+# - drug_exposure_start_date is the start date the note gives, else the note date: the
+#   order date for a prescription, the recording date for an administration, and the
+#   date the patient is known to take the drug for a medication list.
+# - drug_exposure_end_date is required by the CDM. Following the THEMIS convention for
+#   end dates not given in the data, it is the first that applies:
+#   1. the end date the note gives;
+#   2. the start date + the planned duration - 1 day ("for 7 days");
+#   3. for a prescription, the start date + 29 days;
+#   4. for a drug the patient takes (a medication list), the note date: the last date
+#      the patient is known to take it. THEMIS has no rule for medication lists; this
+#      is a convention of this file;
+#   5. otherwise, for an administration, the start date.
+#   THEMIS also infers the duration from the quantity and the daily dose; notes rarely
+#   give a quantity, so that step is not used.
+# - When the note gives only an end date and it is before the note date ("aspirin
+#   stopped on 05/01/2025"), that date is used for both start and end, as the CDM
+#   allows for a single date, rather than a start after the end. Other end dates before
+#   the start date are reported and the next rule is used.
+# - verbatim_end_date is the end date the note gives, only when it is written as a
+#   date (THEMIS: the date the drug was explicitly stopped).
+# - drug_type_concept_id is 32858 "NLP".
+# - route_concept_id is the standard SNOMED route concept of the `route` label, and
+#   route_source_value the label.
+# - sig is the dosing instructions as written.
+# - visit_occurrence_id, visit_detail_id and provider_id come from the note only for
+#   administered and prescribed drugs: the CDM fills the visit only when the exposure
+#   was initiated in that visit, and the provider is the one who prescribed or
+#   administered the drug. A medication-list entry was usually started elsewhere.
+#
+# Filled from the note's context (see aatm.omop.ClinicalNote): person_id, the fallback
+# start date, and the visit and provider for administered and prescribed drugs.
+# drug_exposure_id is generated by the builder.
+#
+# Not filled: days_supply (the CDM fills it only from a verbatim days supply, never
+# from other fields; a planned duration in a note is not one), quantity, refills,
+# stop_reason, lot_number, drug_source_concept_id (for codes of an OMOP vocabulary; the
+# source here is free text), the datetime columns, and dose_unit_source_value (a legacy
+# column the CDM plans to deprecate).
 
 
 - name: Drug name
   key: drug_name
-  definition: The name and dose form of a drug prescribed to the patient or being used by the patient. For example, "Aspirin 81 mg oral tablet" or "Aspirin 325 mg oral tablet". If the dose form is not known, the drug name can be recorded without it. For example, "Aspirin 325 mg" or "Aspirin" if the dose form is not provided.
+  definition: >
+    A drug the patient is prescribed, is given or takes, copied as written with its
+    strength and dose form when they are written next to the name, e.g. "metformin 500
+    mg", "Aspirin 81 mg oral tablet", "amoxicillin-clavulanate 875 mg", "insulin
+    glargine", "ceftriaxone 1 g", "Tylenol" or "influenza vaccine". The span is the drug
+    only: never include the route, the frequency, the duration or the date (from
+    "lisinopril 10 mg PO daily" take "lisinopril 10 mg"). Include the strength of the
+    product, not a dose counted in units, puffs or drops (from "insulin glargine 10
+    units SC at bedtime" take "insulin glargine"). Each drug written in the note
+    is a separate mention, also when the same drug is written again.
+    Does not include, and must not be extracted:
+    (1) negated drugs, e.g. "not on anticoagulation" or "no aspirin";
+    (2) allergies and intolerances, e.g. "allergic to penicillin" or "statin
+    intolerance";
+    (3) drugs only considered, discussed or planned for later, e.g. "consider starting
+    a statin" or "will start insulin if HbA1c rises" (but "start metformin" in the plan
+    is a prescription and is extracted);
+    (4) drug classes without a specific drug, e.g. "antihypertensives", "statins" or
+    "chemotherapy";
+    (5) drugs of anyone other than the patient;
+    (6) alcohol, tobacco and recreational substances.
+  attributes:
+    - key: kind
+      required: true
+      description: How the note records this drug.
+      labels:
+        - value: administered
+          description: >
+            Given to the patient by a health professional, e.g. "ceftriaxone 1 g IV
+            given in the ED", "received cycle 2 of FOLFOX", "influenza vaccine
+            administered today".
+        - value: prescribed
+          description: >
+            Started, prescribed, renewed or changed in this note, e.g. "start
+            amoxicillin 500 mg TID for 7 days", "Rx: metformin 500 mg", "increase
+            lisinopril to 20 mg".
+        - value: taking
+          description: >
+            Part of the patient's medications or reported use, not prescribed or given
+            in this note, e.g. "on lisinopril 10 mg daily", "takes ibuprofen as
+            needed", "home medications: atorvastatin 40 mg", "stopped aspirin last
+            month".
+    - key: route
+      description: >
+        The route of administration written for this drug, e.g. "PO", "IV", "SC",
+        "inhaled". Leave it out when the note does not say.
+      labels:
+        - value: oral
+          description: By mouth, e.g. "PO", "oral", "by mouth", "VO".
+        - value: sublingual
+          description: Under the tongue, e.g. "SL".
+        - value: intravenous
+          description: Into a vein, e.g. "IV", "intravenous", "EV".
+        - value: intramuscular
+          description: Into a muscle, e.g. "IM".
+        - value: subcutaneous
+          description: Under the skin, e.g. "SC", "SQ", "subcut".
+        - value: topical
+          description: On the skin or a mucosa, e.g. "topical", "apply to the rash".
+        - value: transdermal
+          description: Through the skin from a patch, e.g. "patch", "transdermal".
+        - value: inhaled
+          description: Breathed in, e.g. "inhaled", "via nebulizer", "MDI".
+        - value: nasal
+          description: Into the nose, e.g. "nasal spray", "intranasal".
+        - value: ophthalmic
+          description: Into the eye, e.g. "eye drops", "OU", "ophthalmic".
+        - value: otic
+          description: Into the ear, e.g. "ear drops", "otic".
+        - value: rectal
+          description: Into the rectum, e.g. "PR", "suppository".
+        - value: vaginal
+          description: Into the vagina, e.g. "PV", "vaginal".
+  omop:
+    table: drug_exposure
+    fields:
+      person_id: {from: context.person_id}
+      drug_concept_id:
+        from: text
+        map: {}  # any standard concept of the Drug domain, required by the column
+      drug_source_value: {from: text}
+      drug_exposure_start_date:
+        - {from: child.verbatim_start_date, as: date}
+        - {from: context.note_date}
+      drug_exposure_end_date:
+        - {from: child.verbatim_end_date, as: date}
+        - {from: child.drug_duration, as: days, period_start: drug_exposure_start_date}
+        - value: 30  # a written prescription: start + 29 days (THEMIS)
+          period_start: drug_exposure_start_date
+          when: {attribute.kind: [prescribed]}
+        - from: context.note_date  # a medication list: known to be taken then
+          when: {attribute.kind: [taking]}
+        - {value: 1, period_start: drug_exposure_start_date}  # the start date
+      verbatim_end_date: {from: child.verbatim_end_date, as: date}
+      drug_type_concept_id: {value: 32858}  # NLP
+      route_concept_id:
+        from: attribute.route
+        concepts:
+          oral: "SNOMED:26643006"  # Oral
+          sublingual: "SNOMED:37839007"  # Sublingual
+          intravenous: "SNOMED:47625008"  # Intravenous
+          intramuscular: "SNOMED:78421000"  # Intramuscular
+          subcutaneous: "SNOMED:34206005"  # Subcutaneous
+          topical: "SNOMED:6064005"  # Topical
+          transdermal: "SNOMED:45890007"  # Transdermal
+          inhaled: "SNOMED:447694001"  # Respiratory tract
+          nasal: "SNOMED:46713006"  # Nasal
+          ophthalmic: "SNOMED:54485002"  # Ophthalmic
+          otic: "SNOMED:10547007"  # Otic
+          rectal: "SNOMED:37161004"  # Rectal
+          vaginal: "SNOMED:16857009"  # Vaginal
+      route_source_value: {from: attribute.route}
+      sig: {from: child.sig}
+      provider_id:
+        from: context.provider_id
+        when: {attribute.kind: [administered, prescribed]}
+      visit_occurrence_id:
+        from: context.visit_occurrence_id
+        when: {attribute.kind: [administered, prescribed]}
+      visit_detail_id:
+        from: context.visit_detail_id
+        when: {attribute.kind: [administered, prescribed]}
 
-- name: Drug exposure start date
+- name: Drug start date
   key: verbatim_start_date
-  definition: The date when a specific drug started or was prescribed for the patient. For example, the date of the consultation in which the drug was prescribed.
+  definition: >
+    The date a specific drug was started, prescribed or given, when the note links a
+    date to that drug, e.g. "2020" from "on lisinopril since 2020" or "03/01/2025" from
+    "started metformin on 03/01/2025". Take only the date itself. Does not include
+    relative times such as "today", "yesterday" or "last week".
   has_parent: true
   parent_key: drug_name
 
-- name: Drug exposure end date
+- name: Drug end date
   key: verbatim_end_date
-  definition: The date when a specific drug use ended for the patient. For example, the date of the consultation in which the drug was discontinued or the date informed by the patient during a consultation.
+  definition: >
+    The date a specific drug was stopped or is to be stopped, when the note links such
+    a date to that drug, e.g. "05/01/2025" from "lisinopril stopped on 05/01/2025" or
+    "06/10/2025" from "amoxicillin until 06/10/2025". Take only the date itself. Does
+    not include relative times such as "last month" or a duration such as "for 7
+    days".
   has_parent: true
   parent_key: drug_name
 
-- name: Drug route
-  key: route_source_value
-  definition: The route by which a drug is administered or prescribed to the patient. For example, "oral", "intravenous", "topical".
+- name: Drug duration
+  key: drug_duration
+  definition: >
+    How long a specific drug is to be taken, when the note gives a planned duration,
+    e.g. "7 days" from "amoxicillin 500 mg TID for 7 days", "2 weeks" from "prednisone
+    taper over 2 weeks" or "10 dias" from "por 10 dias". Take only the duration itself.
   has_parent: true
   parent_key: drug_name
 
-- name: Drug dose unit
-  key: dose_unit_source_value
-  definition: A single measured quantity of a medicine, packaged for administration to a patient at one time. For example, a tablet or a vial to be injected.
+- name: Drug dosing instructions
+  key: sig
+  definition: >
+    The dosing instructions of a specific drug as written by the provider: the dose,
+    route, frequency and duration, e.g. "1 tablet PO twice daily for 7 days" or "10
+    units SC at bedtime". Leave out the drug name and the final period.
   has_parent: true
   parent_key: drug_name
-
-- name: Drug dosage
-  key: sig # from OMOP CDM drug_exposure table
-  definition: The amount of a drug prescribed including the frequency and duration of the treatment. This is the verbatim instruction for the drug as written by the provider. For example, "1 tablet per day for 14 days".
-  has_parent: true
-  parent_key: drug_name
-

@@ -34,8 +34,20 @@ Each column has one source, or a list of sources tried in order:
   local OMOP vocabulary database.
 
 ``maps_to: true`` replaces a concept by the standard concept it maps to ("Maps to"),
-as the CDM requires for ``*_concept_id`` columns. ``as: int | float | str | date``
-converts the value; dates are parsed from text such as "March 2024".
+as the CDM requires for ``*_concept_id`` columns. ``as: int | float | str | date | days``
+converts the value; dates are parsed from text such as "March 2024", and ``days`` reads
+a duration such as "7 days", "2 weeks" or "1 month" (30 days) as a number of days.
+
+Two options adjust any source:
+
+- ``period_start: <column>``: the value is a number of days N, and the column gets the
+  last day of the N-day period that starts on the date of ``<column>``, i.e. that date
+  plus N - 1 days. ``{from: child.duration, as: days, period_start:
+  drug_exposure_start_date}`` turns "for 7 days" into the end date of a 7-day course;
+  ``{value: 1, period_start: ...}`` repeats the start date. ``<column>`` must be listed
+  before this column.
+- ``when: {attribute.<key>: [<label>, ...]}``: use the source only for mentions whose
+  attribute has one of these labels; otherwise the next source is tried.
 
 Text from the note can also be coded, with a ``from`` source and one of:
 
@@ -137,9 +149,11 @@ class FieldSource(BaseModel):
     maps_to: bool = False
     map: Optional[MapSpec] = None
     lookup: Optional[str] = None
-    as_: Optional[Literal["int", "float", "str", "date"]] = Field(
+    as_: Optional[Literal["int", "float", "str", "date", "days"]] = Field(
         default=None, alias="as"
     )
+    period_start: Optional[str] = None
+    when: Optional[dict[str, list[str]]] = None
 
     @field_validator("concept", mode="before")
     @classmethod
@@ -213,6 +227,24 @@ class FieldSource(BaseModel):
             )
         if self.as_ is not None and (self.concept is not None or coders):
             raise ValueError("'as' cannot be used with concepts")
+        if self.period_start is not None:
+            numeric_constant = isinstance(self.value, int) and not isinstance(
+                self.value, bool
+            )
+            if self.as_ != "days" and not numeric_constant:
+                raise ValueError(
+                    "'period_start' needs a number of days: 'as: days' with a 'from' "
+                    "source, or an integer 'value'"
+                )
+        for condition, labels in (self.when or {}).items():
+            kind, _, key = condition.partition(".")
+            if kind != "attribute" or not key:
+                raise ValueError(
+                    f"'when' takes attribute labels, e.g. 'when: {{attribute.<key>: "
+                    f"[<label>]}}', not {condition!r}"
+                )
+            if not labels:
+                raise ValueError(f"'when: {condition}' lists no labels")
         return self
 
     @property
@@ -237,6 +269,13 @@ class FieldSource(BaseModel):
     def concept_refs(self) -> list[ConceptRef]:
         refs = [self.concept] if self.concept is not None else []
         return refs + list((self.concepts or {}).values())
+
+    def when_attributes(self) -> dict[str, list[str]]:
+        """The ``when`` conditions keyed by attribute key, e.g. ``{"kind": [...]}``."""
+        return {
+            condition.partition(".")[2]: labels
+            for condition, labels in (self.when or {}).items()
+        }
 
 
 class OmopMapping(BaseModel):
@@ -270,6 +309,22 @@ class OmopMapping(BaseModel):
                 )
             if not sources:
                 raise ValueError(f"Column {column!r} has no sources")
+        listed = list(self.fields)
+        for column, sources in self.fields.items():
+            for source in sources:
+                start = source.period_start
+                if start is None:
+                    continue
+                if start not in model.model_fields:
+                    raise ValueError(
+                        f"Column {column!r}: period_start {start!r} is not a column "
+                        f"of {self.table!r}"
+                    )
+                if start not in listed or listed.index(start) > listed.index(column):
+                    raise ValueError(
+                        f"Column {column!r}: period_start {start!r} must be mapped "
+                        "before it"
+                    )
         return self
 
     def concept_refs(self) -> list[ConceptRef]:
@@ -301,6 +356,16 @@ def validate_entity_mapping(entity: Any, child_keys: set[str]) -> None:
     for column, sources in mapping.fields.items():
         for source in sources:
             where = f"Entity {entity.key!r}, column {column!r}"
+            for key, labels in source.when_attributes().items():
+                attribute = entity.get_attribute(key)
+                if attribute is None:
+                    raise ValueError(f"{where}: 'when' uses unknown attribute {key!r}")
+                for label in labels:
+                    if attribute.match_label(label) is None:
+                        raise ValueError(
+                            f"{where}: 'when' label {label!r} is not a label of "
+                            f"attribute {key!r}"
+                        )
             if source.kind == "attribute":
                 attribute = entity.get_attribute(source.key)
                 if attribute is None:

@@ -1,14 +1,12 @@
-"""Pydantic models for OMOP CDM drug exposure extraction and representation.
+"""Pydantic extraction models for OMOP CDM drug exposure information.
 
-This module defines data models related to the OMOP Common Data Model
-`drug_exposure` table. It includes one model intended for extracting
-drug-exposure information from unstructured clinical documents and another
-model that extends it with additional OMOP fields required for full table
-representation.
+These models are the target data models of the older `ExtractionTask` interface, kept
+in the OMOP extraction model registry as ``drug_exposure`` and ``drug_exposure_list``.
+They hold the subset of `drug_exposure` fields that may be read from unstructured
+text, with checks for temporal consistency and numeric constraints.
 
-The module also includes field-level validation for temporal consistency and
-numeric constraints, and registers the extraction model in the OMOP extraction
-model registry.
+Rows of the CDM table itself are `aatm.omop.tables.DrugExposure`, built from entity
+definitions by `aatm.omop.OmopTableBuilder`.
 """
 
 from __future__ import annotations
@@ -191,59 +189,3 @@ class DrugExposureExtractionModel(BaseModel):
         if v is not None and v < 0:
             raise ValueError("quantity cannot be negative")
         return v
-
-
-class DrugExposure(DrugExposureExtractionModel):
-    """Complete OMOP CDM model for the `drug_exposure` table.
-
-    This model extends `DrugExposureExtractionModel` by adding OMOP-specific
-    fields that are typically required in the structured table but are not usually
-    expected to be extracted directly from clinical free text.
-
-    Attributes:
-        drug_exposure_id: Unique identifier for the drug exposure record.
-        person_id: Identifier of the person associated with the record.
-        drug_concept_id: Standard concept identifier for the drug.
-        drug_type_concept_id: Concept identifier representing the provenance or
-            type of the drug record.
-        provider_id: Identifier of the associated provider.
-        visit_occurrence_id: Identifier of the associated visit occurrence.
-        visit_detail_id: Identifier of the associated visit detail.
-        route_concept_id: Standard concept identifier for the route of
-            administration.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    drug_exposure_id: int = Field(
-        ...,
-        description="Unique identifier for the drug exposure record.",
-    )
-    person_id: int = Field(
-        ...,
-        description="Identifier of the person for whom the drug exposure is recorded.",
-    )
-    drug_concept_id: int = Field(
-        ...,
-        description="Standard drug concept identifier representing the drug product or ingredient.",
-    )
-    drug_type_concept_id: int = Field(
-        ...,
-        description="Concept identifier representing the provenance/type of the drug record.",
-    )
-    provider_id: Optional[int] = Field(
-        None,
-        description="Identifier of the provider associated with the drug record.",
-    )
-    visit_occurrence_id: Optional[int] = Field(
-        None,
-        description="Identifier of the visit during which the drug exposure occurred.",
-    )
-    visit_detail_id: Optional[int] = Field(
-        None,
-        description="Identifier of the visit detail during which the drug exposure occurred.",
-    )
-    route_concept_id: Optional[int] = Field(
-        None,
-        description="Standard concept identifier for the route of administration.",
-    )

@@ -18,11 +18,12 @@ tables.issues_dataframe()  # what could not be filled, and why
 """
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Optional, Sequence, get_args
 
 import asyncio
+import re
 
 import pandas as pd
 from dateutil import parser as date_parser
@@ -57,6 +58,7 @@ IssueReason = Literal[
     "unmapped",
     "low_confidence",
     "domain_mismatch",
+    "single_date",
 ]
 
 # ("map", domain, vocabularies) or ("lookup", vocabulary_id)
@@ -244,6 +246,44 @@ def _parse_date(text: str, dayfirst: bool) -> tuple[Optional[date], bool]:
     if first.year != second.year:
         return None, False
     return first.date(), first.date() != second.date()
+
+
+_NUMBER_WORDS = {
+    "a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "fourteen": 14, "um": 1, "uma": 1,
+    "dois": 2, "duas": 2, "tres": 3, "três": 3, "sete": 7, "dez": 10, "catorze": 14,
+    "quatorze": 14,
+}  # fmt: skip
+_DURATION = re.compile(
+    r"(?P<n>\d+(?:[.,]\d+)?|[a-zà-ú]+)\s*-?\s*(?:"
+    r"(?P<days>days?|d|dias?)|(?P<weeks>weeks?|wks?|w|semanas?)"
+    r"|(?P<months>months?|mos?|m[eê]s(?:es)?))\b",
+    re.IGNORECASE,
+)
+
+
+def _parse_days(text: str) -> Optional[int]:
+    """Read a duration written in a note as a number of days.
+
+    "7 days", "x7d", "2 weeks", "a 10-day course", "1 month" (30 days), "14 dias".
+    Durations written with digits win over words ("a day" in "once a day for 7 days").
+    Returns ``None`` when the text has no duration or several different ones.
+    """
+    with_digits: set[int] = set()
+    with_words: set[int] = set()
+    for match in _DURATION.finditer(text):
+        number = match["n"].lower()
+        if number in _NUMBER_WORDS:
+            count, found = float(_NUMBER_WORDS[number]), with_words
+        else:
+            try:
+                count, found = float(number.replace(",", ".")), with_digits
+            except ValueError:
+                continue
+        per_unit = 1 if match["days"] else 7 if match["weeks"] else 30
+        found.add(round(count * per_unit))
+    durations = with_digits or with_words
+    return durations.pop() if len(durations) == 1 else None
 
 
 class OmopTableBuilder:
@@ -600,12 +640,49 @@ class OmopTableBuilder:
     ) -> OmopTableRow:
         model = OMOP_TABLES[mapping.table]
         values: dict[str, Any] = {model.primary_key: row_id}
+        starts = {end: start for start, end in model.date_ranges}
+        # Columns filled by a later source of their list, e.g. the note date when the
+        # note gives no start date.
+        fallbacks: dict[str, FieldSource] = {}
         for column, sources in mapping.fields.items():
             failed: list[OmopIssue] = []
-            for source in sources:
+            for index, source in enumerate(sources):
+                if not self._applies(source, record):
+                    continue
                 n_issues = len(ctx.issues)
                 value = self._value(source, column, record, ctx)
+                if value is not None and source.period_start is not None:
+                    value = self._period_end(source, value, column, values, ctx)
+                start_column = starts.get(column, "")
+                start = values.get(start_column)
+                if (
+                    isinstance(value, date)
+                    and isinstance(start, date)
+                    and value < start
+                ):
+                    if start_column in fallbacks:
+                        # The note gives only the end date: the CDM allows a single
+                        # date for both, rather than a fallback start after the end.
+                        values[start_column] = value
+                        ctx.add(
+                            start_column,
+                            "single_date",
+                            f"No {start_column} in the note, and "
+                            f"{self._describe(fallbacks[start_column])} "
+                            f"({start.isoformat()}) is after {column} "
+                            f"{value.isoformat()}; used {value.isoformat()} for both",
+                        )
+                    else:
+                        ctx.add(
+                            column,
+                            "invalid_value",
+                            f"{value.isoformat()} is before {start_column} "
+                            f"{start.isoformat()}",
+                        )
+                        value = None
                 if value is not None:
+                    if index > 0:
+                        fallbacks[column] = source
                     values[column] = value
                     for issue in failed:
                         issue.detail += f"; used {self._describe(source)} instead"
@@ -629,12 +706,44 @@ class OmopTableBuilder:
         return row
 
     @staticmethod
+    def _applies(source: FieldSource, record: EntityRecord) -> bool:
+        """Whether the mention's attributes meet the source's ``when`` conditions."""
+        for key, labels in source.when_attributes().items():
+            label = record.attributes.get(key)
+            if label is None or label.casefold() not in {
+                wanted.casefold() for wanted in labels
+            }:
+                return False
+        return True
+
+    @staticmethod
+    def _period_end(
+        source: FieldSource,
+        days: Any,
+        column: str,
+        values: dict[str, Any],
+        ctx: _RowContext,
+    ) -> Optional[date]:
+        """The last day of a period of `days` days starting on ``period_start``."""
+        start = values.get(source.period_start)  # type: ignore[arg-type]
+        if not isinstance(start, date):
+            return None
+        if not isinstance(days, int) or days < 1:
+            ctx.add(column, "invalid_value", f"{days!r} is not a number of days")
+            return None
+        return start + timedelta(days=days - 1)
+
+    @staticmethod
     def _describe(source: FieldSource) -> str:
         if source.from_ is not None:
-            return source.from_
-        if source.concept is not None:
-            return str(source.concept)
-        return f"the constant {source.value!r}"
+            described = source.from_
+        elif source.concept is not None:
+            described = str(source.concept)
+        else:
+            described = f"the constant {source.value!r}"
+        if source.period_start is not None:
+            described += f" days from {source.period_start}"
+        return described
 
     def _validate_row(
         self, model: type[OmopTableRow], values: dict[str, Any], ctx: _RowContext
@@ -779,6 +888,11 @@ class OmopTableBuilder:
     ) -> Any:
         if as_ is None or as_ == "str":
             return raw
+        if as_ == "days":
+            days = _parse_days(raw)
+            if days is None:
+                ctx.add(column, "invalid_value", f"{raw!r} is not a duration")
+            return days
         if as_ == "date":
             parsed, imputed = _parse_date(raw, self.dayfirst)
             if parsed is None:

@@ -34,10 +34,11 @@
 #   32893 "Confirmed diagnosis" or 32899 "Preliminary diagnosis". The CDM's own
 #   examples of statuses are the point in the visit when the diagnosis was given
 #   (admitting, principal, secondary); notes rarely say that, so it is not extracted.
-# - condition_start_date is the start date when the note states one. Otherwise it is
-#   the end date, as the CDM allows when a record has a single date, and else the note
+# - condition_start_date is the start date when the note states one, else the note
 #   date: the condition is known to be present on that date, but may have started
-#   earlier. The CDM notes that most sources have no condition start date.
+#   earlier. The CDM notes that most sources have no condition start date. When the
+#   note gives only an end date before the note date, that date is used for both, as
+#   the CDM allows for a single date.
 # - condition_end_date is the end date when the note states one, e.g. at the end of an
 #   episode described in a discharge summary. The CDM records most conditions as
 #   snapshots without an end date. An end date before the start date is left empty and
@@ -104,7 +105,6 @@
       condition_source_value: {from: text}
       condition_start_date:
         - {from: child.verbatim_start_date, as: date}
-        - {from: child.verbatim_end_date, as: date}
         - {from: context.note_date}
       condition_end_date: {from: child.verbatim_end_date, as: date}
       condition_type_concept_id: {value: 32858}  # NLP
