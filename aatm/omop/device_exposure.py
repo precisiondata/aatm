@@ -1,4 +1,13 @@
-"""Pydantic models for OMOP CDM device exposure extraction and representation."""
+"""Pydantic extraction models for OMOP CDM device exposure information.
+
+These models are the target data models of the older `ExtractionTask` interface, kept
+in the OMOP extraction model registry as ``device_exposure`` and
+``device_exposure_list``. They hold the subset of `device_exposure` fields that may be
+read from unstructured text, with checks for temporal consistency.
+
+Rows of the CDM table itself are `aatm.omop.tables.DeviceExposure`, built from entity
+definitions by `aatm.omop.OmopTableBuilder`.
+"""
 
 from __future__ import annotations
 
@@ -108,42 +117,3 @@ class ListOfDeviceExposureExtractionModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     records: list[DeviceExposureExtractionModel]
-
-
-class DeviceExposure(DeviceExposureExtractionModel):
-    """Complete OMOP CDM model for the `device_exposure` table."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    device_exposure_id: int = Field(
-        ...,
-        description="Unique identifier for the device exposure record.",
-    )
-    person_id: int = Field(
-        ...,
-        description="Identifier of the person associated with the device exposure.",
-    )
-    device_concept_id: int = Field(
-        ...,
-        description="Standard Device concept identifier mapped from the source value.",
-    )
-    device_type_concept_id: int = Field(
-        ...,
-        description="Concept identifier representing the provenance or type of the device record.",
-    )
-    provider_id: Optional[int] = Field(
-        None,
-        description="Identifier of the provider associated with the device record.",
-    )
-    visit_occurrence_id: Optional[int] = Field(
-        None,
-        description="Identifier of the visit during which the device was prescribed or given.",
-    )
-    visit_detail_id: Optional[int] = Field(
-        None,
-        description="Identifier of the visit detail during which the device was prescribed or given.",
-    )
-    unit_concept_id: Optional[int] = Field(
-        None,
-        description="Standard Unit concept identifier representing the unit associated with the device quantity.",
-    )

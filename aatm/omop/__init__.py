@@ -12,6 +12,7 @@ from aatm.omop.mapping import (
 from aatm.omop.tables import (
     OMOP_TABLES,
     ConditionOccurrence,
+    DeviceExposure,
     DrugExposure,
     Measurement,
     Observation,
@@ -49,6 +50,7 @@ __all__ = [
     "OmopMapping",
     "OMOP_TABLES",
     "ConditionOccurrence",
+    "DeviceExposure",
     "DrugExposure",
     "Measurement",
     "Observation",

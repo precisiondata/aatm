@@ -145,6 +145,7 @@ def test_key_depths():
         "smoking_status",
         "family_history",
         "medical_history",
+        "device_exposure",
     ],
 )
 def test_predefined_definitions_load(key):
