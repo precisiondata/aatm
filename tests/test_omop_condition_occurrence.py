@@ -189,6 +189,26 @@ def test_only_an_end_date_is_used_as_the_start():
     # Not the note date (2025-06-01), which would come after the end.
     assert row.condition_start_date == date(2024, 4, 10)
     assert row.condition_end_date == date(2024, 4, 10)
+    (issue,) = tables.issues
+    assert (issue.column, issue.reason) == ("condition_start_date", "single_date")
+    assert issue.detail == (
+        "No condition_start_date in the note, and context.note_date (2025-06-01) is "
+        "after condition_end_date 2024-04-10; used 2024-04-10 for both"
+    )
+
+
+def test_an_end_date_after_the_note_date_keeps_the_note_date_as_start():
+    text = "pneumonia, antibiotics until 2025-06-10"
+    tables = build(
+        text,
+        [
+            mention("e1", "condition_name", "pneumonia", status="confirmed"),
+            mention("e2", "verbatim_end_date", "2025-06-10", parents=["e1"]),
+        ],
+    )
+    (row,) = tables.rows["condition_occurrence"]
+    assert row.condition_start_date == date(2025, 6, 1)
+    assert row.condition_end_date == date(2025, 6, 10)
     assert tables.issues == []
 
 

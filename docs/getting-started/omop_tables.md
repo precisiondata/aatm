@@ -6,9 +6,9 @@ what to find in the notes and where each piece goes in the table; AATM extracts 
 an LLM, codes it with the OMOP vocabularies and fills the rows as far as the notes
 allow.
 
-Three tables are supported: `measurement` (scores, lab results), `observation`
-(smoking, family and medical history, and other facts) and `condition_occurrence` (diagnoses, signs
-and symptoms).
+Four tables are supported: `measurement` (scores, lab results), `observation`
+(smoking, family and medical history, and other facts), `condition_occurrence`
+(diagnoses, signs and symptoms) and `drug_exposure` (drugs prescribed, given or taken).
 
 If you have not extracted entities from a note before, read the
 [Information extraction quick start](quick_start_extraction.md) first: this page builds
@@ -38,6 +38,7 @@ on its *entity definitions*.
     | `family_history` | `observation` | yes, to code conditions |
     | `medical_history` | `observation` | yes, to code conditions |
     | `condition_occurrence` | `condition_occurrence` | yes, to code conditions |
+    | `drug_exposure` | `drug_exposure` | yes, to code drugs |
 
     Definitions without the mapper only need the vocabulary database and an LLM, so
     they are the easiest way to start.
@@ -153,6 +154,7 @@ in `tables.issues_dataframe()`, with the row, the column, a reason and a detail.
 | `invalid_value` | A value does not fit its column, e.g. text that is not a number | Check the extracted text |
 | `truncated` | A text was longer than its column (50 characters for `*_source_value`) | Usually nothing |
 | `multiple_children` | A mention had two children of the same kind, e.g. two dates; the first was used | Check the note |
+| `single_date` | The note gave only an end date, earlier than the fallback start date (often the note date); the end date was used for both, as the CDM allows | Usually nothing |
 
 ---
 
@@ -310,6 +312,9 @@ else the note date:
 | Option | Use with | Effect |
 |---|---|---|
 | `as: int`, `float`, `str` or `date` | `from:` | Convert the text. Dates are read from text such as `"05/12/2025"` or `"March 2024"`; decimal commas (`"11,2"`) are accepted |
+| `as: days` | `from:` | Read a duration as a number of days: `"7 days"`, `"x7d"`, `"2 weeks"`, `"1 month"` (30 days), `"14 dias"` |
+| `period_start: <column>` | `as: days`, or an integer `value:` | Store the last day of a period of N days starting on that column's date: the date + N - 1. The column must be mapped before this one |
+| `when: {attribute.<key>: [<label>, ...]}` | any source | Use the source only when the attribute has one of these labels; otherwise try the next source |
 | `concepts: {<label>: "<VOCABULARY>:<code>"}` | `from: attribute.<key>` | Store the concept of the chosen label instead of the label |
 | `maps_to: true` | `concept:` or `concepts:` | Store the standard concept the code maps to |
 | `lookup: <VOCABULARY>` | `from:` | Find the text as a code of that vocabulary, e.g. units in UCUM |
@@ -595,10 +600,12 @@ extracted.
 
 1. the start date the note gives for that condition ("since 2019" → 2019-01-01,
    reported as `imputed_date_parts`);
-2. the end date, when the note gives only that one ("pneumonia until 2024-04-10"): the
-   CDM allows a single date for both;
-3. the note date. The condition is known to be present then, but may have started much
+2. the note date. The condition is known to be present then, but may have started much
    earlier, so read these start dates as "recorded on" rather than "onset".
+
+When the note gives only an end date before the note date ("pneumonia, resolved
+2024-04-10"), that date is used for both start and end, as the CDM allows for a single
+date, and reported as `single_date`.
 
 The CDM notes that most sources have no condition start date, and records most
 conditions as snapshots without an end date. `condition_end_date` is the end date the
@@ -610,6 +617,102 @@ note gives, e.g. for an episode in a discharge summary ("pneumonia from 03/01/20
     `condition_concept_id` takes standard concepts of the Condition domain only. The
     mapper searches that domain, and a concept of another domain, e.g. a procedure, is
     stored but reported as `domain_mismatch`. Check the coded conditions with
+    `tables.mappings_dataframe()`.
+
+## The drug_exposure table
+
+The `drug_exposure` table holds the drugs a patient is prescribed, is given or takes:
+medicines, vaccines and biologics. Each row is one mention of a drug, with its standard
+concept, its dates, the route and the dosing instructions. The predefined definition
+follows the [CDM conventions for this table](https://ohdsi.github.io/CommonDataModel/cdm55.html#drug_exposure)
+and the [THEMIS conventions for drug_exposure](https://ohdsi.github.io/Themis/drug_exposure.html).
+
+```python
+import asyncio
+
+from aatm.omop import ClinicalNote, OmopExtractionPipeline
+from aatm.selectors import OpenAILLMSelector
+from aatm.terminology_mapper import TerminologyMapper
+
+mapper = TerminologyMapper(retriever="text-embedding-3-small", selector=OpenAILLMSelector("gpt-5-mini"))
+mapper.retriever.top_k = 30
+
+pipeline = OmopExtractionPipeline(
+    "drug_exposure",
+    model_id="openai/gpt-5-mini",
+    mapper=mapper,  # codes drug names
+)
+notes = [
+    ClinicalNote(
+        text=(
+            "Home meds: lisinopril 10 mg PO daily since 2020, metformin 500 mg tablet BID.\n"
+            "Ceftriaxone 1 g IV given in the ED.\n"
+            "Plan: start amoxicillin 875 mg PO BID for 7 days. Consider a statin.\n"
+            "Allergic to penicillin. Not on anticoagulation."
+        ),
+        person_id=30,
+        note_date="2025-06-01",
+        visit_occurrence_id=900,
+        provider_id=12,
+    ),
+]
+tables = asyncio.run(pipeline(notes))
+tables["drug_exposure"]
+```
+
+A run with `gpt-5-mini` gave four rows (concept names added in italics; `drug_type_concept_id`
+is 32858 *NLP* in every row):
+
+| drug_exposure_id | drug_concept_id | drug_source_value | start | end | route_concept_id | sig | visit_occurrence_id | provider_id |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 1308304 *lisinopril 10 MG* | lisinopril 10 mg | 2020-01-01 | 2025-06-01 | 4132161 *Oral* | | | |
+| 2 | 40164929 *metformin hydrochloride 500 MG Oral Tablet* | metformin 500 mg tablet | 2025-06-01 | 2025-06-01 | | | | |
+| 3 | 46287328 *ceftriaxone 1000 MG Injection* | Ceftriaxone 1 g | 2025-06-01 | 2025-06-01 | 4171047 *Intravenous* | | 900 | 12 |
+| 4 | 19083494 *amoxicillin 875 MG* | amoxicillin 875 mg | 2025-06-01 | 2025-06-07 | 4132161 *Oral* | 875 mg PO BID for 7 days | 900 | 12 |
+
+"Consider a statin" is only considered, the penicillin is an allergy and
+anticoagulation is negated, so none of them is a row. Drug classes such as
+"antihypertensives" are left out too: the CDM would store them with
+`drug_concept_id = 0`.
+
+**Kind.** Each drug gets a required `kind` label, which decides the end date and the
+visit:
+
+| Label | Means | Visit and provider |
+|---|---|---|
+| `administered` | Given to the patient, e.g. "ceftriaxone 1 g IV given in the ED" | From the note |
+| `prescribed` | Started, prescribed or changed in this note, e.g. "start amoxicillin" | From the note |
+| `taking` | On the patient's medication list, or reported use | Left empty: the CDM fills the visit only when the exposure was started in it |
+
+**Dates.** `drug_exposure_start_date` is the start date the note gives, else the note
+date. `drug_exposure_end_date` is required by the CDM; when the note gives none, it is
+inferred as THEMIS ratified:
+
+1. the end date the note gives ("until 06/10/2025"), also kept in `verbatim_end_date`;
+2. the start date + the planned duration - 1 day ("for 7 days" → 2025-06-07);
+3. for a `prescribed` drug, the start date + 29 days;
+4. for a `taking` drug, the note date: the last date it is known to be taken. THEMIS has
+   no rule for medication lists, so this is a convention of this definition;
+5. for an `administered` drug, the start date.
+
+When the note gives only a stop date before the note date ("aspirin stopped on
+05/01/2025"), that date is used for both start and end and reported as `single_date`,
+rather than a start after the stop.
+
+**Route.** The optional `route` label (`oral`, `intravenous`, `subcutaneous`,
+`inhaled`, ...) is stored as its standard SNOMED route concept in `route_concept_id`.
+
+**Not filled.** The CDM fills `days_supply` only from a verbatim days supply, never
+from other fields, so a duration in a note does not go there. `quantity`, `refills`,
+`stop_reason` and `lot_number` are left empty, and `dose_unit_source_value` is a legacy
+column the CDM plans to deprecate.
+
+!!! note "Check the coded drugs"
+    `drug_concept_id` takes standard concepts of the Drug domain. The CDM prefers the
+    most detailed concept the source supports, such as a clinical drug, over an
+    ingredient, so the mention keeps the strength and dose form. A name without detail
+    can be coded too specifically: in one run "Influenza vaccine" was coded as one
+    seasonal formulation, with a score of 0.41. Review low scores with
     `tables.mappings_dataframe()`.
 
 ---
@@ -631,8 +734,10 @@ note gives, e.g. for an episode in a discharge summary ("pneumonia from 03/01/20
 
 ## Current limits
 
-- Only the `measurement`, `observation` and `condition_occurrence` tables are supported
-  so far.
+- Only the `measurement`, `observation`, `condition_occurrence` and `drug_exposure`
+  tables are supported so far.
+- `drug_exposure` end dates are not inferred from the quantity and daily dose (the
+  second THEMIS rule), and mail-order prescriptions are not told apart from others.
 - `condition_start_date` falls back to the note date when the note gives no date, which
   is later than the real onset of long-standing conditions.
 - `map` searches with the extracted text alone: a unit such as mg/dL, which hints at a

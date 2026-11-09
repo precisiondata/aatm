@@ -12,7 +12,7 @@ See https://ohdsi.github.io/CommonDataModel/cdm55.html
 from datetime import date, datetime
 from typing import Annotated, ClassVar, Optional
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 _Varchar50 = Annotated[str, StringConstraints(max_length=50)]
 
@@ -171,9 +171,9 @@ class ConditionOccurrence(OmopTableRow):
     """A row of the OMOP CDM v5.5 ``condition_occurrence`` table.
 
     Diagnoses, signs and symptoms of the patient. `condition_concept_id` is a standard
-    concept of the Condition domain, and `condition_status_concept_id` says how sure or
-    current the diagnosis is, e.g. *Preliminary diagnosis* or *Resolved condition*.
-    Conditions of relatives are family history and go to ``observation``.
+    concept of the Condition domain, and `condition_status_concept_id` qualifies the
+    diagnosis, e.g. *Preliminary diagnosis*. Past diagnoses and conditions of relatives
+    go to ``observation``.
     """
 
     table_name: ClassVar[str] = "condition_occurrence"
@@ -213,6 +213,63 @@ class ConditionOccurrence(OmopTableRow):
     condition_status_source_value: Optional[_Varchar50] = None
 
 
+class DrugExposure(OmopTableRow):
+    """A row of the OMOP CDM v5.5 ``drug_exposure`` table.
+
+    A drug prescribed, administered or taken by the patient: medicines, vaccines and
+    biologics. `drug_concept_id` is a standard concept of the Drug domain, as detailed
+    as the source allows (a clinical drug such as "metformin 500 mg oral tablet" rather
+    than the ingredient). `drug_exposure_end_date` is required: when the source has no
+    end date, it is inferred (see the THEMIS conventions).
+    """
+
+    table_name: ClassVar[str] = "drug_exposure"
+    primary_key: ClassVar[str] = "drug_exposure_id"
+    required_fields: ClassVar[tuple[str, ...]] = (
+        "drug_exposure_id",
+        "person_id",
+        "drug_concept_id",
+        "drug_exposure_start_date",
+        "drug_exposure_end_date",
+        "drug_type_concept_id",
+    )
+    concept_domains: ClassVar[dict[str, str]] = {
+        "drug_concept_id": "Drug",
+        "drug_type_concept_id": "Type Concept",
+        "route_concept_id": "Route",
+    }
+    date_ranges: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("drug_exposure_start_date", "drug_exposure_end_date"),
+        ("drug_exposure_start_datetime", "drug_exposure_end_datetime"),
+    )
+
+    drug_exposure_id: Optional[int] = None
+    person_id: Optional[int] = None
+    drug_concept_id: Optional[int] = None
+    drug_exposure_start_date: Optional[date] = None
+    drug_exposure_start_datetime: Optional[datetime] = None
+    drug_exposure_end_date: Optional[date] = None
+    drug_exposure_end_datetime: Optional[datetime] = None
+    verbatim_end_date: Optional[date] = None
+    drug_type_concept_id: Optional[int] = None
+    stop_reason: Optional[Annotated[str, StringConstraints(max_length=20)]] = None
+    refills: Optional[Annotated[int, Field(ge=0)]] = None
+    quantity: Optional[Annotated[float, Field(ge=0)]] = None
+    # "Negative values are not allowed" (CDM v5.5 conventions for days_supply).
+    days_supply: Optional[Annotated[int, Field(ge=0)]] = None
+    sig: Optional[str] = None
+    route_concept_id: Optional[int] = None
+    lot_number: Optional[_Varchar50] = None
+    provider_id: Optional[int] = None
+    visit_occurrence_id: Optional[int] = None
+    visit_detail_id: Optional[int] = None
+    drug_source_value: Optional[_Varchar50] = None
+    drug_source_concept_id: Optional[int] = None
+    route_source_value: Optional[_Varchar50] = None
+    dose_unit_source_value: Optional[_Varchar50] = None
+
+
 OMOP_TABLES: dict[str, type[OmopTableRow]] = {
-    model.table_name: model for model in (Measurement, Observation, ConditionOccurrence)
+    model.table_name: model
+    for model in (Measurement, Observation, ConditionOccurrence, DrugExposure)
 }
