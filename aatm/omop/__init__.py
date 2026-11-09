@@ -9,7 +9,7 @@ from aatm.omop.mapping import (
     MapSpec,
     OmopMapping,
 )
-from aatm.omop.tables import OMOP_TABLES, Measurement, OmopTableRow
+from aatm.omop.tables import OMOP_TABLES, Measurement, Observation, OmopTableRow
 
 # The builder depends on aatm.data_models.extractors, which itself imports
 # aatm.omop.mapping, so it is imported lazily to avoid a circular import.
@@ -42,6 +42,7 @@ __all__ = [
     "OmopMapping",
     "OMOP_TABLES",
     "Measurement",
+    "Observation",
     "OmopTableRow",
     *_LAZY,
 ]

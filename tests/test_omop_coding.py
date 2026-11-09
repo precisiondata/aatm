@@ -199,7 +199,10 @@ def test_map_vocabulary_must_be_indexed():
 
 
 def test_map_domain_must_match_the_column():
-    with pytest.raises(ValueError, match="must hold a 'Measurement' concept"):
+    with pytest.raises(
+        ValueError,
+        match="would retrieve concepts in the 'Condition' domain, not 'Measurement'",
+    ):
         make_builder(domain="Condition")
 
 

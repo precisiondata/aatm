@@ -26,6 +26,8 @@ class OmopTableRow(BaseModel):
         required_fields: Columns the CDM requires. Missing ones are reported.
         concept_domains: Expected domain of the concept stored in some ``*_concept_id``
             columns, checked when the builder is created.
+        excluded_concept_domains: Domains a column must not hold, e.g. a Condition
+            concept in ``observation_concept_id`` belongs to ``condition_occurrence``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -34,6 +36,24 @@ class OmopTableRow(BaseModel):
     primary_key: ClassVar[str]
     required_fields: ClassVar[tuple[str, ...]]
     concept_domains: ClassVar[dict[str, str]] = {}
+    excluded_concept_domains: ClassVar[dict[str, frozenset[str]]] = {}
+
+    @classmethod
+    def domain_problem(cls, column: str, domain_id: Optional[str]) -> Optional[str]:
+        """Why a concept of `domain_id` cannot go in `column`, or ``None`` if it can.
+
+        The reason reads after "is", e.g. "in the 'Observation' domain, not 'Measurement'".
+        """
+        expected = cls.concept_domains.get(column)
+        if expected and domain_id != expected:
+            return f"in the {domain_id!r} domain, not {expected!r}"
+        excluded = cls.excluded_concept_domains.get(column, frozenset())
+        if domain_id in excluded:
+            return (
+                f"in the {domain_id!r} domain, which goes to another table than "
+                f"{cls.table_name!r}"
+            )
+        return None
 
 
 class Measurement(OmopTableRow):
@@ -86,6 +106,64 @@ class Measurement(OmopTableRow):
     meas_event_field_concept_id: Optional[int] = None
 
 
+class Observation(OmopTableRow):
+    """A row of the OMOP CDM v5.5 ``observation`` table.
+
+    Clinical facts that are not measurements, conditions, procedures, drugs or devices:
+    social and lifestyle facts (smoking), medical and family history, and the like.
+    Like measurements, they are attribute-value pairs: `observation_concept_id` is the
+    attribute and the value is a concept, a number, a string or a date. For family
+    history, `observation_concept_id` is the history concept and `value_as_concept_id`
+    the condition.
+    """
+
+    table_name: ClassVar[str] = "observation"
+    primary_key: ClassVar[str] = "observation_id"
+    required_fields: ClassVar[tuple[str, ...]] = (
+        "observation_id",
+        "person_id",
+        "observation_concept_id",
+        "observation_date",
+        "observation_type_concept_id",
+    )
+    concept_domains: ClassVar[dict[str, str]] = {
+        "observation_type_concept_id": "Type Concept",
+        "unit_concept_id": "Unit",
+    }
+    # "Concepts from the Condition, Procedure, Drug, Measurement or Device domains must
+    # go to their own tables" (CDM v5.5 conventions for observation_concept_id).
+    excluded_concept_domains: ClassVar[dict[str, frozenset[str]]] = {
+        "observation_concept_id": frozenset(
+            {"Condition", "Procedure", "Drug", "Measurement", "Device", "Specimen"}
+        ),
+    }
+
+    observation_id: Optional[int] = None
+    person_id: Optional[int] = None
+    observation_concept_id: Optional[int] = None
+    observation_date: Optional[date] = None
+    observation_datetime: Optional[datetime] = None
+    observation_type_concept_id: Optional[int] = None
+    value_as_number: Optional[float] = None
+    value_as_string: Optional[Annotated[str, StringConstraints(max_length=60)]] = None
+    value_as_concept_id: Optional[int] = None
+    value_as_date: Optional[date] = None
+    qualifier_concept_id: Optional[int] = None
+    unit_concept_id: Optional[int] = None
+    provider_id: Optional[int] = None
+    visit_occurrence_id: Optional[int] = None
+    visit_detail_id: Optional[int] = None
+    observation_source_value: Optional[_Varchar50] = None
+    observation_source_concept_id: Optional[int] = None
+    unit_source_value: Optional[_Varchar50] = None
+    unit_source_concept_id: Optional[int] = None
+    qualifier_source_value: Optional[_Varchar50] = None
+    value_source_value: Optional[_Varchar50] = None
+    value_as_source_concept_id: Optional[int] = None
+    observation_event_id: Optional[int] = None
+    obs_event_field_concept_id: Optional[int] = None
+
+
 OMOP_TABLES: dict[str, type[OmopTableRow]] = {
-    model.table_name: model for model in (Measurement,)
+    model.table_name: model for model in (Measurement, Observation)
 }

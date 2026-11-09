@@ -239,13 +239,13 @@ def test_non_standard_concept_needs_maps_to():
 
 def test_concept_of_wrong_domain_fails():
     defs = ecog_definitions(measurement_concept_id={"concept": "SNOMED:425389002"})
-    with pytest.raises(ValueError, match="not in the 'Measurement' domain"):
+    with pytest.raises(ValueError, match="'Observation' domain, not 'Measurement'"):
         OmopTableBuilder(defs, vocabulary=FakeLookup())
 
 
 def test_constant_concept_id_is_checked():
     defs = ecog_definitions(measurement_type_concept_id={"value": 4175026})
-    with pytest.raises(ValueError, match="not in the 'Type Concept' domain"):
+    with pytest.raises(ValueError, match="'Observation' domain, not 'Type Concept'"):
         OmopTableBuilder(defs, vocabulary=FakeLookup())
 
 

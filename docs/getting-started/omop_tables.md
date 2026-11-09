@@ -5,8 +5,11 @@ An entity definition can say how each extracted mention becomes a row of an
 whole chain in one call: extraction with an LLM, coding with the OMOP vocabularies, and
 table rows that are filled as far as the notes allow.
 
-This page uses the predefined ECOG performance status definition, which builds rows of
-the `measurement` table.
+Two tables are supported: `measurement` and `observation`. This page uses the
+predefined ECOG performance status definition, which builds `measurement` rows, then
+shows [lab results](#coding-text-with-the-terminology-mapper) coded with the
+terminology mapper and [smoking and family history](#the-observation-table) in the
+`observation` table.
 
 !!! note "Prerequisites"
     Concept codes are looked up in the local vocabulary database built by
@@ -290,9 +293,76 @@ otherwise a single standard concept matching while ignoring case is used (`"mg/d
 
 ---
 
+## The observation table
+
+The `observation` table holds clinical facts that are not measurements, conditions,
+procedures, drugs or devices: social and lifestyle facts, medical and family history.
+Like measurements, they are attribute-value pairs: `observation_concept_id` is the
+attribute, and the value is a concept, a number, a string or a date.
+
+Two predefined definitions build observation rows, and the pipeline can run them
+together, so each note is extracted once:
+
+```python
+mapper = TerminologyMapper(retriever="text-embedding-3-small", selector=OpenAILLMSelector("gpt-5-mini"))
+pipeline = OmopExtractionPipeline(
+    ["smoking_status", "family_history"], model_id="openai/gpt-5-mini", mapper=mapper
+)
+tables = await pipeline([
+    ClinicalNote(
+        text="Former smoker, 30 pack-years. Mother had breast cancer at 45.",
+        person_id=20,
+        note_date="2025-06-01",
+    ),
+])
+tables["observation"]
+```
+
+A typical result (concept names added in italics):
+
+| observation_id | observation_concept_id | observation_source_value | value_as_number | value_as_concept_id | value_source_value | qualifier_concept_id | unit_concept_id |
+|---|---|---|---|---|---|---|---|
+| 1 | 43054909 *Tobacco smoking status* | Former smoker | | 45883458 *Former smoker* | former | | |
+| 2 | 3003421 *Cigarettes smoked total (pack per year)* | 30 pack-years | 30.0 | | 30 | | 0 |
+| 3 | 4167217 *Family history of clinical finding* | breast cancer | | 4112853 *Malignant tumor of breast* | breast cancer | 4248584 *Mother* | |
+
+**`smoking_status`** has two entities, so one note can give two rows:
+
+- *Smoking status*: LOINC 72166-2 *Tobacco smoking status*, with its standard LOINC
+  answer in `value_as_concept_id` (never, former, current every day, current some day,
+  current with unknown frequency). "Non-smoker" or "denies smoking" don't say whether
+  the patient ever smoked; they get the label `not_current`, which has no LOINC answer,
+  so `0` is stored, as the CDM asks for an unmapped value.
+- *Pack-years*: LOINC 8664-5, with the number in `value_as_number`. There is no UCUM
+  concept for pack-years, so `unit_concept_id` is `0` and `unit_source_value` is
+  `"pack-years"`.
+
+**`family_history`** follows the CDM convention: `observation_concept_id` is SNOMED
+416471007 *Family history of clinical finding*, and `value_as_concept_id` is the
+condition, coded from the mention with the terminology mapper, restricted to SNOMED
+concepts of the Condition domain:
+
+```yaml
+      value_as_concept_id:
+        from: text
+        map: {domain: Condition, vocabularies: [SNOMED]}
+```
+
+The relative goes to `qualifier_concept_id` as a standard SNOMED relationship concept
+(*Mother*, *Sister*...). The CDM has no column for the relative, so this is a
+convention of the definition file; `qualifier_source_value` keeps the label.
+
+**Domain rules.** The CDM sends Condition, Procedure, Drug, Measurement, Device and
+Specimen concepts to their own tables, so the builder rejects them in
+`observation_concept_id`, whether they come from a code, a constant or a `map`
+domain. `value_as_concept_id` accepts any domain, since for family history it holds
+a condition.
+
+---
+
 ## Current limits
 
-- Only the `measurement` table is supported so far.
+- Only the `measurement` and `observation` tables are supported so far.
 - `map` sends the text alone: specimen hints from the unit (mg/dL suggests serum) are
   not used.
 - Mapper scores are not calibrated across retrievers and selectors.
