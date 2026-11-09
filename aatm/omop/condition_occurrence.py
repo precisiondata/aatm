@@ -1,13 +1,12 @@
-"""Pydantic models for OMOP CDM condition occurrence extraction and representation.
+"""Pydantic extraction models for OMOP CDM condition occurrence information.
 
-This module defines data models related to the OMOP Common Data Model
-`condition_occurrence` table. It includes one model intended for extracting
-condition-occurrence information from unstructured clinical documents and another
-model that extends it with additional OMOP fields required for full table
-representation.
+These models are the target data models of the older `ExtractionTask` interface, kept
+in the OMOP extraction model registry as ``condition_occurrence`` and
+``condition_occurrence_list``. They hold the subset of `condition_occurrence` fields
+that may be read from unstructured text, with checks for temporal consistency.
 
-The module also includes field-level validation for temporal consistency and
-registers the extraction model in the OMOP extraction model registry.
+Rows of the CDM table itself are `aatm.omop.tables.ConditionOccurrence`, built from
+entity definitions by `aatm.omop.OmopTableBuilder`.
 """
 
 from __future__ import annotations
@@ -151,77 +150,3 @@ class ListOfConditionOccurrenceExtractionModel(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     records: list[ConditionOccurrenceExtractionModel]
-
-
-class ConditionOccurrence(ConditionOccurrenceExtractionModel):
-    """Complete OMOP CDM model for the `condition_occurrence` table.
-
-    This model extends `ConditionOccurrenceExtractionModel` by adding OMOP-specific
-    fields that are typically required in the structured table but are not usually
-    expected to be extracted directly from clinical free text.
-
-    Attributes:
-        condition_occurrence_id: Unique identifier for the condition record.
-        condition_status_concept_id: Standard concept identifier representing the
-            status of the condition during the visit.
-        person_id: Identifier of the person for whom the condition is recorded.
-        condition_concept_id: Standard concept identifier for the condition.
-        condition_type_concept_id: Concept identifier representing the provenance
-            or type of the condition record.
-        provider_id: Identifier of the provider associated with the condition.
-        visit_occurrence_id: Identifier of the visit during which the condition
-            occurred or was recorded.
-        visit_detail_id: Identifier of the visit detail during which the condition
-            occurred or was recorded.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    condition_occurrence_id: int = Field(
-        ...,
-        description="Unique identifier for the condition occurrence record.",
-    )
-    condition_status_concept_id: Optional[int] = Field(
-        None,
-        description="Standard concept identifier representing the condition status.",
-    )
-    person_id: int = Field(
-        ...,
-        description="Identifier of the person for whom the condition is recorded.",
-    )
-    condition_concept_id: int = Field(
-        ...,
-        description=(
-            "Standard concept identifier mapped from the source value and "
-            "representing a condition."
-        ),
-    )
-    condition_start_date: date = Field(
-        ...,
-        description="Start date of the condition. Required in the OMOP CDM table.",
-    )
-    condition_type_concept_id: int = Field(
-        ...,
-        description=(
-            "Concept identifier representing the provenance or type of the "
-            "condition record, such as EHR, claim, registry, or another source."
-        ),
-    )
-    provider_id: Optional[int] = Field(
-        None,
-        description=(
-            "Identifier of the provider associated with the condition record, "
-            "such as the provider who made the diagnosis or recorded the symptom."
-        ),
-    )
-    visit_occurrence_id: Optional[int] = Field(
-        None,
-        description="Identifier of the visit during which the condition occurred or was recorded.",
-    )
-    visit_detail_id: Optional[int] = Field(
-        None,
-        description=(
-            "Identifier of the visit detail during which the condition occurred "
-            "or was recorded."
-        ),
-    )

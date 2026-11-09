@@ -129,12 +129,13 @@ AATM ships definitions aligned with OMOP CDM tables and common clinical scales:
 
 | Name | Keys |
 |---|---|
-| `condition_occurrence` | `condition_name`; children of a condition: `verbatim_start_date`, `verbatim_end_date` |
+| `condition_occurrence` | `condition_name` with required attribute `status` (`confirmed`, `preliminary`); children of a condition: `verbatim_start_date`, `verbatim_end_date` |
 | `drug_exposure` | `drug_name`; children of a drug: `verbatim_start_date`, `verbatim_end_date`, `route_source_value`, `dose_unit_source_value`, `sig` |
 | `ecog_performance_status` | `ecog_performance_status` with attributes `score` (`0`-`5`), or `score_range_min` / `score_range_max` for a range such as "ECOG 0-1"; child of a status: `assessment_date` |
 | `lab_results` | `lab_test` with attribute `operator` (`<`, `<=`, `>`, `>=`); children of a test: `lab_value`, `lab_unit`, `lab_date` |
 | `smoking_status` | `smoking_status` with required attribute `status` (`never`, `former`, `current_every_day`, `current_some_day`, `current_unknown_frequency`, `not_current`); `pack_years` with child `pack_years_value` |
 | `family_history` | `family_history` (the condition) with attribute `relative` (`mother`, `father`, `sister`, ...) |
+| `medical_history` | `medical_history`: a past condition the patient no longer has |
 
 ```python
 EntityDefinitions.from_predefined("drug_exposure")
@@ -514,11 +515,13 @@ extraction: many `text_not_in_line` rejections point to line-id mistakes, and ma
 ## 10. Current limitations
 
 - Matching is exact; spans with different case or spacing than the note are rejected.
-- The `condition_occurrence` and `drug_exposure` definitions have no attributes, so
-  negation, uncertainty and family history are not captured by them: "denies chest
-  pain" is only excluded if the definition says so. You can capture them with your own
+- The `drug_exposure` definition has no attributes, so negation and uncertainty are
+  not captured by it: "stopped metformin" is only excluded if the definition says so.
+  You can capture them with your own
   [attributes](entity_definitions.md#attributes-what-the-note-says-about-a-mention),
   e.g. an `assertion` attribute with `present`, `absent` and `possible`.
+  `condition_occurrence` excludes negated, ruled-out and past conditions and those of
+  relatives, and labels each condition `confirmed` or `preliminary`.
 - Attribute labels come from a single extraction call; there is no separate
   classification pass per mention yet.
 - `GeminiExtractor` (also in `aatm.extractors`) is an older interface based on

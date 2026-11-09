@@ -613,6 +613,16 @@ class OmopTableBuilder:
                 failed += ctx.issues[n_issues:]
 
         row = self._validate_row(model, values, ctx)
+        for start_column, end_column in model.date_ranges:
+            start, end = getattr(row, start_column), getattr(row, end_column)
+            if start is not None and end is not None and end < start:
+                setattr(row, end_column, None)
+                ctx.add(
+                    end_column,
+                    "invalid_value",
+                    f"{end.isoformat()} is before {start_column} "
+                    f"{start.isoformat()}; left empty",
+                )
         for column in model.required_fields:
             if getattr(row, column) is None:
                 ctx.add(column, "missing_required", f"{column} is required by the CDM")

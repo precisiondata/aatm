@@ -28,6 +28,8 @@ class OmopTableRow(BaseModel):
             columns, checked when the builder is created.
         excluded_concept_domains: Domains a column must not hold, e.g. a Condition
             concept in ``observation_concept_id`` belongs to ``condition_occurrence``.
+        date_ranges: Pairs of (start, end) columns where the end cannot come before
+            the start. The builder drops an end that does and reports it.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -37,6 +39,7 @@ class OmopTableRow(BaseModel):
     required_fields: ClassVar[tuple[str, ...]]
     concept_domains: ClassVar[dict[str, str]] = {}
     excluded_concept_domains: ClassVar[dict[str, frozenset[str]]] = {}
+    date_ranges: ClassVar[tuple[tuple[str, str], ...]] = ()
 
     @classmethod
     def domain_problem(cls, column: str, domain_id: Optional[str]) -> Optional[str]:
@@ -164,6 +167,52 @@ class Observation(OmopTableRow):
     obs_event_field_concept_id: Optional[int] = None
 
 
+class ConditionOccurrence(OmopTableRow):
+    """A row of the OMOP CDM v5.5 ``condition_occurrence`` table.
+
+    Diagnoses, signs and symptoms of the patient. `condition_concept_id` is a standard
+    concept of the Condition domain, and `condition_status_concept_id` says how sure or
+    current the diagnosis is, e.g. *Preliminary diagnosis* or *Resolved condition*.
+    Conditions of relatives are family history and go to ``observation``.
+    """
+
+    table_name: ClassVar[str] = "condition_occurrence"
+    primary_key: ClassVar[str] = "condition_occurrence_id"
+    required_fields: ClassVar[tuple[str, ...]] = (
+        "condition_occurrence_id",
+        "person_id",
+        "condition_concept_id",
+        "condition_start_date",
+        "condition_type_concept_id",
+    )
+    concept_domains: ClassVar[dict[str, str]] = {
+        "condition_concept_id": "Condition",
+        "condition_type_concept_id": "Type Concept",
+        "condition_status_concept_id": "Condition Status",
+    }
+    date_ranges: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("condition_start_date", "condition_end_date"),
+        ("condition_start_datetime", "condition_end_datetime"),
+    )
+
+    condition_occurrence_id: Optional[int] = None
+    person_id: Optional[int] = None
+    condition_concept_id: Optional[int] = None
+    condition_start_date: Optional[date] = None
+    condition_start_datetime: Optional[datetime] = None
+    condition_end_date: Optional[date] = None
+    condition_end_datetime: Optional[datetime] = None
+    condition_type_concept_id: Optional[int] = None
+    condition_status_concept_id: Optional[int] = None
+    stop_reason: Optional[Annotated[str, StringConstraints(max_length=20)]] = None
+    provider_id: Optional[int] = None
+    visit_occurrence_id: Optional[int] = None
+    visit_detail_id: Optional[int] = None
+    condition_source_value: Optional[_Varchar50] = None
+    condition_source_concept_id: Optional[int] = None
+    condition_status_source_value: Optional[_Varchar50] = None
+
+
 OMOP_TABLES: dict[str, type[OmopTableRow]] = {
-    model.table_name: model for model in (Measurement, Observation)
+    model.table_name: model for model in (Measurement, Observation, ConditionOccurrence)
 }

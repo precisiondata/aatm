@@ -1,4 +1,4 @@
-"""The OMOP observation table: smoking status and family history."""
+"""The OMOP observation table: smoking status, family and medical history."""
 
 import asyncio
 from datetime import date
@@ -42,6 +42,9 @@ OBSERVATION_CONCEPTS = [
     concept(4283070, "66839005", "Father", "Relationship"),
     concept(201826, "44054006", "Type 2 diabetes mellitus", "Condition"),
     concept(32858, "OMOP4976931", "NLP", "Type Concept", "Type Concept"),
+    concept(
+        3002660, "11348-0", "History of Past illness Narrative", "Observation", "LOINC"
+    ),
 ]
 
 
@@ -278,6 +281,92 @@ def test_family_history_needs_a_mapper():
         )
 
 
+# --- medical history -----------------------------------------------------------------
+
+HISTORY_NOTE = "History of type 2 diabetes in remission. H/o lupus."
+
+
+def history_builder(coder=None):
+    defs = EntityDefinitions.from_predefined("medical_history")
+    return OmopTableBuilder(defs, vocabulary=Lookup(), mapper=coder or ConditionCoder())
+
+
+def test_medical_history_rows():
+    coder = ConditionCoder()
+    builder = history_builder(coder)
+    result = extract(
+        builder.entity_definitions,
+        HISTORY_NOTE,
+        [
+            mention("e1", "medical_history", "type 2 diabetes"),
+            mention("e2", "medical_history", "lupus"),
+        ],
+    )
+    tables = builder.build([note(HISTORY_NOTE, visit_occurrence_id=3)], [result])
+    diabetes, lupus = tables.rows["observation"]
+
+    assert diabetes.observation_concept_id == 3002660
+    assert diabetes.value_as_concept_id == 201826
+    assert diabetes.value_source_value == "type 2 diabetes"
+    assert diabetes.observation_source_value == "type 2 diabetes"
+    assert diabetes.observation_date == date(2025, 6, 1)
+    assert diabetes.observation_type_concept_id == 32858
+    assert diabetes.visit_occurrence_id == 3
+    assert lupus.value_as_concept_id == 0
+
+    assert coder.calls == [(["lupus", "type 2 diabetes"], "Condition", None)]
+    assert [(i.row_id, i.column, i.reason) for i in tables.issues] == [
+        (2, "value_as_concept_id", "unmapped")
+    ]
+
+
+def test_medical_history_needs_a_mapper():
+    with pytest.raises(ValueError, match="needs a terminology mapper"):
+        OmopTableBuilder(
+            EntityDefinitions.from_predefined("medical_history"), vocabulary=Lookup()
+        )
+
+
+def test_medical_history_and_conditions_share_one_extraction():
+    # Past conditions go to observation, current ones to condition_occurrence.
+    class Extractor:
+        async def __call__(self, texts):
+            defs = pipeline.entity_definitions
+            return [
+                extract(
+                    defs,
+                    t,
+                    [
+                        mention("e1", "medical_history", "lupus"),
+                        mention(
+                            "e2",
+                            "condition_name",
+                            "type 2 diabetes",
+                            status="confirmed",
+                        ),
+                    ],
+                )
+                for t in texts
+            ]
+
+    lookup = Lookup()
+    for c in (
+        concept(32893, "OMOP4976963", "Confirmed", "Condition Status", "Condition Status"),
+        concept(32899, "OMOP4976969", "Preliminary", "Condition Status", "Condition Status"),
+    ):  # fmt: skip
+        lookup.concepts[c.concept_id] = c
+    pipeline = OmopExtractionPipeline(
+        ["condition_occurrence", "medical_history"],
+        extractor=Extractor(),
+        vocabulary=lookup,
+        mapper=ConditionCoder(),
+    )
+    tables = asyncio.run(pipeline([note("H/o lupus. Has type 2 diabetes.")]))
+    assert tables["observation"]["value_as_concept_id"].tolist() == [0]
+    assert tables["observation"]["value_source_value"].tolist() == ["lupus"]
+    assert tables["condition_occurrence"]["condition_concept_id"].tolist() == [201826]
+
+
 # --- several definitions in one pipeline -------------------------------------------
 
 
@@ -369,10 +458,20 @@ def test_a_key_clash_with_a_definitions_object_names_its_position():
 # --- predefined files ----------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name", ["smoking_status", "family_history"])
+@pytest.mark.parametrize(
+    "name", ["smoking_status", "family_history", "medical_history"]
+)
 def test_predefined_prompts_have_no_omop_details(name):
     prompt = EntityDefinitions.from_predefined(name).to_prompt_str()
-    for leaked in ("LOINC", "SNOMED", "416471007", "LA18978-9", "omop", "concept_id"):
+    for leaked in (
+        "LOINC",
+        "SNOMED",
+        "416471007",
+        "11348-0",
+        "LA18978-9",
+        "omop",
+        "concept_id",
+    ):
         assert leaked not in prompt
 
 
@@ -390,12 +489,20 @@ def test_predefined_observation_concepts_resolve_in_local_vocabulary():
         vocabulary=lookup,
         mapper=ConditionCoder(),
     )
-    names = set(smoking.describe_concepts().concept_name) | set(
-        family.describe_concepts().concept_name
+    history = OmopTableBuilder(
+        EntityDefinitions.from_predefined("medical_history"),
+        vocabulary=lookup,
+        mapper=ConditionCoder(),
+    )
+    names = (
+        set(smoking.describe_concepts().concept_name)
+        | set(family.describe_concepts().concept_name)
+        | set(history.describe_concepts().concept_name)
     )
     assert {
         "Tobacco smoking status",
         "Never smoker",
         "Family history of clinical finding",
         "Mother",
+        "History of Past illness Narrative",
     } <= names

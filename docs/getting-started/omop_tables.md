@@ -6,8 +6,9 @@ what to find in the notes and where each piece goes in the table; AATM extracts 
 an LLM, codes it with the OMOP vocabularies and fills the rows as far as the notes
 allow.
 
-Two tables are supported: `measurement` (scores, lab results) and `observation`
-(smoking, family history and other facts).
+Three tables are supported: `measurement` (scores, lab results), `observation`
+(smoking, family and medical history, and other facts) and `condition_occurrence` (diagnoses, signs
+and symptoms).
 
 If you have not extracted entities from a note before, read the
 [Information extraction quick start](quick_start_extraction.md) first: this page builds
@@ -35,6 +36,8 @@ on its *entity definitions*.
     | `smoking_status` | `observation` | no |
     | `lab_results` | `measurement` | yes, to code test names |
     | `family_history` | `observation` | yes, to code conditions |
+    | `medical_history` | `observation` | yes, to code conditions |
+    | `condition_occurrence` | `condition_occurrence` | yes, to code conditions |
 
     Definitions without the mapper only need the vocabulary database and an LLM, so
     they are the easiest way to start.
@@ -444,13 +447,16 @@ mapper = TerminologyMapper(retriever="text-embedding-3-small", selector=OpenAILL
 mapper.retriever.top_k = 30
 
 pipeline = OmopExtractionPipeline(
-    ["smoking_status", "family_history"],  # predefined names, YAML paths, or both
+    ["smoking_status", "family_history", "medical_history"],  # names, YAML paths, or both
     model_id="openai/gpt-5-mini",
-    mapper=mapper,                         # family_history codes conditions with it
+    mapper=mapper,  # family_history and medical_history code conditions with it
 )
 notes = [
     ClinicalNote(
-        text="Former smoker, 30 pack-years. Mother had breast cancer at 45.",
+        text=(
+            "Former smoker, 30 pack-years. Mother had breast cancer at 45. "
+            "History of appendicitis."
+        ),
         person_id=20,
         note_date="2025-06-01",
     ),
@@ -466,6 +472,7 @@ A typical result (concept names added in italics):
 | 1 | 43054909 *Tobacco smoking status* | Former smoker | | 45883458 *Former smoker* | former | | |
 | 2 | 3003421 *Cigarettes smoked total (pack per year)* | 30 pack-years | 30.0 | | 30 | | 0 |
 | 3 | 4167217 *Family history of clinical finding* | breast cancer | | 4112853 *Malignant tumor of breast* | breast cancer | 4248584 *Mother* | |
+| 4 | 3002660 *History of Past illness Narrative* | appendicitis | | 440448 *Appendicitis* | appendicitis | | |
 
 **`smoking_status`** gives up to two rows per mention:
 
@@ -482,6 +489,23 @@ is the condition, coded by the mapper, and `qualifier_concept_id` is the relativ
 (*Mother*, *Sister*...). The CDM has no column for the relative, so that last choice is
 a convention of this definition; `qualifier_source_value` keeps the label.
 
+**`medical_history`** takes the patient's past conditions, which the CDM keeps out of
+`condition_occurrence`: "history of appendicitis", "h/o stroke, no sequelae",
+"hepatitis C, treated and cured". `observation_concept_id` is LOINC 11348-0 *History of
+Past illness Narrative* and `value_as_concept_id` is the condition, coded by the mapper,
+as for family history. Conditions the patient still has, even when listed under past
+medical history ("PMH: hypertension"), go to `condition_occurrence`, and past surgeries
+("s/p appendectomy") are not extracted. When the past condition happened is not
+captured: `observation_date` is the note date.
+
+!!! note "Why LOINC 11348-0"
+    SNOMED *History of clinical finding in subject* is not a standard concept. The
+    vocabulary maps precoordinated SNOMED concepts such as *History of myocardial
+    infarction* to the condition with *Maps to value*. Their *Maps to* target is in
+    the OMOP Extension vocabulary, which the other predefined definitions do not need.
+    To use a different concept, copy `medical_history.yaml` and change
+    `observation_concept_id`.
+
 !!! note "Which concepts the observation table accepts"
     The CDM sends Condition, Procedure, Drug, Measurement, Device and Specimen concepts
     to their own tables, so `observation_concept_id` rejects them. `value_as_concept_id`
@@ -495,6 +519,98 @@ Entity keys must be unique across the combined definitions, since the model's ou
   - key 'smoking_status' is defined in predefined 'smoking_status' and definitions/alcohol_use.yaml
 List each file once, and rename keys that clash in your own files.
 ```
+
+---
+
+## The condition_occurrence table
+
+The `condition_occurrence` table holds the patient's diagnoses, problems, signs and
+symptoms. Each row is one mention of a condition, with its standard concept, its dates
+and a status.
+
+```python
+import asyncio
+
+from aatm.omop import ClinicalNote, OmopExtractionPipeline
+from aatm.selectors import OpenAILLMSelector
+from aatm.terminology_mapper import TerminologyMapper
+
+mapper = TerminologyMapper(retriever="text-embedding-3-small", selector=OpenAILLMSelector("gpt-5-mini"))
+mapper.retriever.top_k = 30
+
+pipeline = OmopExtractionPipeline(
+    "condition_occurrence",
+    model_id="openai/gpt-5-mini",
+    mapper=mapper,  # codes condition names
+)
+notes = [
+    ClinicalNote(
+        text=(
+            "Type 2 diabetes since 2019. Probable community-acquired pneumonia. "
+            "History of appendicitis. Rule out PE. Denies chest pain. "
+            "Mother had breast cancer."
+        ),
+        person_id=20,
+        note_date="2025-06-01",
+    ),
+]
+tables = asyncio.run(pipeline(notes))
+tables["condition_occurrence"]
+```
+
+A run with `gpt-5-mini` gave two rows (concept names added in italics):
+
+| condition_occurrence_id | condition_concept_id | condition_source_value | condition_start_date | condition_status_concept_id | condition_status_source_value | condition_type_concept_id |
+|---|---|---|---|---|---|---|
+| 1 | 201826 *Type 2 diabetes mellitus* | Type 2 diabetes | 2019-01-01 | 32893 *Confirmed diagnosis* | confirmed | 32858 *NLP* |
+| 2 | 4293463 *Community acquired pneumonia* | community-acquired pneumonia | 2025-06-01 | 32899 *Preliminary diagnosis* | preliminary | 32858 *NLP* |
+
+The only issue is `imputed_date_parts` on row 1: "2019" has no month or day and is
+read as 2019-01-01.
+
+**What is not a row.** The definition follows the
+[CDM conventions for this table](https://ohdsi.github.io/CommonDataModel/cdm55.html#condition_occurrence),
+so the other four conditions of the note are left out:
+
+| In the note | Why it is not here |
+|---|---|
+| "History of appendicitis" | Past diagnoses belong in `observation`, says the CDM: add `medical_history` to the list of definitions to keep it. Long-standing conditions the patient still has, e.g. "PMH: hypertension", are kept. |
+| "Rule out PE" | Rule-out and "question of" diagnoses are not recorded in this table. |
+| "Denies chest pain" | Negated. |
+| "Mother had breast cancer" | Family history belongs in `observation`: add `family_history` to the list of definitions to keep it. |
+
+**Status.** Each condition gets a required `status` label, stored in
+`condition_status_concept_id`:
+
+| Label | Means | Concept |
+|---|---|---|
+| `confirmed` | Stated as a fact, e.g. "hypertension", "diagnosed with asthma in 2010" | 32893 *Confirmed diagnosis* |
+| `preliminary` | A likely working diagnosis, e.g. "probable pneumonia", "presumed sepsis" | 32899 *Preliminary diagnosis* |
+
+The CDM's own examples of a status are the point in the visit when the diagnosis was
+given (admitting, principal, secondary diagnosis). Notes rarely say that, so it is not
+extracted.
+
+**Dates.** `condition_start_date` is the first that applies:
+
+1. the start date the note gives for that condition ("since 2019" → 2019-01-01,
+   reported as `imputed_date_parts`);
+2. the end date, when the note gives only that one ("pneumonia until 2024-04-10"): the
+   CDM allows a single date for both;
+3. the note date. The condition is known to be present then, but may have started much
+   earlier, so read these start dates as "recorded on" rather than "onset".
+
+The CDM notes that most sources have no condition start date, and records most
+conditions as snapshots without an end date. `condition_end_date` is the end date the
+note gives, e.g. for an episode in a discharge summary ("pneumonia from 03/01/2025 to
+03/10/2025"). An end date before the start date is left empty and reported as
+`invalid_value`.
+
+!!! note "Which concepts the condition_occurrence table accepts"
+    `condition_concept_id` takes standard concepts of the Condition domain only. The
+    mapper searches that domain, and a concept of another domain, e.g. a procedure, is
+    stored but reported as `domain_mismatch`. Check the coded conditions with
+    `tables.mappings_dataframe()`.
 
 ---
 
@@ -515,7 +631,10 @@ List each file once, and rename keys that clash in your own files.
 
 ## Current limits
 
-- Only the `measurement` and `observation` tables are supported so far.
+- Only the `measurement`, `observation` and `condition_occurrence` tables are supported
+  so far.
+- `condition_start_date` falls back to the note date when the note gives no date, which
+  is later than the real onset of long-standing conditions.
 - `map` searches with the extracted text alone: a unit such as mg/dL, which hints at a
   serum test, is not used.
 - Mapper scores are not comparable across retrievers and selectors.
