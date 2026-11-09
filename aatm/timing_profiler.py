@@ -1,8 +1,10 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-import torch
+import threading
 import time
+
+import torch
 
 from aatm.logs import get_logger
 
@@ -11,12 +13,16 @@ logger = get_logger(__name__)
 
 @dataclass
 class TimingProfiler:
-    """Simple cumulative timing profiler for batch processing."""
+    """Simple cumulative timing profiler for batch processing.
+
+    Safe to use from several threads at once.
+    """
 
     enabled: bool = True
     synchronize_cuda: bool = False
     totals: dict[str, float] = field(default_factory=lambda: defaultdict(float))
     counts: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @contextmanager
     def time_block(self, name: str):
@@ -36,17 +42,19 @@ class TimingProfiler:
             if self.synchronize_cuda and torch.cuda.is_available():
                 torch.cuda.synchronize()
 
-            elapsed = time.perf_counter() - start
-            self.totals[name] += elapsed
-            self.counts[name] += 1
+            self._record(name, time.perf_counter() - start)
 
     def add(self, name: str, elapsed: float) -> None:
         """Manually add a measured duration."""
         if not self.enabled:
             return
 
-        self.totals[name] += elapsed
-        self.counts[name] += 1
+        self._record(name, elapsed)
+
+    def _record(self, name: str, elapsed: float) -> None:
+        with self._lock:
+            self.totals[name] += elapsed
+            self.counts[name] += 1
 
     def log_batch(
         self,
@@ -80,16 +88,20 @@ class TimingProfiler:
         if not self.enabled:
             return
 
-        total_time = sum(self.totals.values())
+        with self._lock:
+            totals = dict(self.totals)
+            counts = dict(self.counts)
+
+        total_time = sum(totals.values())
 
         logger.info(f"[PROFILE] {label} | total_profiled_time={total_time:.3f}s")
 
         for name, elapsed in sorted(
-            self.totals.items(),
+            totals.items(),
             key=lambda item: item[1],
             reverse=True,
         ):
-            count = self.counts[name]
+            count = counts[name]
             avg = elapsed / count if count > 0 else 0.0
             pct = elapsed / total_time * 100 if total_time > 0 else 0.0
 

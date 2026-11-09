@@ -11,23 +11,43 @@ artifacts.
 """
 
 import gc
+from functools import partial
 import shutil
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Hashable, List, Tuple
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from dataclasses import dataclass, field
+from typing import Any
 
+import numpy as np
 import pandas as pd
 import questionary
 import torch
-from chromadb import Collection, Embeddings
+from chromadb import Embeddings
 from rich.console import Console
-from rich.progress import track
+from rich.progress import Progress, TaskID, track
 
+from aatm.background_iterator import BackgroundIterator
+from aatm.device import get_device
+from aatm.gpu_memory import (
+    CANDIDATE_BATCH_SIZES,
+    GpuMemoryLimit,
+    calibrate_batch_size,
+    encode_with_oom_backoff,
+)
 from aatm.logs import get_logger
-from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY
+from aatm.precision import (
+    COLLECTION_DTYPE_KEY,
+    EmbeddingDtype,
+    check_dtype_supported,
+    default_embedding_dtype,
+    dtype_for_existing_collection,
+    requested_embedding_dtype,
+)
 from aatm.data_models import ExpressionMetadata
 from aatm.timing_profiler import TimingProfiler
+from aatm.vector_db_writer import ChromaWriterProcess, WriteAck
 
 logger = get_logger(__name__)
 console = Console()
@@ -279,154 +299,294 @@ def build_mapping_datasets(standard_vocabularies: list[str]) -> None:
         con.close()
 
 
-def measure_embedding_vram(
-    model: Any,
-    batch_size: int = 1,
-    seq_len: int = 1000,
-    device: str = "cuda",
-) -> dict[str, Any]:
-    """Measure approximate peak VRAM used by an embedding model forward pass.
+def collect_calibration_texts(
+    dataset_paths: Iterable[Path],
+    n_longest: int = max(CANDIDATE_BATCH_SIZES),
+    n_typical: int = 1024,
+    token_lengths: Callable[[list[str]], list[int]] | None = None,
+    seed: int = 0,
+) -> tuple[list[str], list[str]]:
+    """Collect texts for `calibrate_batch_size`: the longest and a typical sample.
 
     Args:
-        model: Local embedding model.
-        batch_size: Batch size used in the synthetic forward pass.
-        seq_len: Sequence length used in the synthetic forward pass.
-        device: Device on which to run the measurement.
+        dataset_paths: CSV files built by `build_mapping_datasets`.
+        n_longest: Number of longest texts to return.
+        n_typical: Number of randomly sampled texts to return.
+        token_lengths: Returns the token count of each text. When given, the
+            longest texts are ranked by tokens, which is what GPU memory depends
+            on, instead of by characters.
+        seed: Random seed for the typical sample.
 
     Returns:
-        Dictionary with peak allocated memory, peak reserved memory, and output
-        embedding shape.
+        The longest texts, longest first, and a random sample of texts.
     """
-    if not torch.cuda.is_available() and device == "cuda":
-        raise RuntimeError("CUDA is not available")
+    longest: list[str] = []
+    samples: list[pd.Series] = []
 
-    gpu_memory_cleanup(reset_peak=True)
-
-    model = model.to(device)
-    model.eval()
-
-    input_ids = torch.ones(
-        (batch_size, seq_len),
-        dtype=torch.long,
-        device=device,
-    )
-    attention_mask = torch.ones(
-        (batch_size, seq_len),
-        dtype=torch.long,
-        device=device,
-    )
-
-    with torch.inference_mode():
-        outputs = model(
-            {
-                "input_ids": input_ids,
-                "attention_mask": attention_mask,
-            }
+    for dataset_path in dataset_paths:
+        expressions = (
+            pd.read_csv(dataset_path, usecols=["expression"], low_memory=False)[
+                "expression"
+            ]
+            .dropna()
+            .astype(str)
+            .drop_duplicates()
+        )
+        # Over-collect by characters, then rank by tokens below.
+        top = expressions.str.len().nlargest(4 * n_longest).index
+        longest.extend(expressions.loc[top].tolist())
+        samples.append(
+            expressions.sample(n=min(n_typical, len(expressions)), random_state=seed)
         )
 
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
+    if token_lengths is not None and longest:
+        ranked = sorted(zip(token_lengths(longest), longest), key=lambda pair: -pair[0])
+        longest = [text for _, text in ranked]
+    else:
+        longest.sort(key=len, reverse=True)
 
-    sentence_embedding = outputs["sentence_embedding"]
-    embedding_shape = tuple(sentence_embedding.shape)
-
-    peak_allocated_gib = torch.cuda.max_memory_allocated() / 1024**3
-    peak_reserved_gib = torch.cuda.max_memory_reserved() / 1024**3
-
-    del sentence_embedding
-    del outputs
-    del input_ids
-    del attention_mask
-
-    gpu_memory_cleanup()
-
-    return {
-        "peak_allocated_gib": peak_allocated_gib,
-        "peak_reserved_gib": peak_reserved_gib,
-        "embedding_shape": embedding_shape,
-    }
+    typical = pd.concat(samples) if samples else pd.Series(dtype=str)
+    typical = typical.sample(n=min(n_typical, len(typical)), random_state=seed)
+    return longest[:n_longest], typical.tolist()
 
 
-def estimate_batch_size(embedding_model_name: str) -> int:
-    """Estimate a suitable batch size for local GPU embedding generation.
+def _encode_with_batch_size(
+    embedding_function: Any, texts: Sequence[str], batch_size: int
+) -> Any:
+    embedding_function.batch_size = batch_size
+    return embedding_function(list(texts))
+
+
+def _token_lengths(embedding_function: Any) -> Callable[[list[str]], list[int]]:
+    tokenizer = embedding_function.model.tokenizer
+
+    def lengths(texts: list[str]) -> list[int]:
+        return [len(ids) for ids in tokenizer(texts)["input_ids"]]
+
+    return lengths
+
+
+PREFETCH_CHUNKS = 2
+"""How many prepared chunks may wait for the GPU while it encodes."""
+
+
+def get_existing_collection(client: Any, name: str) -> Any | None:
+    """Return the named ChromaDB collection, or ``None`` if it does not exist."""
+    from chromadb.errors import NotFoundError
+
+    try:
+        return client.get_collection(name)
+    except NotFoundError:
+        return None
+
+
+def release_chromadb_clients() -> None:
+    """Drop this process's cached ChromaDB clients so another process can open the files."""
+    from chromadb.api.shared_system_client import SharedSystemClient
+
+    SharedSystemClient.clear_system_cache()
+    gc.collect()
+
+
+@dataclass
+class PreparedChunk:
+    """One chunk of dataset rows, ready to be embedded and written.
+
+    Attributes:
+        expression_origin: Dataset the rows come from.
+        dataset_rows: Total rows in that dataset, for progress reporting.
+        row_start: Index of the chunk's first row in the dataset.
+        n_rows: Rows in the chunk before deduplication.
+        n_unique: Rows left after removing duplicate IDs within the chunk.
+        ids: IDs not yet in the database. Empty if every row already exists.
+        documents: Expression text for each of ``ids``.
+        metadatas: Metadata for each of ``ids``.
+        prepared_at: `time.perf_counter` value when preparation started.
+    """
+
+    expression_origin: str
+    dataset_rows: int
+    row_start: int
+    n_rows: int
+    n_unique: int
+    ids: list[str]
+    documents: list[str]
+    metadatas: list[dict[str, Any]]
+    prepared_at: float
+
+
+def prepare_chunks(
+    dataset_paths: Iterable[Path],
+    chunk_size: int,
+    existing_ids: Callable[[list[str]], set[str]],
+    profiler: TimingProfiler,
+) -> Iterator[PreparedChunk]:
+    """Read datasets and yield chunks of rows that still need embeddings.
+
+    This runs in a background thread while the GPU encodes earlier chunks.
 
     Args:
-        embedding_model_name: Registry key for the embedding model.
+        dataset_paths: CSV files built by `build_mapping_datasets`.
+        chunk_size: Rows per chunk.
+        existing_ids: Returns which of the given IDs are already stored.
+        profiler: Profiler for per-stage timings.
 
-    Returns:
-        Estimated maximum batch size.
+    Yields:
+        One `PreparedChunk` per ``chunk_size`` rows, including chunks whose rows
+        are all present already, so progress can still be reported for them.
 
     Raises:
-        ValueError: If the model is unknown, non-local, or batch size cannot be
-            estimated.
+        ValueError: If a row has no ``expression_id``.
     """
-    retriever_spec = CHROMADB_RETRIEVER_MODEL_REGISTRY.get(embedding_model_name)
+    for dataset_path in dataset_paths:
+        expression_origin = dataset_path.stem
 
-    if retriever_spec is None:
-        raise ValueError(f"Unknown embedding model: {embedding_model_name}")
+        with profiler.time_block("read_csv"):
+            df = pd.read_csv(dataset_path, low_memory=False)
 
-    embedding_function = retriever_spec.embedding_function_cls(
-        model=retriever_spec.model_id
-    )
+        with profiler.time_block("drop_duplicates_dropna"):
+            df = df.drop_duplicates().dropna()
 
-    if not getattr(embedding_function, "is_local", False):
-        raise ValueError(f"Embedding model {embedding_model_name} is not a local model")
+        for row_start in range(0, len(df), chunk_size):
+            prepared_at = time.perf_counter()
 
-    model = embedding_function.model  # type: ignore[attr-defined]
+            with profiler.time_block("build_expression_metadata"):
+                records = df.iloc[row_start : row_start + chunk_size].to_dict("records")
+                # Keep the first row for each ID, as the database does.
+                by_id: dict[str, ExpressionMetadata] = {}
+                for record in records:
+                    metadata = ExpressionMetadata(
+                        **record,
+                        expression_origin=expression_origin,  # type: ignore[arg-type]
+                    )
+                    if metadata.expression_id is None:
+                        raise ValueError(
+                            "expression_id cannot be None. "
+                            f"Given: {metadata.model_dump()}"
+                        )
+                    by_id.setdefault(metadata.expression_id, metadata)
 
-    measurements = []
+            with profiler.time_block("chromadb_get_existing_ids"):
+                found = existing_ids(list(by_id))
 
-    free_bytes, _ = torch.cuda.mem_get_info()
-    run_time_overhead_gib = 1.5
+            new = [
+                (identifier, metadata)
+                for identifier, metadata in by_id.items()
+                if identifier not in found
+            ]
 
-    for batch_size in [1, 10]:
-        for seq_len in [500]:
-            result = measure_embedding_vram(
-                model=model,
-                batch_size=batch_size,
-                seq_len=seq_len,
+            yield PreparedChunk(
+                expression_origin=expression_origin,
+                dataset_rows=len(df),
+                row_start=row_start,
+                n_rows=len(records),
+                n_unique=len(by_id),
+                ids=[identifier for identifier, _ in new],
+                documents=[metadata.expression for _, metadata in new],  # type: ignore[misc]
+                metadatas=[metadata.to_dict() for _, metadata in new],
+                prepared_at=prepared_at,
             )
-            measurements.append((batch_size, seq_len, result))
 
-    peak_reserved_gib_diff = (
-        measurements[-1][2]["peak_reserved_gib"]
-        - measurements[-2][2]["peak_reserved_gib"]
-    )
-    batch_size_diff = measurements[-1][0] - measurements[-2][0]
+        del df
 
-    if batch_size_diff <= 0:
-        raise ValueError("Invalid batch size measurements")
 
-    if peak_reserved_gib_diff <= 0:
-        raise ValueError(
-            f"Unable to estimate memory per batch item for {embedding_model_name}. "
-            f"Measured peak reserved memory did not increase."
+@dataclass
+class _BuildTracker:
+    """Track progress, counters and logs as chunks finish."""
+
+    progress: Progress
+    profiler: TimingProfiler
+    summary_every_n_chunks: int
+    pending: dict[int, PreparedChunk] = field(default_factory=dict)
+    tasks: dict[str, TaskID] = field(default_factory=dict)
+    processed_chunks: int = 0
+    added_documents: int = 0
+
+    def handle_acks(self, acks: list[WriteAck]) -> None:
+        for ack in acks:
+            chunk = self.pending.pop(ack.seq)
+            self.profiler.add("chromadb_add (writer process)", ack.add_seconds)
+            self.finish(chunk, n_new=ack.n_added)
+
+    def finish(self, chunk: PreparedChunk, n_new: int) -> None:
+        task = self.tasks.get(chunk.expression_origin)
+        if task is None:
+            task = self.progress.add_task(
+                f"Adding embeddings for {chunk.expression_origin}",
+                total=chunk.dataset_rows,
+            )
+            self.tasks[chunk.expression_origin] = task
+        self.progress.advance(task, chunk.n_rows)
+
+        self.profiler.log_batch(
+            expression_origin=chunk.expression_origin,
+            row_start=chunk.row_start,
+            n_rows=chunk.n_rows,
+            n_unique=chunk.n_unique,
+            n_new=n_new,
+            batch_elapsed=time.perf_counter() - chunk.prepared_at,
         )
 
-    memory_per_batch_item_gib = peak_reserved_gib_diff / batch_size_diff
+        self.processed_chunks += 1
+        self.added_documents += n_new
 
-    max_batch_size = int(
-        (free_bytes / 1024**3 - run_time_overhead_gib) / memory_per_batch_item_gib
-    )
+        if (
+            self.summary_every_n_chunks > 0
+            and self.processed_chunks % self.summary_every_n_chunks == 0
+        ):
+            self.profiler.log_summary(
+                label=f"partial after {self.processed_chunks} chunks"
+            )
 
-    del model
-    del embedding_function
 
-    gpu_memory_cleanup()
+LOCAL_MODEL_CHUNK_SIZE = 4096
+"""Default rows per ChromaDB round-trip for local models.
 
-    if max_batch_size > 0:
-        return max_batch_size
+Large chunks give each ``encode`` call enough texts to keep the GPU busy. The
+GPU batch size is chosen separately, see `aatm.gpu_memory`.
+"""
 
-    raise ValueError(
-        f"Unable to estimate batch size for embedding model {embedding_model_name}"
-    )
+API_MODEL_CHUNK_SIZE = 100
+"""Default rows per ChromaDB round-trip for API models.
+
+For API models every chunk is one embeddings request, so this stays within
+provider limits on inputs per request.
+"""
+
+
+def resolve_chunk_size(
+    chunk_size: int | None, is_local: bool, max_chromadb_batch_size: int
+) -> int:
+    """Choose how many rows to read and write per ChromaDB round-trip.
+
+    Args:
+        chunk_size: Size requested by the caller, or ``None`` for the default.
+        is_local: Whether the embedding model runs locally.
+        max_chromadb_batch_size: Largest batch the ChromaDB client accepts in a
+            single ``add`` call.
+
+    Returns:
+        The chunk size, capped at ``max_chromadb_batch_size``.
+
+    Raises:
+        ValueError: If ``chunk_size`` is not positive.
+    """
+    if chunk_size is None:
+        chunk_size = LOCAL_MODEL_CHUNK_SIZE if is_local else API_MODEL_CHUNK_SIZE
+
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be > 0")
+
+    return min(chunk_size, max_chromadb_batch_size)
 
 
 def build_local_vector_database(
     embedding_model_name: str,
     vector_db_dir: Path | None = None,
     rate_limit: int | None = None,
-    batch_size: int = 100,
+    chunk_size: int | None = None,
+    encode_batch_size: int | None = None,
+    embedding_dtype: str | None = None,
     profile_timing: bool = False,
     profile_sync_cuda: bool = False,
     profile_summary_every_n_batches: int = 20,
@@ -440,8 +600,20 @@ def build_local_vector_database(
             provided, the default path from the retriever model registry is used.
         rate_limit: Optional maximum number of documents to embed per minute. If
             not provided, the default value from the model registry is used.
-        batch_size: Number of records to process and add to the vector database
-            in each batch.
+        chunk_size: Number of dataset rows read, checked against the database
+            and written to it per round-trip. Defaults to
+            `LOCAL_MODEL_CHUNK_SIZE` for local models and
+            `API_MODEL_CHUNK_SIZE` for API models.
+        encode_batch_size: Number of texts a local model encodes per forward
+            pass. If not provided, on CUDA it is calibrated on the datasets'
+            longest and typical texts (see `aatm.gpu_memory`); otherwise the
+            embedding function's default is used. Ignored for API models.
+        embedding_dtype: Precision for local models: ``float32``,
+            ``bfloat16`` or ``float16``. If not provided,
+            ``AATM_EMBEDDING_DTYPE`` is used, and otherwise the precision the
+            model's checkpoint is stored in. When repairing, the database's
+            recorded precision is used unless a different one is requested,
+            which raises `EmbeddingPrecisionError`. See `aatm.precision`.
         profile_timing: Whether to log per-stage timing information.
         profile_sync_cuda: Whether to synchronize CUDA around timed blocks.
             This makes GPU timings more accurate but adds overhead.
@@ -450,24 +622,45 @@ def build_local_vector_database(
 
     Returns:
         None.
+
+    Raises:
+        EmbeddingPrecisionError: If the requested precision cannot run on this
+            machine, or differs from the precision of the database being
+            repaired.
     """
     from aatm.registries.retrievers import (
         CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry,
     )
+
+    spec = model_registry[embedding_model_name]
+    is_local = bool(getattr(spec.embedding_function_cls, "is_local", False))
+
+    # Validate the requested precision before prompting or loading any weights.
+    requested_dtype: EmbeddingDtype | None = None
+    if is_local:
+        requested_dtype = requested_embedding_dtype(embedding_dtype)
+        if requested_dtype is not None:
+            check_dtype_supported(requested_dtype, get_device())
+    elif embedding_dtype is not None:
+        raise ValueError(
+            f"embedding_dtype only applies to local models; "
+            f"'{embedding_model_name}' is an API model."
+        )
 
     profiler = TimingProfiler(
         enabled=profile_timing,
         synchronize_cuda=profile_sync_cuda,
     )
 
-    processed_batches = 0
-    added_documents = 0
-
     if vector_db_dir is not None and not vector_db_dir.exists():
         raise ValueError("vector_db_dir does not exist")
 
     if vector_db_dir is None:
-        vector_db_dir = Path(model_registry[embedding_model_name].chromadb_path)
+        vector_db_dir = Path(spec.chromadb_path)
+
+    # ChromaDB caches clients by path string; an absolute path keeps a cached
+    # client from pointing at another directory after a change of cwd.
+    vector_db_dir = vector_db_dir.resolve()
 
     if vector_db_dir.exists():
         user_preference = questionary.select(
@@ -504,206 +697,161 @@ def build_local_vector_database(
     with profiler.time_block("chromadb_client_init"):
         client = chromadb.PersistentClient(path=str(vector_db_dir))
 
+    collection_name = spec.collection_name
+    existing_collection = get_existing_collection(client, collection_name)
+
+    model_kwargs: dict[str, Any] = {}
+    collection_metadata: dict[str, Any] | None = None
+
+    if is_local:
+        if existing_collection is None:
+            build_dtype = requested_dtype or default_embedding_dtype(
+                spec.model_id, get_device()
+            )
+        else:
+            build_dtype = dtype_for_existing_collection(
+                (existing_collection.metadata or {}).get(COLLECTION_DTYPE_KEY),
+                requested_dtype,
+            )
+        model_kwargs["dtype"] = build_dtype
+        collection_metadata = {COLLECTION_DTYPE_KEY: build_dtype}
+        console.print(f"Embedding precision: {build_dtype}")
+
     with profiler.time_block("embedding_function_init"):
-        embedding_function = model_registry[
-            embedding_model_name
-        ].embedding_function_cls(model=model_registry[embedding_model_name].model_id)
-
-    if getattr(embedding_function, "is_local", False) and torch.cuda.is_available():
-        with profiler.time_block("estimate_batch_size"):
-            batch_size = estimate_batch_size(embedding_model_name)
-
-    embedding_function.batch_size = batch_size  # type: ignore[attr-defined]
-
-    with profiler.time_block("get_or_create_collection"):
-        collection: Collection = client.get_or_create_collection(
-            model_registry[embedding_model_name].collection_name,
-            embedding_function=embedding_function,
+        embedding_function = spec.embedding_function_cls(
+            model=spec.model_id,
+            **model_kwargs,  # type: ignore[call-arg]
         )
 
-    datasets_base_path = Path(".aatm/datasets")
+    if is_local and encode_batch_size is not None:
+        if encode_batch_size <= 0:
+            raise ValueError("encode_batch_size must be > 0")
+        embedding_function.batch_size = encode_batch_size  # type: ignore[attr-defined]
 
-    for dataset_path in datasets_base_path.glob("*.csv"):
-        expression_origin = dataset_path.stem
+    # Cap GPU memory and size batches by measurement, so the build never
+    # overflows GPU memory. See `aatm.gpu_memory`.
+    guard_gpu_memory = is_local and get_device() == "cuda" and torch.cuda.is_available()
 
-        with profiler.time_block("read_csv"):
-            df = pd.read_csv(dataset_path, low_memory=False)
+    chunk_size = resolve_chunk_size(
+        chunk_size,
+        is_local=is_local,
+        max_chromadb_batch_size=client.get_max_batch_size(),
+    )
 
-        with profiler.time_block("drop_duplicates_dropna"):
-            df = df.drop_duplicates().dropna()
+    if existing_collection is None:
+        with profiler.time_block("create_collection"):
+            client.create_collection(
+                collection_name,
+                embedding_function=embedding_function,
+                metadata=collection_metadata,
+            )
 
-        for row_start in track(
-            range(0, len(df), batch_size),
-            description=f"Adding embeddings for {expression_origin}",
-        ):
-            batch_start = time.perf_counter()
+    # From here on the writer process owns the database. Two clients in different
+    # processes must not share one directory, so release this one first.
+    del existing_collection
+    del client
+    release_chromadb_clients()
 
-            with profiler.time_block("slice_dataframe_to_records"):
-                records: list[dict[Hashable, Any]] = df.iloc[
-                    row_start : row_start + batch_size
-                ].to_dict("records")
+    dataset_paths = sorted(Path(".aatm/datasets").glob("*.csv"))
 
-            with profiler.time_block("build_expression_metadata"):
-                expression_metadatas: list[ExpressionMetadata] = [
-                    ExpressionMetadata(**record, expression_origin=expression_origin)  # type: ignore[arg-type]
-                    for record in records
-                ]
+    with (
+        GpuMemoryLimit(enabled=guard_gpu_memory) as memory_limit,
+        ChromaWriterProcess(str(vector_db_dir), collection_name) as writer,
+        BackgroundIterator(
+            prepare_chunks(
+                dataset_paths,
+                chunk_size=chunk_size,
+                existing_ids=writer.existing_ids,
+                profiler=profiler,
+            ),
+            maxsize=PREFETCH_CHUNKS,
+            name="aatm-chunk-preparer",
+        ) as chunks,
+        Progress(*Progress.get_default_columns(), console=console) as progress,
+    ):
+        tracker = _BuildTracker(
+            progress=progress,
+            profiler=profiler,
+            summary_every_n_chunks=(
+                profile_summary_every_n_batches if profile_timing else 0
+            ),
+        )
+        seq = 0
 
-            with profiler.time_block("deduplicate_batch_ids"):
-                unique_pairs: list[tuple[str, ExpressionMetadata]] = []
-                seen: set[str] = set()
-
-                for metadata in expression_metadatas:
-                    if metadata.expression_id in seen:
-                        continue
-
-                    if metadata.expression_id is None:
-                        raise ValueError(
-                            f"expression_id cannot be None. Given: {metadata.model_dump()}"
-                        )
-
-                    seen.add(metadata.expression_id)
-                    unique_pairs.append((metadata.expression_id, metadata))
-
-                ids = [identifier for identifier, _ in unique_pairs]
-
-                assert all(identifier is not None for identifier in ids), (
-                    f"Missing identifier in {expression_origin}"
+        if guard_gpu_memory and encode_batch_size is None:
+            with profiler.time_block("calibrate_batch_size"):
+                longest_texts, typical_texts = collect_calibration_texts(
+                    dataset_paths,
+                    token_lengths=_token_lengths(embedding_function),
+                )
+                embedding_function.batch_size = calibrate_batch_size(  # type: ignore[attr-defined]
+                    partial(_encode_with_batch_size, embedding_function),
+                    longest_texts,
+                    typical_texts,
+                    limit_bytes=memory_limit.limit_bytes,
                 )
 
-            with profiler.time_block("chromadb_get_existing_ids"):
-                results = collection.get(ids=ids)  # type: ignore[arg-type]
-                found_ids = set(results["ids"])
+        if is_local:
+            logger.info(
+                f"Encoding with batch size {embedding_function.batch_size}"  # type: ignore[attr-defined]
+            )
 
-            with profiler.time_block("filter_existing_ids"):
-                filtered_unique_pairs: List[Tuple[str, ExpressionMetadata]] = [
-                    (identifier, metadata)
-                    for identifier, metadata in unique_pairs
-                    if identifier not in found_ids and identifier is not None
-                ]
+        for chunk in chunks:
+            tracker.handle_acks(writer.poll())
 
-            n_rows = len(records)
-            n_unique = len(unique_pairs)
-            n_new = len(filtered_unique_pairs)
-
-            if not filtered_unique_pairs:
-                batch_elapsed = time.perf_counter() - batch_start
-
-                profiler.log_batch(
-                    expression_origin=expression_origin,
-                    row_start=row_start,
-                    n_rows=n_rows,
-                    n_unique=n_unique,
-                    n_new=0,
-                    batch_elapsed=batch_elapsed,
-                )
-
-                del records
-                del expression_metadatas
-                del unique_pairs
-                del ids
-                del results
-                del found_ids
-                del filtered_unique_pairs
-
-                processed_batches += 1
-
-                if (
-                    profile_timing
-                    and profile_summary_every_n_batches > 0
-                    and processed_batches % profile_summary_every_n_batches == 0
-                ):
-                    profiler.log_summary(
-                        label=f"partial after {processed_batches} batches"
-                    )
-
+            if not chunk.ids:
+                tracker.finish(chunk, n_new=0)
                 continue
 
             if rate_limit is not None:
                 with profiler.time_block("rate_limiter_total"):
                     next_allowed_time, slept_seconds = rate_limiter(
-                        n_docs=len(filtered_unique_pairs),
+                        n_docs=len(chunk.ids),
                         rate_limit=rate_limit,
                         next_allowed_time=next_allowed_time,
                     )
 
                 profiler.add("rate_limiter_sleep", slept_seconds)
 
-            with profiler.time_block("prepare_embedding_input_texts"):
-                texts_to_embed = [
-                    metadata.expression for _, metadata in filtered_unique_pairs
-                ]
-
             with profiler.time_block("embedding_function_call"):
-                embeddings = embedding_function(texts_to_embed)
+                if is_local:
+                    embeddings = encode_with_oom_backoff(
+                        embedding_function, chunk.documents
+                    )
+                else:
+                    embeddings = embedding_function(chunk.documents)
 
             with profiler.time_block("ensure_cpu_embeddings"):
-                embeddings = ensure_cpu_embeddings(embeddings)
+                embeddings_array = np.asarray(
+                    ensure_cpu_embeddings(embeddings), dtype=np.float32
+                )
+                del embeddings
 
-            with profiler.time_block("prepare_chromadb_payload"):
-                add_ids = [identifier for identifier, _ in filtered_unique_pairs]
-                add_documents = [
-                    metadata.expression for _, metadata in filtered_unique_pairs
-                ]
-                add_metadatas = [
-                    metadata.to_dict() for _, metadata in filtered_unique_pairs
-                ]
+            seq += 1
+            tracker.pending[seq] = chunk
 
-            with profiler.time_block("chromadb_add"):
-                collection.add(
-                    ids=add_ids,
-                    documents=add_documents,  # type: ignore[misc,arg-type]
-                    embeddings=embeddings,
-                    metadatas=add_metadatas,  # type: ignore[arg-type]
+            # Blocks only while the writer already has batches queued.
+            with profiler.time_block("wait_for_writer"):
+                writer.add(
+                    seq,
+                    chunk.ids,
+                    embeddings_array,
+                    chunk.documents,
+                    chunk.metadatas,
                 )
 
-            with profiler.time_block("delete_batch_objects"):
-                del embeddings
-                del records
-                del expression_metadatas
-                del unique_pairs
-                del ids
-                del results
-                del found_ids
-                del filtered_unique_pairs
-                del texts_to_embed
-                del add_ids
-                del add_documents
-                del add_metadatas
+        with profiler.time_block("wait_for_final_writes"):
+            tracker.handle_acks(writer.close())
 
-            batch_elapsed = time.perf_counter() - batch_start
+        profiler.add("wait_for_prepared_chunk", chunks.wait_seconds)
 
-            processed_batches += 1
-            added_documents += n_new
-
-            profiler.log_batch(
-                expression_origin=expression_origin,
-                row_start=row_start,
-                n_rows=n_rows,
-                n_unique=n_unique,
-                n_new=n_new,
-                batch_elapsed=batch_elapsed,
-            )
-
-            if (
-                profile_timing
-                and profile_summary_every_n_batches > 0
-                and processed_batches % profile_summary_every_n_batches == 0
-            ):
-                profiler.log_summary(label=f"partial after {processed_batches} batches")
-
-            if processed_batches % 50 == 0:
-                gpu_memory_cleanup()
-
-        del df
-
-        with profiler.time_block("dataset_cleanup"):
-            gpu_memory_cleanup(synchronize=False)
+    console.print(
+        f"Added {tracker.added_documents} embeddings in {tracker.processed_chunks} "
+        "chunks."
+    )
 
     with profiler.time_block("final_delete_objects"):
-        del collection
         del embedding_function
-        del client
 
     with profiler.time_block("final_gpu_memory_cleanup"):
         gpu_memory_cleanup(synchronize=True)

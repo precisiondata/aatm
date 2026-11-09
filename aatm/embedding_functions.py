@@ -22,6 +22,9 @@ Classes:
         GenAI embeddings API.
     Qwen3EmbeddingModels:
         Enumeration of supported Qwen3 embedding model identifiers.
+    LocalSentenceTransformerEmbeddingFunction:
+        Shared base for embedding models that run locally through
+        SentenceTransformers.
     Qwen3EmbeddingFunction:
         ChromaDB embedding function implementation backed by a Qwen3
         embedding model loaded with SentenceTransformers.
@@ -45,7 +48,7 @@ Notes:
 """
 
 from enum import Enum
-from typing import Any
+from typing import Any, ClassVar
 from chromadb import Documents, EmbeddingFunction, Embeddings
 from google import genai
 import os
@@ -56,6 +59,12 @@ from sentence_transformers import SentenceTransformer
 import torch
 
 from aatm.device import get_device
+from aatm.precision import (
+    EmbeddingDtype,
+    EmbeddingPrecisionError,
+    resolve_embedding_dtype,
+    to_torch_dtype,
+)
 
 dotenv.load_dotenv()
 
@@ -121,26 +130,118 @@ class Qwen3EmbeddingModels(Enum):
     QWEN3_8B = "Qwen/Qwen3-Embedding-8B"
 
 
-class Qwen3EmbeddingFunction(EmbeddingFunction):
-    """Embed documents using a Qwen3 SentenceTransformer model.
+class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
+    """Shared base for embedding models run locally with SentenceTransformers.
 
-    This embedding function adapts Qwen3 embedding models loaded through
-    SentenceTransformers to the ChromaDB `EmbeddingFunction` interface.
-    The selected model is loaded onto the device returned by
-    `aatm.device.get_device()` (CUDA, MPS or CPU).
+    Subclasses only choose which model identifiers they accept and which extra
+    arguments they pass to `SentenceTransformer.encode`. Loading, device
+    placement and batching live here so every local model behaves the same way
+    when the vector database is built.
+
+    The model is loaded onto the device returned by `aatm.device.get_device()`
+    (CUDA, MPS or CPU), in the precision chosen by
+    `aatm.precision.resolve_embedding_dtype`: the checkpoint's own precision
+    unless another one is requested.
 
     Attributes:
-        model_id: Fully qualified identifier of the selected Qwen3
-            embedding model.
+        is_local: Always ``True``. Marks the class as a local model, which lets
+            the vector database builder tune the GPU batch size for it.
+        model_id: Fully qualified identifier of the loaded model.
+        dtype: Precision the model runs in.
         model: SentenceTransformer instance used to encode documents.
+        batch_size: Number of texts encoded per forward pass.
     """
 
-    def __init__(self, model: str, *args: Any, **kwargs: Any) -> None:
+    is_local: ClassVar[bool] = True
+
+    encode_kwargs: ClassVar[dict[str, Any]] = {}
+    """Extra keyword arguments passed to every `SentenceTransformer.encode` call."""
+
+    unsupported_dtypes: ClassVar[frozenset[str]] = frozenset()
+    """Precisions known to produce broken embeddings with this model."""
+
+    def __init__(
+        self, model_id: str, batch_size: int = 32, dtype: str | None = None
+    ) -> None:
+        """Load the model onto the selected device.
+
+        Args:
+            model_id: Fully qualified identifier of the model to load.
+            batch_size: Number of texts encoded per forward pass.
+            dtype: Precision to load the model in (``float32``, ``bfloat16`` or
+                ``float16``). If not provided, ``AATM_EMBEDDING_DTYPE`` is used,
+                and otherwise the precision the checkpoint is stored in.
+
+        Returns:
+            None
+
+        Raises:
+            EmbeddingPrecisionError: If the precision is unsupported by the
+                device or the model.
+        """
+        device = get_device()
+        self.dtype: EmbeddingDtype = resolve_embedding_dtype(
+            dtype, device, model_id=model_id
+        )
+        if self.dtype in self.unsupported_dtypes:
+            raise EmbeddingPrecisionError(
+                f"{model_id} does not support {self.dtype} precision."
+            )
+
+        self.model_id = model_id
+        # Pass the dtype explicitly, so the model runs in exactly the precision
+        # recorded in the vector database, whatever transformers' own default.
+        self.model = SentenceTransformer(
+            self.model_id,
+            model_kwargs={"device_map": device, "dtype": to_torch_dtype(self.dtype)},
+            tokenizer_kwargs={"padding_side": "left"},
+        )
+        self.model.eval()
+        self.batch_size = batch_size
+
+    def __call__(self, input: Documents) -> Embeddings:
+        """Generate embeddings for the provided documents.
+
+        Args:
+            input: Documents to be embedded.
+
+        Returns:
+            One float32 vector per document, already on the CPU.
+        """
+        with torch.inference_mode():
+            embeddings = self.model.encode(
+                input,
+                batch_size=self.batch_size,
+                convert_to_numpy=True,
+                **self.encode_kwargs,
+            )
+        return list(embeddings)
+
+
+class Qwen3EmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
+    """Embed documents using a Qwen3 SentenceTransformer model.
+
+    Documents are encoded with the model's ``"query"`` prompt.
+    """
+
+    encode_kwargs: ClassVar[dict[str, Any]] = {"prompt_name": "query"}
+
+    def __init__(
+        self,
+        model: str,
+        batch_size: int = 32,
+        dtype: str | None = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         """Initialize the Qwen3 embedding function.
 
         Args:
             model: Enum key corresponding to a supported Qwen3 embedding
                 model.
+            batch_size: Number of texts encoded per forward pass.
+            dtype: Precision to load the model in. See
+                `LocalSentenceTransformerEmbeddingFunction`.
             *args: Additional positional arguments accepted for interface
                 compatibility.
             **kwargs: Additional keyword arguments accepted for interface
@@ -153,29 +254,9 @@ class Qwen3EmbeddingFunction(EmbeddingFunction):
             ValueError: If `model` is not a valid `Qwen3EmbeddingModels`
                 value.
         """
-        self.model_id = Qwen3EmbeddingModels(model).value
-        self.model = SentenceTransformer(
-            self.model_id,
-            model_kwargs={"device_map": get_device()},
-            tokenizer_kwargs={"padding_side": "left"},
+        super().__init__(
+            Qwen3EmbeddingModels(model).value, batch_size=batch_size, dtype=dtype
         )
-
-    def __call__(self, input: Documents) -> Embeddings:
-        """Generate embeddings for the provided documents.
-
-        This method encodes the input documents using the SentenceTransformer
-        model with the `"query"` prompt configuration.
-
-        Args:
-            input: Documents to be embedded.
-
-        Returns:
-            Embeddings for the provided documents as a list of vectors.
-        """
-        with torch.inference_mode():
-            self.model = self.model.eval()
-            embeddings = self.model.encode(input, prompt_name="query")
-            return embeddings.tolist()
 
 
 class GemmaEmbeddingModels(Enum):
@@ -188,28 +269,31 @@ class GemmaEmbeddingModels(Enum):
     EMBEDDING_GEMMA_300M = "google/embeddinggemma-300M"
 
 
-class GemmaEmbeddingFunction(EmbeddingFunction):
+class GemmaEmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
     """Embed documents using a Gemma SentenceTransformer model.
 
-    This embedding function adapts Gemma embedding models loaded through
-    SentenceTransformers to the ChromaDB `EmbeddingFunction` interface.
-    The selected model is loaded onto the device returned by
-    `aatm.device.get_device()` (CUDA, MPS or CPU).
-
-    Attributes:
-        model_id: Fully qualified identifier of the selected Gemma
-            embedding model.
-        model: SentenceTransformer instance used to encode documents.
+    EmbeddingGemma does not support ``float16``; use ``bfloat16`` or
+    ``float32``.
     """
 
+    unsupported_dtypes: ClassVar[frozenset[str]] = frozenset({"float16"})
+
     def __init__(
-        self, model: str, batch_size: int = 32, *args: Any, **kwargs: Any
+        self,
+        model: str,
+        batch_size: int = 32,
+        dtype: str | None = None,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """Initialize the Gemma embedding function.
 
         Args:
             model: Enum key corresponding to a supported Gemma embedding
                 model.
+            batch_size: Number of texts encoded per forward pass.
+            dtype: Precision to load the model in. See
+                `LocalSentenceTransformerEmbeddingFunction`.
             *args: Additional positional arguments accepted for interface
                 compatibility.
             **kwargs: Additional keyword arguments accepted for interface
@@ -222,27 +306,9 @@ class GemmaEmbeddingFunction(EmbeddingFunction):
             ValueError: If `model` is not a valid `GemmaEmbeddingModels`
                 value.
         """
-        self.model_id = GemmaEmbeddingModels(model).value
-        self.model = SentenceTransformer(
-            self.model_id,
-            model_kwargs={"device_map": get_device()},
-            tokenizer_kwargs={"padding_side": "left"},
+        super().__init__(
+            GemmaEmbeddingModels(model).value, batch_size=batch_size, dtype=dtype
         )
-        self.is_local = True
-        self.batch_size = batch_size
-
-    def __call__(self, input: Documents) -> Embeddings:
-        """Generate embeddings for the provided documents.
-
-        Args:
-            input: Documents to be embedded.
-
-        Returns:
-            Embeddings for the provided documents as a list of vectors.
-        """
-        with torch.inference_mode():
-            embeddings = self.model.encode(input, batch_size=self.batch_size)
-            return embeddings.tolist()
 
 
 class OpenAIEmbeddingModels(Enum):
