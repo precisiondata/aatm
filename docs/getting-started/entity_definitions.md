@@ -96,6 +96,7 @@ A definition file is a YAML **list**. Each item is one entity.
 | `has_parent` | no | `false` | Every mention must be linked to a mention of `parent_key` |
 | `parent_key` | when `has_parent` is true | | Key of the parent entity |
 | `attributes` | no | none | Classifications the model assigns to each mention (see below) |
+| `omop` | no | none | How each mention becomes a row of an OMOP CDM table. Never sent to the model. See [From notes to OMOP tables](omop_tables.md) |
 
 ### Attribute fields
 
@@ -362,12 +363,15 @@ assert result.validated_entities[0].get_attribute("result") == "negative"
 
 ## Other ways to get definitions
 
-**Predefined files** ship with AATM, aligned with OMOP CDM tables. Their source in
+**Predefined files** ship with AATM, aligned with OMOP CDM tables and common clinical
+scales. Their source in
 `aatm/omop/entity_definitions/` is a good starting point to copy:
 
 ```python
 EntityDefinitions.from_predefined("condition_occurrence")
 EntityDefinitions.from_predefined("drug_exposure")
+EntityDefinitions.from_predefined("ecog_performance_status")
+EntityDefinitions.from_predefined("lab_results")
 ```
 
 **In Python**, the same fields are available as models, which is handy for tests or

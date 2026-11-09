@@ -18,6 +18,7 @@ nav:
       - Python API: 'getting-started/quick_start_python_api.md'
       - Information extraction: 'getting-started/quick_start_extraction.md'
     - Writing entity definitions: 'getting-started/entity_definitions.md'
+    - From notes to OMOP tables: 'getting-started/omop_tables.md'
   - API Reference:
     - Command Line Interface: 'reference/cli.md'
     - Pipeline components:
@@ -39,6 +40,7 @@ nav:
     - Other modules:
       - Data Models: 'reference/data_models.md'
       - Extraction data models: 'reference/extraction_data_models.md'
+      - OMOP tables: 'reference/omop.md'
       - Debug: 'reference/debug.md'
       - Device selection: 'reference/device.md'
       - Local database utilities: 'reference/local_database_utils.md'

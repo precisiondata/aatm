@@ -26,6 +26,7 @@ dependencies = [
     "torch>=2.10.0",
     "sentence-transformers>=5.2.2",
     "transformers>=4.57.3",
+    "python-dateutil>=2.9.0",
 ]
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
@@ -48,6 +49,7 @@ dev = [
     "pandas-stubs>=3.0.3.260530",
     "types-tqdm>=4.67.3.20260518",
     "pytest-cov>=7.0.0",
+    "types-python-dateutil>=2.9.0",
 ]
 anthropic = [
     "anthropic>=1.0.0",

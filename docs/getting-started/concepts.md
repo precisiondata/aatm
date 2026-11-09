@@ -79,7 +79,7 @@ Examples:
 
 The extraction pipeline turns clinical text into structured entities that can later be mapped.
 
-- **Entity definitions** (`EntityDefinitions`) describe what to extract. They are loaded from YAML, either predefined (`condition_occurrence`, `drug_exposure`) or your own. An entity can require a parent, such as a start date that belongs to a condition, and can define attributes: labels from a fixed list assigned to each mention, such as the result of a test. See [Writing entity definitions](entity_definitions.md).
+- **Entity definitions** (`EntityDefinitions`) describe what to extract. They are loaded from YAML, either predefined (`condition_occurrence`, `drug_exposure`, `ecog_performance_status`, `lab_results`) or your own. An entity can require a parent, such as a start date that belongs to a condition, and can define attributes: labels from a fixed list assigned to each mention, such as the result of a test. See [Writing entity definitions](entity_definitions.md).
 - **Extractor** (`SimpleLLMExtractor`) sends each document to an LLM as numbered lines. The model returns each mention with an id, its exact text, its line and the ids of its parents.
 - **Validation** (`validate_extracted_entity`) keeps only mentions that exist on the given line, checks keys, parent links and attribute labels, and records why every rejected mention failed. A wrong label on an optional attribute is reported without dropping the mention.
 - **Records** (`EntityValidationResult.to_records()`) nest validated entities under their parents, ready to become table rows.
