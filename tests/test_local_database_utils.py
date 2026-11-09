@@ -216,6 +216,8 @@ def fake_local_project(tmp_path, monkeypatch):
         "is_bf16_supported",
         lambda including_emulation=True: True,
     )
+    # The fake checkpoint is stored in float32, like EmbeddingGemma.
+    monkeypatch.setattr(precision, "checkpoint_dtype", lambda model_id: "float32")
     FakeLocalModel.loaded_dtypes = []
     spec = retrievers.ChromaRetrieverModelSpec(
         name="fake-local",
@@ -246,7 +248,18 @@ def build_local(**kwargs):
     ldu.build_local_vector_database("fake-local", encode_batch_size=8, **kwargs)
 
 
-def test_new_database_defaults_to_float32_and_records_it(fake_local_project):
+def test_new_database_defaults_to_checkpoint_precision(fake_local_project, monkeypatch):
+    from aatm import precision
+
+    monkeypatch.setattr(precision, "checkpoint_dtype", lambda model_id: "bfloat16")
+
+    build_local()
+
+    assert FakeLocalModel.loaded_dtypes == ["bfloat16"]
+    assert stored_dtype(fake_local_project) == "bfloat16"
+
+
+def test_float32_checkpoint_builds_in_float32(fake_local_project):
     build_local()
     assert FakeLocalModel.loaded_dtypes == ["float32"]
     assert stored_dtype(fake_local_project) == "float32"

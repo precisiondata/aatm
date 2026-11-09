@@ -39,9 +39,9 @@ from aatm.gpu_memory import (
 from aatm.logs import get_logger
 from aatm.precision import (
     COLLECTION_DTYPE_KEY,
-    DEFAULT_EMBEDDING_DTYPE,
     EmbeddingDtype,
     check_dtype_supported,
+    default_embedding_dtype,
     dtype_for_existing_collection,
     requested_embedding_dtype,
 )
@@ -608,9 +608,10 @@ def build_local_vector_database(
             pass. If not provided, on CUDA it is calibrated on the datasets'
             longest and typical texts (see `aatm.gpu_memory`); otherwise the
             embedding function's default is used. Ignored for API models.
-        embedding_dtype: Precision for local models: ``float32`` (default),
+        embedding_dtype: Precision for local models: ``float32``,
             ``bfloat16`` or ``float16``. If not provided,
-            ``AATM_EMBEDDING_DTYPE`` is used. When repairing, the database's
+            ``AATM_EMBEDDING_DTYPE`` is used, and otherwise the precision the
+            model's checkpoint is stored in. When repairing, the database's
             recorded precision is used unless a different one is requested,
             which raises `EmbeddingPrecisionError`. See `aatm.precision`.
         profile_timing: Whether to log per-stage timing information.
@@ -704,7 +705,9 @@ def build_local_vector_database(
 
     if is_local:
         if existing_collection is None:
-            build_dtype = requested_dtype or DEFAULT_EMBEDDING_DTYPE
+            build_dtype = requested_dtype or default_embedding_dtype(
+                spec.model_id, get_device()
+            )
         else:
             build_dtype = dtype_for_existing_collection(
                 (existing_collection.metadata or {}).get(COLLECTION_DTYPE_KEY),

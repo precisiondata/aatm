@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from aatm import embedding_functions as ef
+from aatm import precision
 
 
 class FakeSentenceTransformer:
@@ -30,6 +31,14 @@ def fake_st(monkeypatch):
     FakeSentenceTransformer.instances = []
     monkeypatch.setattr(ef, "SentenceTransformer", FakeSentenceTransformer)
     monkeypatch.setattr(ef, "get_device", lambda: "cpu")
+    monkeypatch.delenv("AATM_EMBEDDING_DTYPE", raising=False)
+    # Checkpoints are "stored" in bfloat16 unless a test says otherwise.
+    monkeypatch.setattr(precision, "checkpoint_dtype", lambda model_id: "bfloat16")
+    monkeypatch.setattr(
+        precision.torch.cuda,
+        "is_bf16_supported",
+        lambda including_emulation=True: True,
+    )
     return FakeSentenceTransformer
 
 
@@ -75,8 +84,16 @@ def test_unknown_model_id_is_rejected(fake_st):
         ef.Qwen3EmbeddingFunction(model="not-a-model")
 
 
-def test_models_load_in_float32_by_default(fake_st, monkeypatch):
-    monkeypatch.delenv("AATM_EMBEDDING_DTYPE", raising=False)
+def test_models_load_in_checkpoint_precision_by_default(fake_st, monkeypatch):
+    monkeypatch.setattr(ef, "get_device", lambda: "cuda")
+    function = ef.Qwen3EmbeddingFunction(model=ef.Qwen3EmbeddingModels.QWEN3_06B.value)
+    assert function.dtype == "bfloat16"
+    assert (
+        fake_st.instances[0].init_kwargs["model_kwargs"]["dtype"] is ef.torch.bfloat16
+    )
+
+
+def test_half_precision_checkpoint_loads_in_float32_on_cpu(fake_st):
     function = ef.Qwen3EmbeddingFunction(model=ef.Qwen3EmbeddingModels.QWEN3_06B.value)
     assert function.dtype == "float32"
     assert fake_st.instances[0].init_kwargs["model_kwargs"]["dtype"] is ef.torch.float32

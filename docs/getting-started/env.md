@@ -47,7 +47,7 @@ At `INFO` level, AATM logs the device local models run on (see the logging setti
 
 | Variable | Values | Effect |
 |---|---|---|
-| `AATM_EMBEDDING_DTYPE` | `float32`, `bfloat16`, `float16` | Precision local embedding models run in when building the vector database. Defaults to `float32`. Half precision (`bfloat16` or `float16`) needs an NVIDIA GPU; it roughly halves GPU memory use and encodes faster. `bfloat16` needs an Ampere or newer GPU, and EmbeddingGemma does not support `float16`. `aatm init --embedding-dtype` overrides this variable. |
+| `AATM_EMBEDDING_DTYPE` | `float32`, `bfloat16`, `float16` | Precision local embedding models run in when building the vector database. If unset, AATM uses the precision the model's checkpoint is stored in (`bfloat16` for Qwen3 Embedding, `float32` for EmbeddingGemma), or `float32` if this machine cannot run it. Half precision (`bfloat16` or `float16`) needs an NVIDIA GPU; it roughly halves GPU memory use and encodes faster. `bfloat16` needs an Ampere or newer GPU, and EmbeddingGemma does not support `float16`. `aatm init --embedding-dtype` overrides this variable. |
 
 Half precision changes the embeddings slightly, so AATM never mixes precisions in one vector database. It records the precision in the database and:
 

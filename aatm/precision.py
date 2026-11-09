@@ -1,20 +1,25 @@
 """
 Choose the numeric precision local embedding models run in.
 
-Local embedding models run in full precision (``float32``) by default. On an
-NVIDIA GPU you can opt in to half precision, which roughly halves memory use and
-encodes faster:
+By default, local embedding models run in the precision their checkpoint is
+stored in, read from the model's ``config.json``: ``bfloat16`` for Qwen3
+Embedding, ``float32`` for EmbeddingGemma. If this machine cannot run the
+checkpoint's precision (half precision off an NVIDIA GPU, or ``bfloat16`` on a
+GPU without native support), the model runs in ``float32`` instead.
+
+You can choose another precision. Half precision roughly halves memory use and
+encodes faster on an NVIDIA GPU:
 
 - ``bfloat16``: needs an Ampere or newer GPU (RTX 30xx, A100 and later).
 - ``float16``: works on older GPUs too, but some models produce unstable
   embeddings in it (EmbeddingGemma does not support it).
 
-Choose the precision with, in order of priority:
+The precision is chosen, in order of priority, by:
 
 1. the ``embedding_dtype`` argument of `build_local_vector_database` (or
    ``aatm init --embedding-dtype``);
 2. the ``AATM_EMBEDDING_DTYPE`` environment variable;
-3. the default, ``float32``.
+3. the checkpoint's precision, as described above.
 
 Half precision changes the embeddings slightly, so one vector database must not
 mix precisions. The builder records the precision in the collection's metadata
@@ -24,14 +29,16 @@ retriever, it encodes queries in the precision the database was built with.
 ```python
 from aatm.precision import resolve_embedding_dtype
 
-resolve_embedding_dtype(None, device="cuda")  # "float32" unless AATM_EMBEDDING_DTYPE is set
-resolve_embedding_dtype("bf16", device="cuda")  # "bfloat16"
+resolve_embedding_dtype(None, device="cuda", model_id="Qwen/Qwen3-Embedding-0.6B")
+# "bfloat16", the checkpoint's precision, unless AATM_EMBEDDING_DTYPE is set
+resolve_embedding_dtype("fp32", device="cuda")  # "float32"
 ```
 """
 
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from typing import Literal, cast
 
 import torch
@@ -49,7 +56,8 @@ SUPPORTED_EMBEDDING_DTYPES: tuple[EmbeddingDtype, ...] = (
     "bfloat16",
     "float16",
 )
-DEFAULT_EMBEDDING_DTYPE: EmbeddingDtype = "float32"
+FALLBACK_EMBEDDING_DTYPE: EmbeddingDtype = "float32"
+"""Precision used when the checkpoint's own cannot be read or run on this machine."""
 
 COLLECTION_DTYPE_KEY = "aatm_embedding_dtype"
 """ChromaDB collection metadata key that records the precision of its embeddings."""
@@ -140,24 +148,90 @@ def check_dtype_supported(dtype: EmbeddingDtype, device: str) -> None:
         )
 
 
-def resolve_embedding_dtype(value: str | None, device: str) -> EmbeddingDtype:
+@lru_cache(maxsize=None)
+def checkpoint_dtype(model_id: str) -> EmbeddingDtype | None:
+    """Return the precision a model's checkpoint is stored in.
+
+    Reads ``dtype`` (``torch_dtype`` in older transformers versions) from the
+    model's ``config.json``, using the Hugging Face cache when available.
+
+    Args:
+        model_id: Hugging Face model identifier.
+
+    Returns:
+        The checkpoint's precision, or ``None`` if the config cannot be read or
+        names a precision AATM does not support.
+    """
+    from transformers import AutoConfig
+
+    try:
+        config = AutoConfig.from_pretrained(model_id)
+    except Exception as error:  # noqa: BLE001 - any failure means "unknown"
+        logger.warning(f"Could not read the precision of {model_id}: {error}")
+        return None
+
+    stored = getattr(config, "dtype", None) or getattr(config, "torch_dtype", None)
+    if stored is None:
+        return None
+
+    name = str(stored).removeprefix("torch.")
+    try:
+        return parse_embedding_dtype(name)
+    except EmbeddingPrecisionError:
+        logger.warning(f"{model_id} is stored in unsupported precision {name!r}.")
+        return None
+
+
+def default_embedding_dtype(model_id: str | None, device: str) -> EmbeddingDtype:
+    """Return the precision to use when the user did not choose one.
+
+    Args:
+        model_id: Hugging Face model identifier, or ``None`` if unknown.
+        device: Device the model will run on.
+
+    Returns:
+        The checkpoint's precision if ``device`` can run it, otherwise
+        `FALLBACK_EMBEDDING_DTYPE`.
+    """
+    dtype = checkpoint_dtype(model_id) if model_id else None
+    if dtype is None:
+        return FALLBACK_EMBEDDING_DTYPE
+
+    try:
+        check_dtype_supported(dtype, device)
+    except EmbeddingPrecisionError:
+        logger.info(
+            f"{model_id} is stored in {dtype}, which {device!r} cannot run; "
+            f"using {FALLBACK_EMBEDDING_DTYPE}."
+        )
+        return FALLBACK_EMBEDDING_DTYPE
+    return dtype
+
+
+def resolve_embedding_dtype(
+    value: str | None, device: str, model_id: str | None = None
+) -> EmbeddingDtype:
     """Return the precision to load a local model in.
 
     Args:
         value: Precision passed explicitly, or ``None`` to use
             ``AATM_EMBEDDING_DTYPE`` or the default.
         device: Device the model will run on.
+        model_id: Hugging Face model identifier, used to find the default
+            precision in the checkpoint.
 
     Returns:
         The canonical precision name.
 
     Raises:
-        EmbeddingPrecisionError: If the precision is unsupported, or the device
-            cannot run it.
+        EmbeddingPrecisionError: If a requested precision is unsupported, or the
+            device cannot run it.
     """
-    dtype = requested_embedding_dtype(value) or DEFAULT_EMBEDDING_DTYPE
-    check_dtype_supported(dtype, device)
-    return dtype
+    requested = requested_embedding_dtype(value)
+    if requested is None:
+        return default_embedding_dtype(model_id, device)
+    check_dtype_supported(requested, device)
+    return requested
 
 
 def to_torch_dtype(dtype: EmbeddingDtype) -> torch.dtype:

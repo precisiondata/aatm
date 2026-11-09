@@ -140,8 +140,8 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
 
     The model is loaded onto the device returned by `aatm.device.get_device()`
     (CUDA, MPS or CPU), in the precision chosen by
-    `aatm.precision.resolve_embedding_dtype`: ``float32`` unless half precision
-    is requested.
+    `aatm.precision.resolve_embedding_dtype`: the checkpoint's own precision
+    unless another one is requested.
 
     Attributes:
         is_local: Always ``True``. Marks the class as a local model, which lets
@@ -169,8 +169,8 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
             model_id: Fully qualified identifier of the model to load.
             batch_size: Number of texts encoded per forward pass.
             dtype: Precision to load the model in (``float32``, ``bfloat16`` or
-                ``float16``). If not provided, ``AATM_EMBEDDING_DTYPE`` or the
-                default ``float32`` is used.
+                ``float16``). If not provided, ``AATM_EMBEDDING_DTYPE`` is used,
+                and otherwise the precision the checkpoint is stored in.
 
         Returns:
             None
@@ -180,15 +180,17 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
                 device or the model.
         """
         device = get_device()
-        self.dtype: EmbeddingDtype = resolve_embedding_dtype(dtype, device)
+        self.dtype: EmbeddingDtype = resolve_embedding_dtype(
+            dtype, device, model_id=model_id
+        )
         if self.dtype in self.unsupported_dtypes:
             raise EmbeddingPrecisionError(
                 f"{model_id} does not support {self.dtype} precision."
             )
 
         self.model_id = model_id
-        # Pass the dtype explicitly: recent transformers versions otherwise
-        # load the checkpoint's own dtype, which is bfloat16 for Qwen3.
+        # Pass the dtype explicitly, so the model runs in exactly the precision
+        # recorded in the vector database, whatever transformers' own default.
         self.model = SentenceTransformer(
             self.model_id,
             model_kwargs={"device_map": device, "dtype": to_torch_dtype(self.dtype)},

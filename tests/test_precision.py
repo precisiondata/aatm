@@ -1,4 +1,7 @@
+from types import SimpleNamespace
+
 import pytest
+import torch
 
 from aatm import precision
 from aatm.precision import (
@@ -22,9 +25,88 @@ def bf16_gpu(monkeypatch):
     )
 
 
-def test_default_is_full_precision():
+@pytest.fixture
+def checkpoint(monkeypatch):
+    """Set the precision fake checkpoints are stored in."""
+
+    def set_dtype(dtype):
+        monkeypatch.setattr(precision, "checkpoint_dtype", lambda model_id: dtype)
+
+    return set_dtype
+
+
+def test_default_is_the_checkpoint_precision(bf16_gpu, checkpoint):
+    checkpoint("bfloat16")
+    assert resolve_embedding_dtype(None, device="cuda", model_id="m") == "bfloat16"
+    checkpoint("float32")
+    assert resolve_embedding_dtype(None, device="cuda", model_id="m") == "float32"
+
+
+@pytest.mark.parametrize("device", ["cpu", "mps"])
+def test_half_precision_checkpoint_falls_back_to_float32_off_gpu(checkpoint, device):
+    checkpoint("bfloat16")
+    assert resolve_embedding_dtype(None, device=device, model_id="m") == "float32"
+
+
+def test_bfloat16_checkpoint_falls_back_without_native_support(monkeypatch, checkpoint):
+    monkeypatch.setattr(
+        precision.torch.cuda,
+        "is_bf16_supported",
+        lambda including_emulation=True: False,
+    )
+    checkpoint("bfloat16")
+    assert resolve_embedding_dtype(None, device="cuda", model_id="m") == "float32"
+
+
+def test_unknown_checkpoint_precision_falls_back_to_float32(checkpoint):
+    checkpoint(None)
+    assert resolve_embedding_dtype(None, device="cuda", model_id="m") == "float32"
     assert resolve_embedding_dtype(None, device="cuda") == "float32"
-    assert resolve_embedding_dtype(None, device="cpu") == "float32"
+
+
+def test_request_overrides_checkpoint_precision(bf16_gpu, checkpoint, monkeypatch):
+    checkpoint("bfloat16")
+    assert resolve_embedding_dtype("fp32", device="cuda", model_id="m") == "float32"
+    monkeypatch.setenv(EMBEDDING_DTYPE_ENV_VAR, "float32")
+    assert resolve_embedding_dtype(None, device="cuda", model_id="m") == "float32"
+
+
+@pytest.mark.parametrize(
+    ("config", "expected"),
+    [
+        ({"dtype": torch.bfloat16}, "bfloat16"),
+        ({"torch_dtype": "float32"}, "float32"),  # older transformers versions
+        ({"dtype": torch.float64}, None),  # not supported by AATM
+        ({}, None),
+    ],
+)
+def test_checkpoint_dtype_reads_model_config(monkeypatch, config, expected):
+    import transformers
+
+    monkeypatch.setattr(
+        transformers.AutoConfig,
+        "from_pretrained",
+        lambda model_id: SimpleNamespace(**config),
+    )
+    precision.checkpoint_dtype.cache_clear()
+    try:
+        assert precision.checkpoint_dtype("some/model") == expected
+    finally:
+        precision.checkpoint_dtype.cache_clear()
+
+
+def test_checkpoint_dtype_is_none_when_config_cannot_be_read(monkeypatch):
+    import transformers
+
+    def fail(model_id):
+        raise OSError("offline")
+
+    monkeypatch.setattr(transformers.AutoConfig, "from_pretrained", fail)
+    precision.checkpoint_dtype.cache_clear()
+    try:
+        assert precision.checkpoint_dtype("some/model") is None
+    finally:
+        precision.checkpoint_dtype.cache_clear()
 
 
 @pytest.mark.parametrize(

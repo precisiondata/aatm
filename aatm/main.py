@@ -224,10 +224,10 @@ def init(
         typer.Option(
             "--embedding-dtype",
             help=(
-                "Precision for local embedding models: float32 (default), "
-                "bfloat16 or float16. Half precision is faster and uses less GPU "
-                "memory, but requires an NVIDIA GPU. Overrides "
-                "AATM_EMBEDDING_DTYPE."
+                "Precision for local embedding models: float32, bfloat16 or "
+                "float16. Defaults to the precision of the model's checkpoint. "
+                "Half precision is faster and uses less GPU memory, but requires "
+                "an NVIDIA GPU. Overrides AATM_EMBEDDING_DTYPE."
             ),
             show_default=False,
         ),
@@ -262,7 +262,8 @@ def init(
             the local vector database. If not provided, the user is
             prompted to select one interactively.
         embedding_dtype: Precision for local embedding models. If not
-            provided, `AATM_EMBEDDING_DTYPE` or `float32` is used.
+            provided, `AATM_EMBEDDING_DTYPE` is used, and otherwise the
+            precision of the model's checkpoint.
         standard_vocabs: List of standard vocabularies to include in the
             mapping datasets. If not provided, the user is prompted to
             select one or more interactively.
