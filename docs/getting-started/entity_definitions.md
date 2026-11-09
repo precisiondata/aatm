@@ -374,6 +374,7 @@ EntityDefinitions.from_predefined("ecog_performance_status")
 EntityDefinitions.from_predefined("lab_results")
 EntityDefinitions.from_predefined("smoking_status")
 EntityDefinitions.from_predefined("family_history")
+EntityDefinitions.from_predefined("medical_history")
 ```
 
 **In Python**, the same fields are available as models, which is handy for tests or
