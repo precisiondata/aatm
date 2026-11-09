@@ -43,3 +43,27 @@ def test_estimate_batch_size_rejects_non_local_models(fake_gpu):
 
     with pytest.raises(ValueError, match="not a local embedding model"):
         ldu.estimate_batch_size(ApiFunction())
+
+
+@pytest.mark.parametrize(
+    ("requested", "is_local", "expected"),
+    [
+        (None, True, ldu.LOCAL_MODEL_CHUNK_SIZE),
+        (None, False, ldu.API_MODEL_CHUNK_SIZE),
+        (500, True, 500),
+        (500, False, 500),
+        (100_000, True, 5461),  # capped at the ChromaDB limit
+    ],
+)
+def test_resolve_chunk_size(requested, is_local, expected):
+    assert (
+        ldu.resolve_chunk_size(
+            requested, is_local=is_local, max_chromadb_batch_size=5461
+        )
+        == expected
+    )
+
+
+def test_resolve_chunk_size_rejects_non_positive():
+    with pytest.raises(ValueError):
+        ldu.resolve_chunk_size(0, is_local=True, max_chromadb_batch_size=5461)

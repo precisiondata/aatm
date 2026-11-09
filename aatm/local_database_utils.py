@@ -417,11 +417,53 @@ def estimate_batch_size(embedding_function: Any) -> int:
     )
 
 
+LOCAL_MODEL_CHUNK_SIZE = 4096
+"""Default rows per ChromaDB round-trip for local models.
+
+Large chunks give each ``encode`` call enough texts to keep the GPU busy. The
+GPU batch size is chosen separately, see `estimate_batch_size`.
+"""
+
+API_MODEL_CHUNK_SIZE = 100
+"""Default rows per ChromaDB round-trip for API models.
+
+For API models every chunk is one embeddings request, so this stays within
+provider limits on inputs per request.
+"""
+
+
+def resolve_chunk_size(
+    chunk_size: int | None, is_local: bool, max_chromadb_batch_size: int
+) -> int:
+    """Choose how many rows to read and write per ChromaDB round-trip.
+
+    Args:
+        chunk_size: Size requested by the caller, or ``None`` for the default.
+        is_local: Whether the embedding model runs locally.
+        max_chromadb_batch_size: Largest batch the ChromaDB client accepts in a
+            single ``add`` call.
+
+    Returns:
+        The chunk size, capped at ``max_chromadb_batch_size``.
+
+    Raises:
+        ValueError: If ``chunk_size`` is not positive.
+    """
+    if chunk_size is None:
+        chunk_size = LOCAL_MODEL_CHUNK_SIZE if is_local else API_MODEL_CHUNK_SIZE
+
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be > 0")
+
+    return min(chunk_size, max_chromadb_batch_size)
+
+
 def build_local_vector_database(
     embedding_model_name: str,
     vector_db_dir: Path | None = None,
     rate_limit: int | None = None,
-    batch_size: int = 100,
+    chunk_size: int | None = None,
+    encode_batch_size: int | None = None,
     profile_timing: bool = False,
     profile_sync_cuda: bool = False,
     profile_summary_every_n_batches: int = 20,
@@ -435,8 +477,14 @@ def build_local_vector_database(
             provided, the default path from the retriever model registry is used.
         rate_limit: Optional maximum number of documents to embed per minute. If
             not provided, the default value from the model registry is used.
-        batch_size: Number of records to process and add to the vector database
-            in each batch.
+        chunk_size: Number of dataset rows read, checked against the database
+            and written to it per round-trip. Defaults to
+            `LOCAL_MODEL_CHUNK_SIZE` for local models and
+            `API_MODEL_CHUNK_SIZE` for API models.
+        encode_batch_size: Number of texts a local model encodes per forward
+            pass. If not provided, it is estimated from free GPU memory on CUDA,
+            and otherwise left at the embedding function's default. Ignored for
+            API models.
         profile_timing: Whether to log per-stage timing information.
         profile_sync_cuda: Whether to synchronize CUDA around timed blocks.
             This makes GPU timings more accurate but adds overhead.
@@ -504,11 +552,27 @@ def build_local_vector_database(
             embedding_model_name
         ].embedding_function_cls(model=model_registry[embedding_model_name].model_id)
 
-    if getattr(embedding_function, "is_local", False) and torch.cuda.is_available():
-        with profiler.time_block("estimate_batch_size"):
-            batch_size = estimate_batch_size(embedding_function)
+    is_local = getattr(embedding_function, "is_local", False)
 
-    embedding_function.batch_size = batch_size  # type: ignore[attr-defined]
+    if is_local:
+        if encode_batch_size is None and torch.cuda.is_available():
+            with profiler.time_block("estimate_batch_size"):
+                encode_batch_size = estimate_batch_size(embedding_function)
+
+        if encode_batch_size is not None:
+            if encode_batch_size <= 0:
+                raise ValueError("encode_batch_size must be > 0")
+            embedding_function.batch_size = encode_batch_size  # type: ignore[attr-defined]
+
+        logger.info(
+            f"Encoding with batch size {embedding_function.batch_size}"  # type: ignore[attr-defined]
+        )
+
+    chunk_size = resolve_chunk_size(
+        chunk_size,
+        is_local=is_local,
+        max_chromadb_batch_size=client.get_max_batch_size(),
+    )
 
     with profiler.time_block("get_or_create_collection"):
         collection: Collection = client.get_or_create_collection(
@@ -528,14 +592,14 @@ def build_local_vector_database(
             df = df.drop_duplicates().dropna()
 
         for row_start in track(
-            range(0, len(df), batch_size),
+            range(0, len(df), chunk_size),
             description=f"Adding embeddings for {expression_origin}",
         ):
             batch_start = time.perf_counter()
 
             with profiler.time_block("slice_dataframe_to_records"):
                 records: list[dict[Hashable, Any]] = df.iloc[
-                    row_start : row_start + batch_size
+                    row_start : row_start + chunk_size
                 ].to_dict("records")
 
             with profiler.time_block("build_expression_metadata"):
