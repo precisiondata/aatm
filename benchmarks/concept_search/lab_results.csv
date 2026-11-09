@@ -1,0 +1,31 @@
+id,text,value,unit,sentence,gold,also_accept,language
+1,Hb,11.2,g/dL,"Labs 03/15/2025: Hb 11.2 g/dL, creatinine 1.4 mg/dl.",718-7,,en
+2,creatinine,1.4,mg/dl,"Labs 03/15/2025: Hb 11.2 g/dL, creatinine 1.4 mg/dl.",2160-0,,en
+3,creatinina,1.2,mg/dL,"Exames: creatinina 1,2 mg/dL, ureia 40 mg/dL.",2160-0,,pt
+4,Fasting glucose,126,mg/dL,Fasting glucose 126 mg/dL this morning.,1558-6,,en
+5,K,4.1,mmol/L,"BMP: Na 138, K 4.1 mmol/L, Cl 101.",2823-3,,en
+6,potássio,3.8,mEq/L,Potássio 3.8 mEq/L.,2823-3,,pt
+7,PLT,250,x10^3/uL,"CBC: WBC 7.2, Hgb 13.5, PLT 250 x10^3/uL.",777-3,26515-7,en
+8,HbA1c,8.1,%,HbA1c 8.1% today.,4548-4,,en
+9,TSH,2.3,mIU/L,TSH 2.3 mIU/L (normal).,3016-3,,en
+10,Na,138,mmol/L,"BMP: Na 138 mmol/L, K 4.1, Cl 101.",2951-2,,en
+11,ALT,45,U/L,"LFTs: ALT 45 U/L, AST 30 U/L.",1742-6,,en
+12,AST,30,U/L,"LFTs: ALT 45 U/L, AST 30 U/L.",1920-8,,en
+13,WBC,7.2,x10^3/uL,"CBC: WBC 7.2 x10^3/uL, Hgb 13.5, PLT 250.",6690-2,26464-8,en
+14,urine albumin/creatinine ratio,45,mg/g,Urine albumin/creatinine ratio 45 mg/g.,9318-7,,en
+15,CRP,12,mg/L,CRP 12 mg/L on admission.,1988-5,,en
+16,ureia,40,mg/dL,"Exames: creatinina 1,2 mg/dL, ureia 40 mg/dL.",3091-6,,pt
+17,BUN,18,mg/dL,BUN 18 mg/dL.,3094-0,,en
+18,ferritin,25,ng/mL,Ferritin 25 ng/mL; iron studies pending.,2276-4,,en
+19,INR,1.1,,INR 1.1 on warfarin.,6301-6,34714-6,en
+20,troponin I,0.03,ng/mL,Troponin I 0.03 ng/mL x2.,10839-9,,en
+21,glicemia de jejum,98,mg/dL,Glicemia de jejum 98 mg/dL.,1558-6,,pt
+22,24h urine creatinine,1.2,g/24 h,24h urine creatinine 1.2 g/24 h.,2162-6,,en
+23,Hgb,13.5,g/dL,"CBC: WBC 7.2, Hgb 13.5 g/dL, PLT 250.",718-7,,en
+24,magnesium,2.0,mg/dL,Magnesium 2.0 mg/dL.,19123-9,,en
+25,calcium,9.5,mg/dL,Calcium 9.5 mg/dL.,17861-6,,en
+26,vitamin D 25-OH,20,ng/mL,Vitamin D 25-OH 20 ng/mL (insufficient).,62292-8,1989-3,en
+27,HDL,45,mg/dL,"Lipids: total cholesterol 210 mg/dL, HDL 45 mg/dL.",2085-9,,en
+28,total cholesterol,210,mg/dL,"Lipids: total cholesterol 210 mg/dL, HDL 45 mg/dL.",2093-3,,en
+29,glucose,110,mg/dL,Glucose 110 mg/dL (random).,2345-7,,en
+30,24h urine protein,450,mg/24 h,24h urine protein 450 mg/24 h.,2889-4,,en
