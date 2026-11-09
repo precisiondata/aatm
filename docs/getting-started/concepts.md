@@ -56,6 +56,54 @@ Main implementation:
 
 - `ChromaDBRetriever`
 
+### Metadata filters
+
+A retriever can restrict its candidates with a ChromaDB `where` filter, for example to
+one domain and some vocabularies. The OMOP builder does this for every `map` source:
+
+```python
+from aatm.omop.coding import retriever_filter
+
+where = retriever_filter("Measurement", ["LOINC"])
+# {"$and": [{"std_domain_id": "Measurement"}, {"std_vocabulary_id": {"$in": ["LOINC"]}}]}
+results = retriever(["hemoglobin"], where=where)
+```
+
+ChromaDB applies a filter before the vector search, which takes seconds per query on a
+full index. So by default `ChromaDBRetriever` queries **without** the filter for more
+results than it needs, keeps the ones that match, and asks ChromaDB's filtered query
+only when too few match. `filter_strategy` chooses the method:
+
+| `filter_strategy` | What it does | Results |
+|---|---|---|
+| `"overfetch_fallback"` (default) | Unfiltered query for `max(top_k * overfetch_factor, min_overfetch)` results, then for `max_overfetch` results, then ChromaDB's filtered query, for each query still short of `top_k` matches | Always `top_k` results; about as fast as no filter when the over-fetch finds enough |
+| `"overfetch"` | The same, without the filtered query at the end | Fast, but may return fewer than `top_k` results for rare filters |
+| `"chroma"` | Passes the filter to ChromaDB | Exact, slow on large indexes |
+
+Set it when you load the retriever, or per call:
+
+```python
+retriever = load_retriever(
+    "text-embedding-3-small",
+    filter_strategy="overfetch_fallback",  # default
+    overfetch_factor=20,                   # defaults
+    min_overfetch=1000,
+    max_overfetch=5000,
+)
+retriever(["hemoglobin"], where=where, filter_strategy="chroma")
+```
+
+Both methods are approximate vector searches, so their results can differ slightly. The
+over-fetch can miss matches that rank deep in the unfiltered results, which happens when
+the filter fits the query poorly (a lab test searched in the Condition domain). Raise
+`min_overfetch` and `max_overfetch` for such filters. ChromaDB's filtered search can miss
+close matches too: on a full index it sometimes returned none of the 20 nearest
+Measurement records for a lab test.
+
+The over-fetch evaluates equality, `$eq`, `$in`, `$and` and `$or`, which covers every
+filter `retriever_filter` builds. The default strategy hands any other filter to
+ChromaDB; `"overfetch"` raises `UnsupportedFilterError` for it.
+
 ## Reranker
 
 Rerankers reorder retrieved candidates.

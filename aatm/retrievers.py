@@ -11,12 +11,112 @@ retrievers to be chained with other components such as rerankers and selectors.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, List
+from typing import Any, List, Literal, Mapping, Sequence, get_args
 import chromadb
-from chromadb import EmbeddingFunction, QueryResult
+from chromadb import EmbeddingFunction
 
 from .data_models import RetrievedExpressionMetadata, RetrieverResults, Translation
 from .pipeline import PipelineBaseClass
+
+FilterStrategy = Literal["overfetch_fallback", "overfetch", "chroma"]
+"""How `ChromaDBRetriever` applies a `where` metadata filter.
+
+- ``"overfetch_fallback"`` (default): query without the filter for more
+  results than needed, keep the ones that match the filter, and run ChromaDB's
+  filtered query for the queries where fewer than ``top_k`` matches survive.
+- ``"overfetch"``: the same over-fetch, without the fallback. A query may then
+  return fewer than ``top_k`` results.
+- ``"chroma"``: pass the filter to ChromaDB, which applies it before the vector
+  search. Exact, but slow on large collections when many records match.
+"""
+
+FILTER_STRATEGIES: tuple[str, ...] = get_args(FilterStrategy)
+
+_Hit = tuple[float, dict[str, Any]]
+"""One retrieved record: its distance and its metadata."""
+
+
+class UnsupportedFilterError(ValueError):
+    """Raised when a `where` filter cannot be evaluated in Python."""
+
+
+def _values_equal(a: Any, b: Any) -> bool:
+    # Python treats True == 1; ChromaDB keeps booleans and numbers apart.
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    return a == b
+
+
+def _is_scalar(value: Any) -> bool:
+    return isinstance(value, (str, int, float, bool))
+
+
+def is_supported_filter(where: Any) -> bool:
+    """Whether `matches_filter` can evaluate a ChromaDB `where` filter.
+
+    Supported: field equality (``{"field": value}`` or
+    ``{"field": {"$eq": value}}``), ``{"field": {"$in": [...]}}``, and
+    ``$and`` / ``$or`` over supported filters. Like ChromaDB, each dict holds
+    exactly one key.
+    """
+    if not isinstance(where, Mapping) or len(where) != 1:
+        return False
+    ((key, value),) = where.items()
+    if key in ("$and", "$or"):
+        return (
+            isinstance(value, Sequence)
+            and not isinstance(value, str)
+            and len(value) > 0
+            and all(is_supported_filter(clause) for clause in value)
+        )
+    if key.startswith("$"):
+        return False
+    if _is_scalar(value):
+        return True
+    if isinstance(value, Mapping) and len(value) == 1:
+        ((op, operand),) = value.items()
+        if op == "$eq":
+            return _is_scalar(operand)
+        if op == "$in":
+            return (
+                isinstance(operand, Sequence)
+                and not isinstance(operand, str)
+                and all(_is_scalar(item) for item in operand)
+            )
+    return False
+
+
+def matches_filter(
+    metadata: Mapping[str, Any] | None, where: Mapping[str, Any]
+) -> bool:
+    """Evaluate a ChromaDB `where` filter on one record's metadata.
+
+    A record that lacks a field never matches a condition on that field.
+
+    Raises:
+        UnsupportedFilterError: If the filter is not one of the shapes listed
+            in `is_supported_filter`.
+    """
+    if not is_supported_filter(where):
+        raise UnsupportedFilterError(f"Cannot evaluate filter in Python: {where!r}")
+    return _matches(metadata or {}, where)
+
+
+def _matches(metadata: Mapping[str, Any], where: Mapping[str, Any]) -> bool:
+    ((key, value),) = where.items()
+    if key == "$and":
+        return all(_matches(metadata, clause) for clause in value)
+    if key == "$or":
+        return any(_matches(metadata, clause) for clause in value)
+    if key not in metadata:
+        return False
+    field_value = metadata[key]
+    if isinstance(value, Mapping):
+        ((op, operand),) = value.items()
+        if op == "$in":
+            return any(_values_equal(field_value, item) for item in operand)
+        value = operand  # $eq
+    return _values_equal(field_value, value)
 
 
 class BaseRetriever(PipelineBaseClass, ABC):
@@ -102,6 +202,21 @@ class ChromaDBRetriever(BaseRetriever):
 
     The retriever supports default filtering through a ``where`` clause and a
     configurable default number of results per query.
+
+    A ``where`` filter makes ChromaDB's own query slow on large collections:
+    ChromaDB fetches every record that matches the filter before the vector
+    search. ``filter_strategy`` chooses how the filter is applied instead (see
+    `FilterStrategy`). With the default, ``"overfetch_fallback"``, the
+    retriever first queries without the filter for
+    ``max(top_k * overfetch_factor, min_overfetch)`` results, then, for the
+    queries still short of ``top_k`` matches, for ``max_overfetch`` results,
+    and only then falls back to ChromaDB's filtered query. With an exact
+    search, the ``top_k`` matches that survive would be exactly the filtered
+    query's results. The vector index is approximate, so in practice both
+    methods miss some neighbours, in different places: the over-fetch misses
+    matches that sit deep in the unfiltered ranking (a filter that fits the
+    query poorly), while ChromaDB's filtered search can miss even close
+    matches. Raise ``min_overfetch`` / ``max_overfetch`` for deeper filters.
     """
 
     def __init__(
@@ -111,6 +226,10 @@ class ChromaDBRetriever(BaseRetriever):
         embedding_function: EmbeddingFunction,
         top_k: int = 10,
         where: dict[str, Any] | None = None,
+        filter_strategy: FilterStrategy = "overfetch_fallback",
+        overfetch_factor: int = 20,
+        min_overfetch: int = 1000,
+        max_overfetch: int = 5000,
         *args: Any,
         **kwargs: Any,
     ):
@@ -129,6 +248,16 @@ class ChromaDBRetriever(BaseRetriever):
             top_k: Default number of candidate results to return per query.
             where: Optional metadata filter applied to all queries unless
                 overridden at retrieval time.
+            filter_strategy: How a ``where`` filter is applied. One of
+                ``"overfetch_fallback"`` (default), ``"overfetch"`` or
+                ``"chroma"``. See `FilterStrategy`.
+            overfetch_factor: The first unfiltered query fetches
+                ``top_k * overfetch_factor`` results (at least
+                ``min_overfetch``).
+            min_overfetch: Lower bound on the first unfiltered query's size.
+            max_overfetch: Size of the second, wider unfiltered query, run for
+                the queries the first one left short of ``top_k`` matches.
+                Skipped when it is not larger than the first query.
             *args: Additional positional arguments reserved for compatibility.
             **kwargs: Additional keyword arguments reserved for compatibility.
         """
@@ -141,12 +270,21 @@ class ChromaDBRetriever(BaseRetriever):
         )
         self.top_k = top_k
         self.where = where
+        self.filter_strategy = _check_strategy(filter_strategy)
+        if overfetch_factor < 1 or min_overfetch < 1 or max_overfetch < 1:
+            raise ValueError(
+                "overfetch_factor, min_overfetch and max_overfetch must be >= 1."
+            )
+        self.overfetch_factor = overfetch_factor
+        self.min_overfetch = min_overfetch
+        self.max_overfetch = max_overfetch
 
     def retrieve(
         self,
         queries: List[str],
         where: dict[str, Any] | None = None,
         top_k: int | None = None,
+        filter_strategy: FilterStrategy | None = None,
         *args,
         **kwargs,
     ) -> RetrieverResults:
@@ -164,38 +302,132 @@ class ChromaDBRetriever(BaseRetriever):
                 not provided, the retriever's default filter is used.
             top_k: Optional number of results to return per query. If not
                 provided, the retriever's default ``top_k`` value is used.
+            filter_strategy: Optional override of the retriever's
+                ``filter_strategy`` for this call. Ignored without a filter.
 
         Returns:
             A ``RetrieverResults`` instance containing processed retrieval
                 results for each query, including distances and metadata.
 
         Raises:
+            UnsupportedFilterError: With ``filter_strategy="overfetch"``, if the
+                filter has a shape `is_supported_filter` rejects. The default
+                strategy hands such filters to ChromaDB instead.
             Exception: Propagates errors raised by the underlying ChromaDB
                 client or collection query operation.
         """
-        results: QueryResult = self.collection.query(
-            query_texts=queries,
-            n_results=top_k if top_k is not None else self.top_k,
-            where=where if where is not None else self.where,
+        n_results = top_k if top_k is not None else self.top_k
+        where = where if where is not None else self.where
+        strategy = _check_strategy(
+            filter_strategy if filter_strategy is not None else self.filter_strategy
         )
 
-        processed_results = []
-        for query_id, _ in enumerate(queries):
-            query_results = []
-
-            assert results["distances"] is not None, "distances must not be None"
-            assert results["metadatas"] is not None, "metadatas must not be None"
-
-            for distance, metadata in zip(
-                results["distances"][query_id],
-                results["metadatas"][query_id],
-            ):
-                query_results.append(
-                    RetrievedExpressionMetadata(distance=distance, **metadata)  # type: ignore[arg-type]
+        hits: list[list[_Hit]]
+        if not where:
+            hits = self._query(query_texts=queries, n_results=n_results)
+        elif strategy == "chroma" or (
+            strategy == "overfetch_fallback" and not is_supported_filter(where)
+        ):
+            hits = self._query(query_texts=queries, n_results=n_results, where=where)
+        else:
+            if not is_supported_filter(where):
+                raise UnsupportedFilterError(
+                    f"Cannot evaluate filter in Python: {where!r}. Use "
+                    "filter_strategy='chroma' or 'overfetch_fallback' for it."
                 )
-            processed_results.append(query_results)
+            hits = self._overfetch(
+                queries,
+                where,
+                n_results,
+                fallback=strategy == "overfetch_fallback",
+            )
+
+        processed_results = [
+            [
+                RetrievedExpressionMetadata(distance=distance, **metadata)  # type: ignore[arg-type]
+                for distance, metadata in query_hits
+            ]
+            for query_hits in hits
+        ]
 
         return RetrieverResults(
             results=processed_results,
             queries=queries,
         )
+
+    def overfetch_sizes(self, top_k: int) -> list[int]:
+        """The sizes of the unfiltered queries the over-fetch runs, in order."""
+        first = max(top_k * self.overfetch_factor, self.min_overfetch)
+        return [first, self.max_overfetch] if self.max_overfetch > first else [first]
+
+    def _overfetch(
+        self,
+        queries: List[str],
+        where: dict[str, Any],
+        top_k: int,
+        fallback: bool,
+    ) -> list[list[_Hit]]:
+        """Query without the filter, filter in Python, widen, then fall back."""
+        # Embed once: the wider query and the fallback reuse the embeddings.
+        embeddings = list(self._embed_queries(queries))
+        hits: list[list[_Hit]] = [[] for _ in queries]
+        pending = list(range(len(queries)))
+
+        for size in self.overfetch_sizes(top_k):
+            batch = self._query(
+                query_embeddings=[embeddings[i] for i in pending], n_results=size
+            )
+            still_short = []
+            for i, query_hits in zip(pending, batch):
+                matching = [hit for hit in query_hits if _matches(hit[1], where)]
+                hits[i] = matching[:top_k]
+                # Fewer results than asked for: the whole collection was seen,
+                # so no wider query or fallback can find more matches.
+                if len(matching) < top_k and len(query_hits) >= size:
+                    still_short.append(i)
+            pending = still_short
+            if not pending:
+                return hits
+
+        if fallback:
+            batch = self._query(
+                query_embeddings=[embeddings[i] for i in pending],
+                n_results=top_k,
+                where=where,
+            )
+            for i, query_hits in zip(pending, batch):
+                hits[i] = query_hits
+        return hits
+
+    def _embed_queries(self, queries: List[str]) -> Any:
+        """Embed query texts the way ChromaDB does for `query_texts`."""
+        embed_query = getattr(self.embedding_function, "embed_query", None)
+        if callable(embed_query):
+            return embed_query(input=queries)
+        return self.embedding_function(input=queries)
+
+    def _query(self, n_results: int, **kwargs: Any) -> list[list[_Hit]]:
+        """Run one ChromaDB query and return each query's (distance, metadata)."""
+        results = self.collection.query(
+            n_results=n_results,
+            include=["metadatas", "distances"],
+            **kwargs,
+        )
+        assert results["distances"] is not None, "distances must not be None"
+        assert results["metadatas"] is not None, "metadatas must not be None"
+        return [
+            [
+                (distance, dict(metadata or {}))
+                for distance, metadata in zip(distances, metadatas)
+            ]
+            for distances, metadatas in zip(results["distances"], results["metadatas"])
+        ]
+
+
+def _check_strategy(strategy: str) -> FilterStrategy:
+    if strategy not in FILTER_STRATEGIES:
+        raise ValueError(
+            f"Unknown filter_strategy {strategy!r}. "
+            f"Expected one of: {', '.join(FILTER_STRATEGIES)}."
+        )
+    return strategy  # type: ignore[return-value]
