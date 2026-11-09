@@ -39,10 +39,12 @@ converts the value; dates are parsed from text such as "March 2024".
 
 Text from the note can also be coded, with a ``from`` source and one of:
 
-- ``map: {vocabularies: [LOINC], domain: Measurement, min_score: 0.8}``: send the text
-  through the terminology mapper (translation, retrieval, reranking, selection), e.g.
-  a lab test name to its LOINC concept. ``domain`` defaults to the domain the column
-  requires. Results scoring below ``min_score`` are stored as ``0`` and reported.
+- ``map: {domain: Measurement, min_score: 0.8}``: send the text through the
+  terminology mapper (translation, retrieval, reranking, selection), e.g. a lab test
+  name to its standard concept. Any standard concept qualifies, whatever its
+  vocabulary; ``domain`` defaults to the domain the column requires, and
+  ``vocabularies: [...]`` optionally narrows the search. Results scoring below
+  ``min_score`` are stored as ``0`` and reported.
 - ``lookup: UCUM``: find the text as a code of that vocabulary, e.g. the unit
   ``"mg/dL"``. Exact matches win; otherwise a single standard match ignoring case.
 """
@@ -107,8 +109,9 @@ class MapSpec(BaseModel):
     """How to code a text with the terminology mapper.
 
     Attributes:
-        vocabularies: Standard vocabularies to retrieve from, e.g. ``["LOINC"]``. All
-            indexed vocabularies when omitted.
+        vocabularies: Optionally, only retrieve from these vocabularies, e.g.
+            ``["LOINC"]``. By default every indexed vocabulary is searched: what a
+            ``*_concept_id`` column requires is a standard concept, not a vocabulary.
         domain: Domain to retrieve from, e.g. ``"Measurement"``. Defaults to the domain
             the column requires.
         min_score: Mappings with a lower confidence score are stored as ``0`` (an

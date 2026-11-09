@@ -303,15 +303,16 @@ class OmopTableBuilder:
                 if isinstance(vocabulary, (str, Path))
                 else vocabulary
             )
-        self.concepts: dict[tuple[ConceptRef, bool], Concept] = {}
-        self._resolve_concepts()
-
         self.coder: Optional[TextCoder] = None
         if mapper is not None:
             self.coder = (
                 mapper if hasattr(mapper, "code") else TerminologyMapperCoder(mapper)
             )
+        # Configuration checks first: they are cheap and need no database.
         self._check_coded_sources(coded_sources)
+
+        self.concepts: dict[tuple[ConceptRef, bool], Concept] = {}
+        self._resolve_concepts()
 
     def _check_coded_sources(self, coded_sources: list) -> None:
         from aatm.data_models.data_models import StandardVocabulary
@@ -332,12 +333,14 @@ class OmopTableBuilder:
                     f"{where}: the terminology mapper only indexes {sorted(indexed)}, "
                     f"not {sorted(unknown)}"
                 )
-            expected = OMOP_TABLES[self.mappings[key].table].concept_domains.get(column)
-            if expected and source.map.domain not in (None, expected):
-                raise ValueError(
-                    f"{where} must hold a {expected!r} concept, but 'map' retrieves "
-                    f"from the {source.map.domain!r} domain"
+            if source.map.domain is not None:
+                problem = OMOP_TABLES[self.mappings[key].table].domain_problem(
+                    column, source.map.domain
                 )
+                if problem:
+                    raise ValueError(
+                        f"{where}: 'map' would retrieve concepts {problem}"
+                    )
 
     def _coding_key(self, table: str, column: str, source: FieldSource) -> CodingKey:
         if source.lookup is not None:
@@ -348,12 +351,17 @@ class OmopTableBuilder:
 
     @staticmethod
     def _constant_concept_ids(mapping: OmopMapping) -> dict[str, int]:
+        """Constant concept ids to check in the vocabulary.
+
+        ``0`` is left out: it is the CDM's value for "present but unmapped", e.g. a
+        unit with no standard concept.
+        """
         return {
             column: int(source.value)
             for column, sources in mapping.fields.items()
             if column.endswith("_concept_id")
             for source in sources
-            if source.value is not None
+            if source.value is not None and int(source.value) != 0
         }
 
     def _resolve_concepts(self) -> None:
@@ -400,7 +408,7 @@ class OmopTableBuilder:
         constant_concepts = self.vocabulary.by_id(constants.values())
 
         for key, mapping in self.mappings.items():
-            domains = OMOP_TABLES[mapping.table].concept_domains
+            table_model = OMOP_TABLES[mapping.table]
             for column, sources in mapping.fields.items():
                 for source in sources:
                     concepts = [
@@ -415,7 +423,6 @@ class OmopTableBuilder:
                                 f"{concept_id} not found in the vocabulary"
                             )
                         concepts.append(constant_concepts[concept_id])
-                    expected = domains.get(column)
                     for concept in concepts:
                         if column.endswith("_concept_id") and not column.endswith(
                             "source_concept_id"
@@ -426,10 +433,11 @@ class OmopTableBuilder:
                                     "not a standard concept. Add 'maps_to: true' to "
                                     "use the standard concept it maps to"
                                 )
-                        if expected and concept.domain_id != expected:
+                        problem = table_model.domain_problem(column, concept.domain_id)
+                        if problem:
                             raise ValueError(
-                                f"Entity {key!r}, column {column!r}: {concept} is not "
-                                f"in the {expected!r} domain"
+                                f"Entity {key!r}, column {column!r}: {concept} is "
+                                f"{problem}"
                             )
 
     def describe_concepts(self) -> pd.DataFrame:
@@ -578,6 +586,7 @@ class OmopTableBuilder:
                     vocabulary_id=chosen.vocabulary_id if chosen else None,
                     concept_code=chosen.concept_code if chosen else None,
                     domain_id=chosen.domain_id if chosen else None,
+                    standard=chosen.is_standard if chosen else None,
                 )
             )
         return results
@@ -699,6 +708,14 @@ class OmopTableBuilder:
         stored = result.concept_id or 0
         if result.concept_id is None:
             ctx.add(column, "unmapped", f"No concept for {text!r} with {how}; stored 0")
+        elif result.standard is False and not column.endswith("source_concept_id"):
+            # *_concept_id columns hold standard concepts, whatever their vocabulary.
+            stored = 0
+            ctx.add(
+                column,
+                "unmapped",
+                f"{found} is not a standard concept; stored 0",
+            )
         elif (
             source.map is not None
             and source.map.min_score is not None
@@ -712,13 +729,9 @@ class OmopTableBuilder:
                 f"{source.map.min_score}; stored 0",
             )
         else:
-            expected = OMOP_TABLES[ctx.table].concept_domains.get(column)
-            if expected and result.domain_id != expected:
-                ctx.add(
-                    column,
-                    "domain_mismatch",
-                    f"{found} is in the {result.domain_id!r} domain, not {expected!r}",
-                )
+            problem = OMOP_TABLES[ctx.table].domain_problem(column, result.domain_id)
+            if problem:
+                ctx.add(column, "domain_mismatch", f"{found} is {problem}")
         ctx.mappings.append(
             ConceptMapping(
                 table=ctx.table,
@@ -777,12 +790,79 @@ class OmopTableBuilder:
             return None
 
 
+def _load_definitions(
+    definitions: EntityDefinitions
+    | str
+    | Path
+    | Sequence[EntityDefinitions | str | Path],
+) -> EntityDefinitions:
+    """Load definitions given as objects, predefined names or YAML paths, and combine a list."""
+    if isinstance(definitions, EntityDefinitions):
+        return definitions
+    if isinstance(definitions, (str, Path)):
+        path = Path(definitions)
+        if path.suffix in (".yaml", ".yml"):
+            return EntityDefinitions.from_yaml(path)
+        return EntityDefinitions.from_predefined(str(definitions))
+    loaded = [
+        (_source_name(d, i), _load_definitions(d)) for i, d in enumerate(definitions)
+    ]
+    _check_unique_keys(loaded)
+    return EntityDefinitions(entities=[e for _, d in loaded for e in d.entities])
+
+
+def _source_name(definitions: EntityDefinitions | str | Path, index: int) -> str:
+    """How to name one item of a definitions list in error messages."""
+    if isinstance(definitions, EntityDefinitions):
+        return f"item {index + 1} (an EntityDefinitions object)"
+    path = Path(definitions)
+    if path.suffix in (".yaml", ".yml"):
+        return str(path)
+    return f"predefined '{definitions}'"
+
+
+def _check_unique_keys(loaded: list[tuple[str, EntityDefinitions]]) -> None:
+    """Raise if items of a definitions list repeat, or define the same entity key.
+
+    The message names the files, so a conflict between a predefined file and your own
+    can be found without reading every file.
+    """
+    names = [source for source, _ in loaded]
+    repeated = sorted({n for n in names if names.count(n) > 1})
+
+    sources_of: dict[str, list[str]] = {}
+    seen: set[str] = set()
+    for source, definitions in loaded:
+        if source in seen:
+            continue  # a repeated file is reported once below, not once per key
+        seen.add(source)
+        for entity in definitions.entities:
+            sources_of.setdefault(entity.key, []).append(source)
+    conflicts = {k: v for k, v in sorted(sources_of.items()) if len(v) > 1}
+    if not repeated and not conflicts:
+        return
+
+    lines = [f"  - {n} is listed {names.count(n)} times" for n in repeated]
+    lines += [
+        f"  - key {key!r} is defined in {' and '.join(sources)}"
+        for key, sources in conflicts.items()
+    ]
+    raise ValueError(
+        "Entity keys must be unique across the combined definitions, since the "
+        "model's output is matched to definitions by key:\n"
+        + "\n".join(lines)
+        + "\nList each file once, and rename keys that clash in your own files."
+    )
+
+
 class OmopExtractionPipeline:
     """Extract entities from notes and build OMOP CDM tables in one call.
 
     Args:
         entity_definitions: Definitions with ``omop`` blocks, the name of a predefined
-            file (e.g. ``"ecog_performance_status"``) or a path to a YAML file.
+            file (e.g. ``"ecog_performance_status"``), a path to a YAML file, or a list
+            of these, combined so each note is extracted once, e.g.
+            ``["smoking_status", "family_history"]``.
         model_id: Provider-prefixed model id, e.g. ``"openai/gpt-5-mini"``. Ignored
             when `extractor` is given.
         extractor: A ready-made extractor, e.g. a configured `SimpleLLMExtractor`.
@@ -794,7 +874,10 @@ class OmopExtractionPipeline:
 
     def __init__(
         self,
-        entity_definitions: EntityDefinitions | str | Path,
+        entity_definitions: EntityDefinitions
+        | str
+        | Path
+        | Sequence[EntityDefinitions | str | Path],
         model_id: Optional[str] = None,
         extractor: Any = None,
         vocabulary: ConceptLookup | str | Path = DEFAULT_VOCABULARY_DB,
@@ -802,13 +885,7 @@ class OmopExtractionPipeline:
         mapper: Any = None,
         **extractor_kwargs: Any,
     ):
-        if not isinstance(entity_definitions, EntityDefinitions):
-            path = Path(entity_definitions)
-            entity_definitions = (
-                EntityDefinitions.from_yaml(path)
-                if path.suffix in (".yaml", ".yml")
-                else EntityDefinitions.from_predefined(str(entity_definitions))
-            )
+        entity_definitions = _load_definitions(entity_definitions)
         self.entity_definitions = entity_definitions
         self.builder = OmopTableBuilder(
             entity_definitions, vocabulary=vocabulary, dayfirst=dayfirst, mapper=mapper

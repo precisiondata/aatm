@@ -137,7 +137,14 @@ def test_key_depths():
 
 @pytest.mark.parametrize(
     "key",
-    ["condition_occurrence", "drug_exposure", "ecog_performance_status", "lab_results"],
+    [
+        "condition_occurrence",
+        "drug_exposure",
+        "ecog_performance_status",
+        "lab_results",
+        "smoking_status",
+        "family_history",
+    ],
 )
 def test_predefined_definitions_load(key):
     defs = EntityDefinitions.from_predefined(key)

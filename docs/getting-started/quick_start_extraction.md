@@ -133,6 +133,8 @@ AATM ships definitions aligned with OMOP CDM tables and common clinical scales:
 | `drug_exposure` | `drug_name`; children of a drug: `verbatim_start_date`, `verbatim_end_date`, `route_source_value`, `dose_unit_source_value`, `sig` |
 | `ecog_performance_status` | `ecog_performance_status` with attributes `score` (`0`-`5`), or `score_range_min` / `score_range_max` for a range such as "ECOG 0-1"; child of a status: `assessment_date` |
 | `lab_results` | `lab_test` with attribute `operator` (`<`, `<=`, `>`, `>=`); children of a test: `lab_value`, `lab_unit`, `lab_date` |
+| `smoking_status` | `smoking_status` with required attribute `status` (`never`, `former`, `current_every_day`, `current_some_day`, `current_unknown_frequency`, `not_current`); `pack_years` with child `pack_years_value` |
+| `family_history` | `family_history` (the condition) with attribute `relative` (`mother`, `father`, `sister`, ...) |
 
 ```python
 EntityDefinitions.from_predefined("drug_exposure")
