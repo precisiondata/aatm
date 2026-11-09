@@ -11,11 +11,12 @@ artifacts.
 """
 
 import gc
+from functools import partial
 import shutil
 import sqlite3
 import time
 from pathlib import Path
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -29,6 +30,12 @@ from rich.progress import Progress, TaskID, track
 
 from aatm.background_iterator import BackgroundIterator
 from aatm.device import get_device
+from aatm.gpu_memory import (
+    CANDIDATE_BATCH_SIZES,
+    GpuMemoryLimit,
+    calibrate_batch_size,
+    encode_with_oom_backoff,
+)
 from aatm.logs import get_logger
 from aatm.precision import (
     COLLECTION_DTYPE_KEY,
@@ -292,143 +299,71 @@ def build_mapping_datasets(standard_vocabularies: list[str]) -> None:
         con.close()
 
 
-def measure_embedding_vram(
-    model: Any,
-    batch_size: int = 1,
-    seq_len: int = 1000,
-    device: str = "cuda",
-) -> dict[str, Any]:
-    """Measure approximate peak VRAM used by an embedding model forward pass.
+def collect_calibration_texts(
+    dataset_paths: Iterable[Path],
+    n_longest: int = max(CANDIDATE_BATCH_SIZES),
+    n_typical: int = 1024,
+    token_lengths: Callable[[list[str]], list[int]] | None = None,
+    seed: int = 0,
+) -> tuple[list[str], list[str]]:
+    """Collect texts for `calibrate_batch_size`: the longest and a typical sample.
 
     Args:
-        model: Local embedding model.
-        batch_size: Batch size used in the synthetic forward pass.
-        seq_len: Sequence length used in the synthetic forward pass.
-        device: Device on which to run the measurement.
+        dataset_paths: CSV files built by `build_mapping_datasets`.
+        n_longest: Number of longest texts to return.
+        n_typical: Number of randomly sampled texts to return.
+        token_lengths: Returns the token count of each text. When given, the
+            longest texts are ranked by tokens, which is what GPU memory depends
+            on, instead of by characters.
+        seed: Random seed for the typical sample.
 
     Returns:
-        Dictionary with peak allocated memory, peak reserved memory, and output
-        embedding shape.
+        The longest texts, longest first, and a random sample of texts.
     """
-    if not torch.cuda.is_available() and device == "cuda":
-        raise RuntimeError("CUDA is not available")
+    longest: list[str] = []
+    samples: list[pd.Series] = []
 
-    gpu_memory_cleanup(reset_peak=True)
-
-    model = model.to(device)
-    model.eval()
-
-    input_ids = torch.ones(
-        (batch_size, seq_len),
-        dtype=torch.long,
-        device=device,
-    )
-    attention_mask = torch.ones(
-        (batch_size, seq_len),
-        dtype=torch.long,
-        device=device,
-    )
-
-    with torch.inference_mode():
-        outputs = model(
-            {
-                "input_ids": input_ids,
-                "attention_mask": attention_mask,
-            }
+    for dataset_path in dataset_paths:
+        expressions = (
+            pd.read_csv(dataset_path, usecols=["expression"], low_memory=False)[
+                "expression"
+            ]
+            .dropna()
+            .astype(str)
+            .drop_duplicates()
+        )
+        # Over-collect by characters, then rank by tokens below.
+        top = expressions.str.len().nlargest(4 * n_longest).index
+        longest.extend(expressions.loc[top].tolist())
+        samples.append(
+            expressions.sample(n=min(n_typical, len(expressions)), random_state=seed)
         )
 
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
+    if token_lengths is not None and longest:
+        ranked = sorted(zip(token_lengths(longest), longest), key=lambda pair: -pair[0])
+        longest = [text for _, text in ranked]
+    else:
+        longest.sort(key=len, reverse=True)
 
-    sentence_embedding = outputs["sentence_embedding"]
-    embedding_shape = tuple(sentence_embedding.shape)
-
-    peak_allocated_gib = torch.cuda.max_memory_allocated() / 1024**3
-    peak_reserved_gib = torch.cuda.max_memory_reserved() / 1024**3
-
-    del sentence_embedding
-    del outputs
-    del input_ids
-    del attention_mask
-
-    gpu_memory_cleanup()
-
-    return {
-        "peak_allocated_gib": peak_allocated_gib,
-        "peak_reserved_gib": peak_reserved_gib,
-        "embedding_shape": embedding_shape,
-    }
+    typical = pd.concat(samples) if samples else pd.Series(dtype=str)
+    typical = typical.sample(n=min(n_typical, len(typical)), random_state=seed)
+    return longest[:n_longest], typical.tolist()
 
 
-def estimate_batch_size(embedding_function: Any) -> int:
-    """Estimate a suitable batch size for local GPU embedding generation.
+def _encode_with_batch_size(
+    embedding_function: Any, texts: Sequence[str], batch_size: int
+) -> Any:
+    embedding_function.batch_size = batch_size
+    return embedding_function(list(texts))
 
-    The estimate reuses the model that is already loaded for building the
-    database, so the weights are not loaded a second time and the free-memory
-    reading reflects what the build will actually have available.
 
-    Args:
-        embedding_function: Loaded local embedding function. It must expose
-            ``is_local = True`` and a SentenceTransformer ``model`` attribute.
+def _token_lengths(embedding_function: Any) -> Callable[[list[str]], list[int]]:
+    tokenizer = embedding_function.model.tokenizer
 
-    Returns:
-        Estimated maximum batch size.
+    def lengths(texts: list[str]) -> list[int]:
+        return [len(ids) for ids in tokenizer(texts)["input_ids"]]
 
-    Raises:
-        ValueError: If the embedding function is not a local model, or the batch
-            size cannot be estimated.
-    """
-    if not getattr(embedding_function, "is_local", False):
-        raise ValueError(
-            f"{type(embedding_function).__name__} is not a local embedding model"
-        )
-
-    model = embedding_function.model
-
-    measurements = []
-
-    free_bytes, _ = torch.cuda.mem_get_info()
-    run_time_overhead_gib = 1.5
-
-    for batch_size in [1, 10]:
-        for seq_len in [500]:
-            result = measure_embedding_vram(
-                model=model,
-                batch_size=batch_size,
-                seq_len=seq_len,
-            )
-            measurements.append((batch_size, seq_len, result))
-
-    peak_reserved_gib_diff = (
-        measurements[-1][2]["peak_reserved_gib"]
-        - measurements[-2][2]["peak_reserved_gib"]
-    )
-    batch_size_diff = measurements[-1][0] - measurements[-2][0]
-
-    if batch_size_diff <= 0:
-        raise ValueError("Invalid batch size measurements")
-
-    if peak_reserved_gib_diff <= 0:
-        raise ValueError(
-            "Unable to estimate memory per batch item for "
-            f"{type(embedding_function).__name__}. "
-            f"Measured peak reserved memory did not increase."
-        )
-
-    memory_per_batch_item_gib = peak_reserved_gib_diff / batch_size_diff
-
-    max_batch_size = int(
-        (free_bytes / 1024**3 - run_time_overhead_gib) / memory_per_batch_item_gib
-    )
-
-    gpu_memory_cleanup()
-
-    if max_batch_size > 0:
-        return max_batch_size
-
-    raise ValueError(
-        f"Unable to estimate batch size for {type(embedding_function).__name__}"
-    )
+    return lengths
 
 
 PREFETCH_CHUNKS = 2
@@ -608,7 +543,7 @@ LOCAL_MODEL_CHUNK_SIZE = 4096
 """Default rows per ChromaDB round-trip for local models.
 
 Large chunks give each ``encode`` call enough texts to keep the GPU busy. The
-GPU batch size is chosen separately, see `estimate_batch_size`.
+GPU batch size is chosen separately, see `aatm.gpu_memory`.
 """
 
 API_MODEL_CHUNK_SIZE = 100
@@ -670,9 +605,9 @@ def build_local_vector_database(
             `LOCAL_MODEL_CHUNK_SIZE` for local models and
             `API_MODEL_CHUNK_SIZE` for API models.
         encode_batch_size: Number of texts a local model encodes per forward
-            pass. If not provided, it is estimated from free GPU memory on CUDA,
-            and otherwise left at the embedding function's default. Ignored for
-            API models.
+            pass. If not provided, on CUDA it is calibrated on the datasets'
+            longest and typical texts (see `aatm.gpu_memory`); otherwise the
+            embedding function's default is used. Ignored for API models.
         embedding_dtype: Precision for local models: ``float32`` (default),
             ``bfloat16`` or ``float16``. If not provided,
             ``AATM_EMBEDDING_DTYPE`` is used. When repairing, the database's
@@ -785,19 +720,14 @@ def build_local_vector_database(
             **model_kwargs,  # type: ignore[call-arg]
         )
 
-    if is_local:
-        if encode_batch_size is None and torch.cuda.is_available():
-            with profiler.time_block("estimate_batch_size"):
-                encode_batch_size = estimate_batch_size(embedding_function)
+    if is_local and encode_batch_size is not None:
+        if encode_batch_size <= 0:
+            raise ValueError("encode_batch_size must be > 0")
+        embedding_function.batch_size = encode_batch_size  # type: ignore[attr-defined]
 
-        if encode_batch_size is not None:
-            if encode_batch_size <= 0:
-                raise ValueError("encode_batch_size must be > 0")
-            embedding_function.batch_size = encode_batch_size  # type: ignore[attr-defined]
-
-        logger.info(
-            f"Encoding with batch size {embedding_function.batch_size}"  # type: ignore[attr-defined]
-        )
+    # Cap GPU memory and size batches by measurement, so the build never
+    # overflows GPU memory. See `aatm.gpu_memory`.
+    guard_gpu_memory = is_local and get_device() == "cuda" and torch.cuda.is_available()
 
     chunk_size = resolve_chunk_size(
         chunk_size,
@@ -822,6 +752,7 @@ def build_local_vector_database(
     dataset_paths = sorted(Path(".aatm/datasets").glob("*.csv"))
 
     with (
+        GpuMemoryLimit(enabled=guard_gpu_memory) as memory_limit,
         ChromaWriterProcess(str(vector_db_dir), collection_name) as writer,
         BackgroundIterator(
             prepare_chunks(
@@ -844,6 +775,24 @@ def build_local_vector_database(
         )
         seq = 0
 
+        if guard_gpu_memory and encode_batch_size is None:
+            with profiler.time_block("calibrate_batch_size"):
+                longest_texts, typical_texts = collect_calibration_texts(
+                    dataset_paths,
+                    token_lengths=_token_lengths(embedding_function),
+                )
+                embedding_function.batch_size = calibrate_batch_size(  # type: ignore[attr-defined]
+                    partial(_encode_with_batch_size, embedding_function),
+                    longest_texts,
+                    typical_texts,
+                    limit_bytes=memory_limit.limit_bytes,
+                )
+
+        if is_local:
+            logger.info(
+                f"Encoding with batch size {embedding_function.batch_size}"  # type: ignore[attr-defined]
+            )
+
         for chunk in chunks:
             tracker.handle_acks(writer.poll())
 
@@ -862,7 +811,12 @@ def build_local_vector_database(
                 profiler.add("rate_limiter_sleep", slept_seconds)
 
             with profiler.time_block("embedding_function_call"):
-                embeddings = embedding_function(chunk.documents)
+                if is_local:
+                    embeddings = encode_with_oom_backoff(
+                        embedding_function, chunk.documents
+                    )
+                else:
+                    embeddings = embedding_function(chunk.documents)
 
             with profiler.time_block("ensure_cpu_embeddings"):
                 embeddings_array = np.asarray(
@@ -882,9 +836,6 @@ def build_local_vector_database(
                     chunk.documents,
                     chunk.metadatas,
                 )
-
-            if seq % 50 == 0:
-                gpu_memory_cleanup()
 
         with profiler.time_block("wait_for_final_writes"):
             tracker.handle_acks(writer.close())
