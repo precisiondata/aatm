@@ -136,6 +136,7 @@ AATM ships definitions aligned with OMOP CDM tables and common clinical scales:
 | `smoking_status` | `smoking_status` with required attribute `status` (`never`, `former`, `current_every_day`, `current_some_day`, `current_unknown_frequency`, `not_current`); `pack_years` with child `pack_years_value` |
 | `family_history` | `family_history` (the condition) with attribute `relative` (`mother`, `father`, `sister`, ...) |
 | `medical_history` | `medical_history`: a past condition the patient no longer has |
+| `device_exposure` | `device_name` with required attribute `kind` (`placed`, `existing`); children of a device: `verbatim_start_date`, `verbatim_end_date`, `device_quantity` |
 
 ```python
 EntityDefinitions.from_predefined("drug_exposure")

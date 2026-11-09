@@ -269,7 +269,63 @@ class DrugExposure(OmopTableRow):
     dose_unit_source_value: Optional[_Varchar50] = None
 
 
+class DeviceExposure(OmopTableRow):
+    """A row of the OMOP CDM v5.5 ``device_exposure`` table.
+
+    A physical object used for diagnosis or treatment by means other than chemical
+    action: implants (pacemakers, stents, artificial joints), equipment and supplies
+    (crutches, catheters, insulin pumps). Procedures are the actions, often the
+    placement of a device, and go to their own table. `device_exposure_end_date` is
+    only filled when the source gives it.
+    """
+
+    table_name: ClassVar[str] = "device_exposure"
+    primary_key: ClassVar[str] = "device_exposure_id"
+    required_fields: ClassVar[tuple[str, ...]] = (
+        "device_exposure_id",
+        "person_id",
+        "device_concept_id",
+        "device_exposure_start_date",
+        "device_type_concept_id",
+    )
+    concept_domains: ClassVar[dict[str, str]] = {
+        "device_concept_id": "Device",
+        "device_type_concept_id": "Type Concept",
+        "unit_concept_id": "Unit",
+    }
+    date_ranges: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("device_exposure_start_date", "device_exposure_end_date"),
+        ("device_exposure_start_datetime", "device_exposure_end_datetime"),
+    )
+
+    device_exposure_id: Optional[int] = None
+    person_id: Optional[int] = None
+    device_concept_id: Optional[int] = None
+    device_exposure_start_date: Optional[date] = None
+    device_exposure_start_datetime: Optional[datetime] = None
+    device_exposure_end_date: Optional[date] = None
+    device_exposure_end_datetime: Optional[datetime] = None
+    device_type_concept_id: Optional[int] = None
+    unique_device_id: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
+    production_id: Optional[Annotated[str, StringConstraints(max_length=255)]] = None
+    quantity: Optional[Annotated[int, Field(ge=0)]] = None
+    provider_id: Optional[int] = None
+    visit_occurrence_id: Optional[int] = None
+    visit_detail_id: Optional[int] = None
+    device_source_value: Optional[_Varchar50] = None
+    device_source_concept_id: Optional[int] = None
+    unit_concept_id: Optional[int] = None
+    unit_source_value: Optional[_Varchar50] = None
+    unit_source_concept_id: Optional[int] = None
+
+
 OMOP_TABLES: dict[str, type[OmopTableRow]] = {
     model.table_name: model
-    for model in (Measurement, Observation, ConditionOccurrence, DrugExposure)
+    for model in (
+        Measurement,
+        Observation,
+        ConditionOccurrence,
+        DrugExposure,
+        DeviceExposure,
+    )
 }

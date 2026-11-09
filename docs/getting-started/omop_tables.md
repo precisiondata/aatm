@@ -6,9 +6,10 @@ what to find in the notes and where each piece goes in the table; AATM extracts 
 an LLM, codes it with the OMOP vocabularies and fills the rows as far as the notes
 allow.
 
-Four tables are supported: `measurement` (scores, lab results), `observation`
+Five tables are supported: `measurement` (scores, lab results), `observation`
 (smoking, family and medical history, and other facts), `condition_occurrence`
-(diagnoses, signs and symptoms) and `drug_exposure` (drugs prescribed, given or taken).
+(diagnoses, signs and symptoms), `drug_exposure` (drugs prescribed, given or taken) and
+`device_exposure` (implants, equipment and supplies).
 
 If you have not extracted entities from a note before, read the
 [Information extraction quick start](quick_start_extraction.md) first: this page builds
@@ -39,6 +40,7 @@ on its *entity definitions*.
     | `medical_history` | `observation` | yes, to code conditions |
     | `condition_occurrence` | `condition_occurrence` | yes, to code conditions |
     | `drug_exposure` | `drug_exposure` | yes, to code drugs |
+    | `device_exposure` | `device_exposure` | yes, to code devices |
 
     Definitions without the mapper only need the vocabulary database and an LLM, so
     they are the easiest way to start.
@@ -715,6 +717,89 @@ column the CDM plans to deprecate.
     seasonal formulation, with a score of 0.41. Review low scores with
     `tables.mappings_dataframe()`.
 
+## The device_exposure table
+
+The `device_exposure` table holds the medical devices a patient has or is given:
+implants (pacemakers, stents, artificial joints), equipment and supplies (crutches,
+catheters, insulin pumps, CPAP) and materials such as sutures. Each row is one mention
+of a device, with its standard concept, its dates and the number of devices. The
+predefined definition follows the
+[CDM conventions for this table](https://ohdsi.github.io/CommonDataModel/cdm55.html#device_exposure);
+THEMIS has no device conventions.
+
+```python
+import asyncio
+
+from aatm.omop import ClinicalNote, OmopExtractionPipeline
+from aatm.selectors import OpenAILLMSelector
+from aatm.terminology_mapper import TerminologyMapper
+
+mapper = TerminologyMapper(retriever="text-embedding-3-small", selector=OpenAILLMSelector("gpt-5-mini"))
+mapper.retriever.top_k = 30
+
+pipeline = OmopExtractionPipeline(
+    "device_exposure",
+    model_id="openai/gpt-5-mini",
+    mapper=mapper,  # codes device names
+)
+notes = [
+    ClinicalNote(
+        text=(
+            "s/p PCI with 2 drug-eluting stents in 2021. Dual-chamber pacemaker since 2019.\n"
+            "Foley catheter inserted today for retention. Walks with crutches.\n"
+            "No indwelling lines. Candidate for ICD. Nicotine patch 21 mg daily."
+        ),
+        person_id=40,
+        note_date="2025-06-01",
+        visit_occurrence_id=950,
+        provider_id=14,
+    ),
+]
+tables = asyncio.run(pipeline(notes))
+tables["device_exposure"]
+```
+
+A run with `gpt-5-mini` gave four rows (concept names added in italics;
+`device_type_concept_id` is 32858 *NLP* in every row):
+
+| device_exposure_id | device_concept_id | device_source_value | start | end | quantity | visit_occurrence_id | provider_id |
+|---|---|---|---|---|---|---|---|
+| 1 | 4131681 *Drug eluting stent* | drug-eluting stents | 2021-01-01 | | 2 | | |
+| 2 | 40481477 *Dual chamber pulse generator, device* | Dual-chamber pacemaker | 2019-01-01 | | 1 | | |
+| 3 | 40625746 *Foley catheter* | Foley catheter | 2025-06-01 | | 1 | 950 | 14 |
+| 4 | 4251933 *Crutch* | crutches | 2025-06-01 | | 1 | | |
+
+The PCI is a procedure, the action of placing the stents: only the stents are a
+device. "No indwelling lines" is negated, the ICD is only considered, and the nicotine
+patch is a drug, which belongs in `drug_exposure`. So none of them is a row.
+
+**Kind.** Each device gets a required `kind` label:
+
+| Label | Means | Visit and provider |
+|---|---|---|
+| `placed` | Implanted, inserted, applied, prescribed or supplied in this encounter, e.g. "Foley catheter inserted today" | From the note |
+| `existing` | The patient already has or uses it, e.g. "has a pacemaker", "walks with crutches" | Left empty: the CDM fills the visit only when the exposure was started in it |
+
+**Dates.** `device_exposure_start_date` is the date the note gives (e.g. the implant
+date, "since 2019" → 2019-01-01, reported as `imputed_date_parts`), else the note date.
+Unlike `drug_exposure`, the end date is optional, and the CDM fills it only when the
+source gives it, so it is never inferred. When the note gives only a removal date
+("PICC line removed on 05/20/2025"), it is used for both dates and reported as
+`single_date`.
+
+**Quantity.** The number the note gives ("2 drug-eluting stents"), else 1: the CDM
+stores 1 when a device exposure exists without a quantity.
+
+**Not filled.** `unique_device_id` and `production_id` (the UDI, rarely written in
+notes), the unit columns, which the CDM leaves NULL when the source has no unit, and
+the datetime columns.
+
+!!! note "Check the coded devices"
+    `device_concept_id` takes standard concepts of the Device domain. Device names in
+    notes are often short ("CPAP", "brace"), and mapper scores were low even for right
+    answers in our runs, e.g. "left knee brace" → *Knee orthosis* at 0.31. Review them
+    with `tables.mappings_dataframe()` before setting a `min_score`.
+
 ---
 
 ## Troubleshooting
@@ -734,8 +819,8 @@ column the CDM plans to deprecate.
 
 ## Current limits
 
-- Only the `measurement`, `observation`, `condition_occurrence` and `drug_exposure`
-  tables are supported so far.
+- Only the `measurement`, `observation`, `condition_occurrence`, `drug_exposure` and
+  `device_exposure` tables are supported so far.
 - `drug_exposure` end dates are not inferred from the quantity and daily dose (the
   second THEMIS rule), and mail-order prescriptions are not told apart from others.
 - `condition_start_date` falls back to the note date when the note gives no date, which
