@@ -1,0 +1,33 @@
+# Body weight, stored in the OMOP measurement table with its unit.
+# Used by examples/03_custom_entity_definition.ipynb.
+
+- name: Body weight
+  key: body_weight
+  definition: >
+    The patient's measured body weight: the word for weight, the value and the unit,
+    copied as written, e.g. "weight 72 kg" or "Wt: 158 lb". Stop at the unit: no
+    words or punctuation after it. Does not include target or ideal weights, weight
+    changes such as "lost 5 kg", or the weight of anyone other than the patient.
+  omop:
+    table: measurement
+    fields:
+      person_id: {from: context.person_id}                # from the ClinicalNote
+      measurement_concept_id: {concept: "LOINC:29463-7"}   # Body weight, always the same
+      measurement_date: {from: context.note_date}
+      measurement_type_concept_id: {value: 32858}          # NLP
+      measurement_source_value: {from: text}               # the words of the mention
+      value_as_number: {from: child.weight_value, as: float}
+      unit_concept_id: {from: child.weight_unit, lookup: UCUM}  # "kg" -> kilogram
+      unit_source_value: {from: child.weight_unit}
+
+- name: Weight value
+  key: weight_value
+  definition: The number of a body weight, without the unit, e.g. "72" from "weight 72 kg".
+  has_parent: true
+  parent_key: body_weight
+
+- name: Weight unit
+  key: weight_unit
+  definition: The unit of a body weight, copied as written without punctuation, e.g. "kg" or "lb".
+  has_parent: true
+  parent_key: body_weight
