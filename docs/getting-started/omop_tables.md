@@ -472,7 +472,7 @@ A typical result (concept names added in italics):
 | 1 | 43054909 *Tobacco smoking status* | Former smoker | | 45883458 *Former smoker* | former | | |
 | 2 | 3003421 *Cigarettes smoked total (pack per year)* | 30 pack-years | 30.0 | | 30 | | 0 |
 | 3 | 4167217 *Family history of clinical finding* | breast cancer | | 4112853 *Malignant tumor of breast* | breast cancer | 4248584 *Mother* | |
-| 4 | 3002660 *History of Past illness Narrative* | appendicitis | | *Appendicitis* (as chosen by the mapper) | appendicitis | | |
+| 4 | 3002660 *History of Past illness Narrative* | appendicitis | | 440448 *Appendicitis* | appendicitis | | |
 
 **`smoking_status`** gives up to two rows per mention:
 
@@ -558,12 +558,15 @@ tables = asyncio.run(pipeline(notes))
 tables["condition_occurrence"]
 ```
 
-A typical result has two rows (concept names added in italics):
+A run with `gpt-5-mini` gave two rows (concept names added in italics):
 
 | condition_occurrence_id | condition_concept_id | condition_source_value | condition_start_date | condition_status_concept_id | condition_status_source_value | condition_type_concept_id |
 |---|---|---|---|---|---|---|
-| 1 | *Type 2 diabetes mellitus* | Type 2 diabetes | 2019-01-01 | 32893 *Confirmed diagnosis* | confirmed | 32858 *NLP* |
-| 2 | *Pneumonia* (as chosen by the mapper) | community-acquired pneumonia | 2025-06-01 | 32899 *Preliminary diagnosis* | preliminary | 32858 *NLP* |
+| 1 | 201826 *Type 2 diabetes mellitus* | Type 2 diabetes | 2019-01-01 | 32893 *Confirmed diagnosis* | confirmed | 32858 *NLP* |
+| 2 | 4293463 *Community acquired pneumonia* | community-acquired pneumonia | 2025-06-01 | 32899 *Preliminary diagnosis* | preliminary | 32858 *NLP* |
+
+The only issue is `imputed_date_parts` on row 1: "2019" has no month or day and is
+read as 2019-01-01.
 
 **What is not a row.** The definition follows the
 [CDM conventions for this table](https://ohdsi.github.io/CommonDataModel/cdm55.html#condition_occurrence),
