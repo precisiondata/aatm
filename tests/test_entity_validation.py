@@ -135,7 +135,10 @@ def test_key_depths():
     assert defs.key_depths == {"a": 0, "b": 1, "c": 2}
 
 
-@pytest.mark.parametrize("key", ["condition_occurrence", "drug_exposure"])
+@pytest.mark.parametrize(
+    "key",
+    ["condition_occurrence", "drug_exposure", "ecog_performance_status", "lab_results"],
+)
 def test_predefined_definitions_load(key):
     defs = EntityDefinitions.from_predefined(key)
     assert defs.entities

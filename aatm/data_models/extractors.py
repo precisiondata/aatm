@@ -41,6 +41,7 @@ import yaml
 from importlib.resources import files
 
 from aatm.logs import get_logger
+from aatm.omop.mapping import OmopMapping, validate_entity_mapping
 
 logger = get_logger(__name__)
 
@@ -147,6 +148,8 @@ class EntityDefinition(BaseModel):
         parent_key (Optional[str]): The key of the parent entity. Required when `has_parent` is True.
         attributes (List[AttributeDefinition]): Classifications the model assigns to each
             mention of this entity, e.g. the result of a test.
+        omop (Optional[OmopMapping]): How each mention becomes a row of an OMOP CDM
+            table, see `aatm.omop.mapping`. Never sent to the model.
     """
 
     name: str
@@ -155,6 +158,7 @@ class EntityDefinition(BaseModel):
     has_parent: bool = False
     parent_key: Optional[str] = None
     attributes: List[AttributeDefinition] = Field(default_factory=list)
+    omop: Optional[OmopMapping] = None
 
     @field_validator("key")
     @classmethod
@@ -203,6 +207,7 @@ class EntityDefinition(BaseModel):
         return self
 
     def to_prompt_str(self) -> str:
+        # Only what the model needs: the `omop` mapping is deliberately left out.
         line = f"{self.name} (key: `{self.key}`, has_parent: {self.has_parent}, parent_key: `{self.parent_key}`): {self.definition}"
         if not self.attributes:
             return line
@@ -257,6 +262,13 @@ class EntityDefinitions(BaseModel):
 
         # Raises on cycles such as a -> b -> a.
         _compute_key_depths(self.entities)
+
+        for entity in self.entities:
+            if entity.omop is not None:
+                child_keys = {
+                    e.key for e in self.entities if e.parent_key == entity.key
+                }
+                validate_entity_mapping(entity, child_keys)
         return self
 
     @property

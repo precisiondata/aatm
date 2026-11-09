@@ -125,12 +125,14 @@ between them, YAML pitfalls and how to check a file before using it.
 
 ### Predefined definitions
 
-AATM ships definitions aligned with OMOP CDM tables:
+AATM ships definitions aligned with OMOP CDM tables and common clinical scales:
 
 | Name | Keys |
 |---|---|
 | `condition_occurrence` | `condition_name`; children of a condition: `verbatim_start_date`, `verbatim_end_date` |
 | `drug_exposure` | `drug_name`; children of a drug: `verbatim_start_date`, `verbatim_end_date`, `route_source_value`, `dose_unit_source_value`, `sig` |
+| `ecog_performance_status` | `ecog_performance_status` with attributes `score` (`0`-`5`), or `score_range_min` / `score_range_max` for a range such as "ECOG 0-1"; child of a status: `assessment_date` |
+| `lab_results` | `lab_test` with attribute `operator` (`<`, `<=`, `>`, `>=`); children of a test: `lab_value`, `lab_unit`, `lab_date` |
 
 ```python
 EntityDefinitions.from_predefined("drug_exposure")
@@ -510,9 +512,9 @@ extraction: many `text_not_in_line` rejections point to line-id mistakes, and ma
 ## 10. Current limitations
 
 - Matching is exact; spans with different case or spacing than the note are rejected.
-- The predefined definitions have no attributes, so negation, uncertainty and family
-  history are not captured by them: "denies chest pain" is only excluded if the
-  definition says so. You can capture them with your own
+- The `condition_occurrence` and `drug_exposure` definitions have no attributes, so
+  negation, uncertainty and family history are not captured by them: "denies chest
+  pain" is only excluded if the definition says so. You can capture them with your own
   [attributes](entity_definitions.md#attributes-what-the-note-says-about-a-mention),
   e.g. an `assertion` attribute with `present`, `absent` and `possible`.
 - Attribute labels come from a single extraction call; there is no separate

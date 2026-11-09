@@ -300,6 +300,7 @@ class TerminologyMapper:
         output_dir: str | Path | None = None,
         return_as: Literal["df", "mapped_source_concepts"] = "df",
         save_to_disk: bool = True,
+        where: Optional[dict[str, Any]] = None,
     ) -> pd.DataFrame | List[SourceConcept] | List[MappedSourceConcept]:
         """Map source concepts from a file to standardized concepts.
 
@@ -317,6 +318,9 @@ class TerminologyMapper:
             return_as: Return type. Options: "df" or
                 "mapped_source_concepts".
             save_to_disk: Whether to save the results to disk.
+            where: Optional metadata filter passed to the retriever for this call,
+                e.g. ``{"std_domain_id": "Measurement"}`` to only retrieve
+                Measurement concepts. Overrides the retriever's own filter.
 
         Returns:
             A pandas DataFrame containing the mapped source concepts.
@@ -371,8 +375,13 @@ class TerminologyMapper:
                 )
 
             translated_batch: List[Translation] = batch | self.translator
+            retrieved = (
+                self.retriever(translated_batch, where=where)
+                if where is not None
+                else translated_batch | self.retriever
+            )
             selected_source_concepts: SelectorResults = (
-                translated_batch | self.retriever | self.reranker | self.selector
+                retrieved | self.reranker | self.selector
             )
             translated_source_concepts.extend(translated_batch)
             mapped_source_concepts.extend(
