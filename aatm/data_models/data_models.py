@@ -329,6 +329,10 @@ class MappedSourceConcept(SourceConcept):
         domain_id: Domain of the mapped target concept.
         confidence_score: Confidence score of the mapping.
         source_code_description_original: Source code description before translation.
+        mapping_rationale: Why the selector chose the concept, for selectors that
+            explain their choice (`aatm.concept_search.AgenticSelector`).
+        mapping_trace: The searches made to find the concept, as JSON, for
+            selectors that search (`aatm.concept_search.AgenticSelector`).
     """
 
     target_concept_id: Optional[str]
@@ -337,6 +341,8 @@ class MappedSourceConcept(SourceConcept):
     domain_id: Optional[str]
     confidence_score: Optional[float]
     source_code_description_original: Optional[str]
+    mapping_rationale: Optional[str] = None
+    mapping_trace: Optional[str] = None
 
     @field_validator(
         "source_code",
@@ -420,11 +426,13 @@ class MappedSourceConcept(SourceConcept):
                     invalid_reason=source_concept.invalid_reason,
                     target_vocabulary_code=selected_result.std_vocabulary_code,
                     confidence_score=1 - selected_result.distance
-                    if selected_result.distance
+                    if selected_result.distance is not None
                     else None,
                     source_code_description_original=source_concept.source_code_description
                     if translation
                     else None,
+                    mapping_rationale=getattr(selected_result, "rationale", None),
+                    mapping_trace=getattr(selected_result, "trace", None),
                 )
             )
 
@@ -447,6 +455,11 @@ class MappedSourceConcept(SourceConcept):
             if model_dict["target_vocabulary_id"]
             else None
         )
+        # Only selectors that explain their choice fill these: leave them out of
+        # the output of the others.
+        for key in ("mapping_rationale", "mapping_trace"):
+            if model_dict[key] is None:
+                del model_dict[key]
         return model_dict
 
 
@@ -508,10 +521,16 @@ class SelectedExpressionMetadata(RetrievedExpressionMetadata):
 
     Attributes:
         result_list_index: Index of the selected result in the candidate
-            list.
+            list, or ``-1`` for a concept the selector found itself.
+        rationale: Why the selector chose it, when the selector explains.
+        trace: The searches the selector made, as JSON, when it searches.
+        usage: Calls and tokens spent on the selection, when reported.
     """
 
     result_list_index: int
+    rationale: Optional[str] = None
+    trace: Optional[str] = None
+    usage: Optional[Dict[str, Any]] = None
 
 
 class EmptySelectionMetadata(BaseModel):
@@ -545,6 +564,9 @@ class EmptySelectionMetadata(BaseModel):
     std_domain_id: None = None
     result_list_index: None = None
     distance: None = None
+    rationale: Optional[str] = None
+    trace: Optional[str] = None
+    usage: Optional[Dict[str, Any]] = None
 
 
 class RetrieverResults(BaseModel):

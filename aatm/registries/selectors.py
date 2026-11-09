@@ -112,6 +112,31 @@ SELECTORS_SPECS = [
     ),
 ]
 
+
+def _agentic_selector(**kwargs: Any) -> BaseSelector:
+    # Imported on use: the agent pulls in the vocabulary tools.
+    from aatm.concept_search.selector import AgenticSelector
+
+    return AgenticSelector(**kwargs)
+
+
+# The concept search agent (aatm.concept_search): it searches beyond the retrieved
+# candidates with the mapper's retriever and the vocabulary database.
+SELECTORS_SPECS += [
+    SelectorRegistryEntry(
+        name=f"agent-{model}",
+        selector_class=_agentic_selector,  # type: ignore[arg-type]
+        kwargs={"model_id": f"{provider}/{model}"},
+    )
+    for provider, model in (
+        ("openai", "gpt-5-mini"),
+        ("openai", "gpt-5"),
+        ("openai", "gpt-5.2"),
+        ("gemini", "gemini-3-flash-preview"),
+        ("gemini", "gemini-2.5-flash"),
+    )
+]
+
 SELECTORS_REGISTRY: dict[str, SelectorRegistryEntry] = {
     entry.name: entry for entry in SELECTORS_SPECS
 }
