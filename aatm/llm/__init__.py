@@ -14,13 +14,16 @@ with ``base_url``). More can be added with `register_provider`.
 
 from aatm.llm.base import LLMResponseError, LLMSettings, ReasoningEffort, StructuredLLM
 from aatm.llm.registry import available_providers, create_llm, register_provider
+from aatm.llm.usage import TokenUsage, track_usage
 
 __all__ = [
     "LLMResponseError",
     "LLMSettings",
     "ReasoningEffort",
     "StructuredLLM",
+    "TokenUsage",
     "available_providers",
     "create_llm",
     "register_provider",
+    "track_usage",
 ]

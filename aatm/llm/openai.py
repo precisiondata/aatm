@@ -5,6 +5,7 @@ from typing import Any, Optional
 from openai import AsyncOpenAI
 
 from aatm.llm.base import LLMResponseError, LLMSettings, T
+from aatm.llm.usage import record_usage, usage_attr
 
 
 class OpenAILLM:
@@ -43,6 +44,10 @@ class OpenAILLM:
             input=user,
             text_format=output_type,
             **self._request_kwargs(),
+        )
+        usage = getattr(response, "usage", None)
+        record_usage(
+            usage_attr(usage, "input_tokens"), usage_attr(usage, "output_tokens")
         )
         if response.output_parsed is None:
             raise LLMResponseError(
@@ -97,6 +102,10 @@ class OpenAICompatibleLLM:
             ],
             response_format=output_type,
             **self._request_kwargs(),
+        )
+        usage = getattr(completion, "usage", None)
+        record_usage(
+            usage_attr(usage, "prompt_tokens"), usage_attr(usage, "completion_tokens")
         )
         if not completion.choices:
             raise LLMResponseError(f"{self.model_id} returned no choices.")
