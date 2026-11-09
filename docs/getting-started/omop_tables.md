@@ -425,6 +425,116 @@ How it works:
     measurement* rather than the more specific LOINC *Potassium [Moles/volume] in Serum
     or Plasma*; both are valid standard concepts.
 
+### Searching with an agent
+
+The mapper makes one search with the text alone, then picks from what it found. That
+fails in two ways: the right concept is not among the candidates ("creatinine" brings
+back urine and 24-hour tests, but not serum creatinine), or the text does not say which
+variant it is, while the rest of the note does (`mg/dL` means a mass concentration,
+`mmol/L` a molar one).
+
+`AgenticCoder` codes each text with an LLM agent instead. The agent gets the text
+**with its context**, and searches the vocabularies with tools until it finds the
+concept or concludes there is none:
+
+```python
+import asyncio
+
+from aatm.omop import AgenticCoder, ClinicalNote, OmopExtractionPipeline
+
+coder = AgenticCoder(
+    "openai/gpt-5-mini",                 # any aatm.llm model id
+    retriever="text-embedding-3-small",  # the embedding model chosen in `aatm init`
+    max_tool_calls=8,                    # per text
+)
+pipeline = OmopExtractionPipeline("lab_results", model_id="openai/gpt-5-mini", mapper=coder)
+notes = [ClinicalNote(text="Labs 03/15/2025: Hb 11.2 g/dL, creatinine 1.4 mg/dl.", person_id=10)]
+tables = asyncio.run(pipeline(notes))
+tables.mappings_dataframe()[["text", "concept_name", "score", "rationale", "trace", "usage"]]
+```
+
+**The context.** The builder gives the agent, for each coded text: the other values of
+the mention (its attributes, and the first text of each child, e.g. the value
+`1.4` and unit `mg/dl` of a lab test), the line of the note it comes from, and the
+target column (`measurement.measurement_concept_id`). The domain and vocabularies of
+the `map` source still restrict the answer. Nothing changes in the YAML.
+
+**The tools.**
+
+| Tool | What it does |
+|---|---|
+| Semantic search | The retriever's embedding search, with the agent's own queries: expansions ("Hb" → "hemoglobin"), translations ("potássio" → "potassium"), the specimen or unit added |
+| Lexical search | Concept names and synonyms containing every word of a query, in `.aatm/omop.db` |
+| Code lookup | A code in any vocabulary, with the standard concepts it maps to |
+| Concept details | Synonyms, "Maps to" and the LOINC axes (component, property, time, system, scale, method), to check that the specimen and property match the unit |
+| Hierarchy | Direct parents and children, to move to a more general or more specific concept |
+
+The answer is checked against the vocabulary: it must be a standard, valid concept of
+the required domain and vocabularies, or the agent is asked again.
+
+**What you get back.** `mappings_dataframe()` gains three columns:
+
+- `rationale`: the agent's reason, e.g. *"mg/dl is a mass concentration; serum is the
+  usual specimen for creatinine"*;
+- `trace`: every action with its query and the candidates it returned;
+- `usage`: tool calls, LLM calls, input and output tokens, seconds, and whether the
+  budget ran out.
+
+**The score** is the agent's confidence on a fixed scale, so `min_score` means the same
+thing whatever the retriever:
+
+| Level | Score | Meaning |
+|---|---|---|
+| high | 0.9 | Matches the text and everything the context states |
+| medium | 0.6 | The right concept, but a detail the context does not state was assumed |
+| low | 0.3 | The closest concept available, with a known mismatch or real ambiguity |
+
+`min_score: 0.5` keeps *high* and *medium*. When the budget runs out the agent must
+answer from what it has seen, and its score is capped at *low*.
+
+**Caching.** The plain mapper codes each distinct text once. The agent codes each
+distinct text *in its context* once: "creatinine 1.4 mg/dL" in two notes is one search,
+but "creatinine 1.4 mg/dL" and "urine creatinine 80 mg/dL" are two.
+
+#### Choosing between the mapper and the agent
+
+On 30 lab results with gold LOINC codes (abbreviations, Portuguese names, 24-hour and
+urine tests; LOINC Measurement concepts only; `text-embedding-3-small` index;
+`gpt-5-mini`):
+
+| Method | Correct | LLM calls per text | Tokens per text (in / out) |
+|---|---|---|---|
+| Nearest candidate (`FirstResultSelector`) | 1 / 30 | 0 | – |
+| `OpenAILLMSelector` over the top 30 | 14 / 30 | 1 | not reported |
+| Agent, text only | 27 / 30 | 2.2 | 3,300 / 940 |
+| **Agent, text with context** | **29 / 30** | 2.2 | 3,400 / 900 |
+
+The agent used 2.2 tool calls per text on average (at most 5 of the 8 allowed) and
+never ran out of budget. Its one miss was *BUN*, coded to urea nitrogen in blood rather
+than in serum or plasma. The LLM selector failed mostly because the right concept was
+not among its 30 candidates ("creatinine", "K", "potássio"). With context, the agent
+also told *Hb* (mass concentration, not "by calculation") and the albumin/creatinine
+*mass* ratio (from `mg/g`) apart.
+
+Most of the time per text goes to the vector search, not to the LLM: a ChromaDB query
+filtered by domain takes about 5 seconds on a full index (2.5 million expressions),
+against a few milliseconds unfiltered.
+
+The benchmark and its gold codes are in `benchmarks/concept_search/`; run it with your
+own retriever and model before choosing.
+
+- **The plain mapper** costs one search (and one LLM call with an LLM selector) per
+  distinct text, and is the choice when texts are explicit ("Creatinine in serum") or
+  cost and speed matter most.
+- **The agent** costs a few LLM calls per distinct text in context, and is the choice
+  when texts are short, abbreviated or not in English, and when variants of a test
+  differ by specimen or unit.
+
+The agent is also available as the selector of a `TerminologyMapper`, so CSV
+terminology mapping and a mapper you already configured can use it:
+`TerminologyMapper(retriever=..., selector=AgenticSelector("openai/gpt-5-mini"))`. In a
+builder, that mapper also receives the context.
+
 ### Code lookups
 
 `lookup: <VOCABULARY>` finds the extracted text as a code of a vocabulary. It suits
@@ -814,6 +924,7 @@ the datetime columns.
 | `... uses 'map', so the builder needs a terminology mapper` | The definition codes text, but no mapper was given | Pass `mapper=TerminologyMapper(...)` |
 | `SyntaxError: 'await' outside function` | `await` used in a script | Use `asyncio.run(pipeline(notes))`, or run it in a notebook |
 | Every `map` is `unmapped` | The mapper found no candidates, e.g. the search index for its retriever was not built | Use the embedding model you chose in `aatm init` as the `retriever` |
+| `trace` shows `error: ...` and `budget_exhausted` in `usage` | The agent ran out of tool calls before an answer | Raise `max_tool_calls`, or use a stronger model |
 
 ---
 
@@ -825,9 +936,11 @@ the datetime columns.
   second THEMIS rule), and mail-order prescriptions are not told apart from others.
 - `condition_start_date` falls back to the note date when the note gives no date, which
   is later than the real onset of long-standing conditions.
-- `map` searches with the extracted text alone: a unit such as mg/dL, which hints at a
-  serum test, is not used.
-- Mapper scores are not comparable across retrievers and selectors.
+- With the plain mapper, `map` searches with the extracted text alone: a unit such as
+  mg/dL, which hints at a serum test, is only used by the
+  [agent](#searching-with-an-agent).
+- Mapper scores are not comparable across retrievers and selectors. The agent's score
+  is a self-reported confidence level, not calibrated yet.
 - Units written outside UCUM ("lb", "x10^3/uL", "mEq/L") are not converted before the
   lookup.
 - Relative dates ("on admission", "after cycle 2") are not resolved: the next source,

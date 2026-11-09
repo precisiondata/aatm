@@ -31,6 +31,7 @@ _LAZY = {
     "ConceptMapping": "aatm.omop.builder",
     "CodedText": "aatm.omop.coding",
     "TerminologyMapperCoder": "aatm.omop.coding",
+    "AgenticCoder": "aatm.omop.coding",
 }
 
 

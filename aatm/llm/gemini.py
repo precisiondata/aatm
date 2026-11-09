@@ -7,6 +7,7 @@ from google.genai import types
 from pydantic import ValidationError
 
 from aatm.llm.base import LLMResponseError, LLMSettings, T
+from aatm.llm.usage import record_usage, usage_attr
 
 
 # JSON Schema keywords kept in the schema sent to Gemini. Others (pattern, minLength,
@@ -103,6 +104,12 @@ class GeminiLLM:
             contents=user,
             config=self._config(system, output_type),
         )
+        usage = getattr(response, "usage_metadata", None)
+        output_tokens = usage_attr(usage, "candidates_token_count")
+        thoughts = usage_attr(usage, "thoughts_token_count")
+        if thoughts is not None:
+            output_tokens = (output_tokens or 0) + thoughts
+        record_usage(usage_attr(usage, "prompt_token_count"), output_tokens)
         if not response.text:
             reason = None
             if response.candidates:

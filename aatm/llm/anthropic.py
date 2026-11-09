@@ -7,6 +7,7 @@ import logging
 from typing import Any, Optional
 
 from aatm.llm.base import LLMResponseError, LLMSettings, T
+from aatm.llm.usage import record_usage, usage_attr
 
 try:
     import anthropic
@@ -63,6 +64,10 @@ class AnthropicLLM:
             messages=[{"role": "user", "content": user}],
             output_format=output_type,
             **self._request_kwargs(),
+        )
+        usage = getattr(message, "usage", None)
+        record_usage(
+            usage_attr(usage, "input_tokens"), usage_attr(usage, "output_tokens")
         )
         if message.stop_reason == "refusal":
             details = message.stop_details

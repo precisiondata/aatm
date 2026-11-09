@@ -301,6 +301,7 @@ class TerminologyMapper:
         return_as: Literal["df", "mapped_source_concepts"] = "df",
         save_to_disk: bool = True,
         where: Optional[dict[str, Any]] = None,
+        contexts: Optional[List[Any]] = None,
     ) -> pd.DataFrame | List[SourceConcept] | List[MappedSourceConcept]:
         """Map source concepts from a file to standardized concepts.
 
@@ -321,6 +322,11 @@ class TerminologyMapper:
             where: Optional metadata filter passed to the retriever for this call,
                 e.g. ``{"std_domain_id": "Measurement"}`` to only retrieve
                 Measurement concepts. Overrides the retriever's own filter.
+            contexts: Optional context of each expression
+                (`aatm.concept_search.CodingContext`: related values, the sentence it
+                comes from), in the order of ``expressions``. Only used by selectors
+                that read context, such as `aatm.concept_search.AgenticSelector`;
+                by default they get each source concept's code and vocabulary.
 
         Returns:
             A pandas DataFrame containing the mapped source concepts.
@@ -357,6 +363,14 @@ class TerminologyMapper:
         assert return_as in ["df", "mapped_source_concepts"], (
             "Parameter return_as must be either 'df' or 'mapped_source_concepts'."
         )
+        if contexts is not None and len(contexts) != len(source_concepts):
+            raise ValueError(
+                f"Got {len(contexts)} contexts for {len(source_concepts)} expressions"
+            )
+        uses_context = getattr(self.selector, "uses_context", False)
+        if uses_context:
+            # Agentic selectors search further with the mapper's own retriever.
+            self.selector.bind(self.retriever)  # type: ignore[attr-defined]
 
         # map source concepts
         mapped_source_concepts: List[MappedSourceConcept] = []
@@ -380,9 +394,22 @@ class TerminologyMapper:
                 if where is not None
                 else translated_batch | self.retriever
             )
-            selected_source_concepts: SelectorResults = (
-                retrieved | self.reranker | self.selector
-            )
+            if uses_context:
+                from aatm.concept_search.selector import source_context
+
+                batch_contexts = (
+                    contexts[batch_idx : batch_idx + self.batch_size]
+                    if contexts is not None
+                    else [
+                        source_context(source_concept, translation.text)
+                        for source_concept, translation in zip(batch, translated_batch)
+                    ]
+                )
+                selected_source_concepts = self.selector.select(  # type: ignore[call-arg]
+                    retrieved | self.reranker, contexts=batch_contexts, where=where
+                )
+            else:
+                selected_source_concepts = retrieved | self.reranker | self.selector
             translated_source_concepts.extend(translated_batch)
             mapped_source_concepts.extend(
                 MappedSourceConcept.from_selector_results(

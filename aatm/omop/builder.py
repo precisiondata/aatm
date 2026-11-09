@@ -35,7 +35,12 @@ from aatm.data_models.extractors import (
     EntityValidationResult,
 )
 from aatm.logs import get_logger
-from aatm.omop.coding import CodedText, TerminologyMapperCoder, TextCoder
+from aatm.omop.coding import (
+    CodedText,
+    TerminologyMapperCoder,
+    TextCoder,
+    uses_context,
+)
 from aatm.omop.mapping import ClinicalNote, ConceptRef, FieldSource, OmopMapping
 from aatm.omop.tables import OMOP_TABLES, OmopTableRow
 from aatm.omop.vocabulary import (
@@ -63,6 +68,8 @@ IssueReason = Literal[
 
 # ("map", domain, vocabularies) or ("lookup", vocabulary_id)
 CodingKey = tuple
+# (coding key, text, context key): the context key is "" unless the coder reads context
+CodedKey = tuple[CodingKey, str, str]
 
 
 class OmopIssue(BaseModel):
@@ -118,6 +125,12 @@ class ConceptMapping(BaseModel):
         score: The mapper's confidence, for ``"map"``.
         stored: The value stored in the column: the concept id, or ``0`` when the
             mapping was rejected.
+        rationale: Why the concept was chosen, when the coder explains its choice
+            (`aatm.omop.AgenticCoder`).
+        trace: The searches made to find the concept (queries, candidates), when the
+            coder searches.
+        usage: Tool calls, LLM calls, tokens and seconds spent on this text, when
+            reported. Texts coded once and reused share the same usage.
     """
 
     table: str
@@ -132,6 +145,9 @@ class ConceptMapping(BaseModel):
     domain_id: Optional[str]
     score: Optional[float]
     stored: int
+    rationale: Optional[str] = None
+    trace: Optional[list[dict[str, Any]]] = None
+    usage: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -204,7 +220,7 @@ class _RowContext:
         note_index: int,
         note: ClinicalNote,
         entity_id: str,
-        coded: dict[tuple[CodingKey, str], CodedText],
+        coded: dict[CodedKey, CodedText],
     ):
         self.table = table
         self.note_index = note_index
@@ -530,7 +546,7 @@ class OmopTableBuilder:
         tables = OmopTables(extraction_results=list(results))
         next_id: dict[str, int] = {}
         records = [result.to_records() for result in results]
-        coded = self._code_texts(records)
+        coded = self._code_texts(notes, records)
 
         for note_index, (note, note_records) in enumerate(zip(notes, records)):
             if isinstance(note, str):
@@ -564,12 +580,73 @@ class OmopTableBuilder:
                 tables.issues.extend(ctx.issues)
         return tables
 
+    @property
+    def _coder_uses_context(self) -> bool:
+        return self.coder is not None and uses_context(self.coder)
+
+    def _context(
+        self,
+        source: FieldSource,
+        table: str,
+        column: str,
+        text: str,
+        record: EntityRecord,
+        note: ClinicalNote | str,
+    ) -> Any:
+        """The context of a coded text: the rest of the mention, and its note line.
+
+        For ``from: text`` or ``attribute`` sources: the mention's attributes and the
+        first text of each child, e.g. the value and unit of a lab test. For a
+        ``from: child.<key>`` source: the parent mention's text, its attributes and the
+        other children.
+        """
+        from aatm.concept_search.agent import CodingContext
+
+        related: dict[str, str] = {}
+        if source.kind == "child":
+            related[record.key] = record.text
+        for key, label in record.attributes.items():
+            related[key] = label
+        for key, children in record.children.items():
+            if children and not (source.kind == "child" and key == source.key):
+                related[key] = children[0].text
+        note_text = note.text if isinstance(note, ClinicalNote) else note
+        line_start = note_text.rfind("\n", 0, record.start) + 1
+        line_end = note_text.find("\n", record.end)
+        sentence = note_text[line_start : line_end if line_end != -1 else None]
+        return CodingContext(
+            text=text,
+            related=related,
+            sentence=sentence.strip() or None,
+            target=f"{table}.{column}",
+        )
+
+    def _context_key(
+        self,
+        key: CodingKey,
+        source: FieldSource,
+        table: str,
+        column: str,
+        text: str,
+        record: EntityRecord,
+        note: ClinicalNote | str,
+    ) -> tuple[str, Any]:
+        """The cache key of a text's context and the context, for coders that read it."""
+        if key[0] != "map" or not self._coder_uses_context:
+            return "", None
+        context = self._context(source, table, column, text, record, note)
+        return context.cache_key(), context
+
     def _code_texts(
-        self, records: list[list[EntityRecord]]
-    ) -> dict[tuple[CodingKey, str], CodedText]:
-        """Code the texts of all ``map`` and ``lookup`` sources, once per distinct text."""
-        requests: dict[CodingKey, set[str]] = {}
-        for note_records in records:
+        self, notes: Sequence[ClinicalNote | str], records: list[list[EntityRecord]]
+    ) -> dict[CodedKey, CodedText]:
+        """Code the texts of all ``map`` and ``lookup`` sources.
+
+        Each distinct text is coded once, or once per distinct context for coders that
+        read context (`aatm.omop.AgenticCoder`).
+        """
+        requests: dict[CodingKey, dict[tuple[str, str], Any]] = {}
+        for note, note_records in zip(notes, records):
             for record in note_records:
                 mapping = self.mappings.get(record.key)
                 if mapping is None:
@@ -579,22 +656,31 @@ class OmopTableBuilder:
                         if not source.codes_text:
                             continue
                         raw = self._raw(source, record)
-                        if raw is not None and raw.strip():
-                            key = self._coding_key(mapping.table, column, source)
-                            requests.setdefault(key, set()).add(raw.strip())
+                        if raw is None or not raw.strip():
+                            continue
+                        text = raw.strip()
+                        key = self._coding_key(mapping.table, column, source)
+                        context_key, context = self._context_key(
+                            key, source, mapping.table, column, text, record, note
+                        )
+                        requests.setdefault(key, {})[(text, context_key)] = context
 
-        coded: dict[tuple[CodingKey, str], CodedText] = {}
-        for key, texts in requests.items():
-            ordered = sorted(texts)
+        coded: dict[CodedKey, CodedText] = {}
+        for key, wanted in requests.items():
+            ordered = sorted(wanted)
+            texts = [text for text, _ in ordered]
             if key[0] == "map":
                 assert self.coder is not None
+                kwargs: dict[str, Any] = {}
+                if self._coder_uses_context:
+                    kwargs["contexts"] = [wanted[item] for item in ordered]
                 results = self.coder.code(
-                    ordered, domain=key[1], vocabularies=list(key[2]) or None
+                    texts, domain=key[1], vocabularies=list(key[2]) or None, **kwargs
                 )
             else:
-                results = self._lookup_codes(key[1], ordered)
-            for result in results:
-                coded[(key, result.text)] = result
+                results = self._lookup_codes(key[1], texts)
+            for (text, context_key), result in zip(ordered, results):
+                coded[(key, text, context_key)] = result
 
         # The mapper does not return concept names: add them for review.
         unnamed = {
@@ -796,7 +882,7 @@ class OmopTableBuilder:
         if source.concepts is not None:
             return self._label_concept(source, column, raw, ctx)
         if source.codes_text:
-            return self._coded_value(source, column, raw, ctx)
+            return self._coded_value(source, column, raw, record, ctx)
         return self._convert(raw, source.as_, column, ctx)
 
     @staticmethod
@@ -812,12 +898,20 @@ class OmopTableBuilder:
         return None
 
     def _coded_value(
-        self, source: FieldSource, column: str, raw: str, ctx: _RowContext
+        self,
+        source: FieldSource,
+        column: str,
+        raw: str,
+        record: EntityRecord,
+        ctx: _RowContext,
     ) -> int:
         key = self._coding_key(ctx.table, column, source)
         method: Literal["map", "lookup"] = "map" if key[0] == "map" else "lookup"
         text = raw.strip()
-        result = ctx.coded.get((key, text)) or CodedText(text=text)
+        context_key, _ = self._context_key(
+            key, source, ctx.table, column, text, record, ctx.note
+        )
+        result = ctx.coded.get((key, text, context_key)) or CodedText(text=text)
         how = (
             f"the terminology mapper ({', '.join(key[2]) or 'all vocabularies'})"
             if method == "map"
@@ -864,6 +958,9 @@ class OmopTableBuilder:
                 domain_id=result.domain_id,
                 score=result.score,
                 stored=stored,
+                rationale=result.rationale,
+                trace=result.trace,
+                usage=result.usage,
             )
         )
         return stored

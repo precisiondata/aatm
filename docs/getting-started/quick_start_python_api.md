@@ -269,12 +269,43 @@ The selector registry exposes:
 - `gemini-2.5-flash`
 - `gemini-2.5-flash-lite`
 - `gemini-2.5-pro` 
+- `agent-gpt-5-mini`, `agent-gpt-5`, `agent-gpt-5.2`, `agent-gemini-3-flash-preview`,
+  `agent-gemini-2.5-flash`: the concept search agent (see below)
 
 ```python
 from aatm.registries.selectors import load_selector
 
 selector = load_selector("first-result-selector")
 ```
+
+### Agentic selector
+
+The other selectors can only pick among the retrieved candidates. `AgenticSelector`
+starts from them, and when none fits, an LLM agent searches further: its own semantic
+searches with the mapper's retriever (expanding abbreviations, translating), lexical
+search over concept names and synonyms, code lookups, concept details and the
+hierarchy, in the vocabulary database built by `aatm init`. Each source concept's code
+and vocabulary are given to the agent, so `ICD10CM E11` can be looked up directly.
+
+```python
+from aatm.concept_search import AgenticSelector
+from aatm.terminology_mapper import TerminologyMapper
+
+mapper = TerminologyMapper(
+    input_file="source_concepts.csv",
+    retriever="text-embedding-3-small",
+    selector=AgenticSelector("openai/gpt-5-mini", max_tool_calls=8),
+)
+df = mapper.map()
+df[["source_code_description", "target_concept_id", "confidence_score", "mapping_rationale"]]
+```
+
+The output gains a `mapping_rationale` column (the agent's reason) and a
+`mapping_trace` column (its searches, as JSON). `confidence_score` is the agent's
+confidence level: 0.9 (high), 0.6 (medium) or 0.3 (low); see
+[Searching with an agent](omop_tables.md#searching-with-an-agent). Any `aatm.llm` model
+id works, e.g. `"anthropic/claude-sonnet-5-5"` or `"ollama/llama3.3"`. The same agent
+codes extracted text in OMOP tables, with `aatm.omop.AgenticCoder`.
 
 ---
 
