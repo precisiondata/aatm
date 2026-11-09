@@ -15,18 +15,23 @@ import shutil
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Hashable, List, Tuple
+from collections.abc import Callable, Iterable, Iterator
+from dataclasses import dataclass, field
+from typing import Any
 
+import numpy as np
 import pandas as pd
 import questionary
 import torch
-from chromadb import Collection, Embeddings
+from chromadb import Embeddings
 from rich.console import Console
-from rich.progress import track
+from rich.progress import Progress, TaskID, track
 
+from aatm.background_iterator import BackgroundIterator
 from aatm.logs import get_logger
 from aatm.data_models import ExpressionMetadata
 from aatm.timing_profiler import TimingProfiler
+from aatm.vector_db_writer import ChromaWriterProcess, WriteAck
 
 logger = get_logger(__name__)
 console = Console()
@@ -417,6 +422,169 @@ def estimate_batch_size(embedding_function: Any) -> int:
     )
 
 
+PREFETCH_CHUNKS = 2
+"""How many prepared chunks may wait for the GPU while it encodes."""
+
+
+def release_chromadb_clients() -> None:
+    """Drop this process's cached ChromaDB clients so another process can open the files."""
+    from chromadb.api.shared_system_client import SharedSystemClient
+
+    SharedSystemClient.clear_system_cache()
+    gc.collect()
+
+
+@dataclass
+class PreparedChunk:
+    """One chunk of dataset rows, ready to be embedded and written.
+
+    Attributes:
+        expression_origin: Dataset the rows come from.
+        dataset_rows: Total rows in that dataset, for progress reporting.
+        row_start: Index of the chunk's first row in the dataset.
+        n_rows: Rows in the chunk before deduplication.
+        n_unique: Rows left after removing duplicate IDs within the chunk.
+        ids: IDs not yet in the database. Empty if every row already exists.
+        documents: Expression text for each of ``ids``.
+        metadatas: Metadata for each of ``ids``.
+        prepared_at: `time.perf_counter` value when preparation started.
+    """
+
+    expression_origin: str
+    dataset_rows: int
+    row_start: int
+    n_rows: int
+    n_unique: int
+    ids: list[str]
+    documents: list[str]
+    metadatas: list[dict[str, Any]]
+    prepared_at: float
+
+
+def prepare_chunks(
+    dataset_paths: Iterable[Path],
+    chunk_size: int,
+    existing_ids: Callable[[list[str]], set[str]],
+    profiler: TimingProfiler,
+) -> Iterator[PreparedChunk]:
+    """Read datasets and yield chunks of rows that still need embeddings.
+
+    This runs in a background thread while the GPU encodes earlier chunks.
+
+    Args:
+        dataset_paths: CSV files built by `build_mapping_datasets`.
+        chunk_size: Rows per chunk.
+        existing_ids: Returns which of the given IDs are already stored.
+        profiler: Profiler for per-stage timings.
+
+    Yields:
+        One `PreparedChunk` per ``chunk_size`` rows, including chunks whose rows
+        are all present already, so progress can still be reported for them.
+
+    Raises:
+        ValueError: If a row has no ``expression_id``.
+    """
+    for dataset_path in dataset_paths:
+        expression_origin = dataset_path.stem
+
+        with profiler.time_block("read_csv"):
+            df = pd.read_csv(dataset_path, low_memory=False)
+
+        with profiler.time_block("drop_duplicates_dropna"):
+            df = df.drop_duplicates().dropna()
+
+        for row_start in range(0, len(df), chunk_size):
+            prepared_at = time.perf_counter()
+
+            with profiler.time_block("build_expression_metadata"):
+                records = df.iloc[row_start : row_start + chunk_size].to_dict("records")
+                # Keep the first row for each ID, as the database does.
+                by_id: dict[str, ExpressionMetadata] = {}
+                for record in records:
+                    metadata = ExpressionMetadata(
+                        **record,
+                        expression_origin=expression_origin,  # type: ignore[arg-type]
+                    )
+                    if metadata.expression_id is None:
+                        raise ValueError(
+                            "expression_id cannot be None. "
+                            f"Given: {metadata.model_dump()}"
+                        )
+                    by_id.setdefault(metadata.expression_id, metadata)
+
+            with profiler.time_block("chromadb_get_existing_ids"):
+                found = existing_ids(list(by_id))
+
+            new = [
+                (identifier, metadata)
+                for identifier, metadata in by_id.items()
+                if identifier not in found
+            ]
+
+            yield PreparedChunk(
+                expression_origin=expression_origin,
+                dataset_rows=len(df),
+                row_start=row_start,
+                n_rows=len(records),
+                n_unique=len(by_id),
+                ids=[identifier for identifier, _ in new],
+                documents=[metadata.expression for _, metadata in new],  # type: ignore[misc]
+                metadatas=[metadata.to_dict() for _, metadata in new],
+                prepared_at=prepared_at,
+            )
+
+        del df
+
+
+@dataclass
+class _BuildTracker:
+    """Track progress, counters and logs as chunks finish."""
+
+    progress: Progress
+    profiler: TimingProfiler
+    summary_every_n_chunks: int
+    pending: dict[int, PreparedChunk] = field(default_factory=dict)
+    tasks: dict[str, TaskID] = field(default_factory=dict)
+    processed_chunks: int = 0
+    added_documents: int = 0
+
+    def handle_acks(self, acks: list[WriteAck]) -> None:
+        for ack in acks:
+            chunk = self.pending.pop(ack.seq)
+            self.profiler.add("chromadb_add (writer process)", ack.add_seconds)
+            self.finish(chunk, n_new=ack.n_added)
+
+    def finish(self, chunk: PreparedChunk, n_new: int) -> None:
+        task = self.tasks.get(chunk.expression_origin)
+        if task is None:
+            task = self.progress.add_task(
+                f"Adding embeddings for {chunk.expression_origin}",
+                total=chunk.dataset_rows,
+            )
+            self.tasks[chunk.expression_origin] = task
+        self.progress.advance(task, chunk.n_rows)
+
+        self.profiler.log_batch(
+            expression_origin=chunk.expression_origin,
+            row_start=chunk.row_start,
+            n_rows=chunk.n_rows,
+            n_unique=chunk.n_unique,
+            n_new=n_new,
+            batch_elapsed=time.perf_counter() - chunk.prepared_at,
+        )
+
+        self.processed_chunks += 1
+        self.added_documents += n_new
+
+        if (
+            self.summary_every_n_chunks > 0
+            and self.processed_chunks % self.summary_every_n_chunks == 0
+        ):
+            self.profiler.log_summary(
+                label=f"partial after {self.processed_chunks} chunks"
+            )
+
+
 LOCAL_MODEL_CHUNK_SIZE = 4096
 """Default rows per ChromaDB round-trip for local models.
 
@@ -503,9 +671,6 @@ def build_local_vector_database(
         synchronize_cuda=profile_sync_cuda,
     )
 
-    processed_batches = 0
-    added_documents = 0
-
     if vector_db_dir is not None and not vector_db_dir.exists():
         raise ValueError("vector_db_dir does not exist")
 
@@ -574,195 +739,98 @@ def build_local_vector_database(
         max_chromadb_batch_size=client.get_max_batch_size(),
     )
 
+    collection_name = model_registry[embedding_model_name].collection_name
+
     with profiler.time_block("get_or_create_collection"):
-        collection: Collection = client.get_or_create_collection(
-            model_registry[embedding_model_name].collection_name,
+        client.get_or_create_collection(
+            collection_name,
             embedding_function=embedding_function,
         )
 
-    datasets_base_path = Path(".aatm/datasets")
+    # From here on the writer process owns the database. Two clients in different
+    # processes must not share one directory, so release this one first.
+    del client
+    release_chromadb_clients()
 
-    for dataset_path in datasets_base_path.glob("*.csv"):
-        expression_origin = dataset_path.stem
+    dataset_paths = sorted(Path(".aatm/datasets").glob("*.csv"))
 
-        with profiler.time_block("read_csv"):
-            df = pd.read_csv(dataset_path, low_memory=False)
+    with (
+        ChromaWriterProcess(str(vector_db_dir), collection_name) as writer,
+        BackgroundIterator(
+            prepare_chunks(
+                dataset_paths,
+                chunk_size=chunk_size,
+                existing_ids=writer.existing_ids,
+                profiler=profiler,
+            ),
+            maxsize=PREFETCH_CHUNKS,
+            name="aatm-chunk-preparer",
+        ) as chunks,
+        Progress(*Progress.get_default_columns(), console=console) as progress,
+    ):
+        tracker = _BuildTracker(
+            progress=progress,
+            profiler=profiler,
+            summary_every_n_chunks=(
+                profile_summary_every_n_batches if profile_timing else 0
+            ),
+        )
+        seq = 0
 
-        with profiler.time_block("drop_duplicates_dropna"):
-            df = df.drop_duplicates().dropna()
+        for chunk in chunks:
+            tracker.handle_acks(writer.poll())
 
-        for row_start in track(
-            range(0, len(df), chunk_size),
-            description=f"Adding embeddings for {expression_origin}",
-        ):
-            batch_start = time.perf_counter()
-
-            with profiler.time_block("slice_dataframe_to_records"):
-                records: list[dict[Hashable, Any]] = df.iloc[
-                    row_start : row_start + chunk_size
-                ].to_dict("records")
-
-            with profiler.time_block("build_expression_metadata"):
-                expression_metadatas: list[ExpressionMetadata] = [
-                    ExpressionMetadata(**record, expression_origin=expression_origin)  # type: ignore[arg-type]
-                    for record in records
-                ]
-
-            with profiler.time_block("deduplicate_batch_ids"):
-                unique_pairs: list[tuple[str, ExpressionMetadata]] = []
-                seen: set[str] = set()
-
-                for metadata in expression_metadatas:
-                    if metadata.expression_id in seen:
-                        continue
-
-                    if metadata.expression_id is None:
-                        raise ValueError(
-                            f"expression_id cannot be None. Given: {metadata.model_dump()}"
-                        )
-
-                    seen.add(metadata.expression_id)
-                    unique_pairs.append((metadata.expression_id, metadata))
-
-                ids = [identifier for identifier, _ in unique_pairs]
-
-                assert all(identifier is not None for identifier in ids), (
-                    f"Missing identifier in {expression_origin}"
-                )
-
-            with profiler.time_block("chromadb_get_existing_ids"):
-                results = collection.get(ids=ids)  # type: ignore[arg-type]
-                found_ids = set(results["ids"])
-
-            with profiler.time_block("filter_existing_ids"):
-                filtered_unique_pairs: List[Tuple[str, ExpressionMetadata]] = [
-                    (identifier, metadata)
-                    for identifier, metadata in unique_pairs
-                    if identifier not in found_ids and identifier is not None
-                ]
-
-            n_rows = len(records)
-            n_unique = len(unique_pairs)
-            n_new = len(filtered_unique_pairs)
-
-            if not filtered_unique_pairs:
-                batch_elapsed = time.perf_counter() - batch_start
-
-                profiler.log_batch(
-                    expression_origin=expression_origin,
-                    row_start=row_start,
-                    n_rows=n_rows,
-                    n_unique=n_unique,
-                    n_new=0,
-                    batch_elapsed=batch_elapsed,
-                )
-
-                del records
-                del expression_metadatas
-                del unique_pairs
-                del ids
-                del results
-                del found_ids
-                del filtered_unique_pairs
-
-                processed_batches += 1
-
-                if (
-                    profile_timing
-                    and profile_summary_every_n_batches > 0
-                    and processed_batches % profile_summary_every_n_batches == 0
-                ):
-                    profiler.log_summary(
-                        label=f"partial after {processed_batches} batches"
-                    )
-
+            if not chunk.ids:
+                tracker.finish(chunk, n_new=0)
                 continue
 
             if rate_limit is not None:
                 with profiler.time_block("rate_limiter_total"):
                     next_allowed_time, slept_seconds = rate_limiter(
-                        n_docs=len(filtered_unique_pairs),
+                        n_docs=len(chunk.ids),
                         rate_limit=rate_limit,
                         next_allowed_time=next_allowed_time,
                     )
 
                 profiler.add("rate_limiter_sleep", slept_seconds)
 
-            with profiler.time_block("prepare_embedding_input_texts"):
-                texts_to_embed = [
-                    metadata.expression for _, metadata in filtered_unique_pairs
-                ]
-
             with profiler.time_block("embedding_function_call"):
-                embeddings = embedding_function(texts_to_embed)
+                embeddings = embedding_function(chunk.documents)
 
             with profiler.time_block("ensure_cpu_embeddings"):
-                embeddings = ensure_cpu_embeddings(embeddings)
+                embeddings_array = np.asarray(
+                    ensure_cpu_embeddings(embeddings), dtype=np.float32
+                )
+                del embeddings
 
-            with profiler.time_block("prepare_chromadb_payload"):
-                add_ids = [identifier for identifier, _ in filtered_unique_pairs]
-                add_documents = [
-                    metadata.expression for _, metadata in filtered_unique_pairs
-                ]
-                add_metadatas = [
-                    metadata.to_dict() for _, metadata in filtered_unique_pairs
-                ]
+            seq += 1
+            tracker.pending[seq] = chunk
 
-            with profiler.time_block("chromadb_add"):
-                collection.add(
-                    ids=add_ids,
-                    documents=add_documents,  # type: ignore[misc,arg-type]
-                    embeddings=embeddings,
-                    metadatas=add_metadatas,  # type: ignore[arg-type]
+            # Blocks only while the writer already has batches queued.
+            with profiler.time_block("wait_for_writer"):
+                writer.add(
+                    seq,
+                    chunk.ids,
+                    embeddings_array,
+                    chunk.documents,
+                    chunk.metadatas,
                 )
 
-            with profiler.time_block("delete_batch_objects"):
-                del embeddings
-                del records
-                del expression_metadatas
-                del unique_pairs
-                del ids
-                del results
-                del found_ids
-                del filtered_unique_pairs
-                del texts_to_embed
-                del add_ids
-                del add_documents
-                del add_metadatas
-
-            batch_elapsed = time.perf_counter() - batch_start
-
-            processed_batches += 1
-            added_documents += n_new
-
-            profiler.log_batch(
-                expression_origin=expression_origin,
-                row_start=row_start,
-                n_rows=n_rows,
-                n_unique=n_unique,
-                n_new=n_new,
-                batch_elapsed=batch_elapsed,
-            )
-
-            if (
-                profile_timing
-                and profile_summary_every_n_batches > 0
-                and processed_batches % profile_summary_every_n_batches == 0
-            ):
-                profiler.log_summary(label=f"partial after {processed_batches} batches")
-
-            if processed_batches % 50 == 0:
+            if seq % 50 == 0:
                 gpu_memory_cleanup()
 
-        del df
+        with profiler.time_block("wait_for_final_writes"):
+            tracker.handle_acks(writer.close())
 
-        with profiler.time_block("dataset_cleanup"):
-            gpu_memory_cleanup(synchronize=False)
+        profiler.add("wait_for_prepared_chunk", chunks.wait_seconds)
+
+    console.print(
+        f"Added {tracker.added_documents} embeddings in {tracker.processed_chunks} "
+        "chunks."
+    )
 
     with profiler.time_block("final_delete_objects"):
-        del collection
         del embedding_function
-        del client
 
     with profiler.time_block("final_gpu_memory_cleanup"):
         gpu_memory_cleanup(synchronize=True)
