@@ -19,8 +19,8 @@
 # the model.
 #
 # - measurement_concept_id is coded from the test name with the terminology mapper
-#   (aatm.terminology_mapper.TerminologyMapper), restricted to LOINC concepts of the
-#   Measurement domain. The builder needs a mapper for this file:
+#   (aatm.terminology_mapper.TerminologyMapper), restricted to standard concepts of the
+#   Measurement domain, from any vocabulary. The builder needs a mapper for this file:
 #   OmopTableBuilder(definitions, mapper=TerminologyMapper(...)).
 #   Test names often leave out the specimen ("Hemoglobin" in blood or urine), so check
 #   the mappings with OmopTables.mappings_dataframe().
@@ -77,7 +77,7 @@
       person_id: {from: context.person_id}
       measurement_concept_id:
         from: text
-        map: {vocabularies: [LOINC]}  # domain: Measurement, required by the column
+        map: {}  # any standard concept of the Measurement domain, required by the column
       measurement_source_value: {from: text}
       measurement_date:
         - {from: child.lab_date, as: date}

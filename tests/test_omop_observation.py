@@ -264,8 +264,8 @@ def test_family_history_rows():
     assert lupus.value_as_concept_id == 0
     assert lupus.qualifier_concept_id == 4248584
 
-    # Conditions are retrieved from SNOMED's Condition domain, each text once.
-    assert coder.calls == [(["lupus", "type 2 diabetes"], "Condition", ["SNOMED"])]
+    # Any standard Condition concept qualifies, whatever its vocabulary; each text once.
+    assert coder.calls == [(["lupus", "type 2 diabetes"], "Condition", None)]
     assert [(i.row_id, i.column, i.reason) for i in tables.issues] == [
         (2, "value_as_concept_id", "unmapped")
     ]

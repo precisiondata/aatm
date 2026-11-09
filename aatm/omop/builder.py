@@ -586,6 +586,7 @@ class OmopTableBuilder:
                     vocabulary_id=chosen.vocabulary_id if chosen else None,
                     concept_code=chosen.concept_code if chosen else None,
                     domain_id=chosen.domain_id if chosen else None,
+                    standard=chosen.is_standard if chosen else None,
                 )
             )
         return results
@@ -707,6 +708,14 @@ class OmopTableBuilder:
         stored = result.concept_id or 0
         if result.concept_id is None:
             ctx.add(column, "unmapped", f"No concept for {text!r} with {how}; stored 0")
+        elif result.standard is False and not column.endswith("source_concept_id"):
+            # *_concept_id columns hold standard concepts, whatever their vocabulary.
+            stored = 0
+            ctx.add(
+                column,
+                "unmapped",
+                f"{found} is not a standard concept; stored 0",
+            )
         elif (
             source.map is not None
             and source.map.min_score is not None

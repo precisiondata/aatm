@@ -20,7 +20,8 @@
 #   416471007 "Family history of clinical finding" and value_as_concept_id the
 #   condition itself.
 # - The condition is coded from the mention with the terminology mapper, restricted to
-#   SNOMED concepts of the Condition domain. The builder needs a mapper for this file:
+#   standard concepts of the Condition domain, from any vocabulary. The builder needs a
+#   mapper for this file:
 #   OmopTableBuilder(definitions, mapper=TerminologyMapper(...)).
 # - The relative goes to qualifier_concept_id as a standard SNOMED relationship concept
 #   ("Mother", "Sister"...). The CDM has no dedicated column for the relative; this is
@@ -99,7 +100,7 @@
       observation_type_concept_id: {value: 32858}  # NLP
       value_as_concept_id:
         from: text
-        map: {domain: Condition, vocabularies: [SNOMED]}
+        map: {domain: Condition}
       value_source_value: {from: text}
       qualifier_concept_id:
         from: attribute.relative

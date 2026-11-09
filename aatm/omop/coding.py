@@ -32,6 +32,7 @@ class CodedText(BaseModel):
         domain_id: Its domain, e.g. ``"Measurement"``.
         score: The mapper's confidence, from 0 to 1 (``1 - distance`` for the default
             selector), when available.
+        standard: Whether the concept is standard. ``None`` when unknown.
     """
 
     text: str
@@ -41,6 +42,7 @@ class CodedText(BaseModel):
     concept_code: Optional[str] = None
     domain_id: Optional[str] = None
     score: Optional[float] = None
+    standard: Optional[bool] = None
 
 
 class TextCoder(Protocol):
@@ -106,6 +108,8 @@ class TerminologyMapperCoder:
                 concept_code=m.target_vocabulary_code,
                 domain_id=m.domain_id,
                 score=m.confidence_score,
+                # The mapper's index holds standard concepts only.
+                standard=True if m.target_concept_id else None,
             )
             for text, m in zip(texts, mapped)
         ]

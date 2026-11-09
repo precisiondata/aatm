@@ -24,6 +24,8 @@ UNIT_CONCEPTS = [
     # Two standard units that differ only by case: "mm" vs "Mm".
     concept(8588, "mm", "millimeter", "Unit", "UCUM"),
     concept(9999, "Mm", "megameter", "Unit", "UCUM"),
+    # A unit code whose only concept is not standard.
+    concept(9100, "mEq/L", "milliequivalent per liter", "Unit", "UCUM", standard=None),
     concept(32858, "OMOP4976931", "NLP", "Type Concept", "Type Concept"),
     concept(4171756, "276139006", "<", "Meas Value Operator"),
     concept(
@@ -280,6 +282,27 @@ def test_unmapped_text_and_ambiguous_unit_store_zero():
     assert issues == [("measurement_concept_id", "unmapped")]
 
 
+def test_non_standard_lookup_result_is_not_stored():
+    builder = make_builder()
+    tables = run(
+        builder, "Hb 4 mEq/L", [lab("e1", "Hb"), part("e2", "lab_unit", "mEq/L", "e1")]
+    )
+    assert tables.rows["measurement"][0].unit_concept_id == 0
+    (issue,) = tables.issues
+    assert issue.reason == "unmapped"
+    assert "is not a standard concept" in issue.detail
+    assert tables.mappings[1].concept_id == 9100  # still shown for review
+
+
+def test_predefined_maps_do_not_restrict_vocabularies():
+    for name, key, column in [
+        ("lab_results", "lab_test", "measurement_concept_id"),
+        ("family_history", "family_history", "value_as_concept_id"),
+    ]:
+        (source,) = EntityDefinitions.from_predefined(name).get(key).omop.fields[column]
+        assert source.map.vocabularies is None
+
+
 def test_case_insensitive_unit_must_be_unique():
     builder = make_builder()
     tables = run(
@@ -374,6 +397,7 @@ def test_terminology_mapper_passes_the_filter_to_its_retriever(tmp_path):
         concept_code="718-7",
         domain_id="Measurement",
         score=0.75,
+        standard=True,
     )
     assert not any(tmp_path.iterdir())  # nothing written to disk
 

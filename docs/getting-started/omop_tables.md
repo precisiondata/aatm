@@ -182,6 +182,13 @@ created, so mistakes fail before any model call:
 `*_source_concept_id` columns keep the code as written, standard or not, as the CDM
 asks.
 
+!!! note "Standard, from any vocabulary"
+    A `*_concept_id` column needs a **standard** concept of the right domain. Its
+    vocabulary does not matter: SNOMED, LOINC, RxNorm or any other. The same rule
+    applies to every source: fixed codes and label maps are checked when the builder
+    is created, and a `map` or `lookup` that finds a non-standard concept stores `0`
+    and reports `unmapped`.
+
 Check what a mapping resolves to before a run:
 
 ```python
@@ -226,7 +233,7 @@ and selection. The predefined `lab_results` definition does this for the test na
     fields:
       measurement_concept_id:
         from: text
-        map: {vocabularies: [LOINC]}       # domain defaults to Measurement
+        map: {}                            # domain defaults to Measurement
       unit_concept_id: {from: child.lab_unit, lookup: UCUM}
       value_as_number: {from: child.lab_value, as: float}
       # ...
@@ -262,10 +269,12 @@ tables.mappings_dataframe()
 
 How it works:
 
-- **Retrieval is restricted** to the domain and vocabularies you give. `domain`
-  defaults to the domain the column requires (`Measurement` for
-  `measurement_concept_id`), and a conflicting one fails when the builder is created.
-  The filter is passed to the retriever with `TerminologyMapper.map(..., where=...)`.
+- **Retrieval is restricted to a domain**, not to a vocabulary: any standard concept
+  of that domain is a candidate. `domain` defaults to the domain the column requires
+  (`Measurement` for `measurement_concept_id`), and a conflicting one fails when the
+  builder is created. `map: {vocabularies: [LOINC]}` optionally narrows the search,
+  e.g. when your data must use one vocabulary. The filter is passed to the retriever
+  with `TerminologyMapper.map(..., where=...)`.
 - **Each distinct text is coded once per batch**: a hundred notes mentioning "Hb" make
   one mapper query.
 - **The result is already standard**: the index holds standard concepts and
@@ -283,6 +292,12 @@ How it works:
     `OpenAILLMSelector("gpt-5-mini")` choosing among 30 candidates, 7 of 9 test names in
     a small sample were coded correctly, including Portuguese ones. Both misses were
     creatinine, whose serum concept was not among the retrieved candidates.
+
+    Without a vocabulary filter, several tests map to standard SNOMED procedures such
+    as *Potassium measurement* instead of LOINC observables such as *Potassium
+    [Moles/volume] in Serum or Plasma*. Both are valid; the SNOMED ones usually leave
+    out the specimen and property. Add `vocabularies: [LOINC]` if you need that
+    detail.
 
 ### Code lookups
 
@@ -339,13 +354,13 @@ A typical result (concept names added in italics):
 
 **`family_history`** follows the CDM convention: `observation_concept_id` is SNOMED
 416471007 *Family history of clinical finding*, and `value_as_concept_id` is the
-condition, coded from the mention with the terminology mapper, restricted to SNOMED
+condition, coded from the mention with the terminology mapper, restricted to standard
 concepts of the Condition domain:
 
 ```yaml
       value_as_concept_id:
         from: text
-        map: {domain: Condition, vocabularies: [SNOMED]}
+        map: {domain: Condition}
 ```
 
 The relative goes to `qualifier_concept_id` as a standard SNOMED relationship concept
