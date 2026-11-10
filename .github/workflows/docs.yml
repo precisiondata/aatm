@@ -1,17 +1,32 @@
 name: Docs
 
+# Versioned docs on GitHub Pages, managed by mike:
+# - push to main   -> "dev" (latest unreleased)
+# - push a v* tag  -> "<version>", aliased "latest" and set as the default
+# - manual run     -> build any tag, e.g. to backfill older releases
 on:
   push:
     branches: [ main ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag to build (e.g. v0.2.0)"
+        required: true
+      latest:
+        description: "Also alias it as 'latest' and make it the default"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # PR builds cancel each other; deploys share one queue so gh-pages
+  # pushes never race.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -29,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          # gh-deploy needs the gh-pages history.
+          ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
 
       - name: Install uv and Python
@@ -44,12 +59,64 @@ jobs:
       - name: Install the project
         run: uv sync --locked --all-extras --no-group cu128 --group cpu
 
+      # Tags released before versioned docs pin `extra.version: 0.1.0` and
+      # lack mike in their lockfile; give them the version selector.
+      - name: Enable the version selector on older tags
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          sed -i 's/^  version: 0\.1\.0$/  version:\n    provider: mike\n    default: latest\n    alias: true/' mkdocs.yml
+          grep -q "provider: mike" mkdocs.yml
+
       - name: Build docs
-        run: uv run mkdocs build --strict
+        run: uv run --with "mike>=2.1.3" mkdocs build --strict
 
       - name: Deploy to GitHub Pages
         if: github.event_name != 'pull_request'
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ inputs.ref || github.ref_name }}
+          SET_LATEST: ${{ github.event_name == 'push' || inputs.latest }}
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          uv run mkdocs gh-deploy --strict --force --no-history
+          mike() { uv run --with "mike>=2.1.3" mike "$@"; }
+
+          # gh-pages from before versioned docs held one site at the root;
+          # drop it so stale unversioned pages don't linger.
+          rc=0; git ls-remote --exit-code --heads origin gh-pages >/dev/null || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            git fetch origin gh-pages --depth=1
+            if git show FETCH_HEAD:versions.json >/dev/null 2>&1; then
+              git branch -f gh-pages FETCH_HEAD
+            else
+              echo "gh-pages predates versioned docs; starting it fresh"
+              git branch -D gh-pages 2>/dev/null || true
+              push_force=1
+            fi
+          elif [ "$rc" -ne 2 ]; then
+            echo "::error::Could not query gh-pages on origin"; exit 1
+          fi
+
+          if [ "$EVENT" = "push" ] && [ "$REF_TYPE" = "branch" ]; then
+            mike deploy --title "dev (unreleased)" dev
+            # Until a release is deployed, point the site root at dev.
+            if ! mike list --json | grep -q '"latest"'; then
+              mike set-default dev
+            fi
+          else
+            version="${REF_NAME#v}"
+            if [ "$SET_LATEST" = "true" ]; then
+              mike deploy --update-aliases "$version" latest
+              mike set-default latest
+            else
+              mike deploy "$version"
+            fi
+          fi
+
+          if [ -n "${push_force:-}" ]; then
+            git push --force origin gh-pages
+          else
+            git push origin gh-pages
+          fi

@@ -52,6 +52,7 @@ nav:
 
 theme:
   name: material
+  custom_dir: overrides
   locale: en
   features:
     - search.suggest
@@ -74,7 +75,11 @@ theme:
     - content.action.edit
 
 extra:
-  version: 0.1.0
+  # Version selector backed by mike (see .github/workflows/docs.yml).
+  version:
+    provider: mike
+    default: latest
+    alias: true
 
 plugins:
   - search
