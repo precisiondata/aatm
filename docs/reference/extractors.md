@@ -12,6 +12,12 @@ LLM-based extractors. See the [Information extraction quick start](../getting-st
 
 ::: aatm.llm.registry
 
+## Rate limits and retries
+
+::: aatm.llm.limits
+
+::: aatm.llm.usage
+
 ## Legacy extractors
 
 ::: aatm.extractors.extractors

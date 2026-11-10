@@ -5,6 +5,7 @@ from typing import Any, Optional
 from openai import AsyncOpenAI
 
 from aatm.llm.base import LLMResponseError, LLMSettings, T
+from aatm.llm.limits import estimate_tokens, get_rate_limiter
 from aatm.llm.usage import record_usage, usage_attr
 
 
@@ -22,7 +23,8 @@ class OpenAILLM:
         self.model = model
         self.model_id = f"openai/{model}"
         self.settings = settings or LLMSettings()
-        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        # Retries are handled by the shared limiter (`aatm.llm.limits`).
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url, max_retries=0)
 
     def _request_kwargs(self) -> dict[str, Any]:
         s = self.settings
@@ -38,6 +40,12 @@ class OpenAILLM:
         return {**kwargs, **s.provider_kwargs}
 
     async def generate(self, *, system: str, user: str, output_type: type[T]) -> T:
+        return await get_rate_limiter(self.model_id).run(
+            lambda: self._generate(system=system, user=user, output_type=output_type),
+            estimated_tokens=estimate_tokens(system, user),
+        )
+
+    async def _generate(self, *, system: str, user: str, output_type: type[T]) -> T:
         response = await self.client.responses.parse(
             model=self.model,
             instructions=system,
@@ -78,7 +86,9 @@ class OpenAICompatibleLLM:
         self.model_id = f"{provider}/{model}"
         self.settings = settings or LLMSettings()
         # Local servers usually need no key, but the OpenAI client requires one.
-        self.client = AsyncOpenAI(api_key=api_key or "not-needed", base_url=base_url)
+        self.client = AsyncOpenAI(
+            api_key=api_key or "not-needed", base_url=base_url, max_retries=0
+        )
 
     def _request_kwargs(self) -> dict[str, Any]:
         s = self.settings
@@ -94,6 +104,12 @@ class OpenAICompatibleLLM:
         return {**kwargs, **s.provider_kwargs}
 
     async def generate(self, *, system: str, user: str, output_type: type[T]) -> T:
+        return await get_rate_limiter(self.model_id).run(
+            lambda: self._generate(system=system, user=user, output_type=output_type),
+            estimated_tokens=estimate_tokens(system, user),
+        )
+
+    async def _generate(self, *, system: str, user: str, output_type: type[T]) -> T:
         completion = await self.client.chat.completions.parse(
             model=self.model,
             messages=[

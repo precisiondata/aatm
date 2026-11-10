@@ -101,17 +101,50 @@ import asyncio
 results = asyncio.run(extractor([note]))
 ```
 
-Several notes can be passed at once. Use `max_concurrency` to control how many model
-calls run in parallel (default: 1):
+Several notes can be passed at once and are extracted concurrently:
+
+```python
+results = await extractor(list_of_notes)
+```
+
+### Concurrency, rate limits and retries
+
+Every LLM call in AATM (extraction, the concept search agent, ...) goes through one
+limiter per model, shared by every component. By default it allows 16 calls in flight
+per model and retries rate-limit errors (429), server errors (5xx), timeouts and
+connection errors up to 6 times, with exponential backoff and jitter, honouring the
+provider's `Retry-After`. A 429 also pauses every call to that model for the wait.
+
+Set the limits once, for every model (`"*"`), a provider or one model:
+
+```python
+from aatm.llm import set_rate_limits
+
+set_rate_limits("*", max_concurrency=16)
+set_rate_limits("anthropic", requests_per_minute=1000, tokens_per_minute=400_000)
+set_rate_limits("openai/gpt-5-mini", max_concurrency=64, max_retries=8)
+```
+
+Limits are looked up by model id, then provider, then `"*"`. Each model has its own
+limiter, even when its limits come from the provider entry. The token limit counts
+input and output tokens; a call reserves an estimate of its prompt before it starts,
+corrected with the provider's count when it returns.
+
+An error that persists after the retries stops the batch by default. With
+`on_error="record"`, the note gets an empty result with the error in its `error`
+field instead, and the other notes go on:
 
 ```python
 extractor = SimpleLLMExtractor(
     model_id="openai/gpt-5",
     entity_definitions=entity_definitions,
-    max_concurrency=4,
+    on_error="record",
 )
 results = await extractor(list_of_notes)
+failed = [i for i, r in enumerate(results) if r.error]
 ```
+
+`max_concurrency` on the extractor adds a cap of its own on top of the model's limiter.
 
 ---
 
@@ -480,7 +513,8 @@ segments=segment_text(note, max_segment_chars=400))`.
 | `base_url` | `None` | Server URL for OpenAI-compatible providers |
 | `settings` | `None` | `aatm.llm.LLMSettings` or a dict, e.g. `{"temperature": 0, "max_tokens": 8000}` |
 | `llm` | `None` | A ready-made `aatm.llm.StructuredLLM`, used instead of `model_id` |
-| `max_concurrency` | `1` | Parallel model calls |
+| `max_concurrency` | `None` | Parallel model calls from this extractor; `None` leaves it to the model's limiter (`aatm.llm.set_rate_limits`) |
+| `on_error` | `"raise"` | `"record"` returns an empty result with the error for a note that fails after retries |
 | `max_segment_chars` | `None` | Split lines longer than this at sentence boundaries |
 | `instructions` | built-in prompt | Custom system prompt; `{output_format}` and `{entity_definitions}` are filled in |
 

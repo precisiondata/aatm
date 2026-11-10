@@ -23,7 +23,9 @@ key is read from the provider's usual environment variable unless passed explici
 """
 
 import asyncio
-from typing import Any, List, Optional
+import contextlib
+import logging
+from typing import Any, List, Literal, Optional
 
 from aatm.data_models.extractors import (
     EntityDefinitions,
@@ -34,6 +36,8 @@ from aatm.data_models.extractors import (
     validate_extracted_entity,
 )
 from aatm.llm import LLMSettings, StructuredLLM, create_llm
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_INSTRUCTION = """
 # Goal
@@ -92,12 +96,19 @@ class SimpleLLMExtractor:
         base_url: Server URL for OpenAI-compatible providers (vLLM, Ollama, ...).
         settings: Generation settings, as an `aatm.llm.LLMSettings` or a compatible
             dict, e.g. ``{"temperature": 0, "max_tokens": 8000}``.
-        max_concurrency: Maximum number of concurrent model calls.
+        max_concurrency: Maximum number of concurrent model calls made by this
+            extractor. ``None`` (default) leaves the cap to the model's shared rate
+            limiter (`aatm.llm.set_rate_limits`), which also retries rate-limit and
+            transient errors.
         max_segment_chars: If set, lines longer than this are split at sentence
             boundaries into separately numbered segments before being sent to the
             model. ``None`` (default) keeps every line whole.
         llm: A ready-made `aatm.llm.StructuredLLM` to use instead of building one
             from ``model_id``, e.g. a custom provider.
+        on_error: What to do when a text cannot be extracted once retries are spent:
+            ``"raise"`` (default) raises the error; ``"record"`` returns an empty
+            result for that text with the error in its ``error`` field, so one note
+            does not stop a batch.
     """
 
     def __init__(
@@ -109,12 +120,17 @@ class SimpleLLMExtractor:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         settings: Optional[LLMSettings | dict[str, Any]] = None,
-        max_concurrency: int = 1,
+        max_concurrency: Optional[int] = None,
         max_segment_chars: Optional[int] = None,
         llm: Optional[StructuredLLM] = None,
+        on_error: Literal["raise", "record"] = "raise",
     ):
         if entity_definitions is None:
             raise ValueError("entity_definitions is required")
+        if on_error not in ("raise", "record"):
+            raise ValueError("on_error must be 'raise' or 'record'")
+        if max_concurrency is not None and max_concurrency < 1:
+            raise ValueError("max_concurrency must be >= 1 or None")
         if llm is None:
             if model_id is None:
                 raise ValueError("Either model_id or llm must be given")
@@ -124,7 +140,10 @@ class SimpleLLMExtractor:
 
         self.llm = llm
         self.model_id = llm.model_id
-        self.semaphore = asyncio.Semaphore(max_concurrency)
+        self.semaphore: Optional[asyncio.Semaphore] = (
+            asyncio.Semaphore(max_concurrency) if max_concurrency is not None else None
+        )
+        self.on_error = on_error
         self.entity_definitions = entity_definitions
         self.max_segment_chars = max_segment_chars
 
@@ -138,12 +157,18 @@ class SimpleLLMExtractor:
     async def extract(self, text: str) -> EntityValidationResult:
         segments = segment_text(text, max_segment_chars=self.max_segment_chars)
 
-        async with self.semaphore:
-            candidates = await self.llm.generate(
-                system=self.instructions,
-                user=format_segments_for_prompt(segments),
-                output_type=self.output_type,
-            )
+        try:
+            async with self.semaphore or contextlib.nullcontext():
+                candidates = await self.llm.generate(
+                    system=self.instructions,
+                    user=format_segments_for_prompt(segments),
+                    output_type=self.output_type,
+                )
+        except Exception as e:
+            if self.on_error == "raise":
+                raise
+            logger.warning("Extraction failed with %s: %s", self.model_id, e)
+            return EntityValidationResult(error=f"{type(e).__name__}: {e}")
 
         return validate_extracted_entity(
             text=text,

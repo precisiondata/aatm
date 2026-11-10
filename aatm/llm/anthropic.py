@@ -7,6 +7,7 @@ import logging
 from typing import Any, Optional
 
 from aatm.llm.base import LLMResponseError, LLMSettings, T
+from aatm.llm.limits import estimate_tokens, get_rate_limiter
 from aatm.llm.usage import record_usage, usage_attr
 
 try:
@@ -39,7 +40,8 @@ class AnthropicLLM:
         self.model = model
         self.model_id = f"anthropic/{model}"
         self.settings = settings or LLMSettings()
-        client_kwargs: dict[str, Any] = {}
+        # Retries are handled by the shared limiter (`aatm.llm.limits`).
+        client_kwargs: dict[str, Any] = {"max_retries": 0}
         if api_key is not None:
             client_kwargs["api_key"] = api_key
         if self.settings.timeout is not None:
@@ -58,6 +60,12 @@ class AnthropicLLM:
         return {**kwargs, **s.provider_kwargs}
 
     async def generate(self, *, system: str, user: str, output_type: type[T]) -> T:
+        return await get_rate_limiter(self.model_id).run(
+            lambda: self._generate(system=system, user=user, output_type=output_type),
+            estimated_tokens=estimate_tokens(system, user),
+        )
+
+    async def _generate(self, *, system: str, user: str, output_type: type[T]) -> T:
         message = await self.client.messages.parse(
             model=self.model,
             system=system,

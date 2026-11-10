@@ -7,6 +7,7 @@ from google.genai import types
 from pydantic import ValidationError
 
 from aatm.llm.base import LLMResponseError, LLMSettings, T
+from aatm.llm.limits import estimate_tokens, get_rate_limiter
 from aatm.llm.usage import record_usage, usage_attr
 
 
@@ -99,6 +100,12 @@ class GeminiLLM:
         return types.GenerateContentConfig(**{**kwargs, **s.provider_kwargs})
 
     async def generate(self, *, system: str, user: str, output_type: type[T]) -> T:
+        return await get_rate_limiter(self.model_id).run(
+            lambda: self._generate(system=system, user=user, output_type=output_type),
+            estimated_tokens=estimate_tokens(system, user),
+        )
+
+    async def _generate(self, *, system: str, user: str, output_type: type[T]) -> T:
         response = await self.client.aio.models.generate_content(
             model=self.model,
             contents=user,

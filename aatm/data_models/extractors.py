@@ -680,6 +680,8 @@ class EntityValidationResult(BaseModel):
             rejected.
         optional_attribute_issues: Problems with optional or unknown attributes. The
             candidate is kept, without the faulty attribute.
+        error: The error that stopped the extraction, if any (see ``on_error`` in
+            `aatm.extractors.SimpleLLMExtractor`). Such a result has no entities.
     """
 
     validated_entities: list[ExtractedEntity] = Field(default_factory=list)
@@ -687,6 +689,7 @@ class EntityValidationResult(BaseModel):
     unmatched_keys: list[str] = Field(default_factory=list)
     required_attribute_issues: list[AttributeIssue] = Field(default_factory=list)
     optional_attribute_issues: list[AttributeIssue] = Field(default_factory=list)
+    error: Optional[str] = None
 
     def get_entity(self, entity_id: str) -> Optional[ExtractedEntity]:
         """Return the validated entity with this id, or ``None``."""
