@@ -1,0 +1,3424 @@
+{
+  "label": "before",
+  "code_ref": "c153628 (main before #60)",
+  "model": "embeddinggemma-300M",
+  "dtype": "float32",
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "torch": "2.11.0+cu128",
+  "build_seconds": 2265.5,
+  "batch_setting": [
+    "Encoding with batch size 128 (1846 texts/s).",
+    "Encoding with batch size 128"
+  ],
+  "warnings_during_build": [],
+  "gpu_memory": {
+    "dedicated_baseline_gib": 0.68,
+    "dedicated_peak_gib": 10.03,
+    "shared_baseline_gib": 0.07,
+    "shared_peak_gib": 0.24
+  },
+  "profile_totals_seconds": {
+    "chromadb_add (writer process)": 2042.5,
+    "chromadb_get_existing_ids": 2026.1,
+    "wait_for_prepared_chunk": 1185.9,
+    "embedding_function_call": 1009.3,
+    "build_expression_metadata": 29.0,
+    "calibrate_batch_size": 17.1,
+    "wait_for_writer": 16.0,
+    "wait_for_final_writes": 12.1,
+    "embedding_function_init": 8.9,
+    "read_csv": 4.9,
+    "ensure_cpu_embeddings": 2.3,
+    "drop_duplicates_dropna": 1.4,
+    "final_gpu_memory_cleanup": 0.2,
+    "chromadb_client_init": 0.1,
+    "create_collection": 0.0,
+    "delete_existing_vector_db": 0.0,
+    "final_delete_objects": 0.0
+  },
+  "db_size_gib": 11.92,
+  "rows": 2458830,
+  "rows_per_second": 1085.3,
+  "search": {
+    "Hb": {
+      "ids": [
+        "a2bdd01ee1e50c677efd3e9d294d77c3",
+        "624586e9c204c7df20103af87dcd74be",
+        "0a6bb7a439bb2193ed7994efc542f3bb",
+        "7633a388856da63fb0ee0c2b69f77c63",
+        "4d473b679bcaf43f9f9c891964979c6a",
+        "b46556c2acae6db7b6a6a8c9e48978e5",
+        "bd703478474b3c2e2b6e4e0dd29560c6",
+        "e521371082ea97460a1d3866c9953db7",
+        "46b21eafe6c22aa3e54134b4548f4d2c",
+        "0d54a1b2d0b55c2fe7d900c4cb8e7b10"
+      ],
+      "distances": [
+        0.159107,
+        0.240457,
+        0.265875,
+        0.272488,
+        0.283901,
+        0.291754,
+        0.302202,
+        0.308447,
+        0.309212,
+        0.31364
+      ]
+    },
+    "creatinine": {
+      "ids": [
+        "030c58f30d34e834bdca2dfb2e903529",
+        "12c95593cf865aa73029796f53362924",
+        "939b227aa00a2b5743369e9c3bdab4c0",
+        "0fcb24e9d40de885f82adea04c74a256",
+        "be04406abfcbc21d2adef0baf5f2d3d3",
+        "36b20d06542ba7a0597c2050fc9af142",
+        "9702bb4383cf188f74330427fc4890ef",
+        "be814260143fc6b55ac2e6af3f2359e3",
+        "f48074334767deaff494b05a5a0a7bbe",
+        "2a12dc67444f188a89a2ad7ab39c9716"
+      ],
+      "distances": [
+        0.0,
+        0.151303,
+        0.216281,
+        0.340294,
+        0.353557,
+        0.362443,
+        0.37802,
+        0.397926,
+        0.40415,
+        0.409287
+      ]
+    },
+    "creatinina": {
+      "ids": [
+        "12c95593cf865aa73029796f53362924",
+        "030c58f30d34e834bdca2dfb2e903529",
+        "939b227aa00a2b5743369e9c3bdab4c0",
+        "be04406abfcbc21d2adef0baf5f2d3d3",
+        "2a12dc67444f188a89a2ad7ab39c9716",
+        "f48074334767deaff494b05a5a0a7bbe",
+        "0fcb24e9d40de885f82adea04c74a256",
+        "be814260143fc6b55ac2e6af3f2359e3",
+        "afd0b38394fddbd164b259e660ff9fe7",
+        "10cace195d5d53c23dd9e7a8f6c64616"
+      ],
+      "distances": [
+        0.0,
+        0.151303,
+        0.262698,
+        0.374598,
+        0.378578,
+        0.409428,
+        0.413252,
+        0.419744,
+        0.432765,
+        0.432765
+      ]
+    },
+    "Fasting glucose": {
+      "ids": [
+        "64efd42e986c5c46130e7c94eef38e78",
+        "82b1dfbd4d64020ba075569259f7a980",
+        "eae8a6d3905cc4f20a1ce70f94e0e9af",
+        "09d1016adeb238e32d5e1004a02a0a14",
+        "76cc971ebd8e335e5b9e68180d6ae2b6",
+        "7b50a5409cd82d265d7ea243c928731f",
+        "007946a96d9df67f6e37dd722f06fca0",
+        "569152da32bd0ae7aa56cea794a47bb2",
+        "e46b15348866b3b15ebcc97e770352e3",
+        "a15261a31dfeccd85058abed292d74fd"
+      ],
+      "distances": [
+        0.242697,
+        0.353893,
+        0.36567,
+        0.439118,
+        0.440887,
+        0.455518,
+        0.455518,
+        0.455518,
+        0.455519,
+        0.455519
+      ]
+    },
+    "K": {
+      "ids": [
+        "7c88381402991eea84c539ff8f07292e",
+        "c761a8d21539e94eee77d54cfcb8b3a2",
+        "0e7706b081cdab61038096ca197b070e",
+        "130f855595cb87d14abbfe9683d6449d",
+        "8e48c7f899c9ff190eef8b04dc810622",
+        "d9deb3b389fea486c71a94110ffcdf85",
+        "09ed29144405ccb9ff3b8b22f132fd19",
+        "2a238b2ee8da58d0188a0cf5e6185a42",
+        "27a73748471986a2362a5add88998809",
+        "16fe029bbe719655f6f75ed95742eba7"
+      ],
+      "distances": [
+        0.0,
+        0.0,
+        0.059191,
+        0.059191,
+        0.188721,
+        0.2738,
+        0.287474,
+        0.31233,
+        0.342194,
+        0.351196
+      ]
+    },
+    "potássio": {
+      "ids": [
+        "aa0c8c5940ee92680c2af3093f458f71",
+        "7c66d788cdac3b98e3e7b8e551f34c62",
+        "697a0d4ee1284e313c1007b860f00b49",
+        "d29b1f5713873aabc664a6d3e150e11a",
+        "2c449c2613e3a21e4348ca8ff2ec9bcc",
+        "4eb1774e6504a37fa1c479caf55800b5",
+        "8db54cf3d07be38d7d80122edc56a843",
+        "5cbdc4fd5df4b990de26665e997975fa",
+        "5bf788d1425fcb2ef8ac1e0f0738f8ee",
+        "9c43ba99a999b50efa17824aff65907d"
+      ],
+      "distances": [
+        0.152419,
+        0.160245,
+        0.167367,
+        0.171362,
+        0.290574,
+        0.296439,
+        0.314526,
+        0.319904,
+        0.330941,
+        0.336269
+      ]
+    },
+    "PLT": {
+      "ids": [
+        "02a2f0b91967db4cc0c3c16c64658bf6",
+        "d3d4d72e98f05ef349e2a7d2bc67aef8",
+        "3c6b959913b5fe372664af521a9d20e3",
+        "1c50b4eef4d7cbccdeb40aad50fd05c7",
+        "bbc1b67622cd4f56a45d406c38cdaa78",
+        "5be3c871f302a1d9ba2a704f2bb8d027",
+        "c3b2a2bf79641344b7730a2e59abff4a",
+        "8c0093e6593cd4bb4d4241d46df2c426",
+        "295b2e66ef4186459cf3ac09d8fdff47",
+        "07911cb24151eaa2097117dde25bf7ff"
+      ],
+      "distances": [
+        0.30005,
+        0.309316,
+        0.330218,
+        0.413647,
+        0.435317,
+        0.439511,
+        0.439511,
+        0.439511,
+        0.472705,
+        0.4757
+      ]
+    },
+    "HbA1c": {
+      "ids": [
+        "df80e0aedbe03f5a9814c269eff14083",
+        "df67514cb3cc457deca4971a98760bd0",
+        "b785d7358656cbc78cddf93ddc972ef7",
+        "babb96d4093202e7fcdbc3758c62ccea",
+        "800ebffa053839e42872c439ae03b4bc",
+        "2a3ca4ab697b09aac7c37f5202d5d9bc",
+        "8f8bd743581d903f80531c8abc094347",
+        "ecdb3d5e4bfc808f3137684354d36784",
+        "b712aa6721f789daa68e038faa061c52",
+        "a30cf09faea6c83c255d4c7174dc2a1b"
+      ],
+      "distances": [
+        0.0,
+        0.242724,
+        0.249628,
+        0.249628,
+        0.249628,
+        0.252145,
+        0.26781,
+        0.287361,
+        0.289681,
+        0.353878
+      ]
+    },
+    "TSH": {
+      "ids": [
+        "9ad37c82107233278a5ef3d1d3457a69",
+        "2eb965254fde8d81b55aedee3ff43861",
+        "cd20c2ff2a82cdd081c42a786cdba123",
+        "3114c783c02fe463a65ef14ccd170938",
+        "7ad1ddfa19e18603ccb911e15cace9f1",
+        "ff46221e8e2e735f60c3f20e6da1a975",
+        "83941e0cebdd0df7f7fdc09b47c44404",
+        "52520e38329b32f9eefa3a399bb94d7c",
+        "288f21ef78834da0bb76fdb23fa6f1c2",
+        "ee33612f5b2df4db6d2d9dd0762762cb"
+      ],
+      "distances": [
+        0.311085,
+        0.411131,
+        0.437609,
+        0.439995,
+        0.441385,
+        0.442351,
+        0.448559,
+        0.448723,
+        0.457606,
+        0.459592
+      ]
+    },
+    "Na": {
+      "ids": [
+        "d32a5881f4da3ee40735b247eac8782a",
+        "1f57a6d354b2aff61c4b1c616803c4d7",
+        "53a3548a5813620a636496c3bbbb5e42",
+        "dcc05b3b469c7a0c042973516f230582",
+        "7e8170ab997e2525ebfe52ee118e8864",
+        "883099abdb255dba88fbd965046d5901",
+        "9f5a42f2ae61bc696402c4269e2e2419",
+        "185750c31eabcbfc889f979bf3005523",
+        "603ae117f1e16dcb687797efc350c0c5",
+        "becee1768fdb7ab78628f3c7ff52b1a6"
+      ],
+      "distances": [
+        0.292009,
+        0.384513,
+        0.390297,
+        0.390297,
+        0.391424,
+        0.391424,
+        0.396699,
+        0.402995,
+        0.404083,
+        0.410645
+      ]
+    },
+    "ALT": {
+      "ids": [
+        "3e580beb60f4547391f73e0c79dcbc5a",
+        "9a7bdcfd4c4b22f3a823b08a1ff6ef60",
+        "062e08c148bf66a7c3b6843121df9b6a",
+        "da44e2cdd72b4b0fa753bc626cec97fd",
+        "fc5dc78796fc1358902f02aaa9ee6c7c",
+        "d27613a50e1de140d902b4f9f26580f4",
+        "712c441f284659db7e83efdc42d6b56d",
+        "6ce92bb3c406bb0fa262b25412491141",
+        "c9924bb019daff7f9b36b0d3b1aaf845",
+        "a58014806184057d2aec060d05f2b769"
+      ],
+      "distances": [
+        0.340673,
+        0.352606,
+        0.375629,
+        0.38568,
+        0.391926,
+        0.39798,
+        0.402368,
+        0.408993,
+        0.409782,
+        0.412733
+      ]
+    },
+    "AST": {
+      "ids": [
+        "c00321e277eb4a194ce25fe60fd53425",
+        "ed665207df60f9edce60aac38c7c0e44",
+        "49c19025954750e194650b383d9ccb39",
+        "a003808ae3e09e3a92e4e497ae5beb87",
+        "ca6e9bc81d6cccb727f3c1baf8f91004",
+        "a4f082d4f23066c40c1ada0278ee1d25",
+        "9c40b4fae6209a23da889f97404526ad",
+        "bd2b2ba53cdbaa68624e062d1385fa6e",
+        "e18e9fb663a03e8fc32b3aeb3b0fc156",
+        "172990d707aee6a875053db624022511"
+      ],
+      "distances": [
+        0.380712,
+        0.386386,
+        0.387434,
+        0.425128,
+        0.425997,
+        0.425997,
+        0.430344,
+        0.44717,
+        0.459482,
+        0.474071
+      ]
+    },
+    "WBC": {
+      "ids": [
+        "db3a22f3c78e0b7ede4762c89a02ab1a",
+        "1556c5b9c40422c9e474cf6d65487176",
+        "8c5559c3b5855262498a6d879ea91b4f",
+        "cea288d4daf3ab956696615ca9cb7aaf",
+        "afa8ee233d42ffaf36c705f81b63312a",
+        "7b95e82ea7e8191849106fcd62439719",
+        "9864601092b9ae18162d6e5e5ba2aaf5",
+        "6ab7ae16a0e7595ad32666233563b393",
+        "b2bd7ea2b5500f48015af6ae2f6cbe4d",
+        "c78e27d9556ebb811ed06f601263a4c9"
+      ],
+      "distances": [
+        0.332891,
+        0.337723,
+        0.339704,
+        0.348082,
+        0.349882,
+        0.361017,
+        0.381571,
+        0.385313,
+        0.386086,
+        0.391845
+      ]
+    },
+    "urine albumin/creatinine ratio": {
+      "ids": [
+        "16404267ede4e5d4ad5905c83a1387d6",
+        "8d35d63b1d6facdde68fb459bb551f07",
+        "b9cf8ffb58b2fc2ace593af760725b42",
+        "c19dac8fcaab2b603703eedb48be9e31",
+        "6bb31fc6b9c984a111aaa22219cde53b",
+        "144dc172fcbc33cc7befe276819a0120",
+        "afb55bb310ee4c66401a2941d8a7f1e8",
+        "4c8cdb9160875734ca4e605595855685",
+        "b744404e8a7aa8299c19a533a4e5e51b",
+        "7d8d24546d98867be7a0ef80f5ed8b21"
+      ],
+      "distances": [
+        0.045419,
+        0.06271,
+        0.161744,
+        0.161744,
+        0.171731,
+        0.171732,
+        0.180033,
+        0.184638,
+        0.184638,
+        0.193742
+      ]
+    },
+    "CRP": {
+      "ids": [
+        "49297c835979f25a730acd65211508f5",
+        "adfa9c30b9169f9613534f6341c2b2f1",
+        "600c989d25f9fd247181dca24c3a2bef",
+        "7774631c78622d1433611e62d8464239",
+        "5abfa24b47223c42e5a6b6e0ba20db79",
+        "5067f90ed196885d327ab245ade0b9b3",
+        "06531513625b0af15c63d65f5bacba30",
+        "b8f98d865542dce39699a2655d138735",
+        "6414b5f5305b193c5887a382c8c54888",
+        "86bf756c725852f14d53610ef2b43ccc"
+      ],
+      "distances": [
+        0.270057,
+        0.336109,
+        0.423606,
+        0.427394,
+        0.428674,
+        0.433959,
+        0.433959,
+        0.433959,
+        0.433959,
+        0.433959
+      ]
+    },
+    "ureia": {
+      "ids": [
+        "a0584e69ab7f4c1f8287e7306bcf3339",
+        "5fc62bc196bd418c37709b086f44a8a9",
+        "9049893ec02da122bd5a30e56879d492",
+        "749f4bee473e6bf31bb3223abefb9ef7",
+        "2ff99a23ec38031c1438a3d99a1a6bac",
+        "b6c9508ef7860e2ef47b58d7fc6f42f4",
+        "15af8da1162d5287dfe847b658ee9f59",
+        "3115c97757558d7ce7c0d020bfab2fcc",
+        "71f8a32a60aa30d5f727d7238d75bb96",
+        "5e0be9b89540f19fc2312ce3158b3203"
+      ],
+      "distances": [
+        0.324814,
+        0.324814,
+        0.331759,
+        0.405091,
+        0.405091,
+        0.408861,
+        0.410393,
+        0.416827,
+        0.416827,
+        0.422129
+      ]
+    },
+    "BUN": {
+      "ids": [
+        "047fc8662f4f5eba4ca10684d54d9992",
+        "7435ed229ec68a224c9e8ae5b5746060",
+        "6265cb2d5c9895a0e2ddbc5983caa745",
+        "630828580652ceb56de789c6217b65b5",
+        "76505899bfc50d234187fa3731c80360",
+        "2bb4181304ee86514a41debeff38e2a3",
+        "b59cd0fad0fa706a69b33811c6102d61",
+        "880e08c987e30f24ddb62fcc2033e0fa",
+        "10ceba2b6aed7b0a8474cad01da558cc",
+        "7ee9f66a9d90b3b26ff5ae3e089da491"
+      ],
+      "distances": [
+        0.387487,
+        0.475425,
+        0.475425,
+        0.480827,
+        0.502533,
+        0.509973,
+        0.510673,
+        0.510673,
+        0.517454,
+        0.520612
+      ]
+    },
+    "ferritin": {
+      "ids": [
+        "6a0745dada4249c4870eca7ab5670073",
+        "be1ebbd8233ce8f75584cc5cf218b5ed",
+        "85452e2df3495158fd4c96cef4dc9777",
+        "e2af2af2c297cb7d8fa9314333adaeef",
+        "ee3af251b795f482ea7748e290cd9384",
+        "b82bc31794b9b830b53f00c82cb56732",
+        "87c72564eaed892719dbcbe02deeec6a",
+        "6955b44bdc82a37b9b8256d8f34a924a",
+        "f49bbeae6d007dcc609a494cc3fdbe4d",
+        "3342280bf8b9030bbdfa38690d54d85e"
+      ],
+      "distances": [
+        0.343618,
+        0.346294,
+        0.348316,
+        0.350575,
+        0.351682,
+        0.357831,
+        0.3623,
+        0.37314,
+        0.37344,
+        0.373648
+      ]
+    },
+    "INR": {
+      "ids": [
+        "39787ef7494b4bd3a10aa114faf36477",
+        "0a4951922041f6d402c896843118c77d",
+        "0894bdcdb45ad5aa81a5ba1d13b76e8e",
+        "151d9d8d1e0ae9cadcc041ee9d6617dc",
+        "c144140bbb90a74ea281b0df32de9a4d",
+        "da859b1c891e0b9bd5f705e1ba327691",
+        "c0e5f430876ed4b2545700a1412547f8",
+        "2f0553fe2341e4be641b886de931a55d",
+        "5c29406ad2c581bd1848372062246d6f",
+        "0a5e0ea164dad62cd413ab2b39e24c14"
+      ],
+      "distances": [
+        0.406588,
+        0.432237,
+        0.432237,
+        0.432237,
+        0.458512,
+        0.494946,
+        0.512162,
+        0.543743,
+        0.544432,
+        0.547229
+      ]
+    },
+    "troponin I": {
+      "ids": [
+        "873b04a690d62d8d2f38c849bcad233e",
+        "d26da335c71fd7bb9d91d7f4ce9e4534",
+        "365b1d37c3eaad175a83e44af9dc79cc",
+        "687f3f5b03429a8eee819e5591455833",
+        "7395bfd054fa93c59c8fdab7fb5878e7",
+        "532bf036d136eca7b53803237b8a4b7f",
+        "deac24b16d9f19ea0d27a561e667fbed",
+        "8e34696e82cae467147cd14266e9d4cb",
+        "5aa46b41b754ae5dde62bede31b15749",
+        "48549c48018844356cad01ccaa5f47c1"
+      ],
+      "distances": [
+        0.346201,
+        0.384765,
+        0.384765,
+        0.412997,
+        0.412997,
+        0.436397,
+        0.439331,
+        0.456918,
+        0.461758,
+        0.465619
+      ]
+    },
+    "glicemia de jejum": {
+      "ids": [
+        "7a5595eefb2fd68f0cf0898224a1a90e",
+        "107080c7f3c8bf810d6ba640856ec678",
+        "90a60b11bfaa16d95eb566d162e026a7",
+        "e89b4a9b1807f6bd93398d04398c45ab",
+        "ab06ded6f3350d19b8b181294952ac30",
+        "32dc7a938c84d9fcd04d187765985eb1",
+        "e12881db8709c67fd5eaef794ea010cb",
+        "effefebf9298274603928b8697e44f8d",
+        "6413338105129134ef3b5f7883120480",
+        "e34e0974099f39eb8fd4a917d8fbb333"
+      ],
+      "distances": [
+        0.360973,
+        0.476047,
+        0.482021,
+        0.489778,
+        0.493421,
+        0.49798,
+        0.500137,
+        0.500533,
+        0.503541,
+        0.509278
+      ]
+    },
+    "24h urine creatinine": {
+      "ids": [
+        "89b3dc1898239b98b11524ea17bb9cb3",
+        "b4ac7dcdce70ae90624108bb39e3f64e",
+        "1c7cd5f0db62a938ac1631b984c02198",
+        "021b7ad8b76248800d9de1344029e98f",
+        "c0578a305ddae9b8f855dd7ebdd1b9c5",
+        "214225c4035ed0fdb5d91cf8906f5c16",
+        "55055aba88a3810a78776069c72f7c9c",
+        "610c1f26f18e7f03db193c1379140472",
+        "cfeb500e570448849e9988fe2be589a1",
+        "cafd1644d24ec3b7498f4d9bcc22fd17"
+      ],
+      "distances": [
+        0.082627,
+        0.125605,
+        0.125606,
+        0.334314,
+        0.347358,
+        0.350523,
+        0.353409,
+        0.358103,
+        0.360987,
+        0.369455
+      ]
+    },
+    "Hgb": {
+      "ids": [
+        "a2bdd01ee1e50c677efd3e9d294d77c3",
+        "e9a69467296df925900f116ee24279bd",
+        "e060cf72ae2e4e9edc7f31985d1b8525",
+        "0a6bb7a439bb2193ed7994efc542f3bb",
+        "78727ccf7594fd6a76010a7448465b2d",
+        "b46556c2acae6db7b6a6a8c9e48978e5",
+        "b853550c7c352306994bccb7e9685e47",
+        "6152241325f1bb3aeae007cdca1d173a",
+        "ad9dec67309b4c4fe67af52eea7d346f",
+        "15e246e12edbd62ec75d00fb62b73c37"
+      ],
+      "distances": [
+        0.297686,
+        0.303801,
+        0.303801,
+        0.352428,
+        0.402432,
+        0.410369,
+        0.428937,
+        0.436148,
+        0.438336,
+        0.439344
+      ]
+    },
+    "magnesium": {
+      "ids": [
+        "b9bf5b8a1dcd24c799d6c9fe77acb24c",
+        "26a516007e48f54c11af2598a1484305",
+        "475f14aced9b5317edaa14c5bd0e047b",
+        "11fec1c6987684a35560dd121cbd050a",
+        "f2f696bf56de7931d348fc2f3a234d1e",
+        "bc2ec0caecf38b979b9df1c903fc5337",
+        "cb8148aa424cb8dc3195c8d211ddce9e",
+        "4a21398f4ffd457d1ce1ca1ad12a16f2",
+        "9967292f61ebe7a4d5106d606cd58298",
+        "c9d5ae051eca045174fbb86decfeb4a0"
+      ],
+      "distances": [
+        0.0,
+        0.019039,
+        0.244137,
+        0.244614,
+        0.249729,
+        0.25092,
+        0.252286,
+        0.253648,
+        0.260855,
+        0.261064
+      ]
+    },
+    "calcium": {
+      "ids": [
+        "93a6144a915cefeb2c83278e9ca8b427",
+        "c923426cfa4d82d26324a454a19e9b57",
+        "3051d2cca90322fe9caa4562fd11a97c",
+        "d5b1a1441c9e96068095e2ca8c7c09e9",
+        "4acf503b53b784403099b2d63be929e7",
+        "fc75b9b0edf18d1cf6367b2be6102273",
+        "29ec6af9bb7b70a2859e70e9ac104fa6",
+        "5a6766547ff555ac6cb4dba0175d2fa2",
+        "fa520c1fa2a9ce4e6979b8eca487840b",
+        "c5eaa5da069b60071f769b84a3206d79"
+      ],
+      "distances": [
+        0.0,
+        0.086977,
+        0.20199,
+        0.231535,
+        0.242444,
+        0.251044,
+        0.262694,
+        0.270992,
+        0.275634,
+        0.276747
+      ]
+    },
+    "vitamin D 25-OH": {
+      "ids": [
+        "1af6abe445033b32a31824a9e5510bf3",
+        "b605362f56aeadfab19799ff5d448cf7",
+        "505a328a53ec57d5de54db1e52aed3e6",
+        "f3b5dfd36d85764d12a01339613f403e",
+        "e09abc751f3e390ef6ba5bdf00523734",
+        "e51177fa397b48da433e4147e7209469",
+        "8f99350b9c534daff10846ebd2a3a03a",
+        "572f27607085de84acb72ab7c45adcd8",
+        "fce58bc691798ffe17deffd1ba01761c",
+        "dd92c6def7c7d81a7a287f3444edf193"
+      ],
+      "distances": [
+        0.286578,
+        0.315852,
+        0.315915,
+        0.35994,
+        0.363692,
+        0.373347,
+        0.373347,
+        0.381175,
+        0.390073,
+        0.40277
+      ]
+    },
+    "HDL": {
+      "ids": [
+        "4ded6f948b4a344cc168ac97cd6ff842",
+        "9db18f3016e74b6597a60be234e98e4a",
+        "a47a2926589c2946f7ea8c350f70032e",
+        "9b53e0ac921938540f4b63d0e288c948",
+        "0a0d7543aeb77888906bee702f61ee7d",
+        "ce386704c65ee2916b270572aa24a002",
+        "e9a69467296df925900f116ee24279bd",
+        "e060cf72ae2e4e9edc7f31985d1b8525",
+        "f0359e9ea2bebef8fd247edc2dbdae10",
+        "2de0865ad2fe25504e179179d1d265f8"
+      ],
+      "distances": [
+        0.372533,
+        0.390569,
+        0.390733,
+        0.433788,
+        0.444397,
+        0.445213,
+        0.456549,
+        0.456549,
+        0.484922,
+        0.490564
+      ]
+    },
+    "total cholesterol": {
+      "ids": [
+        "46254e75ee2547c74a6ba73a550eb315",
+        "3790049805e8c25307b8d82e2316aca2",
+        "d1388dbb852df9d4fbca0620dbd86b71",
+        "499dce3bc354c3eb76d53aa185ce0880",
+        "792d53378784e73594d6afb8950ea683",
+        "ac744433ff10f2142e70bafad678958f",
+        "541b8e0349cf84f10c8b1686f5289fcb",
+        "90120362791de79399cd1d115566c630",
+        "e9e7be436d8631aa700b5da8986f5f47",
+        "a10a5b5798c15314215a4fe18978d7e2"
+      ],
+      "distances": [
+        0.12636,
+        0.234397,
+        0.234397,
+        0.250558,
+        0.277167,
+        0.28017,
+        0.280828,
+        0.2901,
+        0.31817,
+        0.323875
+      ]
+    },
+    "glucose": {
+      "ids": [
+        "82b1dfbd4d64020ba075569259f7a980",
+        "eae8a6d3905cc4f20a1ce70f94e0e9af",
+        "76cc971ebd8e335e5b9e68180d6ae2b6",
+        "7a8f8457875b31ea03618e538abdb312",
+        "a34c5954b693fcb898acd6e560afdf5c",
+        "5521a7fe4fd6bf4341285186364de42d",
+        "9eb25eb177430bf16468e41bbed4fa81",
+        "f0998775cd655504c4027af5a7103189",
+        "e450445edc20d9f33d6bd5c530b159a0",
+        "81f6ac9224786b00f4b061c6b8d24047"
+      ],
+      "distances": [
+        0.0,
+        0.069688,
+        0.150484,
+        0.216474,
+        0.227989,
+        0.253093,
+        0.283495,
+        0.283495,
+        0.290712,
+        0.29479
+      ]
+    },
+    "24h urine protein": {
+      "ids": [
+        "1adc6f5d227c0f45e6e4ff55038874fe",
+        "40e543e3405c855dcbc72138df22132c",
+        "860745a2442993d97eb0f932388ca9e6",
+        "951906754542f805a2c98d7a528e6bd2",
+        "fcfff550ff2d244a14691db35892be04",
+        "f00c6a17219feee5a7ca21488c38b657",
+        "2d2adbaa9d20bb2126d3d81aec2314bf",
+        "7606ba13d79a4f3e91de61cc5527c4a2",
+        "d30c94da5e0b63f831733374ef320a85",
+        "b952fab5f508a2397a5be932242fd8eb"
+      ],
+      "distances": [
+        0.19538,
+        0.195381,
+        0.267772,
+        0.267772,
+        0.290078,
+        0.290078,
+        0.303561,
+        0.303561,
+        0.307334,
+        0.329529
+      ]
+    },
+    "brivaracetam 25 mg por cada comprimido para administración oral": {
+      "ids": [
+        "4b0b7db336166c7c8a168551a12586f2",
+        "5e0520325f7b4d285dae0061b6a0d007",
+        "309548049aab829f340b6d697918033f",
+        "7a0a92136f1bb9023f7e059be2ebdcc9",
+        "0750ffaee5a598c8df810d7987f3575a",
+        "6b4dec6cb49bc24d88a19d3bf3c82f81",
+        "29dc9323e8913ee6984dcf8a9435c440",
+        "c2051e21e1f58860dc810796b22ef28c",
+        "9f77690b3d75930b9a175bdf87ded75f",
+        "5a275a00b0b3c7d600c2f76cc7f11140"
+      ],
+      "distances": [
+        0.0,
+        0.228246,
+        0.229516,
+        0.242227,
+        0.246982,
+        0.249178,
+        0.256853,
+        0.258882,
+        0.261472,
+        0.267115
+      ]
+    },
+    "amikacina": {
+      "ids": [
+        "35b7555434c7b93024b331a69dffd8cc",
+        "c17ab3493e12cfa6b084c453f86964d7",
+        "b588d2c020aa4c0ed59b33e968cf307c",
+        "ebebdf31b5f8c9969c9d90df66dfb8e0",
+        "6e45246569ab68b3b42f98d684f18981",
+        "8ac59e6143ebb43d00710c22263c375a",
+        "47ec05ce4b046d53494fbc3b327837fb",
+        "2ca4e4e8223f6aa5476a1feb11ff9e8d",
+        "b1db2e21fd650e2297c3445fe17ead63",
+        "7fa99e4fe14624f448d08baad62d7f28"
+      ],
+      "distances": [
+        0.0,
+        0.157656,
+        0.226978,
+        0.338877,
+        0.362189,
+        0.363229,
+        0.368546,
+        0.37976,
+        0.381471,
+        0.382584
+      ]
+    },
+    "cilazapril 1 mg por cada comprimido para administración oral": {
+      "ids": [
+        "f7d41e3725870863d14a2d7dfd045766",
+        "da82e2db3ef94e4c93214fbb098eafce",
+        "c771674439aba0684f57167eb06c4792",
+        "edf65600ce198daf8e0b133130305b03",
+        "50925ba2dedc27973ecfc72db744906f",
+        "cfaa32015de3a253ef1b90aa11fc4417",
+        "5b9f37f9570f25951afd5e04fb27e22d",
+        "5d449716ad9e179a3207ec5ea5922052",
+        "be6c4f21bf8b9e7316bebf52e5aa2425",
+        "6f99d9efdd258b9ad5c307b0ba2d486c"
+      ],
+      "distances": [
+        0.0,
+        0.243962,
+        0.272484,
+        0.284574,
+        0.292086,
+        0.29538,
+        0.297,
+        0.297208,
+        0.302109,
+        0.307553
+      ]
+    },
+    "Serum TIBC (total iron binding capacity)": {
+      "ids": [
+        "a6b1e83cfe7d6653185cf46dc6d85350",
+        "b37b04d8b3c93a1bc9974ed1e8a23286",
+        "e05df985c3b9efc360101cc31854bdd3",
+        "a9bafbca65f0419d55687fe7f159d73a",
+        "21fa1b87eefe8da881848bce8880b762",
+        "5c4b6a571bf598ae5c4a97a8dcf50a05",
+        "6b0d03a3f6607d0d1e23dacb8fe7a437",
+        "c3053540c5630473eee7b3f6dafe4fa4",
+        "d9ccd0ca4c97c645e943a4099c1592b7",
+        "5b86f8a0671440a4ad9dbe68238a9607"
+      ],
+      "distances": [
+        0.0,
+        0.215025,
+        0.215025,
+        0.311476,
+        0.332828,
+        0.351082,
+        0.357386,
+        0.361052,
+        0.36196,
+        0.396382
+      ]
+    },
+    "Product containing iopanoic acid (medicinal product)": {
+      "ids": [
+        "a5986347e24ee15b71ac571b24085bb3",
+        "2104654400866c9093aeec56b4f0ff80",
+        "32ee11695120eddadd8c8229a615136e",
+        "bb03f63dcb3f3a449314e9c27a74ec3c",
+        "c7ae5fae93aeac782b8f5c77a9165672",
+        "f0c1797c9f113072bac2c1f98942b74f",
+        "3b18e0f84d0e3d6ee2e1d1fad66739e7",
+        "eb1ae46440057f75633be0591589e490",
+        "f93c92474fcae0f98877219607b11978",
+        "927f4fc7e4dcc57e562462c152e4671f"
+      ],
+      "distances": [
+        0.0,
+        0.19475,
+        0.21849,
+        0.312195,
+        0.325952,
+        0.332303,
+        0.343133,
+        0.345645,
+        0.347323,
+        0.350353
+      ]
+    },
+    "Product containing precisely fenofibrate 150 milligram/1 each conventional release oral capsule (clinical drug)": {
+      "ids": [
+        "6d3ee777f998de1775ba337deaeded55",
+        "c0f3ae2b57e30bda61ed0a380ff90e59",
+        "88c8ec17856e227c4925dcd18f7ba2ef",
+        "e4e127188ed3d55d91429ba3057b10c3",
+        "43d2e68cae6199427e7abe39d8387eaf",
+        "34533b087a5a6928d1460e9b3d8a6da7",
+        "44c134666c792e3fbb4283968081cd15",
+        "f221deb3924475962190df9d8440be99",
+        "49021dede09f3d6ab2e6ee1dd0eda21b",
+        "78b846c7666b27c03f539b8722051cbb"
+      ],
+      "distances": [
+        0.0,
+        0.196822,
+        0.215293,
+        0.219835,
+        0.226128,
+        0.233721,
+        0.238493,
+        0.240636,
+        0.242687,
+        0.243399
+      ]
+    },
+    "producto que contiene exactamente cloruro de potasio 1,875 gramos por cada comprimido para administración oral de liberación convencional (fármaco de uso clínico)": {
+      "ids": [
+        "7991ff46d4cc961a9603e917dd179042",
+        "e6a831b9b39d1f6bb39ec07355f6ab32",
+        "4830aa79f8866a61758a1272254bc89f",
+        "3e0ae0d9ff1331c137b83199f7590013",
+        "5c080f04eb91cf00d216fec906a38d04",
+        "d8b2aade669112ea62e112dbe06d89ba",
+        "bbfa1e3f6cde258f0cc677607f11db7e",
+        "aa4c41a4a0e09a00af6fd4e6c80bafde",
+        "f7e44ad27a341b22172637a20b12463d",
+        "2e1688fe8efd34a9b9ed8994d67b808a"
+      ],
+      "distances": [
+        0.0,
+        0.11074,
+        0.134081,
+        0.149507,
+        0.183209,
+        0.192348,
+        0.211857,
+        0.227239,
+        0.229836,
+        0.231737
+      ]
+    },
+    "producto que contiene exactamente clorhidrato de nefazodona 200 miligramos por cada comprimido para administración oral de liberación convencional (fármaco de uso clínico)": {
+      "ids": [
+        "5f2f27ed0f6a9d7a8a4df3b6bc447afa",
+        "72915cd16409c74d5df4c0df37fb8472",
+        "8d7a1b1377662b49146a9990c4189b80",
+        "27ceb9abe9ed225620581e0d3127493c",
+        "49e217eb8d5879c2016fbec3863c5708",
+        "f4a5c1ae56b81917cab4c16e2556adb6",
+        "668009d92f66b0a21a4e9135488454e5",
+        "8d8b1a868ef448a9b9d535c24fb011b0",
+        "60c0fccb5cef1fbc3e206ebeaa1d97fb",
+        "f58bf91d7c639684eeb8db34668d4fae"
+      ],
+      "distances": [
+        0.0,
+        0.080666,
+        0.1562,
+        0.161077,
+        0.169183,
+        0.179793,
+        0.186526,
+        0.207666,
+        0.224574,
+        0.232093
+      ]
+    },
+    "TRATAMENTO DE FENDA LABIAL E/OU FENDA PALATINA": {
+      "ids": [
+        "9afdfbaca915826970df9894f7643ad9",
+        "8ac2452c92b6c51babab7666fe622e8c",
+        "8b1a88be7f265d6841aa525af49be18b",
+        "5f1294dd1c69af439da2954f77a287bd",
+        "c91721c9f10f88e4abf45be8a7feb7cd",
+        "5073e83da00a8e2225b2bfef6583b049",
+        "df44596a1e1ed667759e13cdd94ca655",
+        "6ef98d3032a5e259ef6c36ec4362a959",
+        "f7e4c9a4fcda119a40560435e0e8b5cb",
+        "d19da78cad8194b86114da99c491d514"
+      ],
+      "distances": [
+        0.0,
+        0.492243,
+        0.542309,
+        0.55745,
+        0.587836,
+        0.607214,
+        0.608327,
+        0.628884,
+        0.636098,
+        0.640946
+      ]
+    },
+    "ketazolam": {
+      "ids": [
+        "737228fe7c900af171b33792c993be3d",
+        "371279f1a22cb7de9705c4b4eb83cdc4",
+        "9623ff4e7dfecc588d0f8e4d3ee782dc",
+        "18bbd294d6c18537d29085a1d29a2246",
+        "2fa6cf6b97d55cf82a8aa56246da7e71",
+        "ff7c60fa810278b2a5d0c84f784213dd",
+        "14e3828e3694752bee86ca7f7ebd7058",
+        "ac6bcc3942411a309daec282489dccc2",
+        "e8a4f11e814a16629a0cc3868d37a43d",
+        "527adc3bf617bb526229a0d168c530e1"
+      ],
+      "distances": [
+        0.0,
+        0.0,
+        0.035611,
+        0.326572,
+        0.350662,
+        0.354017,
+        0.39251,
+        0.39251,
+        0.404555,
+        0.404555
+      ]
+    },
+    "Antigen of Rubella virus (substance)": {
+      "ids": [
+        "2e42fa7a9150e8cdac3ce8b8f2e30df2",
+        "7f9136b5a7d3956914fd987c85494a8e",
+        "2ea4a1b31213c1380e98cc6c28a2d381",
+        "fd120a709809fe432332195545d42435",
+        "e08ecc945b82274210c8bd35b6de2cec",
+        "f5ecde885cc82e8adcc986c6f14e440e",
+        "001e13e560bc70780dc84cfd8f37da7a",
+        "3331e3a11eff20c8c487a5f12a9053f9",
+        "9107c8842895fdfc2cd0a8aa3ff4d778",
+        "7f5f0b80107e5085371725a3a4b2517c"
+      ],
+      "distances": [
+        0.0,
+        0.103845,
+        0.138871,
+        0.246824,
+        0.298063,
+        0.315884,
+        0.318714,
+        0.342889,
+        0.345606,
+        0.348551
+      ]
+    },
+    "producto que contiene exactamente clorhidrato de oxicodona 5 miligramos y paracetamol 500 miligramos por cada cápsula para administración oral de liberación convencional (fármaco de uso clínico)": {
+      "ids": [
+        "e231d09afe0e0db7e6a8e6e611f5e0e6",
+        "2bc0c654853d2f1700b66ce037285d9c",
+        "877e35233b1b4d5cc512a739b4a7777a",
+        "3a2035a6e2025dd92d8fb5eec2c327f5",
+        "93818e39a4a06061b2800f053a8e89ac",
+        "5a5acfa0f12ee7be5573eceb35503249",
+        "faa8a713877e475f0dc6de538ff422b7",
+        "de83b961cdf840b64e98c905a8250947",
+        "c86a104e9312bf1dc851389af888cbde",
+        "46a62dac1754223bcd01dc5987b1611d"
+      ],
+      "distances": [
+        0.0,
+        0.041146,
+        0.138261,
+        0.151286,
+        0.153944,
+        0.154251,
+        0.164765,
+        0.168214,
+        0.172119,
+        0.175499
+      ]
+    },
+    "Product containing triptorelin (medicinal product)": {
+      "ids": [
+        "152edbcb33578383769cc5c142ad5ffe",
+        "0c2ffdbb2778f57bb59df79578c83609",
+        "56d7f112b4146fa8ae4052591afc6114",
+        "8badec122fd306b3622027e111375ffb",
+        "dd231e7f73cc91809d1ed821a620fc55",
+        "a1a93221a9a0d356f4c5db99e29d08a8",
+        "99a44031142e065b7da489882f8e56b2",
+        "a91b9054b0b22cb7ead555237cf57eda",
+        "7c72303d5b95d621cbf6ba0171471edc",
+        "7b95a433dc339d4ca08c74267bff5f5e"
+      ],
+      "distances": [
+        0.0,
+        0.172777,
+        0.174432,
+        0.217377,
+        0.238323,
+        0.256318,
+        0.266793,
+        0.267774,
+        0.269476,
+        0.271232
+      ]
+    },
+    "alergia a anfepramona": {
+      "ids": [
+        "3b27037d05eed4689f0e859b6aa0f3ac",
+        "78c7166712143b2cd9cc4a4ad233fca3",
+        "ca51df6f6567dc73439b93404df70b2c",
+        "1deb2c83b06e7020a06be74103110e96",
+        "2f20bc777fc38468e0472d86deb9fe09",
+        "5b767543922a1f27df962addb26c1d0d",
+        "783efb9ee86876da22595f37d2129b5c",
+        "ee7a18913e77bc4144e6d397e23574df",
+        "add3523977c2c8b372dc036f2c7034af",
+        "0077c7da634a1990ac2127332c120631"
+      ],
+      "distances": [
+        0.0,
+        0.369781,
+        0.373092,
+        0.387489,
+        0.417272,
+        0.418865,
+        0.431149,
+        0.43548,
+        0.43826,
+        0.446979
+      ]
+    },
+    "Neomycin (substance)": {
+      "ids": [
+        "3060c16a18cdcc5296d5765368f72c7a",
+        "9415c6eb0d0877b0e48da89960ed035a",
+        "6b78e4343aa6e46d7f4f1d6eb6e6de01",
+        "cea59f0ed775b6b90c298e3a16f357b4",
+        "828e9a59a1a8608cecac3efe2164757a",
+        "d807191b63c17e494c1c152c5c1b3083",
+        "9953c2c1d45f6f36e3fdf553989f9af1",
+        "0b600dfd5a67afee97f6d8f2e097cf41",
+        "4db92169b4a70d6904695722939f9dfa",
+        "3e68cd87dfcbe94b4b634a9d4a89d4b2"
+      ],
+      "distances": [
+        0.0,
+        0.13086,
+        0.343725,
+        0.375067,
+        0.395277,
+        0.396817,
+        0.401556,
+        0.406756,
+        0.412935,
+        0.417208
+      ]
+    },
+    "Product containing precisely dinoprostone 10 milligram/1 milliliter conventional release solution for infusion and/or injection (clinical drug)": {
+      "ids": [
+        "150d0bfd7580264c22845e6b2da144b2",
+        "bb91d7cd3287dc6534e997192571c118",
+        "a7769d5cb80ff7592c99844bebe7d9fd",
+        "3f7731c8f9517d745cf07626fdcbc7a3",
+        "a1d3eeb43408d3aed8634c5b7dc05b06",
+        "98ffcab6143adc0cb7a4ed035daafcb9",
+        "f4bbf420dd4f91273cccc2250ab6ac21",
+        "8b7a29ce7ea1bc7e9978b51aeb123514",
+        "692c42e77de4c222baa63eb000922903",
+        "7c0dc05134fb08ecb85acc09d6f68e2a"
+      ],
+      "distances": [
+        0.0,
+        0.032889,
+        0.042573,
+        0.091008,
+        0.114347,
+        0.13458,
+        0.204099,
+        0.236254,
+        0.238666,
+        0.243343
+      ]
+    },
+    "Air (substance)": {
+      "ids": [
+        "9e4479fc7254a8bd6e728efbd089fd3d",
+        "54ee92e391cea3f9525c6bffc3707671",
+        "9ab19b858fd8d5943b97af1082eefa97",
+        "4d383305f725fcd6ce76be0c8aed992a",
+        "126d41030b0e16bf84acf92d4af0e296",
+        "ee21c025a3cc11aeb370d01e1e9535d9",
+        "1ee417517089844d681342d03fc753e3",
+        "138dd6ae25c15b065d2d8ad863fba7bd",
+        "cc04f33cc078ed1fc81a8686a470f115",
+        "c1cd250fd2e17dc33509741832c28894"
+      ],
+      "distances": [
+        0.0,
+        0.35199,
+        0.360972,
+        0.366505,
+        0.376735,
+        0.391264,
+        0.41966,
+        0.426951,
+        0.427223,
+        0.432976
+      ]
+    },
+    "alergia a danazol": {
+      "ids": [
+        "85dd0afd114f6ea65363e969876a7f04",
+        "e35570f99f11803982a91fc7cafbbcbf",
+        "820a9a4bc69392b118e09a6afcf56f4a",
+        "112ce8881b9285d38d09f94e158bb9d3",
+        "d884272f656f6bdc924aa46238f28057",
+        "056109d889a436663c7e7315a69cdedb",
+        "369014dcc15fa44f530cbca3d4668fa2",
+        "af53832981cecb91bdf17c11ef155c54",
+        "bd5c3568142d4b1739ab126dd6182a09",
+        "622fafb450743e074de1a7e5ac303170"
+      ],
+      "distances": [
+        0.0,
+        0.221903,
+        0.245655,
+        0.25544,
+        0.286883,
+        0.34273,
+        0.383,
+        0.386124,
+        0.400697,
+        0.405588
+      ]
+    },
+    "Rivaroxaban allergy": {
+      "ids": [
+        "1300cc43c86ab0d7ffe8086a6ecc1a1a",
+        "414132efed750adeb405f20e9de206aa",
+        "378105af6e2c75caa0322020d8882cd3",
+        "d0d6716b71616d2a040c583159b35102",
+        "83f7424bd29362dde3fa2fab962437d9",
+        "4243264281e3df0646eb801ccdb7da30",
+        "fbb6242b52ea415761deb32e7a3c67fa",
+        "bda868c0bd227ed310ca16daed8a2ba7",
+        "033e5a38a1cc11bb2d6492db52bd77db",
+        "10dcabd671efe2af9e066522e1591e2f"
+      ],
+      "distances": [
+        0.0,
+        0.138812,
+        0.242845,
+        0.287282,
+        0.316793,
+        0.320682,
+        0.322334,
+        0.331411,
+        0.340858,
+        0.344215
+      ]
+    },
+    "Improving Access to Psychological Therapies programme Work and Social Adjustment Scale - social leisure activities score (observable entity)": {
+      "ids": [
+        "755bf863a2aeebffb1483e7d8a8a1e0e",
+        "4398ea84be8dc5c166be820a31903221",
+        "169a0e5967dc2d56404742491b568616",
+        "4669246d6855bb4ece02488e35d97592",
+        "ea8f36a1c0148c632d599cc405f0e583",
+        "8956a49de0893cd83540214df3220fb2",
+        "786561b9ef1424067976fddd41ff3d55",
+        "8ae976d85994acc08f953555a92c5c45",
+        "8ac16a00e2d7cfd441f9cc7993f61df8",
+        "d075b6ecb48dae77a3205ff3dd3a9a8d"
+      ],
+      "distances": [
+        0.0,
+        0.084605,
+        0.127805,
+        0.136321,
+        0.162164,
+        0.1816,
+        0.183183,
+        0.227346,
+        0.237916,
+        0.254806
+      ]
+    },
+    "producto que contiene exactamente acetato de hidrocortisona 2,75 miligramos y clorhidrato de lidocaína 50 miligramos por cada gramo de ungüento cutáneo de liberación convencional": {
+      "ids": [
+        "612c2d99d64b79d38cc691ccd058612e",
+        "e160274e2dc76519d265bb913b94a5aa",
+        "7aa044a502feb80893af7fe52e68fa1e",
+        "3ef6f741e7941bc2094aa1101cd67dd1",
+        "39a457f5ea88a8bd39845928b90f58a3",
+        "be7c7e312171c3e4b0ed1a6591ee7442",
+        "9dfa8892976c8014e5c0e101059f7b70",
+        "80479f032f471356df2476b255aef5fd",
+        "08130ae7fac0b2b2e38de35719fa26bd",
+        "a7f971ae9fc275fbc92e18245d13f92b"
+      ],
+      "distances": [
+        0.0,
+        0.044426,
+        0.228077,
+        0.241375,
+        0.304575,
+        0.325289,
+        0.335891,
+        0.349685,
+        0.36049,
+        0.362854
+      ]
+    },
+    "clorhidrato de dopamina": {
+      "ids": [
+        "cb00fd9a5e78be0f5bab527a481c9760",
+        "146193aa2a3f647654908235bac54024",
+        "27cca9df5ffb309c5154ad40a5010e67",
+        "eb16ad05ad511d3816e2adcfe5722925",
+        "440fa2de2c0f2bb66237bcf631b3cd16",
+        "fac45b7262f93e60b6e357b1b21964d4",
+        "edd26e8fe6d8c7f4e462d294b344f85f",
+        "79b26ce67b99756481432f09db411124",
+        "556003488edcc0e8445c9a1f46e28a4c",
+        "c94f80697d0a872ad467ed46ed17ebaa"
+      ],
+      "distances": [
+        0.0,
+        0.215992,
+        0.229277,
+        0.265379,
+        0.265852,
+        0.309319,
+        0.336947,
+        0.336947,
+        0.339158,
+        0.356418
+      ]
+    },
+    "producto que contiene exactamente fluoxetina (como clorhidrato de fluoxetina) 25 miligramos y olanzapina 12 miligramos por cada cápsula para administración oral de liberación convencional": {
+      "ids": [
+        "e6b74816f23d400a2580b9409cdc8c12",
+        "ae91379feec760aa4050ca37753dded7",
+        "c42e658fcb4bf241bc898477ef563e90",
+        "f2c8131fa501060cc510ce7574960a52",
+        "5a6af1b545ea9a6a2394ae648314eaa6",
+        "22446ca409e1980b63e2732b11f1dbe3",
+        "7581fae686127f36f2477bb0b6459b55",
+        "a1d05e0aa7014cad0e88268fb01b3271",
+        "8c928a63fb281c8b962f93e781389d3f",
+        "7f71456ece9fc31d7d0944ae70c4adab"
+      ],
+      "distances": [
+        0.0,
+        0.024771,
+        0.027152,
+        0.029938,
+        0.046138,
+        0.048594,
+        0.117871,
+        0.134431,
+        0.137028,
+        0.137792
+      ]
+    },
+    "argón (sustancia)": {
+      "ids": [
+        "3c464a6ea62229907b0eb8234fc0aaf6",
+        "3c6f3e71879d52b74df1e66e1a65ec9c",
+        "d6f2aed29321eac7f67044bd79042770",
+        "ae7dbe28d11a30cda56b2cc2eb542d92",
+        "f113c8523eea13b600db15382022abe9",
+        "e7d0e9fd790afa82e1d2e9f48b28bafc",
+        "d6e470bad4dd1e9bc9fbde59fb29572d",
+        "b782995e6e326b5843570355e24929d8",
+        "ed39cac6686af2f2f9e4ee01d41e5809",
+        "b5feb0366220a5b92e11e5a66309ee72"
+      ],
+      "distances": [
+        0.0,
+        0.364517,
+        0.380516,
+        0.393136,
+        0.438117,
+        0.455017,
+        0.455223,
+        0.4846,
+        0.491689,
+        0.497451
+      ]
+    },
+    "producto que contiene anisindiona (producto medicinal)": {
+      "ids": [
+        "418ba0cd31a9dc5e55135e16a60cb80d",
+        "584eccf3c54d2204811f40031004d8e0",
+        "09c07c66a496be8ee00725350e30c183",
+        "b81434efe3698fff1c2054e8d646bf8a",
+        "1e225c882ffea35c3e2af36a2c62c7a6",
+        "de4537ba3f5457a0a0aeb0072cd58592",
+        "fcbfaf3a791ef6baffd0cb451367cf3a",
+        "c1d810b69a887f6f1fce9b13210ac45d",
+        "e628a8e6edaf390ef201d8d3a5ca158b",
+        "472af6ef1965f14bf5c206b7881f4db2"
+      ],
+      "distances": [
+        0.0,
+        0.155504,
+        0.161435,
+        0.322497,
+        0.327503,
+        0.342073,
+        0.377055,
+        0.403084,
+        0.40464,
+        0.406519
+      ]
+    },
+    "administración de dosis de refuerzo de vacuna que contiene antígeno de Lyssavirus de la rabia como único ingrediente": {
+      "ids": [
+        "d0f7051eb78f38b63ec94f54ef6cc527",
+        "8088b7364b203a87f3ddf8739b7bd8d3",
+        "c38661a053228ddebc3eee8f15402e57",
+        "90ab08aa4f896b36ecb31a53b3525154",
+        "3d3b181ebe4ca8613fdee179f17572b3",
+        "5c561b714b44e7f90f8928b52123ecf4",
+        "51662ee639d37a3678c6c89769c969d8",
+        "ed7dc0281fa3e7b7b8deab67e2ee9bd7",
+        "900bb85797ec0b756f26fc687592d23f",
+        "cd96ed3adae2852c41dc23c51ef13744"
+      ],
+      "distances": [
+        0.0,
+        0.079289,
+        0.235068,
+        0.261212,
+        0.276047,
+        0.306405,
+        0.307921,
+        0.312051,
+        0.333109,
+        0.361197
+      ]
+    },
+    "salicilato de magnesio 600 mg por cada comprimido para administración oral": {
+      "ids": [
+        "2618bdaabd0012949ac5ce37dba609c3",
+        "8702d972030a829bad27c3bf39812a18",
+        "a3e31ed013f96d1fec5776f99d42d6c7",
+        "f5cce1b58bddd61f6eaa39757186e5bc",
+        "9817b0e8e0408236b8f959791956569c",
+        "3c23c035cc333f600ae4560f51dc3190",
+        "4958841b9246bdf3a8dc88f18b7c44ba",
+        "adac3800d393d572710ee4cb15b42f1c",
+        "ad01b26512caa566a88a1aa21f6682ca",
+        "d433c9e9ae9b1a37de5c78abd1ad8022"
+      ],
+      "distances": [
+        0.0,
+        0.292325,
+        0.298225,
+        0.312502,
+        0.319838,
+        0.336893,
+        0.384864,
+        0.392132,
+        0.417733,
+        0.449983
+      ]
+    },
+    "puntaje de la Relative Stress Scale": {
+      "ids": [
+        "af7ca29f4f0712256168ce24ffc003e9",
+        "e186466defde60469c527467f3cf16eb",
+        "c5840dff4c21a23a140516452f003cf1",
+        "ec0b659f9740e15dca27a28bfed694f4",
+        "e33ae9f4763021c5f00be3ad1b3d5f88",
+        "94ff1312c8069ed92aadc35fce4f90d6",
+        "b27b96af1137dc8b520ffcfff8be9f0e",
+        "55df5dc486e15f0b50158885b329e9f4",
+        "1d862fb17a7b64615373c6bddf360d73",
+        "cbc090afe954ae5217b67f10bae35a94"
+      ],
+      "distances": [
+        0.0,
+        0.30339,
+        0.352566,
+        0.386332,
+        0.398445,
+        0.399322,
+        0.411078,
+        0.420269,
+        0.433473,
+        0.4478
+      ]
+    },
+    "Product containing precisely glimepiride 4 milligram and rosiglitazone (as rosiglitazone maleate) 8 milligram/1 each conventional release oral tablet (clinical drug)": {
+      "ids": [
+        "2961aad9d271896a34f66a966eb803be",
+        "8e70fed09b8fd6fe5595b685a6ca33db",
+        "ec89015b5caeefef158152c8bd5b141e",
+        "a8b71b072a0dcf8aeb682ca7e1ff9963",
+        "8df7f6377a48439a9eb29ac6fb74ead6",
+        "b03211c1016581cc81ffabc6e54f5e3b",
+        "3fee8aa23292dea3cd2c89c5228497e1",
+        "0f51606d8f8994c9a0e7e805cf49d4b3",
+        "a25fc6ecce6cee1db11b7cfa1f870980",
+        "13f8d20eab31f85622d939047e829a9b"
+      ],
+      "distances": [
+        0.0,
+        0.059538,
+        0.090772,
+        0.098101,
+        0.100219,
+        0.199276,
+        0.212334,
+        0.218245,
+        0.223115,
+        0.227237
+      ]
+    },
+    "PULPOTOMIA DENTÁRIA": {
+      "ids": [
+        "23151d9d765cedd2c223fce74e7f9495",
+        "10f493f2a9bb5a24c1d46f7420d9f9ce",
+        "ae67d00bd853038a7f26c33b93811315",
+        "5e30449609550b796668ba80c998dd50",
+        "189f1be875e40171c8516b3c2a07fd78",
+        "471049431a108764ea30f0b00acf04b7",
+        "b5c039619b3a563f44ce536f8fd67bdc",
+        "d43b7a554b54995797ed8d3f62148fc5",
+        "afc9d12790611d0278b01f07d60b223b",
+        "83344b2dec2234326344fde92f373e82"
+      ],
+      "distances": [
+        0.0,
+        0.288587,
+        0.363984,
+        0.422242,
+        0.448404,
+        0.449377,
+        0.492665,
+        0.498147,
+        0.510441,
+        0.515327
+      ]
+    },
+    "Kaolin allergy": {
+      "ids": [
+        "a238b62f8738e197fb49e3e72146d0c1",
+        "1fb5b17ca053176d0c083bedb570b325",
+        "da023591f1d932d9ff1301d948f02151",
+        "b48bd28eccf1e1f9a1841571eea58519",
+        "a79937ba6fd9e3f5fdc6b3afaa35ac6a",
+        "006139b4129d55b8fa596e82fe7b26c5",
+        "dda4a4d5ed2b5855110690d2ffe612e2",
+        "40f023eddfc3f8137aae5f37e9645594",
+        "7bc6a12ef4c93082652816ea29e8b5b3",
+        "4d183ebfc7df694260f25a6d1293a23e"
+      ],
+      "distances": [
+        0.0,
+        0.122156,
+        0.327335,
+        0.334111,
+        0.334249,
+        0.352149,
+        0.359922,
+        0.368124,
+        0.370233,
+        0.378078
+      ]
+    },
+    "Nabumetone allergy": {
+      "ids": [
+        "ef51f23daefe0839426188af3b607bba",
+        "759bded606fbf335db904ff2cc45fd4e",
+        "40b8b989b023a96b0e92c6a755646114",
+        "2f20530a52a8f9287d91bb3cb4599514",
+        "a9bfa6cc0c69afabce6ee09b658c0c11",
+        "87aa1f14ce787afa2bb1a26b97887ce1",
+        "331f15a1375a672edee6893df6c9a02b",
+        "f6d420456e7ea5957673e611f6c72e97",
+        "793316f6b8c00c17d5aa8f7cf7d2eef6",
+        "dd865b605682cf0e3dc4ac20ed6f3c5b"
+      ],
+      "distances": [
+        0.0,
+        0.170203,
+        0.18932,
+        0.219933,
+        0.23585,
+        0.255484,
+        0.277119,
+        0.301667,
+        0.308774,
+        0.314603
+      ]
+    },
+    "producto con difenhidramina y paracetamol": {
+      "ids": [
+        "3a9e826ad91fb0095825a76c03ac3fe5",
+        "000a73bfd4b131a1af09754bca3cba30",
+        "576bb68cc4c1cc8170073456a730aa2e",
+        "ce1f244565413785495a1119227bf72c",
+        "a0759e9e8af170ab1454798ab4b1ac5b",
+        "35091747cc4361a3e8f220f79b6a1b6b",
+        "49506704a658727cba3f08645c32b7b0",
+        "cba34a8c58665f176042dc901407a8dd",
+        "e3f49dace2517491caa0f4d7cedc5411",
+        "e81638d5071bc972a435df0a6a6ae034"
+      ],
+      "distances": [
+        0.0,
+        0.0,
+        0.064898,
+        0.064898,
+        0.180973,
+        0.180973,
+        0.23017,
+        0.23017,
+        0.235369,
+        0.235369
+      ]
+    },
+    "RADIOGRAFIA DE CORACAO E VASOS DA BASE (PA + LATERAL + OBLIQUA)": {
+      "ids": [
+        "2a82079a478ec8913fb4b5a5a0842fea",
+        "e7de1241f9e14e643d2cd89eb5237343",
+        "ecf00d2d841a417720d7902956218268",
+        "c0e5b4ef924301bbc85bf5e003e0bdec",
+        "cda643bd977088d418340bacfa99ca50",
+        "eb8795793851b96b584536da93509c70",
+        "bf968f2938a22735a3bd39f1febd0441",
+        "6d84d5b20cdff5769ce75c8219c80ce2",
+        "fc93e4ea45451bdd52ad8bb0cb4db90f",
+        "1ea744e94e601183d08427e3a03d6c9e"
+      ],
+      "distances": [
+        0.0,
+        0.101673,
+        0.394711,
+        0.435433,
+        0.439362,
+        0.47631,
+        0.522349,
+        0.522916,
+        0.526313,
+        0.528372
+      ]
+    },
+    "producto que contiene solamente clorhidrato de clonidina 0,1 mg por cada comprimido para administración oral": {
+      "ids": [
+        "e0bb4fd558d18cf2919ee6200c7beb8d",
+        "ebdfd43697c736462f3831d7e7e8f921",
+        "ce5cb1d8cb99ac1232471143e82d24be",
+        "ab80e422f827d4b24c90b9ae4c20359f",
+        "0f91dae41620e8fa816e8e796e7fe353",
+        "4cd695a7f12b3a58618f42d171de781a",
+        "7a2e0bd8fdcbca1f9b07afac1a40f33c",
+        "c2192cbc58c67c47932c66077aca70d7",
+        "8b5133fe9777ffda96034ebd8fef15c6",
+        "58ff7dbc33f90172fe2132c69f731e74"
+      ],
+      "distances": [
+        0.0,
+        0.089627,
+        0.148886,
+        0.152961,
+        0.260132,
+        0.282451,
+        0.330355,
+        0.35396,
+        0.370428,
+        0.371034
+      ]
+    },
+    "producto con leuprorelina": {
+      "ids": [
+        "24a938709d071c6617571a6f449922f6",
+        "de4b8a9b3d23a3ad2390a3dc9b916305",
+        "97abe95fb77dc72a00bff5bb42f1e748",
+        "4ca037a24fa5a723a2ec11556d24fee6",
+        "868a5f153edef35b60d98ea873552476",
+        "b9c426e2c4a596bbb09f56b4f507f3c9",
+        "bc0b0d3d263974db28369a75ba7a0cd8",
+        "e9889949cf0579c6df608284084b243a",
+        "852ab2dd7e7e32b1940d2cf2b584ec6f",
+        "1a5f53124033d72621a51250f07e7517"
+      ],
+      "distances": [
+        0.0,
+        0.136245,
+        0.13842,
+        0.242647,
+        0.282273,
+        0.285074,
+        0.304001,
+        0.365552,
+        0.36933,
+        0.37848
+      ]
+    },
+    "producto que contiene cloruro de aluminio": {
+      "ids": [
+        "c100e7dfea5ac34dcee04f5a3a4381da",
+        "e83e2a2eefeb86dac158238ccef65293",
+        "a017eb06977d749bb798bd8bf49ea200",
+        "2260e9a70570ece1c59d870a57a00a6f",
+        "54e3fb564be8fd8a5a0be77f2378c067",
+        "eaf1c931e02902e739165ea23d49755a",
+        "386452b7381b3e06051915f69c8ad994",
+        "6afcd034a533df6aea8ea2185cca19ac",
+        "c2272d4b8dff6b5b46829cc31be42204",
+        "95f742f114979377de5a4725397cb98f"
+      ],
+      "distances": [
+        0.0,
+        0.104381,
+        0.143552,
+        0.146908,
+        0.278608,
+        0.280938,
+        0.288704,
+        0.320056,
+        0.326799,
+        0.331183
+      ]
+    },
+    "producto que contiene yodo-125": {
+      "ids": [
+        "74a2066a1514e92d2900d780a10104ad",
+        "f98b0c49afd06ebc1582bcc27ebbcd42",
+        "f964145f1bba2610ce2a28f98cb264d0",
+        "af34c8b45479a76882b9a1b71bdc2452",
+        "5e7b4d2bc49a2146b718becde9af64c9",
+        "bc30f16aa856c97ebc77fc98af4f356c",
+        "5f6de1fd2028e6b336939878a2fab81e",
+        "db8b5739628d1cf2adc0a7b448b7663e",
+        "e00808bf7ab4b336f070c357fb0181b1",
+        "2f1946a0f02c1eab15a275d13cd3d671"
+      ],
+      "distances": [
+        0.0,
+        0.062082,
+        0.142529,
+        0.186474,
+        0.217563,
+        0.261908,
+        0.261995,
+        0.2785,
+        0.301143,
+        0.305207
+      ]
+    },
+    "Product containing precisely dehydroepiandrosterone 10 milligram/1 each conventional release oral tablet (clinical drug)": {
+      "ids": [
+        "cc4633908aa26687de3acad4aa325bd1",
+        "d37e84f35316e0db1c6109a9a8b57664",
+        "a9b5e38890a9e6531a687951369cfcae",
+        "4b2c43238311b8cd1a59e84262018aa0",
+        "6359809c476b9e944521d58f33050388",
+        "7245f623e036029cdb8a68c61f8e28a6",
+        "70a45bfeb60a3e9a585ae03eec5baeaf",
+        "320e72c4b5bfb57f4eae1cab70310f06",
+        "2456117c98558fb7883191c796d1107b",
+        "71f719e044af66b4e2944d563c14aeed"
+      ],
+      "distances": [
+        0.0,
+        0.185227,
+        0.196284,
+        0.196942,
+        0.198833,
+        0.222101,
+        0.223574,
+        0.228782,
+        0.233274,
+        0.266069
+      ]
+    },
+    "evaluación con la Batería de Terapia Ocupacional para Evaluar las Aptitudes de Conducción de Vehículos": {
+      "ids": [
+        "9364f55ab78391940576b2b2c7c7b9a0",
+        "7e4b54ef7de71b541581cfeeb6d5917f",
+        "e7ce4dc8a026a8dc9be9aa651e142464",
+        "7a4d890a2f55f96501967f80a657993e",
+        "65fe31ac1599aa6f30b985d05a89d98b",
+        "2c7b20eb75dad5d7c7324c85d18110f2",
+        "c31aaff2b34d5b238c4e3085b85b86d1",
+        "e53af02735c75ef3fb5d2db4f99458b3",
+        "3a0032028f6c5a932aa223b79d46c002",
+        "560f6bd4e5165a5f63bc9e906b309072"
+      ],
+      "distances": [
+        0.0,
+        0.101058,
+        0.108847,
+        0.228097,
+        0.488951,
+        0.534191,
+        0.538506,
+        0.552167,
+        0.56272,
+        0.583713
+      ]
+    },
+    "Allergy to gemeprost (finding)": {
+      "ids": [
+        "1112176f1369b4c28f38c74c2426cb6f",
+        "b3430754c43b59c968406771ab471b0c",
+        "cdb2d212431381ef43c915c4a2ac3017",
+        "250bec1a6385d97204116cd573cfb71b",
+        "ea2c424e053346446f0b741d037fb8c5",
+        "9ef0e0faa99c2e91f915bdaec38466a7",
+        "81ddce2b5aec2374656bbf43a4219b27",
+        "2fb07025ce5cd81648827ac25f210d61",
+        "9101c6f05bdcb8a4b248a6ffabab84af",
+        "beee63484bfd4790217982c540027312"
+      ],
+      "distances": [
+        0.0,
+        0.220626,
+        0.270813,
+        0.307221,
+        0.311192,
+        0.315433,
+        0.317354,
+        0.321477,
+        0.323786,
+        0.327759
+      ]
+    },
+    "clorambucilo": {
+      "ids": [
+        "00765c5e227d1c4803f4b6973730799f",
+        "cbb74995cbbc6bcdc07dd88db7fec708",
+        "a386112a5e1152ea3a4a7c8951d67062",
+        "276f27b63792c85f25f4bd0611f19bb4",
+        "21e16c797cb8ee3cecc2a0f300669d1e",
+        "2812b2b22f5562c77adfa499939f6265",
+        "32ecce14a9c7ea9a4f01433190c7886a",
+        "193af08601fdef840ee421418122838d",
+        "a7f100075b0e0d1bf9e28333a8a1675c",
+        "552437f17a199d2ff38b96d27e5166e7"
+      ],
+      "distances": [
+        0.0,
+        0.336726,
+        0.343481,
+        0.401038,
+        0.401039,
+        0.406629,
+        0.412159,
+        0.412159,
+        0.413345,
+        0.414148
+      ]
+    },
+    "producto que contiene manitol y sorbitol (producto medicinal)": {
+      "ids": [
+        "03408dbcf48981fc0c5162c9e096ddef",
+        "e735831a62fc0f2ccb05d22bb8cedf80",
+        "38977f1d90efd82344bf3cf7b1bdcfa1",
+        "42d3b61a0b53881676377cf03a75aaac",
+        "bf71906fa904f07dab57f08545bb8019",
+        "2fdee8c5ae9def1b47bd93d3ed9e3d5b",
+        "23acde868291fcad2d30644efd2a1c15",
+        "4c952dcf2f36944c74c81afb1ada7187",
+        "e5d4270b97ba63513001cd2616e60e8d",
+        "a583e2a0541bdb49d6ad7744a8f1e6e2"
+      ],
+      "distances": [
+        0.0,
+        0.0,
+        0.212805,
+        0.227105,
+        0.227105,
+        0.240099,
+        0.240099,
+        0.280363,
+        0.310858,
+        0.310858
+      ]
+    },
+    "Administration of first dose of vaccine product containing only Bordetella pertussis antigen (procedure)": {
+      "ids": [
+        "60c4aef227170edbf8af8a3977d32836",
+        "46878366a4f7f91959034216d759b3f4",
+        "75e86bca00ea38660456b30e1c087080",
+        "0335f76fccd2cefcbfecc074b4c4f2c3",
+        "caac95e3c81581bf2c334f16efd4dcab",
+        "bef92032aa7d230d0e5e892a7f6bb260",
+        "6c4240b0e000a6d86220487d70345f34",
+        "2ec263f2a410bf591767b5fc380bd706",
+        "cd944d4b34c5f4bde80fb4b4a7483ddd",
+        "7fc41d2842c27b8191b6a0846dd4768d"
+      ],
+      "distances": [
+        0.0,
+        0.0,
+        0.137666,
+        0.137666,
+        0.157949,
+        0.187149,
+        0.189218,
+        0.197896,
+        0.197896,
+        0.205079
+      ]
+    },
+    "Test of Pragmatic Language Skills Second Edition score (observable entity)": {
+      "ids": [
+        "caa9740eac9f4ad8dc9c6f307c3311e4",
+        "67af8f7ff976e4cf8da8a8c10128c12c",
+        "c8c4b108978375616922033a579efe6d",
+        "012bdba00a2b3e41d48e788c3ee2fdf4",
+        "6578972da4b5dbf8a3a28fa58efb896a",
+        "5f5bb6c0244992275871919161fab4a6",
+        "65d1bc853fedec43cf306bb6cd097d99",
+        "5530b38e3f6c3db6ddb0cffae8e8d2b0",
+        "19671485da6bed18202452b512f5480c",
+        "a02c541fb6f2337be9a35f7dfdbb0b35"
+      ],
+      "distances": [
+        0.0,
+        0.211583,
+        0.24251,
+        0.244354,
+        0.290445,
+        0.297371,
+        0.316414,
+        0.335066,
+        0.341086,
+        0.348885
+      ]
+    },
+    "metaproterenol": {
+      "ids": [
+        "d653e9595dbf7a13b9fc5658774d4a90",
+        "625afd12e38f790543f4996cf2fb493e",
+        "a64d01ef0156fd190634eb820cff88ac",
+        "b76aeae31b58d2d9626b755a4e344d27",
+        "a8d1bd72dcd4bf7a0b81af82f650d78a",
+        "60c9a57ce52d3a831756228837f940b7",
+        "ecdae214e939b7283f8ca853e6e84452",
+        "9d5a9a378155abae83ba864a192d4963",
+        "0b9dfdf080c2702569e455096b49ce20",
+        "810ae56e35f0f482661d75fcc328d6e0"
+      ],
+      "distances": [
+        0.0,
+        0.0,
+        0.038083,
+        0.2651,
+        0.283841,
+        0.285399,
+        0.324868,
+        0.324868,
+        0.333661,
+        0.338557
+      ]
+    },
+    "evaluación con la Prueba de Lectura Silenciosa de Gray (procedimiento)": {
+      "ids": [
+        "b9d57ec32e354379921e7a30d1b0ac1b",
+        "c68e66ba302262a6037809e6acb52fef",
+        "01e1c5140b27f8767f9f66ddf6f0c1f4",
+        "2b51978d6eafa4f57456c4cb90ae540c",
+        "439b359d738151cf191bc3431990c5ca",
+        "218ac0ef92a70bf847e51039e5cc2f76",
+        "c66144a8c11ba198830199c1f68dab9c",
+        "6c6611f048bddc6e2a70f61004307c7b",
+        "3ceeef0cd02897a40ba796fafc3e4883",
+        "4c92bce900cd5767e8cc453ad4451341"
+      ],
+      "distances": [
+        0.0,
+        0.118505,
+        0.27622,
+        0.351844,
+        0.40255,
+        0.427556,
+        0.444584,
+        0.500344,
+        0.52485,
+        0.529163
+      ]
+    },
+    "Butorphanol (substance)": {
+      "ids": [
+        "d11ca10fbf90e6ec5c7244b669705acc",
+        "d64ef96072818c87ce546ef12cc5b0f1",
+        "f2bcdc0c1cbba4662c8a4ee2adef6233",
+        "262b082faa091c8159296142dac5c080",
+        "3de9f591bd6c45a5c314082ce5354846",
+        "75b999f591ac5584890524204f17ddc7",
+        "b222bb6ce5bc28d4041d4d988673cd0c",
+        "27936bbc4ecdffc8521e587fab846925",
+        "7de02f443a4aede3a7f3f77dbe4a45dc",
+        "86f1a472c2aa92c5e6f25cc84c474e25"
+      ],
+      "distances": [
+        0.0,
+        0.158401,
+        0.247001,
+        0.266647,
+        0.284346,
+        0.318371,
+        0.325515,
+        0.325721,
+        0.326679,
+        0.334946
+      ]
+    },
+    "producto que contiene exactamente fosfato de codeína 60 miligramos y paracetamol 300 miligramos por cada comprimido para administración oral de liberación convencional": {
+      "ids": [
+        "ff651831b22eee87225f7bedbe9e586e",
+        "1b6438a84365a1c04c918cc1f6ba48d9",
+        "b26d4fae3514906bd7a8c95af98c198d",
+        "d343d39cf55b5c969b99d71b13a5f1ed",
+        "8f8393fed7cbce9e78eb0596647df61f",
+        "84cacf60774a5e4ba47f0a009df22a67",
+        "13a5108c49e746eb602c9980a65823fa",
+        "b31d3e1e1f91aee974fe4d4be249db21",
+        "e363dc5c541de7e70db29128b70e64dc",
+        "7acc6b2923fbdcfbef33711b0bb814f5"
+      ],
+      "distances": [
+        0.0,
+        0.037368,
+        0.102329,
+        0.125322,
+        0.138373,
+        0.1449,
+        0.161091,
+        0.163143,
+        0.193589,
+        0.195365
+      ]
+    },
+    "bencilcinamato": {
+      "ids": [
+        "58b3d7a7fcf1d513cf3560cf52388cbb",
+        "2be69b786746ccce2d5fcbff6a607baa",
+        "e74d3534b4afd429276393745be845ad",
+        "e59bbe6c732d8cea6ae8db1969662d6d",
+        "149360cefa10fe8f9b21a342e64d580e",
+        "78a6e48d1078940b9ddabdb53014197e",
+        "f42d932c0d66dbd4d986dcd55e110d4a",
+        "805b962f768297b4c8f3e4e638248efa",
+        "a35f7c9220995ed478a69881c067d86b",
+        "8c8e0fab9b23e04270f4b72dac43cbe2"
+      ],
+      "distances": [
+        0.0,
+        0.50359,
+        0.505521,
+        0.516961,
+        0.530007,
+        0.577721,
+        0.585474,
+        0.592547,
+        0.596516,
+        0.601106
+      ]
+    },
+    "Product containing precisely buprenorphine 52.5 microgram/1 hour prolonged-release transdermal patch (clinical drug)": {
+      "ids": [
+        "52e8f4c1409ae7227f5b1f801a9cbfc0",
+        "a66a0c1c3564ebc989fefb01e5b1bc75",
+        "28bac8f5403fa2cdfd018e3970c1c1ca",
+        "6ac1cadcec8dba4b20c0df3f6d180cfc",
+        "6064560d35b4167be5d1b0e40de64102",
+        "b6c534303844ec813de15ecfe41d6a08",
+        "061707e87412c950ed45dd75b686f470",
+        "1f7d23628578b64411752c1483ac2bf1",
+        "d602fb968c3ca584ed2cc4067b31149a",
+        "884c30978941bf29bf6f5656d6541352"
+      ],
+      "distances": [
+        0.0,
+        0.188249,
+        0.19566,
+        0.208081,
+        0.211256,
+        0.228651,
+        0.232869,
+        0.238759,
+        0.24882,
+        0.266069
+      ]
+    },
+    "Health of the Nation Outcome Scales for Children and Adolescents - parent's assessment scale 2 score - overactivity, attention and concentration (observable entity)": {
+      "ids": [
+        "c1372ccb498bda813ea40fa4d8ce7cac",
+        "98425a7b641eef4ce1489845ce06766b",
+        "bdf7f4839e7e991b87ddbdff153a630f",
+        "fd76584081f7f7ed988133d28304debc",
+        "a18dd25a0afb215259c0d8d46d7ccd3c",
+        "c4cbde05bb2c599a125df34fc1b8bdf3",
+        "9ae51e23b5c2f3965909a70d8cae6a5a",
+        "109c24c14809c7203b4d377f8963c288",
+        "c8e4ab9932fb7e5637238ff9e23a6ed7",
+        "97a5a6963be3495813081993b43cbadb"
+      ],
+      "distances": [
+        0.0,
+        0.119549,
+        0.129141,
+        0.204095,
+        0.307014,
+        0.328351,
+        0.354059,
+        0.358793,
+        0.492165,
+        0.553164
+      ]
+    },
+    "Psychotic symptom rating scales auditory hallucination subscale score (observable entity)": {
+      "ids": [
+        "968d34a7571664e459e1b0270c28c165",
+        "68d49bf97023ea333ac4a21e9bb945d6",
+        "2443589787750b678a6743ceafa9f6c0",
+        "0fb7c8d8e0b2d6d3c73fc4d7b941b253",
+        "b50c7c9336b0d00843fa6d875bfc29f9",
+        "c61a07d6abe5177a8f016b3f9d002f71",
+        "2a30d166a2df48bde00e40495b0a21c1",
+        "838572d278fa741cf59a1ba948bcc5f5",
+        "24ba186e326fd298d4cddda30df9e9f8",
+        "b9ccdff5e9b4441eeeafe7981c546a13"
+      ],
+      "distances": [
+        0.0,
+        0.111798,
+        0.112794,
+        0.116586,
+        0.163008,
+        0.195682,
+        0.205192,
+        0.219447,
+        0.233206,
+        0.249165
+      ]
+    },
+    "Product containing rapacuronium (medicinal product)": {
+      "ids": [
+        "cc54985df5100787dc86a18fdbe2641d",
+        "48e35419e87575e6771b877e245f5cf0",
+        "d8725c0bb23a818918cd5ef72314484f",
+        "1320f6df6e3f438f25368dfb59316913",
+        "a609cd317d3067fd88e59c9c56c133b9",
+        "8b092e75c906cda114ff75439b840eda",
+        "fa8f81a25283f1236725837862811910",
+        "13bbb3b551372af80bfa8f0bbc307567",
+        "1ace252818dae1fa192739480b86e193",
+        "142b0cc3c33df25cb30d5c87dedaeed8"
+      ],
+      "distances": [
+        0.0,
+        0.198589,
+        0.225171,
+        0.246865,
+        0.253378,
+        0.309608,
+        0.323219,
+        0.32406,
+        0.327498,
+        0.357696
+      ]
+    },
+    "producto que contiene hidroclorotiazida (producto medicinal)": {
+      "ids": [
+        "c2e736ae3dfc32008d62c98c4040593e",
+        "ab501dfcc00abec90ba6f82bbde6a384",
+        "6acbabe0ef621a2c8ac25940af04dd07",
+        "028361c9f756da89bafcab3185c5c298",
+        "e6bf34f88770fe7659ca75fb1e182457",
+        "3082aef9b6d99a4bafee4c70c7753fe8",
+        "50fbe7f34225c4acb20a8ff0ae222144",
+        "fc05e07a625e5da350decaa85096fe72",
+        "512a24770e46e2b7e9d995b0cc0c7c97",
+        "77235ba96529d0e84e3352203bfd3057"
+      ],
+      "distances": [
+        0.0,
+        0.186158,
+        0.192701,
+        0.233282,
+        0.233282,
+        0.256685,
+        0.256814,
+        0.256814,
+        0.26608,
+        0.270013
+      ]
+    },
+    "producto que contiene exactamente clorhidrato de sotalol 15 miligramos/1 mililitro, solución inyectable de liberación convencional (fármaco de uso clínico)": {
+      "ids": [
+        "96c6d88b4861b9e759a4abe87b6592f8",
+        "318b2d4e8ea4aa25720fd544d21ed86d",
+        "a27d5fd042fefd1cffcf7d603f5ab15e",
+        "c1096fedc33b095df623adf37b3d58b4",
+        "2e99cb8eff6ec267a195603b03e1135f",
+        "6b62ec1883e2bdc8df8d7da31f8a31fb",
+        "1b6cf27be262288ce4ca7532aff5caa6",
+        "6d6f81de060634706a7d00d6782ffc2b",
+        "320cddc8323f9a25eafe5b8b280893b4",
+        "449bc57c7eaa95eb22a7e50b3aad2b11"
+      ],
+      "distances": [
+        0.0,
+        0.05892,
+        0.196,
+        0.25422,
+        0.276771,
+        0.320866,
+        0.354714,
+        0.358203,
+        0.358502,
+        0.361068
+      ]
+    },
+    "clorhidrato de tramadol 150 mg por cada cápsula de liberación prolongada para administración oral": {
+      "ids": [
+        "73c647820f4cad86e078ee9fa12fb9b4",
+        "7f211b1231078f1172ce7b1f57a00352",
+        "0f07550e6dfc9d0ff1cfaca60ffbad23",
+        "c342c5f4669790b80f9e9e2e3ffa5027",
+        "bfdb2cb919298cdb0aa0ce1fd31d6d2c",
+        "b20e0dd5a6425106fd7d48411c0726e8",
+        "e09e994c0d960035250cb1be6f079aee",
+        "f502d8764cc67408e2f4f8f6517b8bf0",
+        "33b670aa7740a1187c87e8d2f6b280fe",
+        "0a80de92ec45fd9374b8d6292acb610e"
+      ],
+      "distances": [
+        0.0,
+        0.090356,
+        0.168004,
+        0.224862,
+        0.242648,
+        0.244327,
+        0.257973,
+        0.259963,
+        0.260056,
+        0.273862
+      ]
+    },
+    "Product containing precisely diazepam 5 milligram/1 milliliter conventional release emulsion for injection (clinical drug)": {
+      "ids": [
+        "35e5c37679a6c94c7fd25f2ad81c0b64",
+        "3e858237f14d22699b7dd3634a38c119",
+        "c4e21a0600c7a5a416166d2ed91f7be8",
+        "92f567715e08253bec45d950d2af6dc9",
+        "7c68ae6be2c5f1b487147cfcfd2b0cfa",
+        "04155a778201e6076af5f71fea27721e",
+        "17b20c4966e87448ac7df95f5fbaa742",
+        "6d0c8cd3da2c033ddad597b4983c25f5",
+        "0a1e34016fa7519c14eda353bf1dd764",
+        "711c250b7efde50a59d95d19ae11fe80"
+      ],
+      "distances": [
+        0.0,
+        0.055116,
+        0.056536,
+        0.133264,
+        0.175089,
+        0.191934,
+        0.226569,
+        0.228668,
+        0.229951,
+        0.246076
+      ]
+    },
+    "producto que contiene solamente sunitinib 25 mg por cada cápsula para administración oral": {
+      "ids": [
+        "974a2a433d89ca9e97387f9e2b3ee813",
+        "0c7ca6aa042bec1bbc3fe4be3b1c8f5d",
+        "128d4fc38037de1c5deb7755a0668346",
+        "f291852840babf5dfa0f91bea0819a81",
+        "998ae338fc657695585972b8c8e84c2b",
+        "e7d909f51547b9bee7a5e6e8e8f5b8a8",
+        "d128340bda4a658fecc05c30d8b13541",
+        "effc06d4e4c29317f803baa059c500fb",
+        "f789253b23f867cddfc056320c7510d0",
+        "cfaa8506f9ac40c3ac177aa2b643ed42"
+      ],
+      "distances": [
+        0.0,
+        0.247129,
+        0.251274,
+        0.252802,
+        0.27696,
+        0.281742,
+        0.282019,
+        0.289614,
+        0.292138,
+        0.321152
+      ]
+    },
+    "cefaclor anhidro": {
+      "ids": [
+        "dda2eebc5aa20e911fd85b4743143a4f",
+        "e1fa0e90f911658cace4694809fdfa89",
+        "f004276819df214913c48bff82d208b3",
+        "dfb81e19c98719346da6db221412bf1f",
+        "19efa83a092fa0937646f45d96c3b678",
+        "045523eada4f716a1df3d298eb4ae12b",
+        "ae16366e0b79a7d0312a57eee07b3ce4",
+        "4303100251e07fa470475d17f2bba125",
+        "68765821f680d47f6e8bd1dd2e2f3c28",
+        "b988ce1edfa0039f92204fb3edd5b637"
+      ],
+      "distances": [
+        0.0,
+        0.279513,
+        0.301534,
+        0.301534,
+        0.317301,
+        0.359276,
+        0.416342,
+        0.421362,
+        0.429787,
+        0.44421
+      ]
+    },
+    "Revised Children's Anxiety and Depression Scale total anxiety and depression score": {
+      "ids": [
+        "42edf13f4d96621b94a26dc17736658d",
+        "643c4292f5cd021410046e5cbad84194",
+        "75a9d553c0e3ff6ef765f82c035c4383",
+        "fc782b2ebf29abc6b0eaf6b9c3739b07",
+        "afa9232bc2d4e44167594a99733ce561",
+        "6e83629bfc0c45af330a6520ee8c6ba4",
+        "9b67216f61bc36d0f1babae656961756",
+        "87c9678f88d5f86af78cca363651f365",
+        "28af0c991cba15cc75f65366da077ec7",
+        "ca4d4e220622deeac0f8983085290252"
+      ],
+      "distances": [
+        0.0,
+        0.049595,
+        0.076287,
+        0.146031,
+        0.163605,
+        0.168842,
+        0.197103,
+        0.214049,
+        0.217567,
+        0.230052
+      ]
+    },
+    "Cinoxacin allergy": {
+      "ids": [
+        "d80eea839899e23fc7ff95baa077f1e6",
+        "ecbbce404250add43fb48369dcfd5fa4",
+        "9b50dc909595cb50f05bc39e2c2e3e00",
+        "354be4795a0475bf1e2b88329c86841a",
+        "8d8327bb293ce2326a84e925eaff04de",
+        "93fdf1307fc088d86b2c4e49feebccb3",
+        "a90ad8450368d7e295b9da4897ee37cd",
+        "365d47207dbbea570d4b6dcbe46626a8",
+        "4a621fcd53ce8fc02a9ff03f8d3e39ce",
+        "5f29ac40d096be38388fb1cbde7ec819"
+      ],
+      "distances": [
+        0.0,
+        0.123849,
+        0.243201,
+        0.281726,
+        0.31025,
+        0.318757,
+        0.327273,
+        0.333492,
+        0.338641,
+        0.347227
+      ]
+    },
+    "clorhidrato de pilocarpina": {
+      "ids": [
+        "0717873ec038d807bc7a7438f0ac7209",
+        "9bb2303957f3020885fb3f056f540082",
+        "1318e0aa8bec6ea002f6df752daf0db1",
+        "0068d113c05c3d94e2f4ec10c6fea71f",
+        "4bf6595ee61fc4941347c1fa883a704d",
+        "b68ee1bf14499b98fd13248d609b93d1",
+        "499b3627a6a0b0cdc7ba257b630fff69",
+        "1396753e93f728ca77f9a7860f1df997",
+        "cafbd6297d85a41d318ff150ef3f5097",
+        "3b04a103779c40f0b1fb91e5b254a809"
+      ],
+      "distances": [
+        0.0,
+        0.269632,
+        0.328092,
+        0.361412,
+        0.393771,
+        0.400047,
+        0.400047,
+        0.412186,
+        0.412186,
+        0.426838
+      ]
+    },
+    "producto que contiene pralatrexato": {
+      "ids": [
+        "19dc8c0954f5750cb386dfc3e7e92f3e",
+        "45a50d763e27690a258138bc00716174",
+        "ee250bc5963f1763276149eeabb8aec4",
+        "576bd5b1879efa97d4cdab2a93b16b82",
+        "8c9b3c8ee56f3f3674b761322571c086",
+        "489ce2ba52480764d106a351236ae0bc",
+        "7ac8d235ad42a7804f00e4884fbd4b49",
+        "ea389157a93e3592174493f2d1b81a2f",
+        "0864260ff3d3bf2a87efa2d1970783f9",
+        "a6c00943d1d706b7c7275f64c1065b4d"
+      ],
+      "distances": [
+        0.0,
+        0.144054,
+        0.178056,
+        0.193995,
+        0.197761,
+        0.247497,
+        0.27121,
+        0.308079,
+        0.31397,
+        0.325242
+      ]
+    },
+    "clorotrianiseno": {
+      "ids": [
+        "a71a133d04aa51935788f9d7bf5e89ab",
+        "a3b63356e5b56018f7178baa5a3bae57",
+        "1fda44d45bd25050b42d28956b31bc75",
+        "2812b2b22f5562c77adfa499939f6265",
+        "e640ca513eface14f49ac78e4bb3417e",
+        "3ebe713b8b9d956f4104690739e0e06d",
+        "826fdd0b8f3f3806d645ef758bbce107",
+        "be9b511e2ec6d11bb0652c076ccf6ad1",
+        "5e7f920114ba597c106be8d8dcd1dbbc",
+        "a386112a5e1152ea3a4a7c8951d67062"
+      ],
+      "distances": [
+        0.0,
+        0.358244,
+        0.384614,
+        0.417389,
+        0.426482,
+        0.428654,
+        0.437262,
+        0.437262,
+        0.448593,
+        0.458599
+      ]
+    },
+    "producto que contiene exactamente olmesartán medoxomilo 20 miligramos por cada comprimido para administración oral de liberación convencional (fármaco de uso clínico)": {
+      "ids": [
+        "3ab07ad1eabd94c5a2ba31c3047a998e",
+        "485705b7b6ecc8b9132c9600d038b4be",
+        "d4c86b781c825333e488098a38440151",
+        "e30eb0868de857a394c89b2680721e0c",
+        "f3d57ebb73117cb8bad173469b557b72",
+        "96819bb906f5a8811f4edce0560d1c82",
+        "4a432cb15fd153e568c964a377753e96",
+        "f72c70a415de99a3bc85660c6b0acda8",
+        "260bb40fd06922e9b92faf6461d0b365",
+        "520e470549bac7767a703eb73ebd5b15"
+      ],
+      "distances": [
+        0.0,
+        0.060868,
+        0.180754,
+        0.182473,
+        0.202382,
+        0.207009,
+        0.211345,
+        0.251017,
+        0.257111,
+        0.27594
+      ]
+    },
+    "puntaje del Cuestionario General de Salud de 20 ítems (entidad observable)": {
+      "ids": [
+        "8cdd916d14249d67520bbc651f2632b4",
+        "239d9e7ceb61ab27e89b1d174957d42b",
+        "d76831698dbd6d7ac6239b608a34e0fc",
+        "f9b5fc4841bef421fd62b46d0b1a3a55",
+        "b7f95a4a8d7ec9d5982220356392ab75",
+        "123a377a13117d6ad1e494e4232439a5",
+        "5025a4e2158b83b1e919f4b27f27f0a6",
+        "71c2a5248e5012cc32f1354b98d6e1dc",
+        "dea563c2297d885cfb12d89345910f2f",
+        "e50146370ee88291fb71a2a4f15195a9"
+      ],
+      "distances": [
+        0.157098,
+        0.294569,
+        0.30275,
+        0.333905,
+        0.337096,
+        0.359585,
+        0.387308,
+        0.419671,
+        0.454657,
+        0.479594
+      ]
+    },
+    "Product containing precisely ranitidine (as ranitidine hydrochloride) 150 milligram/1 each conventional release effervescent oral tablet (clinical drug)": {
+      "ids": [
+        "0acbe0c9f8c482380e8774965d86f36a",
+        "698a17bd5ce1fa4c56efe84a544c6c8c",
+        "c22965e08c2c29844ce32a112e017c98",
+        "3b17df213e6141c3cac105b8f0fb7213",
+        "8b34292d8da203ae16631da0b3affa1e",
+        "acbc3d1a23854ee732729ec3a9d05e56",
+        "62ad3ba49e56c559586eb55eaa37d930",
+        "1cd4c60cb4950f5b0170f6539419f885",
+        "f41d83e9e70ebbe88b96ade4526db5ba",
+        "47a03546138e23fe8b86b001ba96329a"
+      ],
+      "distances": [
+        0.0,
+        0.036554,
+        0.200771,
+        0.202524,
+        0.2044,
+        0.211194,
+        0.21165,
+        0.212376,
+        0.213391,
+        0.214467
+      ]
+    },
+    "alergia a estreptoquinasa (hallazgo)": {
+      "ids": [
+        "054044924c3aa43a1557e57c3986440a",
+        "ea31537cc36acc73c48212c2ebd6d769",
+        "58ea867c8f7b024d7e80cba947108c73",
+        "099664440d5c5f07ea1e220027a6c9da",
+        "f7bc167c07201f60bdfa81121cc8ca2e",
+        "607e25f3adba77a8f145f540fb547493",
+        "fd2c1606edf37ad07981b61d021d13b1",
+        "3c208e7c9ab38d2f59cd52538700df55",
+        "75b4cf72479fe940b0322d6bb829258b",
+        "131fed3ecc5633f7b44b8105a66d39fc"
+      ],
+      "distances": [
+        0.0,
+        0.187917,
+        0.257455,
+        0.294636,
+        0.294697,
+        0.298841,
+        0.301665,
+        0.3257,
+        0.326927,
+        0.328684
+      ]
+    },
+    "Urine tyrosine level (observable entity)": {
+      "ids": [
+        "0dbe5bcad682ba4f7093f2008da4b5dd",
+        "8a1f49c15e18c43bc81f1e8550e79ab4",
+        "536adcc9a4f89a3613b6bb26c6298d10",
+        "a32fba766a41da8389c6e9efb40d5a44",
+        "603e7d0ae195b5c1fd6a78894b207bd2",
+        "a787b274ef22c90534349439f20b96fc",
+        "70523b4e759a6738e918d8b7ea3eeb8a",
+        "5e85b1c3ee2f173170deb0c93fc68cd2",
+        "3a21121395d5ee3ee2a69046696c063b",
+        "d3f68e68c5f52ca460c60999f4068709"
+      ],
+      "distances": [
+        0.0,
+        0.220369,
+        0.227419,
+        0.257125,
+        0.260217,
+        0.262297,
+        0.271595,
+        0.272149,
+        0.274407,
+        0.295791
+      ]
+    },
+    "producto que contiene exactamente etinilestradiol 30 microgramos, fumarato ferroso 75 miligramos y norgestrel 300 microgramos por cada comprimido para administración oral de liberación convencional (fármaco de uso clínico)": {
+      "ids": [
+        "750c33b0f5249bb190a3c87cbf0ff48d",
+        "45773d8cc10dfab5857e76097803901a",
+        "1a833b68b81627c647bcba203571366f",
+        "efb5454b58ee26346e661980c5a9a513",
+        "ca39f0b1f258dd0271b11490d0f24659",
+        "5c089237386143f82ada1ef050832940",
+        "ca420078fc687462e42c0970296f55c7",
+        "f70e29d4c0b2d0a5ef3bd612d87cc648",
+        "4a9eadb85d86fde5b63646590bbe5550",
+        "93a42a64b7e5a4b2f87f683d8ff5214f"
+      ],
+      "distances": [
+        0.0,
+        0.0,
+        0.0,
+        0.041782,
+        0.041782,
+        0.041782,
+        0.043196,
+        0.043196,
+        0.043196,
+        0.087269
+      ]
+    },
+    "evaluación con las Matrices Progresivas y de Vocabulario de Raven (procedimiento)": {
+      "ids": [
+        "48e377ac46ae43149957e41bebeda7d6",
+        "397514a129b9bb7cab4c77de3ef5e136",
+        "2cc1327dc636a2747e0cc056bcea58b2",
+        "b3f6da781fec3551f469b405300ee45b",
+        "7c682b8dd1da6687fcb8d1dc734ff83a",
+        "f9cfb750eaa8fdf3a0b859afb202388d",
+        "fafd9ec44cfc80178db9066c6021180e",
+        "9f93705ca3f4d74e9e5629cb35acb9e3",
+        "3538fda6f9ce26157fe873cf2280c8ec",
+        "cae895e084d1142b849e3c621bc3a4a1"
+      ],
+      "distances": [
+        0.0,
+        0.115901,
+        0.207742,
+        0.286287,
+        0.299096,
+        0.329773,
+        0.342956,
+        0.356054,
+        0.359731,
+        0.392604
+      ]
+    },
+    "Product containing precisely pentazocine (as pentazocine lactate) 30 milligram/1 milliliter conventional release solution for injection (clinical drug)": {
+      "ids": [
+        "d96a967f3ce2fbbf61efb57ef823afb0",
+        "81331c6ef40ad78b9decbaf44708fc47",
+        "2cc6ca824e2d3fcf15adbd61ff23dd9b",
+        "8e03aeb68ed7ffb6986f199e140cb130",
+        "d3d145b57646bb5015ca3ab5a0203d07",
+        "68e7cd0f754d98eaf5b8a7ab302d4f32",
+        "49e8f80ce4750cd11b23a130576508a8",
+        "44709de0b1235d2736d3d99a530ff9a3",
+        "8031380f1b8ad09863ac7fab881537d4",
+        "fc6b388e4423fcb28537aaa3ea3da46e"
+      ],
+      "distances": [
+        0.0,
+        0.235888,
+        0.258175,
+        0.258623,
+        0.2782,
+        0.316818,
+        0.329767,
+        0.340362,
+        0.35842,
+        0.35948
+      ]
+    },
+    "galamina": {
+      "ids": [
+        "ba786c62cfba3229754c549998f4544a",
+        "305fdd8af1f4b1ac3c2456df1c3d979a",
+        "eaf15c400d7dfe543a6391c8822c8468",
+        "cc17208ddfbca9a41ea400c462347db7",
+        "99357d03d2989396472daf5322192f46",
+        "522a1f9aa8e1fa0108b042d349bf003a",
+        "a81620b03c8503b3348b5f79782caafa",
+        "ed8d289767640d2c446e9a93d9d46eb2",
+        "4e656a745d812794bd28b67dbc606a69",
+        "b809bd258e7397e6652cdcba8a978ed6"
+      ],
+      "distances": [
+        0.0,
+        0.249321,
+        0.315954,
+        0.386404,
+        0.390002,
+        0.422932,
+        0.43427,
+        0.434918,
+        0.441221,
+        0.444991
+      ]
+    },
+    "topiramato 25 mg por cada comprimido para administración oral": {
+      "ids": [
+        "6b4dec6cb49bc24d88a19d3bf3c82f81",
+        "bd85d0136e437229329a511a5591cfd5",
+        "29dc9323e8913ee6984dcf8a9435c440",
+        "5e0520325f7b4d285dae0061b6a0d007",
+        "cbd3ca80b1d615224dd0fa6216871041",
+        "6d39bad75e5a3244ca6457523f2e0ce6",
+        "7a3306d0b921c34f9c028db678849df1",
+        "cc004a59cd5d926e8c4a4d9337dc22d3",
+        "4b0b7db336166c7c8a168551a12586f2",
+        "dd12513b764e652945d652dc610524bb"
+      ],
+      "distances": [
+        0.0,
+        0.11175,
+        0.209652,
+        0.222273,
+        0.227445,
+        0.233516,
+        0.244258,
+        0.245112,
+        0.249178,
+        0.26396
+      ]
+    },
+    "producto con buserelina": {
+      "ids": [
+        "150f86901ecdd91762c2032045f44679",
+        "b1d1c79f58ac25d50f56dbb48a521955",
+        "c95c14b6401a7b88ed1fcf5dcc75ce08",
+        "0c1ad3627788fef3c98d3cabf72d1c30",
+        "678000c56ebd7297196d9215168ff8d3",
+        "868a89b3c024631e4cf28109764f210a",
+        "ca384e640e060a1c18477da9aefa6a04",
+        "1f85095b5da85008d5989b321d8c368b",
+        "5731fb3fa7bd2ed70cd82e50972b2938",
+        "a77996c9140005a194ce3a02def10a34"
+      ],
+      "distances": [
+        0.0,
+        0.101517,
+        0.26113,
+        0.278859,
+        0.316562,
+        0.377382,
+        0.389994,
+        0.394598,
+        0.396954,
+        0.422761
+      ]
+    },
+    "Product containing precisely atazanavir (as atazanavir sulfate) 200 milligram/1 each conventional release oral capsule (clinical drug)": {
+      "ids": [
+        "4f8a9d60725ef96e44a9366e5e889cd9",
+        "5a6d0c6cf5d76ffeb331ef4c69d561f7",
+        "54a695a3222829f058f29324023b7c52",
+        "935bd50330651c0d7c3e35d2d8c9fe8c",
+        "17543b1b22f9d95b12f69362fa8a24e0",
+        "ece0e043f5600ad527098206f6e567c8",
+        "ba8c6832656f9d2302c4b08252e5c9d0",
+        "02e517b66d198c651cf73f25eb124074",
+        "00fdcfd46303a6fa038aa893ee838176",
+        "ff8ec2d40035b6fb3aa0f0df70bbbc0d"
+      ],
+      "distances": [
+        0.0,
+        0.177164,
+        0.194416,
+        0.218994,
+        0.236013,
+        0.236966,
+        0.239627,
+        0.247873,
+        0.280233,
+        0.287208
+      ]
+    },
+    "alergia a alcaloide del cólquico": {
+      "ids": [
+        "46598ea9a4b6a985fe8ec276e4f35bac",
+        "9d4d4ba3e6230b1c6019f6d4445ebbd7",
+        "c27717be39c457b0a77676c1997c835c",
+        "2c65ee562c5478afdb8d21cbe81c727a",
+        "b886aa15a5ee05989773ca4c355f40d1",
+        "6cdfd58b63988cefd370320eeeb5504c",
+        "306c95dc2b19fc029555e69b7740f207",
+        "dd3d7ed524197127f8c7fcc3aed36a6f",
+        "45442437b267595d602ee9a6bd6a75d3",
+        "8fbae81917ee86ba1c4e6a24144269b1"
+      ],
+      "distances": [
+        0.353082,
+        0.355667,
+        0.362237,
+        0.363999,
+        0.386728,
+        0.391262,
+        0.393068,
+        0.393858,
+        0.403244,
+        0.404669
+      ]
+    },
+    "deslanósido (sustancia)": {
+      "ids": [
+        "64bfbed5f8df123ecfbc47a502520146",
+        "2cacedbcb01b14ecf011022486a5aa66",
+        "55f95db2750629a6924cf6fd41a8ab4a",
+        "c9ca7d6fa835c0fc872ccec80efa1795",
+        "bda94ec4f09b2455709dc5f431eeb267",
+        "6a70fcd885fb125d037227352c450ae8",
+        "9702444b9fa238e92169f57ffa38328a",
+        "be12a83b994024a14384467aca8f48e6",
+        "ec5f0f4738cd0e743cae88456c3ca71d",
+        "a48e3a94b68600c2c12bd38b4435d5b5"
+      ],
+      "distances": [
+        0.0,
+        0.31452,
+        0.333802,
+        0.338291,
+        0.369725,
+        0.376828,
+        0.378562,
+        0.381263,
+        0.39631,
+        0.399575
+      ]
+    },
+    "succinato de cloranfenicol sódico (sustancia)": {
+      "ids": [
+        "e27de31f67ad6f58f84130b38464b607",
+        "c32bca0cf18febff8433046d04c3dfb3",
+        "4548753b134ad4ebbd542f7ad8983559",
+        "820aac8bd330c940e05677e6e1df9320",
+        "b8fb310f3337b9d091a0ab4f165378e1",
+        "c116d37dc677771dd7b728b088a6c9bb",
+        "ed366f54c6ce022cf510bd0283b5f05c",
+        "dfd15a5a1c1f70a96c9257e84a8c9fe1",
+        "65955fc7449ede86b3e7c2a06dab5c92",
+        "3a5b49596a425d3c9085a04348010914"
+      ],
+      "distances": [
+        0.0,
+        0.212142,
+        0.231486,
+        0.320538,
+        0.40741,
+        0.412654,
+        0.418466,
+        0.420886,
+        0.42596,
+        0.426864
+      ]
+    },
+    "arbutamina": {
+      "ids": [
+        "4f2b3da4c0b19fdcfa65492b30cdbb91",
+        "6dcd0ac79adcdc5597a2f67cd40e7a5d",
+        "ad5aaace5501e41514136c9ceb3021f7",
+        "f76ac1c3aaf7bc2c3b4f16886a86c01e",
+        "b2e3eba07c94e0d4582efb27dafd360d",
+        "2d3e420ba169d366438cb02232cc7b70",
+        "a125052d36954dbc18d6da5f63099d7c",
+        "254937fe0dbb493bfb86cc9503dd5321",
+        "a22582dce29e3f05616a13cfe7282a01",
+        "c102e4cd7431b511a2ce38fdcefdf89c"
+      ],
+      "distances": [
+        0.0,
+        0.126076,
+        0.184005,
+        0.235712,
+        0.290488,
+        0.374021,
+        0.498656,
+        0.505088,
+        0.517746,
+        0.520093
+      ]
+    },
+    "producto que contiene exactamente famciclovir 125 miligramos por cada comprimido para administración oral de liberación convencional": {
+      "ids": [
+        "cd881f5af6775c382c11a763c326168c",
+        "1640799290abfd748b9871bc8c73fbc1",
+        "dfb90602f0b8616d2eed180382e4ae52",
+        "d029c804b87541e2d759be98402acd01",
+        "1634a987efb3c18364778f7dc05112be",
+        "57ca0459836d252291ea471ccfcb1942",
+        "eceb2105ae7596409a6c7c76e93b1c4b",
+        "d8c4952c1d81d9f01efd378a9c8e4dbd",
+        "1a2e2025ad0ccfb0fe8fdc35bec9969c",
+        "83a4120bd1861114a52128d862291ecf"
+      ],
+      "distances": [
+        0.0,
+        0.073898,
+        0.178197,
+        0.178939,
+        0.212038,
+        0.224136,
+        0.270141,
+        0.273452,
+        0.276378,
+        0.28534
+      ]
+    },
+    "Administration of pre-school booster dose of vaccine product containing only Measles morbillivirus and Mumps orthorubulavirus and Rubella virus antigens (procedure)": {
+      "ids": [
+        "75a270bbf3d05c923f419167d1b0f999",
+        "c0cdda1ce21faf9fb00a2458748cb2c2",
+        "0070d11f29fdf2aae2448e961fd9d9bd",
+        "344e0c734ede0509fcb21813454215a9",
+        "bdc1384b76f87a41983ba06a6b004baf",
+        "ef85a062e3674b294e90aeba3039529b",
+        "046f257583339d0f51638a84ec134c61",
+        "dc40d466e19d72fb1a152638802b4080",
+        "ad291fd94916365e395411fb8d69c99b",
+        "2e666adfa8940e539d0c2fd575cf4412"
+      ],
+      "distances": [
+        0.0,
+        0.079889,
+        0.08535,
+        0.194932,
+        0.229081,
+        0.328684,
+        0.348062,
+        0.35366,
+        0.362392,
+        0.366684
+      ]
+    },
+    "Aspergillus fumigatus 1 antibody level (observable entity)": {
+      "ids": [
+        "751445254b3342cc3155e4b995c74386",
+        "9923d7966add2a32600fdae0d3452779",
+        "1956e1c89447a896774afb3e41499663",
+        "33de388aa7eff25afa3b732897027180",
+        "22a98e16b484924c98b50db4574870b4",
+        "6c547aaba8db0e50af49abd28c5f6f6f",
+        "dc359816b47db4e07c4ef6ab29436aa6",
+        "cd303b92a142694d9ebb7270548ca9f3",
+        "9e95fde16cb70c445f24147a81e89747",
+        "570b275f91207067df2c0c68bf3f5f1c"
+      ],
+      "distances": [
+        0.0,
+        0.200823,
+        0.289531,
+        0.373418,
+        0.373418,
+        0.373418,
+        0.381069,
+        0.395146,
+        0.397268,
+        0.408999
+      ]
+    },
+    "fosfato de codeína 60 mg y paracetamol 300 mg por cada comprimido para administración oral": {
+      "ids": [
+        "7acc6b2923fbdcfbef33711b0bb814f5",
+        "dd68eae37ee6569bd3e8528d1ce86337",
+        "ff651831b22eee87225f7bedbe9e586e",
+        "5e9ec4a6079bc12b1c4b69aa7ada88a1",
+        "85aa11f55a79378891f56a0647c358d3",
+        "1b6438a84365a1c04c918cc1f6ba48d9",
+        "df4dd289aa0423efa140ac6e21b9e7fa",
+        "781724362fcdf7c0aed98d4fc2715159",
+        "b26d4fae3514906bd7a8c95af98c198d",
+        "128c65f88cfd131cc7dc6bd28744c712"
+      ],
+      "distances": [
+        0.0,
+        0.135195,
+        0.195364,
+        0.199162,
+        0.202885,
+        0.212099,
+        0.218848,
+        0.229858,
+        0.283818,
+        0.286452
+      ]
+    },
+    "antígeno de Borrelia burgdorferi (sustancia)": {
+      "ids": [
+        "c1df2583b6ec349845f4f3f4d4d6185a",
+        "bda62a88b175628a4fd06192b64a7a52",
+        "d2353679c727bfd5347f38f4e00e6835",
+        "eb3fd5409b4abea219f90fc84ccb8235",
+        "c461902ddcc2f2ee76036cb4d67ff6c4",
+        "a19357928508304bb107799fcabf9b27",
+        "b0518c6523a20bd79ca002608295b338",
+        "a65221c52ba3c5c434eca9e542491701",
+        "b55335a6e8f4ad85e95e1620f931a9e9",
+        "3626f992166efef623a7b66a9df461a5"
+      ],
+      "distances": [
+        0.0,
+        0.085971,
+        0.151444,
+        0.188413,
+        0.227371,
+        0.270307,
+        0.272994,
+        0.294969,
+        0.297135,
+        0.315101
+      ]
+    },
+    "Aripiprazole (substance)": {
+      "ids": [
+        "f7eb9670a4c95ad7a5fc0db358a97f05",
+        "bb01bc955b3d8c9167a0f113bb0c7cce",
+        "bc53f80abb444a71e75eae2124b75010",
+        "2829b85db0f88489887a15e7a79e7e8a",
+        "ddbd70510f4275d4af6c2437f7ff8aea",
+        "e90c4e35c843acaebf6c16af054067b8",
+        "ef23b368593dbb9f510f44f4e10cbfb6",
+        "7a9d47bf15d51ddc268bb92dba20b71f",
+        "ea791b2e5648e5caa23fb34b01668b4d",
+        "50621fa73a8ade678d4cc65cdce78e87"
+      ],
+      "distances": [
+        0.0,
+        0.269613,
+        0.29865,
+        0.358395,
+        0.368608,
+        0.380434,
+        0.390756,
+        0.408688,
+        0.410184,
+        0.430397
+      ]
+    },
+    "bálsamo de Canadá": {
+      "ids": [
+        "bf901cc3da6f4975d4c7efe89ee70ef1",
+        "97eb2bdbfc22337c61d028d119a1019d",
+        "679e568d74ae0375fae4df4232650a90",
+        "77b87048d2326c970182ec51bf1b38d0",
+        "3b213941c550a04e09805a132af08fc9",
+        "61ed3eeb90f8e0d5d805500395a1cd8a",
+        "0e6362ae195deb9631b05abed298cff1",
+        "f51d28775c5b06f3ae584e4dfc48c123",
+        "460561fc4998ec698b013879c7679a9c",
+        "bd04f7af286a1d0891d034404eacae8c"
+      ],
+      "distances": [
+        0.0,
+        0.33237,
+        0.374366,
+        0.374606,
+        0.441118,
+        0.441475,
+        0.48535,
+        0.488887,
+        0.511304,
+        0.532878
+      ]
+    },
+    "producto con malatión": {
+      "ids": [
+        "6b054367ee767fd401fc55aeb2f39184",
+        "529b72ddb111ada7e0f7a7398e833e00",
+        "887a00e372a720f8867758cd7920ce9e",
+        "924c3a16cb097e117e4f9bd9bd3f9b64",
+        "fe436d25bc093a2fc53ef59ac071af38",
+        "826cf5f12d7ab98d32bf93fd8d22938a",
+        "4a3ff67030ca993015f51067e4105883",
+        "e5e113deb4a65ebe3eb5b0c526cfc967",
+        "4670c1732d400f6447a6ed2c9f85fd15",
+        "61f8cafb8a2ca4b796b43100d07efc58"
+      ],
+      "distances": [
+        0.0,
+        0.158358,
+        0.353832,
+        0.368621,
+        0.425672,
+        0.46135,
+        0.46816,
+        0.491195,
+        0.491263,
+        0.500924
+      ]
+    },
+    "producto que contiene exactamente moxisilita 40 miligramos por cada comprimido para administración oral de liberación convencional": {
+      "ids": [
+        "a6a5df762f033e6389b3589957214396",
+        "4b446c655bfb9d9d7cd321d9fdadcf24",
+        "44434d6f47aa6af89d86d9435f78fb92",
+        "30ff21cec3642e3f5e8b7395172e3f5f",
+        "790288c1739ea5ce03a20e8c8622461e",
+        "59cf617b83d75cae52889fd4b04fa43b",
+        "9c761e855fc8ceec700310e45a24f7a4",
+        "190b4e2f5ea6610f48c8d01f881d76ce",
+        "a298f4525ad548b997cca4222cac7aa3",
+        "8d8f0fc95b3f5beb08925dc9a74b6603"
+      ],
+      "distances": [
+        0.0,
+        0.067379,
+        0.195696,
+        0.231841,
+        0.26586,
+        0.28283,
+        0.285762,
+        0.302849,
+        0.320913,
+        0.328105
+      ]
+    },
+    "clorhidrato de lidocaína 5 mg/g, gel para aplicación cutánea": {
+      "ids": [
+        "30271c5e36e1ec7d39201b581c83ca3d",
+        "9bbef1a57f5412966a4db4c46f6677f8",
+        "72f575321e15e5b6a51a44622b2174ae",
+        "84678929faa098014e0b9d2ea6726f8a",
+        "a5dadb4bf3be7b66176289bed37ba8a6",
+        "6dca95fa269ef83a291027e418a29f8a",
+        "4b194c34d6a7218e58bd25d38239cfd6",
+        "444ed1fbc070ee3852039184f2d993ad",
+        "8c7b9ed13e756cf36e55788d276be63c",
+        "73c82de6dd51a26bfc7aa2733bfa49cf"
+      ],
+      "distances": [
+        0.0,
+        0.17889,
+        0.232646,
+        0.300377,
+        0.306857,
+        0.31391,
+        0.321436,
+        0.324139,
+        0.325004,
+        0.35269
+      ]
+    },
+    "cloruro de mivacurio": {
+      "ids": [
+        "b5c3d82dd8a8b4211ab519be1bb84c18",
+        "71965af1a7f573d3f8c2895e0c44c866",
+        "32fab56410d48e1ce1cfe343ac8732f3",
+        "4e72a5a338616e98d58efb87f85d5cf7",
+        "9dc619db21b72c7cea8e4c1c2f4f14e5",
+        "2fb08404480490d3202bfd6f9f1ea8a6",
+        "0420e80dac255e8b812aa6c34f8bb02b",
+        "ba0fe615f60749f5a32dca0b6d9d41d6",
+        "ae7955f423effa3321f31faee7cac06e",
+        "18231e69960dc1a1572a88eb787c1871"
+      ],
+      "distances": [
+        0.0,
+        0.211383,
+        0.357593,
+        0.373307,
+        0.404086,
+        0.417257,
+        0.425013,
+        0.431541,
+        0.43882,
+        0.439738
+      ]
+    },
+    "producto con monoctanoína": {
+      "ids": [
+        "fa16eb2ad5fb1b49d18cba0aadd008b3",
+        "ef783b75507a0126f074e179ec9aaf77",
+        "7a6f101341264a4a5891716f9aef135c",
+        "b7e5d542633bff522e1df411fdde474e",
+        "6a862148df304f3941d359d87bf17962",
+        "cc5dc6634abef08560b031d45ce75f1f",
+        "b49a698af32ac1ca7c9a0fc81476e8a5",
+        "ba038c147813bfa1a8e921c1d25ccb6e",
+        "426bff18cce570d00a7fec0337c03401",
+        "ea077614d1a024305c0ea5735df7bb44"
+      ],
+      "distances": [
+        0.0,
+        0.11904,
+        0.298395,
+        0.308209,
+        0.315002,
+        0.3552,
+        0.378754,
+        0.407177,
+        0.412381,
+        0.433461
+      ]
+    },
+    "alergia a proteína del látex de Hevea brasiliensis (hallazgo)": {
+      "ids": [
+        "eb3f24404eccc6dc0eb99bd35c3bf1c5",
+        "440ef6662b00037feb068911eb4f2982",
+        "7ea73fdb5bedf970190a72ee23e457f5",
+        "081401a7aba93d9738b46147d8498ee0",
+        "8395ba6310129389d95e715a8056bdd1",
+        "5970052af058074cd62bca438468e845",
+        "2bc8878afb7d716c367f24b4368e29e6",
+        "1432219197a20569afcffd89ee9cb4ca",
+        "0e74a37f690f59ddbce1902c0b49ea27",
+        "db81242ec7ddf9cb612f556b3827f51e"
+      ],
+      "distances": [
+        0.0,
+        0.189594,
+        0.282396,
+        0.323891,
+        0.330196,
+        0.361904,
+        0.391131,
+        0.398932,
+        0.41021,
+        0.41428
+      ]
+    },
+    "PLANEJAMENTO TRIDIMENSIONAL (POR TRATAMENTO).": {
+      "ids": [
+        "f90e4a3a6274a26128a1755bcca61ae1",
+        "ff0d74605c6f1d25fafe0e4000d9f707",
+        "c8dde6286e6ea533b8eb44adc0a0cabb",
+        "83a18e3405a4e9959edb8b58b58567f8",
+        "e7ba0aeb280aade0bb805084b56f165c",
+        "cbf14e8f9dfb47971661fdcea11786e9",
+        "7ec939e74b72617e0f5efa046f8357b9",
+        "50aa0ca9c0575a702209ee022ff58873",
+        "e92c45e6798260c34f15e8ca28497c9a",
+        "2844f44922f7e93c28b189a10643ec9f"
+      ],
+      "distances": [
+        0.0,
+        0.41896,
+        0.483763,
+        0.484282,
+        0.528338,
+        0.551288,
+        0.65905,
+        0.673972,
+        0.684541,
+        0.688505
+      ]
+    },
+    "producto que contiene exactamente odevixibat 1,2 miligramos por cada cápsula para administración oral de liberación convencional (fármaco de uso clínico)": {
+      "ids": [
+        "50c712303d7f6d2f962465b5bb111ff5",
+        "e70c75d47b897b856927daed83c3dc51",
+        "9188dccac0e038b3ec0e76c5525645af",
+        "e7bb5da8ed1e2e99f4dbac5384211df9",
+        "bb9351407ddf5b1b30e5c72d0beebe0c",
+        "77001dd3363567a040fe886dd0bfb838",
+        "39cbc14ff3763932dc08cccb7fcde54b",
+        "f0cd346f5eb42a3ba62f43933cd2f641",
+        "8ebed73bab3bac6aaee3189b970a8353",
+        "d14c953b9709a00ff0fa681993efac28"
+      ],
+      "distances": [
+        0.0,
+        0.065453,
+        0.125308,
+        0.212679,
+        0.22235,
+        0.294711,
+        0.296372,
+        0.30308,
+        0.37646,
+        0.382499
+      ]
+    },
+    "cefixima (sustancia)": {
+      "ids": [
+        "63aa38bebf0961cd23a002f67ca56821",
+        "4fc41dec4ea5da7940506ec1463f6371",
+        "c30cfdf6cbbb8cc505174116ef6e85ed",
+        "bc586e3e681bf20ddcb7b5d2f6b65e07",
+        "e023af413153ac068dcd3b900f34c8fa",
+        "5857db16b0891aae385714abda3adae9",
+        "7c501549e371b26dd7aeef28893a0363",
+        "a5725ebc8952016d99f712ff83041d0c",
+        "91e1bdf35a43b05e8176f8806adca8c6",
+        "05889ce16099dc6b71212b3f281c3146"
+      ],
+      "distances": [
+        0.0,
+        0.383707,
+        0.413119,
+        0.427028,
+        0.450532,
+        0.452215,
+        0.452339,
+        0.454071,
+        0.456508,
+        0.459952
+      ]
+    },
+    "producto que contiene exactamente alpelisib 200 miligramos por cada comprimido para administración oral de liberación convencional (fármaco de uso clínico)": {
+      "ids": [
+        "28b0fdf1011648c5a6579398b9d5926b",
+        "78fc3b297f4b893233c90d6618fdd5a8",
+        "2ae49879e34bd0291a69d04a56e634af",
+        "6fc14d2045bc757e4c27cca85f311201",
+        "3edd0c2c6775633fa4f511f3fe112427",
+        "c2825b46c608213a9750867b519c5795",
+        "3c8a65be263dbf45788b070df40b34d3",
+        "e66096db0200746d17ff6013b7b08140",
+        "7cd83e670147299d233ec52411b12e50",
+        "a938a60bd80f48f616ed6b24492dcc5c"
+      ],
+      "distances": [
+        0.0,
+        0.052675,
+        0.169673,
+        0.252361,
+        0.26389,
+        0.287116,
+        0.287285,
+        0.287957,
+        0.308213,
+        0.311106
+      ]
+    },
+    "clorhidrato de prometazina 20 mg por cada comprimido para administración oral": {
+      "ids": [
+        "ced50b6cce0ece9c08ca8f5a4dcd51ce",
+        "bc1d80201236254d96e12751ae03ef42",
+        "fc2a1583619a0c7e472a21b036d7f6b8",
+        "a2712396cd4da11320531c7fdd620afa",
+        "20516e5cd3430d7f6684e8279c5ad434",
+        "ae5a0d222c6ca1082841132a6e379aff",
+        "3ac8375b26c857452694f9364f2fc58e",
+        "3c1d8102fbc739571e08cdc46d30048c",
+        "9d5017386c88c1458398b730a9030bd4",
+        "5649173b5f9c66cc86c8c8aa222ab90d"
+      ],
+      "distances": [
+        0.0,
+        0.191639,
+        0.23046,
+        0.240655,
+        0.25103,
+        0.258231,
+        0.261181,
+        0.267061,
+        0.294374,
+        0.30078
+      ]
+    },
+    "eslicarbazepina acetato 200 mg por cada comprimido para administración oral": {
+      "ids": [
+        "3f4adef8c63d1a1b724fb098e69538c3",
+        "54c0e29dd355aa1cb8cd9c5983e00d5b",
+        "8fadd6c1a3d4cfd36eda6310819a8ef4",
+        "aa60c156f71e29a896a5ab4ac33561c3",
+        "ad698d0d4d1d4079cfe3f55c6e10ed86",
+        "8bcf942d9cfa2bcfffe6a7fcb888428b",
+        "74a65f8de1c7678c90481cd153ba5432",
+        "41c4dc84af44022a8515639f9b3bf420",
+        "2e85114930df3b02981bcb232883affb",
+        "fd407cce51f2eb237d494c82583f526f"
+      ],
+      "distances": [
+        0.0,
+        0.188579,
+        0.21038,
+        0.234735,
+        0.243365,
+        0.244281,
+        0.253198,
+        0.259732,
+        0.264793,
+        0.283137
+      ]
+    }
+  }
+}
