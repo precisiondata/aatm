@@ -12,6 +12,7 @@ concept files, process them in batches, and write the mapped output to disk.
 """
 
 from pathlib import Path
+import asyncio
 import time
 from typing import Any, List, Literal, Optional, Tuple
 from rich.console import Console
@@ -62,8 +63,7 @@ def rate_limit(n_docs: int, next_allowed_time: float, rate_limit: int) -> float:
             processed.
 
     Notes:
-        The return annotation in the current implementation is ``None``, but
-        the function actually returns the updated next allowed time.
+        This blocks the calling thread; async code uses `arate_limit`.
     """
     now = time.monotonic()
     if now < next_allowed_time:
@@ -72,6 +72,24 @@ def rate_limit(n_docs: int, next_allowed_time: float, rate_limit: int) -> float:
     # Reserve time for this batch
     next_allowed_time = max(next_allowed_time, now) + n_docs * 60 / rate_limit
     return next_allowed_time
+
+
+async def arate_limit(n_docs: int, next_allowed_time: float, rate_limit: int) -> float:
+    """Async `rate_limit`: waits without blocking the event loop.
+
+    Args:
+        n_docs: Number of documents in the current batch.
+        next_allowed_time: Monotonic timestamp of the next permitted processing time.
+        rate_limit: Maximum number of documents allowed per minute.
+
+    Returns:
+        The monotonic timestamp at which the next batch may be processed.
+    """
+    now = time.monotonic()
+    if now < next_allowed_time:
+        await asyncio.sleep(next_allowed_time - now)
+        now = time.monotonic()
+    return max(next_allowed_time, now) + n_docs * 60 / rate_limit
 
 
 class TerminologyMapper:
@@ -502,7 +520,7 @@ class TerminologyMapper:
 
             # rate limit if defined
             if self.rate_limit is not None:
-                next_allowed_time = rate_limit(
+                next_allowed_time = await arate_limit(
                     len(batch), next_allowed_time, self.rate_limit
                 )
 
