@@ -1247,6 +1247,9 @@ class OmopExtractionPipeline:
         total: Optional[int] = None,
         prices: Optional["Prices"] = None,
         log_every: float = 60.0,
+        batch: bool = False,
+        poll_every: float = 60.0,
+        max_batches: int = 20,
     ) -> "RunSummary":
         """Process a dataset of any size in chunks, writing Parquet files as it goes.
 
@@ -1271,6 +1274,13 @@ class OmopExtractionPipeline:
             prices: Model prices per million input and output tokens, to estimate
                 the cost, e.g. ``{"openai/gpt-5-mini": (0.25, 2.0)}``.
             log_every: Seconds between progress logs.
+            batch: Extract through the provider's batch endpoint (OpenAI,
+                Anthropic, Gemini): each chunk is sent as one job, about half the
+                price, with results within 24 hours. See "Batch extraction" in
+                `aatm.omop.runner`.
+            poll_every: Seconds between polls of pending batch jobs.
+            max_batches: Batch jobs pending at once; reading the source waits
+                while that many are pending.
 
         Returns:
             What this run did: notes built, skipped and failed, rows per table,
@@ -1287,6 +1297,9 @@ class OmopExtractionPipeline:
             total=total,
             prices=prices,
             log_every=log_every,
+            batch=batch,
+            poll_every=poll_every,
+            max_batches=max_batches,
         )
 
     async def rebuild(

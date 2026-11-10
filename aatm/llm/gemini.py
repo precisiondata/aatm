@@ -1,14 +1,21 @@
 """Google Gemini adapter."""
 
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from google import genai
 from google.genai import types
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from aatm.llm.base import LLMResponseError, LLMSettings, T
+from aatm.llm.batch import (
+    BatchRequest,
+    BatchResult,
+    batch_call,
+    check_requests,
+    complete,
+)
 from aatm.llm.limits import estimate_tokens, get_rate_limiter
-from aatm.llm.usage import record_usage, usage_attr
+from aatm.llm.usage import batch_model_id, record_usage, usage_attr
 
 
 # JSON Schema keywords kept in the schema sent to Gemini. Others (pattern, minLength,
@@ -111,6 +118,15 @@ class GeminiLLM:
             contents=user,
             config=self._config(system, output_type),
         )
+        return self._parse(response, output_type, self.model_id)
+
+    def _parse(
+        self,
+        response: types.GenerateContentResponse,
+        output_type: type[T],
+        usage_id: str,
+    ) -> T:
+        """Record the usage of a response and validate its JSON text."""
         usage = getattr(response, "usage_metadata", None)
         output_tokens = usage_attr(usage, "candidates_token_count")
         thoughts = usage_attr(usage, "thoughts_token_count")
@@ -119,7 +135,7 @@ class GeminiLLM:
         record_usage(
             usage_attr(usage, "prompt_token_count"),
             output_tokens,
-            model_id=self.model_id,
+            model_id=usage_id,
         )
         if not response.text:
             reason = None
@@ -135,3 +151,95 @@ class GeminiLLM:
             raise LLMResponseError(
                 f"{self.model_id} returned output that does not match the schema: {e}"
             ) from e
+
+    # --- batch mode -----------------------------------------------------------------
+
+    async def submit_batch(
+        self, requests: Sequence[BatchRequest], output_type: type[BaseModel]
+    ) -> str:
+        """Start a batch job with the requests inlined.
+
+        Inlined requests are limited to about 20 MB in all: lower the chunk size of
+        the run if this raises.
+        """
+        check_requests(requests)
+        size = sum(len(r.system.encode()) + len(r.user.encode()) for r in requests)
+        if size > GEMINI_INLINE_LIMIT:
+            raise ValueError(
+                f"The {len(requests)} requests hold {size / 1e6:.1f} MB of prompts; "
+                f"Gemini takes at most {GEMINI_INLINE_LIMIT / 1e6:.0f} MB in a batch "
+                "of inlined requests. Use a smaller chunk_size"
+            )
+        inlined = [
+            types.InlinedRequest(
+                contents=r.user,
+                config=self._config(r.system, output_type),
+                metadata={"key": r.custom_id},
+            )
+            for r in requests
+        ]
+        job = await batch_call(
+            self.model_id,
+            lambda: self.client.aio.batches.create(
+                model=self.model,
+                src=inlined,
+                config=types.CreateBatchJobConfig(display_name="aatm-extraction"),
+            ),
+        )
+        if not job.name:
+            raise LLMResponseError(f"{self.model_id} returned a batch job without id")
+        return job.name
+
+    async def poll_batch(
+        self, batch_id: str, custom_ids: Sequence[str], output_type: type[BaseModel]
+    ) -> Optional[list[BatchResult]]:
+        job = await batch_call(
+            self.model_id, lambda: self.client.aio.batches.get(name=batch_id)
+        )
+        if job.state not in _GEMINI_ENDED:
+            return None
+        responses = (job.dest.inlined_responses if job.dest else None) or []
+        results: dict[str, BatchResult] = {}
+        # Responses carry the key sent as metadata; without any, they are matched
+        # by position, as they keep the order of the requests.
+        by_position = not any((item.metadata or {}).get("key") for item in responses)
+        for position, item in enumerate(responses):
+            if by_position:
+                key = custom_ids[position] if position < len(custom_ids) else None
+            else:
+                key = (item.metadata or {}).get("key")
+            if key is None:
+                continue
+            if item.error is not None or item.response is None:
+                message = getattr(item.error, "message", None) or "no response"
+                results[key] = BatchResult(
+                    custom_id=key,
+                    error=f"{self.model_id} batch request failed: {message}",
+                )
+                continue
+            try:
+                output = self._parse(
+                    item.response, output_type, batch_model_id(self.model_id)
+                )
+            except LLMResponseError as e:
+                results[key] = BatchResult(custom_id=key, error=str(e))
+            else:
+                results[key] = BatchResult(custom_id=key, output=output)
+        state = getattr(job.state, "value", job.state)
+        reason = f"batch {batch_id} ended ({state}) without a result"
+        if job.error is not None:
+            reason += f": {getattr(job.error, 'message', job.error)}"
+        return complete(custom_ids, results, reason)
+
+
+#: Bytes of prompts accepted in one batch of inlined requests (the API takes 20 MB
+#: per request, framing included).
+GEMINI_INLINE_LIMIT = 19_000_000
+
+_GEMINI_ENDED = {
+    types.JobState.JOB_STATE_SUCCEEDED,
+    types.JobState.JOB_STATE_FAILED,
+    types.JobState.JOB_STATE_CANCELLED,
+    types.JobState.JOB_STATE_EXPIRED,
+    types.JobState.JOB_STATE_PARTIALLY_SUCCEEDED,
+}

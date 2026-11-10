@@ -1137,6 +1137,32 @@ file is updated at every progress line, so you can follow a run from another pro
 and it is kept with `completed: false` and the error when a run stops.
 `OmopRun("output/ecog").summaries()` reads them back, oldest first.
 
+**Batch extraction, about half the price.** For a large run that can wait, pass
+`batch=True` to extract through the provider's batch endpoint (OpenAI, Anthropic and
+Gemini). Batch jobs cost about 50% of live calls and return within 24 hours, often
+much sooner:
+
+```python
+summary = await pipeline.run(
+    "notes.parquet",
+    "output/ecog",
+    chunk_size=1000,   # one batch job per chunk
+    batch=True,
+    poll_every=300,    # seconds between status checks
+    max_batches=20,    # jobs pending at once
+)
+OmopRun("output/ecog").batches()  # the jobs: id, status, notes
+```
+
+Only extraction is batched: coding stays live. Each job is recorded in the ledger as
+soon as it is submitted, so you can stop the run (or lose the machine) while jobs are
+pending: the next run, with or without `batch=True`, collects them instead of
+submitting the notes again. Requests that fail within a job are recorded as failed
+notes and tried again by the next run, live or in a batch. Batch calls are counted as
+`<model>@batch` in the usage, and priced at half the model's price unless `prices`
+has an entry for that id. Gemini takes at most about 20 MB of prompts per job: lower
+`chunk_size` if it refuses one.
+
 **Row ids.** The primary keys of a run are derived from the note:
 `note_id * 65536 + n`, where `n` is the position of the mention in the note. The same
 note gets the same ids in any chunk, after a resume or a rebuild, and in separate runs
