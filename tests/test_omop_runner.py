@@ -345,3 +345,48 @@ def test_source_without_text_column(tmp_path):
     pipeline, _ = make_pipeline()
     with pytest.raises(ValueError, match="no 'text' column"):
         run(pipeline, frame(), tmp_path)
+
+
+# --- overlapping extraction and building --------------------------------------------
+
+
+def test_next_chunk_is_extracted_while_one_is_built(tmp_path):
+    import threading
+
+    pipeline, extractor = make_pipeline()
+    original_build = pipeline.builder.build
+    original_call = extractor.__call__
+    second_chunk_started = threading.Event()
+    overlapped = []
+
+    def slow_build(notes, results, **kwargs):
+        if notes[0].note_id == 1:
+            # Waits for the extraction of the next chunk, which only starts during
+            # this build if the two overlap.
+            overlapped.append(second_chunk_started.wait(timeout=5))
+        return original_build(notes, results, **kwargs)
+
+    class Extractor(FakeExtractor):
+        async def __call__(self, texts):
+            if texts[0].startswith("Visit 3."):
+                second_chunk_started.set()
+            return await original_call(texts)
+
+    pipeline.extractor = Extractor(extractor.definitions)
+    pipeline.builder.build = slow_build
+
+    summary = run(pipeline, notes(4), tmp_path, chunk_size=2)
+
+    assert overlapped == [True]
+    assert summary.built == 4
+    assert OmopRun(tmp_path).status() == {"built": 4}
+
+
+def test_duplicate_note_ids_in_the_chunk_being_built(tmp_path):
+    pipeline, extractor = make_pipeline()
+    # Note 2 is in the first chunk, still being built when the second is read.
+    summary = run(pipeline, notes(2) + notes(1, start=2), tmp_path, chunk_size=2)
+    assert (summary.duplicates, summary.built) == (1, 2)
+    assert extractor.calls == 2
+    df = OmopRun(tmp_path).table("measurement")
+    assert df["measurement_id"].is_unique

@@ -30,6 +30,9 @@ recorded with its error and the run goes on; a later run tries it again, up to
 ``max_attempts`` times in all. `note_id` is the key that tells notes apart, so every
 note needs a unique one.
 
+While a chunk is built (coded and written, in a thread), the next one is extracted;
+at most two chunks are in memory.
+
 ## Rebuilding
 
 Extraction, the costly step, is stored apart from the tables. After changing the
@@ -553,7 +556,8 @@ class RunSummary(BaseModel):
         extracted: Notes extracted by this call: one model call each.
         reused: Notes built from a stored extraction result, with no model call.
         skipped: Notes already built by an earlier run.
-        duplicates: Notes whose note_id repeated one earlier in the same chunk.
+        duplicates: Notes whose note_id repeated one earlier in the same chunk or
+            the chunk before.
         failed: Notes that failed in this call; see `OmopRun.failures`.
         gave_up: Notes not tried again: they failed ``max_attempts`` times.
         rows: Rows written per table.
@@ -727,10 +731,27 @@ class ChunkedRun:
         with self._ledger() as ledger:
             self._recover(ledger)
             self._check(ledger, rebuilding=False)
-            for index, chunk in enumerate(read_chunks(source, chunk_size, columns)):
-                await self._process(ledger, chunk, summary, max_attempts)
-                summary.seconds = time.monotonic() - started
-                self._log_progress(index, summary)
+            # While a chunk is built (in a thread), the next one is extracted.
+            building: Optional[asyncio.Task] = None
+            in_flight: set[int] = set()
+            try:
+                for index, chunk in enumerate(read_chunks(source, chunk_size, columns)):
+                    pairs = await self._prepare(
+                        ledger, chunk, summary, max_attempts, in_flight
+                    )
+                    if building is not None:
+                        await building
+                    in_flight = {n.note_id for n, _ in pairs}  # type: ignore[misc]
+                    building = asyncio.create_task(self._build(ledger, pairs, summary))
+                    summary.seconds = time.monotonic() - started
+                    self._log_progress(index, summary)
+                if building is not None:
+                    await building
+            finally:
+                # Stopped partway: still write the chunk being built.
+                if building is not None and not building.done():
+                    with contextlib.suppress(Exception):
+                        await building
         summary.seconds = time.monotonic() - started
         logger.info("Run finished\n%s", summary)
         return summary
@@ -773,13 +794,19 @@ class ChunkedRun:
             rate,
         )
 
-    async def _process(
+    async def _prepare(
         self,
         ledger: RunLedger,
         chunk: list[ClinicalNote],
         summary: RunSummary,
         max_attempts: int,
-    ) -> None:
+        in_flight: set[int],
+    ) -> list[tuple[ClinicalNote, EntityValidationResult]]:
+        """Extract the notes of a chunk that need it; return those to build.
+
+        `in_flight` holds the notes of the chunk being built meanwhile: they count as
+        duplicates, since the ledger does not record them as built yet.
+        """
         summary.notes += len(chunk)
         notes: dict[int, ClinicalNote] = {}
         for note in chunk:
@@ -792,7 +819,7 @@ class ChunkedRun:
                 raise ValueError(
                     f"note_id {note.note_id} is outside 0 to {MAX_NOTE_ID}"
                 )
-            if note.note_id in notes:
+            if note.note_id in notes or note.note_id in in_flight:
                 summary.duplicates += 1
                 continue
             notes[note.note_id] = note
@@ -818,7 +845,7 @@ class ChunkedRun:
         extracted = await self._extract(ledger, to_extract, summary)
         reused = ledger.load(stored)
         summary.reused += len(reused)
-        await self._build(ledger, extracted + reused, summary)
+        return extracted + reused
 
     async def _extract(
         self, ledger: RunLedger, notes: list[ClinicalNote], summary: RunSummary
@@ -889,7 +916,7 @@ class ChunkedRun:
             tables = _merge(parts)
 
         part = ledger.new_part()
-        counts = _write_part(self.output_dir, part, tables)
+        counts = await asyncio.to_thread(_write_part, self.output_dir, part, tables)
         ledger.commit_part(part, [n.note_id for n in built])  # type: ignore[misc]
         summary.built += len(built)
         for table, n in counts.items():

@@ -1117,6 +1117,13 @@ column. `OmopTableBuilder.build(..., row_ids="note")` numbers rows the same way.
     `chunk_size` bounds memory; larger chunks let the builder group more repeated
     texts per coding call.
 
+    While a chunk is built (coded and written), the next one is extracted, so the
+    slower of the two stages sets the pace. This pays off when coding takes about as
+    long as extraction, e.g. with the [agent](#searching-with-an-agent); without a
+    mapper, building takes milliseconds and extraction is all the time. At most two
+    chunks are in memory. The two stages share the per-minute rate limits, but each
+    gets its own `max_concurrency`, so up to twice as many calls may be in flight.
+
 ---
 
 ## Troubleshooting
