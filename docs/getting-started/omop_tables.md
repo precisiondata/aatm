@@ -492,9 +492,10 @@ thing whatever the retriever:
 `min_score: 0.5` keeps *high* and *medium*. When the budget runs out the agent must
 answer from what it has seen, and its score is capped at *low*.
 
-**Caching.** The plain mapper codes each distinct text once. The agent codes each
-distinct text *in its context* once: "creatinine 1.4 mg/dL" in two notes is one search,
-but "creatinine 1.4 mg/dL" and "urine creatinine 80 mg/dL" are two.
+**Caching.** Within a batch, the plain mapper codes each distinct text once. The agent
+codes each distinct text *in its context* once: "creatinine 1.4 mg/dL" in two notes is
+one search, but "creatinine 1.4 mg/dL" and "urine creatinine 80 mg/dL" are two. To keep
+results across batches and runs, see [Keeping results across runs](#keeping-results-across-runs).
 
 #### Choosing between the mapper and the agent
 
@@ -534,6 +535,99 @@ The agent is also available as the selector of a `TerminologyMapper`, so CSV
 terminology mapping and a mapper you already configured can use it:
 `TerminologyMapper(retriever=..., selector=AgenticSelector("openai/gpt-5-mini"))`. In a
 builder, that mapper also receives the context.
+
+### Keeping results across runs
+
+Coding is usually the most expensive step. Without a cache, every batch and every rerun
+(after a crash, or to rebuild the tables after changing a mapping) pays for the same
+texts again. Turn on the coding cache to store each result on disk and reuse it:
+
+```python
+from aatm.omop import CodingCache, OmopExtractionPipeline
+
+pipeline = OmopExtractionPipeline(
+    "lab_results", model_id="openai/gpt-5-mini", mapper=coder, cache=True
+)
+tables = await pipeline(notes)
+tables.cache_stats  # CacheStats(hits=..., misses=..., stored=...), and .hit_rate
+```
+
+| `cache=` | Effect |
+|---|---|
+| `None` or `False` (default) | No cache |
+| `True` | `.aatm/coding_cache.db` |
+| `"path/to/cache.db"` | That file |
+| `CodingCache(path, max_entries=..., max_bytes=...)` | That file, with a size limit |
+
+The same argument works on `OmopTableBuilder`. In `mappings_dataframe()`, `cached`
+tells which concepts came from the cache; their `usage` was spent in the run that
+first coded them.
+
+**A result is only reused for exactly the same input.** The cache never changes what a
+run produces:
+
+- The agent (and a mapper with `AgenticSelector`) reads context, so its key is the text
+  **with its full context**: the related values (such as the lab value and unit), the
+  line of the note and the target column. "Hb 11.2 g/dL" in two notes with the same
+  line is one search; the same "Hb" on a different line is searched again. Hits
+  therefore come from reruns, rebuilds and repeated lines (templated notes), rather
+  than from the same text in different notes.
+- The plain mapper ignores context, so its key is the text, domain and vocabularies:
+  each distinct text is coded once, across all runs.
+- Every key includes **the coder's identity**: its class, models, generation settings,
+  retriever and index, tool budget, the agent's prompts, the server URL of
+  OpenAI-compatible providers and the aatm version. Changing any of these, or upgrading
+  aatm, starts from an empty cache for that coder. The old entries stay in the file
+  until they are evicted or cleared.
+- The identity also covers **the data the coder reads**: the vocabulary releases in
+  the vocabulary database (e.g. `LOINC 2.78`) and its size, and the id and size of the
+  ChromaDB collection. Rebuilding either from other data starts from an empty cache,
+  and a warning names the old entries so you can clear them.
+- Results that ended in an error (e.g. an API failure) are not stored, so they are
+  retried on the next run.
+
+Each batch codes its most frequent texts first and writes results as it goes, so a
+run that stops partway keeps what it paid for.
+
+**Size.** By default the cache grows without limit. Set `max_entries` (results kept) or
+`max_bytes` (bytes of results kept; the file is somewhat larger) to cap it. When a write
+goes over a limit, the entries used least recently are deleted first:
+
+```python
+cache = CodingCache(".aatm/coding_cache.db", max_entries=1_000_000, max_bytes=2 * 1024**3)
+```
+
+**Clearing.** Delete everything and shrink the file, or one coder's entries:
+
+```python
+cache.info()   # entries, size on disk, and the coders they belong to
+cache.clear()  # everything
+cache.clear(coder="<hash from info()>")
+```
+
+or from the command line:
+
+```bash
+aatm cache info
+aatm cache clear            # asks for confirmation; --yes to skip it
+aatm cache clear --coder <hash>
+```
+
+!!! warning "Rebuilt data the cache cannot see"
+    The data of a retriever that is not a ChromaDB collection (a retriever of your own,
+    for example) cannot be fingerprinted. When the cache opens, a warning names such
+    components: `changes to the content of ... cannot be detected`. If you rebuild
+    their index, run `aatm cache clear`, or results coded against the old data will be
+    reused without any error.
+
+    Model aliases are another blind spot: `openai/gpt-5-mini` names whatever the
+    provider currently serves under that name. Pin a dated model version when results
+    must stay reproducible, and clear the cache when you change it.
+
+**Custom coders.** A coder of your own is cached when it has a `cache_identity()`
+method returning JSON-compatible values that cover everything that changes its results.
+Otherwise wrap it yourself and say what it is:
+`CachedCoder(my_coder, cache, identity={"name": "my_coder", "version": 2})`.
 
 ### Code lookups
 
@@ -924,6 +1018,9 @@ the datetime columns.
 | `... uses 'map', so the builder needs a terminology mapper` | The definition codes text, but no mapper was given | Pass `mapper=TerminologyMapper(...)` |
 | `SyntaxError: 'await' outside function` | `await` used in a script | Use `asyncio.run(pipeline(notes))`, or run it in a notebook |
 | Every `map` is `unmapped` | The mapper found no candidates, e.g. the search index for its retriever was not built | Use the embedding model you chose in `aatm init` as the `retriever` |
+| `... has no cache_identity(): pass identity=...` | `cache=` was given with a custom coder that does not describe itself | Add a `cache_identity()` method, or wrap it in `CachedCoder(coder, cache, identity=...)` |
+| `Coding cache ...: the vocabulary or search index of this coder changed since N results were cached` | The vocabulary database or index was rebuilt; the old results are no longer used | Nothing is wrong; run the `aatm cache clear --coder ...` it shows to free their space |
+| `Coding cache ...: changes to the content of ... cannot be detected` | A retriever whose data the cache cannot fingerprint | After rebuilding its index, run `aatm cache clear` |
 | `trace` shows `error: ...` and `budget_exhausted` in `usage` | The agent ran out of tool calls before an answer | Raise `max_tool_calls`, or use a stronger model |
 
 ---

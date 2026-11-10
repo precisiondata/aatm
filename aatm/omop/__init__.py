@@ -32,6 +32,9 @@ _LAZY = {
     "CodedText": "aatm.omop.coding",
     "TerminologyMapperCoder": "aatm.omop.coding",
     "AgenticCoder": "aatm.omop.coding",
+    "CodingCache": "aatm.omop.cache",
+    "CachedCoder": "aatm.omop.cache",
+    "CacheStats": "aatm.omop.cache",
 }
 
 

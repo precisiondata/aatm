@@ -851,3 +851,78 @@ def doctor() -> None:
 
     if diagnosis.status == "action":
         raise typer.Exit(code=1)
+
+
+cache_app = typer.Typer(
+    help="Inspect or clear the coding cache (.aatm/coding_cache.db)"
+)
+app.add_typer(cache_app, name="cache")
+
+CachePathOption = Annotated[
+    Path,
+    typer.Option("--path", "-p", help="The cache file"),
+]
+
+
+def _open_cache(path: Path):
+    from aatm.omop.cache import CodingCache
+
+    if not path.exists():
+        console.print(f"No coding cache at {path}")
+        raise typer.Exit()
+    return CodingCache(path)
+
+
+def _size(num_bytes: int) -> str:
+    size = float(num_bytes)
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024 or unit == "GB":
+            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} GB"  # pragma: no cover
+
+
+@cache_app.command("info", help="Show the entries, size and coders of the cache")
+def cache_info(path: CachePathOption = Path(".aatm/coding_cache.db")) -> None:
+    """Print the number of entries, their size and the coder identities they belong to."""
+    from rich.table import Table
+
+    info = _open_cache(path).info()
+    console.print(
+        f"{info.path}: {info.entries} entries, {_size(info.bytes)} of results, "
+        f"{_size(info.file_bytes)} on disk"
+    )
+    if not info.coders:
+        return
+    table = Table("Coder", "Entries", "Identity")
+    for coder in info.coders:
+        identity = coder.identity.get("identity", {})
+        label = identity.get("coder", "?") if isinstance(identity, dict) else "?"
+        table.add_row(
+            coder.coder,
+            str(coder.entries),
+            f"{label}, aatm {coder.identity.get('aatm')}",
+        )
+    console.print(table)
+
+
+@cache_app.command("clear", help="Delete the cached results and shrink the file")
+def cache_clear(
+    path: CachePathOption = Path(".aatm/coding_cache.db"),
+    coder: Annotated[
+        Optional[str],
+        typer.Option(
+            "--coder", help="Only delete this coder's entries (see 'aatm cache info')"
+        ),
+    ] = None,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="Do not ask for confirmation")
+    ] = False,
+) -> None:
+    """Delete every cached result, or one coder's, after confirmation."""
+    cache = _open_cache(path)
+    what = f"the entries of coder {coder}" if coder else f"all {len(cache)} entries"
+    if not yes and not typer.confirm(f"Delete {what} from {path}?"):
+        raise typer.Exit()
+    removed = cache.clear(coder)
+    console.print(f"Deleted {removed} entries from {path}")

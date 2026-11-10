@@ -15,6 +15,9 @@ tables = await pipeline(notes)
 tables["measurement"]  # a pandas DataFrame with one row per ECOG mention
 tables.issues_dataframe()  # what could not be filled, and why
 ```
+
+Pass ``cache=True`` (or a path, or an `aatm.omop.CodingCache`) to keep coding results
+across batches and runs; see `aatm.omop.cache`.
 """
 
 from dataclasses import dataclass, field
@@ -35,6 +38,7 @@ from aatm.data_models.extractors import (
     EntityValidationResult,
 )
 from aatm.logs import get_logger
+from aatm.omop.cache import CachedCoder, CacheStats, CodingCache, as_cache
 from aatm.omop.coding import (
     CodedText,
     TerminologyMapperCoder,
@@ -131,6 +135,8 @@ class ConceptMapping(BaseModel):
             coder searches.
         usage: Tool calls, LLM calls, tokens and seconds spent on this text, when
             reported. Texts coded once and reused share the same usage.
+        cached: Whether the concept came from the coding cache. Its ``usage`` was
+            then spent in an earlier run, not this one.
     """
 
     table: str
@@ -148,6 +154,7 @@ class ConceptMapping(BaseModel):
     rationale: Optional[str] = None
     trace: Optional[list[dict[str, Any]]] = None
     usage: Optional[dict[str, Any]] = None
+    cached: bool = False
 
 
 @dataclass
@@ -156,6 +163,9 @@ class OmopTables:
 
     ``tables["measurement"]`` returns the rows of a table as a DataFrame with the CDM
     columns, in CDM order. Missing values are ``None``/``NaN``.
+
+    ``cache_stats`` counts the coding cache's hits and misses for this batch, when the
+    builder has a cache.
     """
 
     rows: dict[str, list[OmopTableRow]] = field(default_factory=dict)
@@ -163,6 +173,7 @@ class OmopTables:
     issues: list[OmopIssue] = field(default_factory=list)
     mappings: list[ConceptMapping] = field(default_factory=list)
     extraction_results: list[EntityValidationResult] = field(default_factory=list)
+    cache_stats: Optional[CacheStats] = None
 
     @property
     def tables(self) -> list[str]:
@@ -319,6 +330,11 @@ class OmopTableBuilder:
         mapper: Codes ``map`` sources: a configured
             `aatm.terminology_mapper.TerminologyMapper`, or any `TextCoder`. Required
             when a mapping uses ``map``.
+        cache: Keep the mapper's results across batches and runs: ``True`` for the
+            default file (``.aatm/coding_cache.db``), a path, or a
+            `aatm.omop.CodingCache` (to set a size limit). ``None`` (default) or
+            ``False`` turns it off. Results are only reused for identical inputs; see
+            `aatm.omop.cache`. Code lookups are never cached: they are local.
 
     Raises:
         ValueError: If no definition has an ``omop`` block, or a concept is unknown,
@@ -332,6 +348,7 @@ class OmopTableBuilder:
         vocabulary: ConceptLookup | str | Path = DEFAULT_VOCABULARY_DB,
         dayfirst: bool = False,
         mapper: Any = None,
+        cache: CodingCache | str | Path | bool | None = None,
     ):
         self.entity_definitions = entity_definitions
         self.dayfirst = dayfirst
@@ -364,11 +381,23 @@ class OmopTableBuilder:
             self.coder = (
                 mapper if hasattr(mapper, "code") else TerminologyMapperCoder(mapper)
             )
+        store = as_cache(cache)
+        if store is not None and self.coder is not None:
+            if isinstance(self.coder, CachedCoder):
+                raise ValueError(
+                    "The mapper is already a CachedCoder: pass it without 'cache'"
+                )
+            self.coder = CachedCoder(self.coder, store)
         # Configuration checks first: they are cheap and need no database.
         self._check_coded_sources(coded_sources)
 
         self.concepts: dict[tuple[ConceptRef, bool], Concept] = {}
         self._resolve_concepts()
+
+    @property
+    def cache(self) -> Optional[CodingCache]:
+        """The coding cache, or ``None`` when results are not cached."""
+        return self.coder.cache if isinstance(self.coder, CachedCoder) else None
 
     def _check_coded_sources(self, coded_sources: list) -> None:
         from aatm.data_models.data_models import StandardVocabulary
@@ -546,7 +575,11 @@ class OmopTableBuilder:
         tables = OmopTables(extraction_results=list(results))
         next_id: dict[str, int] = {}
         records = [result.to_records() for result in results]
+        cached = self.coder if isinstance(self.coder, CachedCoder) else None
+        before = cached.stats.model_copy() if cached else None
         coded = self._code_texts(notes, records)
+        if cached and before:
+            tables.cache_stats = cached.stats - before
 
         for note_index, (note, note_records) in enumerate(zip(notes, records)):
             if isinstance(note, str):
@@ -643,9 +676,11 @@ class OmopTableBuilder:
         """Code the texts of all ``map`` and ``lookup`` sources.
 
         Each distinct text is coded once, or once per distinct context for coders that
-        read context (`aatm.omop.AgenticCoder`).
+        read context (`aatm.omop.AgenticCoder`). The most frequent come first, so a
+        cached run that stops partway has stored the texts that matter most.
         """
         requests: dict[CodingKey, dict[tuple[str, str], Any]] = {}
+        counts: dict[CodingKey, dict[tuple[str, str], int]] = {}
         for note, note_records in zip(notes, records):
             for record in note_records:
                 mapping = self.mappings.get(record.key)
@@ -664,10 +699,12 @@ class OmopTableBuilder:
                             key, source, mapping.table, column, text, record, note
                         )
                         requests.setdefault(key, {})[(text, context_key)] = context
+                        seen = counts.setdefault(key, {})
+                        seen[(text, context_key)] = seen.get((text, context_key), 0) + 1
 
         coded: dict[CodedKey, CodedText] = {}
         for key, wanted in requests.items():
-            ordered = sorted(wanted)
+            ordered = sorted(wanted, key=lambda item: (-counts[key][item], item))
             texts = [text for text, _ in ordered]
             if key[0] == "map":
                 assert self.coder is not None
@@ -961,6 +998,7 @@ class OmopTableBuilder:
                 rationale=result.rationale,
                 trace=result.trace,
                 usage=result.usage,
+                cached=result.cached,
             )
         )
         return stored
@@ -1090,6 +1128,7 @@ class OmopExtractionPipeline:
         vocabulary: See `OmopTableBuilder`.
         dayfirst: See `OmopTableBuilder`.
         mapper: See `OmopTableBuilder`.
+        cache: See `OmopTableBuilder`. Off by default.
         **extractor_kwargs: Passed to `SimpleLLMExtractor`, e.g. ``max_concurrency``.
     """
 
@@ -1104,12 +1143,17 @@ class OmopExtractionPipeline:
         vocabulary: ConceptLookup | str | Path = DEFAULT_VOCABULARY_DB,
         dayfirst: bool = False,
         mapper: Any = None,
+        cache: CodingCache | str | Path | bool | None = None,
         **extractor_kwargs: Any,
     ):
         entity_definitions = _load_definitions(entity_definitions)
         self.entity_definitions = entity_definitions
         self.builder = OmopTableBuilder(
-            entity_definitions, vocabulary=vocabulary, dayfirst=dayfirst, mapper=mapper
+            entity_definitions,
+            vocabulary=vocabulary,
+            dayfirst=dayfirst,
+            mapper=mapper,
+            cache=cache,
         )
         if extractor is None:
             from aatm.extractors import SimpleLLMExtractor
