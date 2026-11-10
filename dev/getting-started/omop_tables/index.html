@@ -4274,6 +4274,28 @@ Give your models' prices, per million input and output tokens, to estimate the c
 file is updated at every progress line, so you can follow a run from another process,
 and it is kept with <code>completed: false</code> and the error when a run stops.
 <code>OmopRun("output/ecog").summaries()</code> reads them back, oldest first.</p>
+<p><strong>Batch extraction, about half the price.</strong> For a large run that can wait, pass
+<code>batch=True</code> to extract through the provider's batch endpoint (OpenAI, Anthropic and
+Gemini). Batch jobs cost about 50% of live calls and return within 24 hours, often
+much sooner:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="n">summary</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>    <span class="s2">"notes.parquet"</span><span class="p">,</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>    <span class="s2">"output/ecog"</span><span class="p">,</span>
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>    <span class="n">chunk_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>   <span class="c1"># one batch job per chunk</span>
+</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>    <span class="n">batch</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>    <span class="n">poll_every</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>    <span class="c1"># seconds between status checks</span>
+</span><span id="__span-28-7"><a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>    <span class="n">max_batches</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>    <span class="c1"># jobs pending at once</span>
+</span><span id="__span-28-8"><a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a><span class="p">)</span>
+</span><span id="__span-28-9"><a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a><span class="n">OmopRun</span><span class="p">(</span><span class="s2">"output/ecog"</span><span class="p">)</span><span class="o">.</span><span class="n">batches</span><span class="p">()</span>  <span class="c1"># the jobs: id, status, notes</span>
+</span></code></pre></div>
+<p>Only extraction is batched: coding stays live. Each job is recorded in the ledger as
+soon as it is submitted, so you can stop the run (or lose the machine) while jobs are
+pending: the next run, with or without <code>batch=True</code>, collects them instead of
+submitting the notes again. Requests that fail within a job are recorded as failed
+notes and tried again by the next run, live or in a batch. Batch calls are counted as
+<code>&lt;model&gt;@batch</code> in the usage, and priced at half the model's price unless <code>prices</code>
+has an entry for that id. Gemini takes at most about 20 MB of prompts per job: lower
+<code>chunk_size</code> if it refuses one.</p>
 <p><strong>Row ids.</strong> The primary keys of a run are derived from the note:
 <code>note_id * 65536 + n</code>, where <code>n</code> is the position of the mention in the note. The same
 note gets the same ids in any chunk, after a resume or a rebuild, and in separate runs
