@@ -83,28 +83,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mike() { uv run --with "mike>=2.1.3" mike "$@"; }
 
-          # gh-pages from before versioned docs held one site at the root;
-          # drop it so stale unversioned pages don't linger.
-          rc=0; git ls-remote --exit-code --heads origin gh-pages >/dev/null || rc=$?
-          if [ "$rc" -eq 0 ]; then
-            git fetch origin gh-pages --depth=1
-            if git show FETCH_HEAD:versions.json >/dev/null 2>&1; then
-              git branch -f gh-pages FETCH_HEAD
-            else
-              echo "gh-pages predates versioned docs; starting it fresh"
-              git branch -D gh-pages 2>/dev/null || true
-              push_force=1
-            fi
-          elif [ "$rc" -ne 2 ]; then
-            echo "::error::Could not query gh-pages on origin"; exit 1
-          fi
+          # Build on top of the published site.
+          git fetch origin +gh-pages:gh-pages
 
           if [ "$EVENT" = "push" ] && [ "$REF_TYPE" = "branch" ]; then
             mike deploy --title "dev (unreleased)" dev
-            # Until a release is deployed, point the site root at dev.
-            if ! mike list --json | grep -q '"latest"'; then
-              mike set-default dev
-            fi
           else
             version="${REF_NAME#v}"
             if [ "$SET_LATEST" = "true" ]; then
@@ -115,8 +98,4 @@ jobs:
             fi
           fi
 
-          if [ -n "${push_force:-}" ]; then
-            git push --force origin gh-pages
-          else
-            git push origin gh-pages
-          fi
+          git push origin gh-pages
