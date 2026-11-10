@@ -191,9 +191,14 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
         self.model_id = model_id
         # Pass the dtype explicitly, so the model runs in exactly the precision
         # recorded in the vector database, whatever transformers' own default.
+        # Turn off the key/value cache: it only helps when generating text, and
+        # these decoder-based models would otherwise keep every layer's keys
+        # and values for the whole batch, more than doubling the GPU memory each
+        # token needs.
         self.model = SentenceTransformer(
             self.model_id,
             model_kwargs={"device_map": device, "dtype": to_torch_dtype(self.dtype)},
+            config_kwargs={"use_cache": False},
             tokenizer_kwargs={"padding_side": "left"},
         )
         self.model.eval()

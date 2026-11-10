@@ -79,6 +79,19 @@ def test_gemma_encodes_without_prompt(fake_st):
     assert "prompt_name" not in fake_st.instances[0].encode_calls[0]
 
 
+@pytest.mark.parametrize(
+    ("cls", "model_id"),
+    [
+        (ef.Qwen3EmbeddingFunction, ef.Qwen3EmbeddingModels.QWEN3_06B.value),
+        (ef.GemmaEmbeddingFunction, ef.GemmaEmbeddingModels.EMBEDDING_GEMMA_300M.value),
+    ],
+)
+def test_local_models_load_without_key_value_cache(fake_st, cls, model_id):
+    # The cache only helps generation; for embeddings it wastes GPU memory.
+    cls(model=model_id)
+    assert fake_st.instances[0].init_kwargs["config_kwargs"] == {"use_cache": False}
+
+
 def test_unknown_model_id_is_rejected(fake_st):
     with pytest.raises(ValueError):
         ef.Qwen3EmbeddingFunction(model="not-a-model")
