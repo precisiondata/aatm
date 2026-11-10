@@ -25,6 +25,17 @@ import threading
 from pydantic import BaseModel
 
 UNKNOWN_MODEL = "unknown"
+#: Appended to the model id of calls made through a provider batch endpoint.
+BATCH_SUFFIX = "@batch"
+#: Share of the live price that batch calls cost, when no ``@batch`` price is given.
+BATCH_DISCOUNT = 0.5
+
+
+def batch_model_id(model_id: str) -> str:
+    """The id under which batch calls of `model_id` are counted."""
+    return model_id if model_id.endswith(BATCH_SUFFIX) else model_id + BATCH_SUFFIX
+
+
 # A tracker may be shared by the event loop and a worker thread.
 _LOCK = threading.Lock()
 
@@ -58,6 +69,23 @@ def model_prices(prices: Optional[Prices]) -> dict[str, ModelPrice]:
             input_price, output_price = price
             normalized[model_id] = ModelPrice(input=input_price, output=output_price)
     return normalized
+
+
+def price_of(model_id: str, prices: dict[str, ModelPrice]) -> Optional[ModelPrice]:
+    """The price of `model_id` in normalized `prices`, or ``None``.
+
+    Batch calls (``<model>@batch``) without a price of their own cost the model's
+    price times `BATCH_DISCOUNT`.
+    """
+    price = prices.get(model_id)
+    if price is not None or not model_id.endswith(BATCH_SUFFIX):
+        return price
+    live = prices.get(model_id[: -len(BATCH_SUFFIX)])
+    if live is None:
+        return None
+    return ModelPrice(
+        input=live.input * BATCH_DISCOUNT, output=live.output * BATCH_DISCOUNT
+    )
 
 
 class ModelTokens(BaseModel):
@@ -121,21 +149,24 @@ class TokenUsage(ModelTokens):
     def cost(self, prices: Optional[Prices]) -> Optional[float]:
         """The estimated cost of the calls, or ``None`` when no prices are given.
 
-        Models without a price are left out: see `unpriced`.
+        Models without a price are left out: see `unpriced`. Batch calls
+        (``<model>@batch``) cost the model's price times `BATCH_DISCOUNT`, unless
+        `prices` has the ``@batch`` id.
         """
         normalized = model_prices(prices)
         if not normalized:
             return None
-        return sum(
-            counts.cost_at(normalized[m])
-            for m, counts in self.by_model.items()
-            if m in normalized
-        )
+        total = 0.0
+        for model_id, counts in self.by_model.items():
+            price = price_of(model_id, normalized)
+            if price is not None:
+                total += counts.cost_at(price)
+        return total
 
     def unpriced(self, prices: Optional[Prices]) -> list[str]:
         """The models called that have no price in `prices`."""
         normalized = model_prices(prices)
-        return sorted(m for m in self.by_model if m not in normalized)
+        return sorted(m for m in self.by_model if price_of(m, normalized) is None)
 
 
 _TRACKERS: ContextVar[tuple[TokenUsage, ...]] = ContextVar(

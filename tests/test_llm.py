@@ -307,3 +307,65 @@ def test_live_extraction(model_id, key_env, definitions):
     result = asyncio.run(extractor([NOTE]))[0]
     texts = {e.text for e in result.validated_entities}
     assert "Hypertension" in texts
+
+
+# --- batch jobs -------------------------------------------------------------------
+
+
+class FakeBatchLLM(FakeLLM):
+    """A `FakeLLM` with batch endpoints: every request gets `answer`, but `fail`."""
+
+    def __init__(self, answer, fail=()):
+        super().__init__(answer)
+        self.fail = set(fail)
+        self.submitted = []
+
+    async def submit_batch(self, requests, output_type):
+        self.submitted.append((list(requests), output_type))
+        return "job-1"
+
+    async def poll_batch(self, batch_id, custom_ids, output_type):
+        from aatm.llm.batch import BatchResult
+
+        return [
+            BatchResult(custom_id=c, error="boom")
+            if c in self.fail
+            else BatchResult(custom_id=c, output=self.answer)
+            for c in custom_ids
+        ]
+
+
+def test_extractor_batch_jobs(definitions):
+    answer = ExtractedEntityCandidates(
+        entities=[
+            ExtractedEntityCandidate(
+                id="e1", text="Hypertension", key="condition_name", line="L2"
+            )
+        ]
+    )
+    llm = FakeBatchLLM(answer, fail=["b"])
+    extractor = SimpleLLMExtractor(entity_definitions=definitions, llm=llm)
+    assert extractor.supports_batch
+    items = [("a", NOTE), ("b", NOTE)]
+
+    assert asyncio.run(extractor.submit_batch(items)) == "job-1"
+    ((requests, output_type),) = llm.submitted
+    assert output_type is ExtractedEntityCandidates
+    assert [r.custom_id for r in requests] == ["a", "b"]
+    assert requests[0].system == extractor.instructions
+    assert "[L2] * Hypertension since 2019" in requests[0].user
+
+    results = asyncio.run(extractor.poll_batch("job-1", items))
+    assert [e.text for e in results["a"].validated_entities] == ["Hypertension"]
+    assert results["a"].error is None
+    assert results["b"].error == "boom"
+
+
+def test_extractor_without_batch_endpoint(definitions):
+    extractor = SimpleLLMExtractor(
+        entity_definitions=definitions,
+        llm=FakeLLM(ExtractedEntityCandidates(entities=[])),
+    )
+    assert not extractor.supports_batch
+    with pytest.raises(ValueError, match="no batch endpoint"):
+        asyncio.run(extractor.submit_batch([("a", NOTE)]))

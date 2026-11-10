@@ -25,7 +25,7 @@ key is read from the provider's usual environment variable unless passed explici
 import asyncio
 import contextlib
 import logging
-from typing import Any, List, Literal, Optional
+from typing import Any, List, Literal, Optional, Sequence
 
 from aatm.data_models.extractors import (
     EntityDefinitions,
@@ -36,6 +36,7 @@ from aatm.data_models.extractors import (
     validate_extracted_entity,
 )
 from aatm.llm import LLMSettings, StructuredLLM, create_llm
+from aatm.llm.batch import BatchLLM, BatchRequest, supports_batch
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +177,70 @@ class SimpleLLMExtractor:
             entity_definitions=self.entity_definitions,
             segments=segments,
         )
+
+    # --- provider batch jobs ------------------------------------------------------
+
+    @property
+    def supports_batch(self) -> bool:
+        """Whether the model can run provider batch jobs (OpenAI, Anthropic, Gemini)."""
+        return supports_batch(self.llm)
+
+    def _batch_llm(self) -> BatchLLM:
+        if not supports_batch(self.llm):
+            raise ValueError(
+                f"{self.model_id} has no batch endpoint here: batch extraction "
+                "supports the openai, anthropic and gemini providers"
+            )
+        return self.llm  # type: ignore[return-value]
+
+    async def submit_batch(self, items: Sequence[tuple[str, str]]) -> str:
+        """Submit texts as one provider batch job; return the job id.
+
+        Args:
+            items: ``(key, text)`` pairs. Keys are unique within the batch, made of
+                letters, digits, ``_`` and ``-``.
+        """
+        requests = [
+            BatchRequest(
+                custom_id=key,
+                system=self.instructions,
+                user=format_segments_for_prompt(
+                    segment_text(text, max_segment_chars=self.max_segment_chars)
+                ),
+            )
+            for key, text in items
+        ]
+        return await self._batch_llm().submit_batch(requests, self.output_type)
+
+    async def poll_batch(
+        self, batch_id: str, items: Sequence[tuple[str, str]]
+    ) -> Optional[dict[str, EntityValidationResult]]:
+        """``None`` while the job runs; then the validated result of each key.
+
+        `items` are the ``(key, text)`` pairs submitted. A request that failed gets
+        a result with its ``error`` set, whatever ``on_error`` is.
+        """
+        keys = [key for key, _ in items]
+        batch = await self._batch_llm().poll_batch(batch_id, keys, self.output_type)
+        if batch is None:
+            return None
+        results: dict[str, EntityValidationResult] = {}
+        for (key, text), item in zip(items, batch):
+            if item.error is not None or item.output is None:
+                results[key] = EntityValidationResult(error=item.error or "no output")
+                continue
+            try:
+                results[key] = validate_extracted_entity(
+                    text=text,
+                    extracted_entities=item.output,
+                    entity_definitions=self.entity_definitions,
+                    segments=segment_text(
+                        text, max_segment_chars=self.max_segment_chars
+                    ),
+                )
+            except Exception as e:  # noqa: BLE001 - one bad output must not stop a batch
+                results[key] = EntityValidationResult(error=f"{type(e).__name__}: {e}")
+        return results
 
     async def __call__(self, texts: List[str]) -> List[EntityValidationResult]:
         if not isinstance(texts, list) or not all(isinstance(t, str) for t in texts):

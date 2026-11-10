@@ -33,6 +33,33 @@ note needs a unique one.
 While a chunk is built (coded and written, in a thread), the next one is extracted;
 at most two chunks are in memory.
 
+## Batch extraction
+
+For large offline runs, ``batch=True`` extracts through the provider's batch endpoint
+(OpenAI Batch API, Anthropic Message Batches, Gemini batch mode), about half the price
+of live calls, with results within 24 hours:
+
+```python
+summary = await pipeline.run(
+    "notes.parquet", "output/ecog", chunk_size=1000, batch=True, poll_every=300
+)
+```
+
+Each chunk's notes to extract are submitted as one job; up to ``max_batches`` jobs
+are pending at once. Pending jobs are polled every ``poll_every`` seconds; the notes
+of a finished job are stored in the ledger and built like live ones. Only extraction
+is batched: coding stays live.
+
+Jobs are recorded in the ledger when submitted. A run that stops (a crash, Ctrl+C)
+leaves them pending, and the next run, in batch mode or not, collects them instead of
+submitting their notes again. Requests that fail within a job are recorded as failed
+notes, tried again by a later run, live or in a batch, up to ``max_attempts``.
+`OmopRun.batches` lists the jobs.
+
+Batch calls are counted under the model id with ``@batch`` appended, and priced at
+half the model's price unless ``prices`` has the ``@batch`` id (see
+`aatm.llm.usage.TokenUsage.cost`).
+
 ## Progress, tokens and cost
 
 A run logs a progress line every ``log_every`` seconds (60 by default), when a chunk
@@ -381,7 +408,7 @@ def _write_part(output_dir: Path, part: int, tables: OmopTables) -> dict[str, in
 _LEDGER_SCHEMA = """
 CREATE TABLE IF NOT EXISTS notes (
     note_id INTEGER PRIMARY KEY,
-    status TEXT NOT NULL,         -- extracted, built or failed
+    status TEXT NOT NULL,         -- submitted, extracted, built or failed
     stage TEXT,                   -- extract or build, for failed notes
     note TEXT NOT NULL,           -- the ClinicalNote, as JSON
     result TEXT,                  -- the EntityValidationResult, as JSON
@@ -397,11 +424,24 @@ CREATE TABLE IF NOT EXISTS parts (
     created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS batches (
+    batch_id TEXT PRIMARY KEY,    -- the provider's job id
+    model_id TEXT NOT NULL,
+    status TEXT NOT NULL,         -- pending, or done once its results are stored
+    notes INTEGER NOT NULL,
+    submitted_at REAL NOT NULL,
+    finished_at REAL
+);
+CREATE TABLE IF NOT EXISTS batch_notes (
+    batch_id TEXT NOT NULL,
+    note_id INTEGER NOT NULL,
+    PRIMARY KEY (batch_id, note_id)
+);
 """
 
 
 class _NoteState(BaseModel):
-    status: Literal["extracted", "built", "failed"]
+    status: Literal["submitted", "extracted", "built", "failed"]
     stage: Optional[Literal["extract", "build"]]
     attempts: int
 
@@ -460,22 +500,48 @@ class RunLedger:
         }
         return [found[i] for i in ids]
 
+    def _extracted(
+        self, items: Sequence[tuple[ClinicalNote, EntityValidationResult]]
+    ) -> None:
+        self.con.executemany(
+            "INSERT INTO notes (note_id, status, note, result, attempts, updated_at)"
+            " VALUES (?, 'extracted', ?, ?, 1, ?) ON CONFLICT (note_id) DO UPDATE"
+            " SET status = 'extracted', stage = NULL, note = excluded.note,"
+            " result = excluded.result, error = NULL, attempts = attempts + 1,"
+            " updated_at = excluded.updated_at",
+            [
+                (n.note_id, n.model_dump_json(), r.model_dump_json(), time.time())
+                for n, r in items
+            ],
+        )
+
+    def _failed(
+        self,
+        items: Sequence[tuple[ClinicalNote, str]],
+        stage: Literal["extract", "build"],
+    ) -> None:
+        now = time.time()
+        if stage == "extract":
+            self.con.executemany(
+                "INSERT INTO notes (note_id, status, stage, note, error, attempts,"
+                " updated_at) VALUES (?, 'failed', 'extract', ?, ?, 1, ?)"
+                " ON CONFLICT (note_id) DO UPDATE SET status = 'failed',"
+                " stage = 'extract', note = excluded.note, error = excluded.error,"
+                " attempts = attempts + 1, updated_at = excluded.updated_at",
+                [(n.note_id, n.model_dump_json(), e, now) for n, e in items],
+            )
+        else:
+            self.con.executemany(
+                "UPDATE notes SET status = 'failed', stage = 'build', error = ?,"
+                " attempts = attempts + 1, updated_at = ? WHERE note_id = ?",
+                [(e, now, n.note_id) for n, e in items],
+            )
+
     def save_extracted(
         self, items: Sequence[tuple[ClinicalNote, EntityValidationResult]]
     ) -> None:
-        now = time.time()
         with self.con:
-            self.con.executemany(
-                "INSERT INTO notes (note_id, status, note, result, attempts, updated_at)"
-                " VALUES (?, 'extracted', ?, ?, 1, ?) ON CONFLICT (note_id) DO UPDATE"
-                " SET status = 'extracted', stage = NULL, note = excluded.note,"
-                " result = excluded.result, error = NULL, attempts = attempts + 1,"
-                " updated_at = excluded.updated_at",
-                [
-                    (n.note_id, n.model_dump_json(), r.model_dump_json(), now)
-                    for n, r in items
-                ],
-            )
+            self._extracted(items)
 
     def save_failed(
         self,
@@ -483,23 +549,80 @@ class RunLedger:
         stage: Literal["extract", "build"],
     ) -> None:
         """Record failed notes. A build failure keeps the stored extraction result."""
+        with self.con:
+            self._failed(items, stage)
+
+    # Batch jobs.
+
+    def save_submitted(
+        self, batch_id: str, model_id: str, notes: Sequence[ClinicalNote]
+    ) -> None:
+        """Record a submitted batch job and mark its notes ``submitted``."""
         now = time.time()
         with self.con:
-            if stage == "extract":
-                self.con.executemany(
-                    "INSERT INTO notes (note_id, status, stage, note, error, attempts,"
-                    " updated_at) VALUES (?, 'failed', 'extract', ?, ?, 1, ?)"
-                    " ON CONFLICT (note_id) DO UPDATE SET status = 'failed',"
-                    " stage = 'extract', note = excluded.note, error = excluded.error,"
-                    " attempts = attempts + 1, updated_at = excluded.updated_at",
-                    [(n.note_id, n.model_dump_json(), e, now) for n, e in items],
-                )
-            else:
-                self.con.executemany(
-                    "UPDATE notes SET status = 'failed', stage = 'build', error = ?,"
-                    " attempts = attempts + 1, updated_at = ? WHERE note_id = ?",
-                    [(e, now, n.note_id) for n, e in items],
-                )
+            self.con.execute(
+                "INSERT INTO batches (batch_id, model_id, status, notes, submitted_at)"
+                " VALUES (?, ?, 'pending', ?, ?)",
+                (batch_id, model_id, len(notes), now),
+            )
+            self.con.executemany(
+                "INSERT INTO batch_notes (batch_id, note_id) VALUES (?, ?)",
+                [(batch_id, n.note_id) for n in notes],
+            )
+            # Attempts are counted when the result comes back.
+            self.con.executemany(
+                "INSERT INTO notes (note_id, status, note, updated_at)"
+                " VALUES (?, 'submitted', ?, ?) ON CONFLICT (note_id) DO UPDATE"
+                " SET status = 'submitted', stage = NULL, note = excluded.note,"
+                " error = NULL, updated_at = excluded.updated_at",
+                [(n.note_id, n.model_dump_json(), now) for n in notes],
+            )
+
+    def pending_batches(self) -> list[tuple[str, str, list[int]]]:
+        """``(batch_id, model_id, note ids)`` of the jobs whose results are not stored."""
+        batches = self.con.execute(
+            "SELECT batch_id, model_id FROM batches WHERE status = 'pending'"
+            " ORDER BY submitted_at"
+        ).fetchall()
+        return [
+            (
+                batch_id,
+                model_id,
+                [
+                    i
+                    for (i,) in self.con.execute(
+                        "SELECT note_id FROM batch_notes WHERE batch_id = ?"
+                        " ORDER BY note_id",
+                        (batch_id,),
+                    )
+                ],
+            )
+            for batch_id, model_id in batches
+        ]
+
+    def notes(self, ids: Sequence[int]) -> list[ClinicalNote]:
+        """The stored notes, in the order of `ids`."""
+        found = {
+            note_id: ClinicalNote.model_validate_json(note)
+            for note_id, note in self._select("note_id, note", ids)
+        }
+        return [found[i] for i in ids]
+
+    def finish_batch(
+        self,
+        batch_id: str,
+        done: Sequence[tuple[ClinicalNote, EntityValidationResult]],
+        failed: Sequence[tuple[ClinicalNote, str]],
+    ) -> None:
+        """Store the results of a finished job and mark it done, in one transaction."""
+        with self.con:
+            self._extracted(done)
+            self._failed(failed, "extract")
+            self.con.execute(
+                "UPDATE batches SET status = 'done', finished_at = ?"
+                " WHERE batch_id = ?",
+                (time.time(), batch_id),
+            )
 
     def new_part(self) -> int:
         with self.con:
@@ -558,9 +681,17 @@ class RunLedger:
         ]
 
     def counts(self) -> dict[str, int]:
-        """Notes per status: ``extracted`` (not built yet), ``built``, ``failed``."""
+        """Notes per status: ``extracted`` (not built yet), ``built``, ``failed``,
+        and ``submitted`` (in a batch job not collected yet)."""
         return dict(
             self.con.execute("SELECT status, COUNT(*) FROM notes GROUP BY status")
+        )
+
+    def batches(self) -> pd.DataFrame:
+        return pd.read_sql(
+            "SELECT batch_id, model_id, status, notes, submitted_at, finished_at"
+            " FROM batches ORDER BY submitted_at",
+            self.con,
         )
 
     def failures(self) -> pd.DataFrame:
@@ -661,6 +792,9 @@ class RunSummary(BaseModel):
             the chunk before.
         failed: Notes that failed in this call; see `OmopRun.failures`.
         gave_up: Notes not tried again: they failed ``max_attempts`` times.
+        batches_submitted: Provider batch jobs submitted by this call.
+        batches_collected: Batch jobs whose results this call stored, those of
+            earlier runs included.
         rows: Rows written per table.
         issues: Issues written.
         cache_stats: Coding cache hits and misses, when the builder has a cache.
@@ -685,6 +819,8 @@ class RunSummary(BaseModel):
     duplicates: int = 0
     failed: int = 0
     gave_up: int = 0
+    batches_submitted: int = 0
+    batches_collected: int = 0
     rows: dict[str, int] = {}
     issues: int = 0
     cache_stats: Optional[CacheStats] = None
@@ -741,6 +877,11 @@ class RunSummary(BaseModel):
         parts.append(
             f"{self.built:,} built, {self.skipped:,} skipped, {self.failed:,} failed"
         )
+        if self.batches_submitted or self.batches_collected:
+            parts.append(
+                f"{self.batches_submitted:,} batch jobs submitted, "
+                f"{self.batches_collected:,} collected"
+            )
         usage = self.usage
         if usage.calls:
             tokens = usage.input_tokens + usage.output_tokens
@@ -767,6 +908,11 @@ class RunSummary(BaseModel):
             + (", ".join(f"{t} {n:,}" for t, n in self.rows.items()) or "none")
             + f"; {self.issues:,} issues",
         ]
+        if self.batches_submitted or self.batches_collected:
+            lines.append(
+                f"batch jobs: {self.batches_submitted:,} submitted, "
+                f"{self.batches_collected:,} collected"
+            )
         for name, stage in self.stages.items():
             if stage.items or stage.usage.calls or stage.errors:
                 lines.append(stage.describe(name))
@@ -815,6 +961,164 @@ def _add_stats(
     return CacheStats(
         hits=a.hits + b.hits, misses=a.misses + b.misses, stored=a.stored + b.stored
     )
+
+
+def _batch_key(note_id: int) -> str:
+    return f"note-{note_id}"
+
+
+def _supports_batch(extractor: Any) -> bool:
+    if not callable(getattr(extractor, "submit_batch", None)):
+        return False
+    return bool(getattr(extractor, "supports_batch", True))
+
+
+class _BatchQueue:
+    """The provider batch jobs of a run: submitted, polled and collected.
+
+    Jobs and their notes are recorded in the ledger when submitted, so a run that
+    stops leaves them there, and the next run (`adopt`) collects them instead of
+    submitting the notes again.
+    """
+
+    def __init__(
+        self,
+        extractor: Any,
+        ledger: RunLedger,
+        summary: RunSummary,
+        poll_every: float,
+    ):
+        self.extractor = extractor
+        self.ledger = ledger
+        self.summary = summary
+        self.poll_every = poll_every
+        self.pending: dict[str, list[int]] = {}
+        self.note_ids: set[int] = set()
+        # Notes of jobs submitted by earlier runs: the source lists them again.
+        self.resumed_ids: set[int] = set()
+        self.next_poll = 0.0
+
+    def adopt(self) -> None:
+        """Take over the jobs earlier runs left pending."""
+        pending = self.ledger.pending_batches()
+        if not pending:
+            return
+        if not callable(getattr(self.extractor, "poll_batch", None)):
+            raise ValueError(
+                f"{len(pending)} batch jobs submitted by an earlier run are still "
+                "pending, and this extractor cannot poll batch jobs: use the "
+                "extractor of that run"
+            )
+        for batch_id, _, ids in pending:
+            self.pending[batch_id] = ids
+            self.note_ids.update(ids)
+            self.resumed_ids.update(ids)
+        logger.info(
+            "Collecting %d batch jobs submitted by an earlier run (%d notes)",
+            len(pending),
+            len(self.resumed_ids),
+        )
+
+    async def submit(self, notes: list[ClinicalNote]) -> None:
+        stage = self.summary.stages["extraction"]
+        started = time.perf_counter()
+        batch_id = await self.extractor.submit_batch(
+            [(_batch_key(n.note_id), n.text) for n in notes]  # type: ignore[arg-type]
+        )
+        stage.seconds += time.perf_counter() - started
+        model_id = getattr(self.extractor, "model_id", None) or "unknown"
+        self.ledger.save_submitted(batch_id, model_id, notes)
+        ids = [n.note_id for n in notes]
+        self.pending[batch_id] = ids  # type: ignore[assignment]
+        self.note_ids.update(ids)  # type: ignore[arg-type]
+        self.summary.batches_submitted += 1
+        logger.info("Submitted batch job %s with %d notes", batch_id, len(notes))
+
+    async def collect(
+        self, wait: bool
+    ) -> list[tuple[ClinicalNote, EntityValidationResult]]:
+        """The notes extracted by jobs that finished since the last call.
+
+        Polls at most every `poll_every` seconds. With `wait`, waits until a job
+        finishes (or none is left); otherwise returns at once.
+        """
+        logged = False
+        while self.pending:
+            now = time.monotonic()
+            if now >= self.next_poll:
+                self.next_poll = now + self.poll_every
+                finished, ready = await self._poll()
+                if finished or not wait:
+                    return ready
+            elif not wait:
+                return []
+            if not logged:
+                logged = True
+                logger.info(
+                    "Waiting for %d batch jobs (%d notes)",
+                    len(self.pending),
+                    len(self.note_ids),
+                )
+            await asyncio.sleep(max(self.next_poll - time.monotonic(), 0.0))
+        return []
+
+    async def _poll(
+        self,
+    ) -> tuple[int, list[tuple[ClinicalNote, EntityValidationResult]]]:
+        stage = self.summary.stages["extraction"]
+        started = time.perf_counter()
+        with track_usage() as usage:
+            outcomes = await asyncio.gather(
+                *(self._poll_one(b, ids) for b, ids in list(self.pending.items()))
+            )
+        stage.seconds += time.perf_counter() - started
+        stage.usage.merge(usage)
+        finished = [o for o in outcomes if o is not None]
+        return len(finished), [pair for pairs in finished for pair in pairs]
+
+    async def _poll_one(
+        self, batch_id: str, ids: list[int]
+    ) -> Optional[list[tuple[ClinicalNote, EntityValidationResult]]]:
+        notes = self.ledger.notes(ids)
+        items = [(_batch_key(n.note_id), n.text) for n in notes]  # type: ignore[arg-type]
+        try:
+            results = await self.extractor.poll_batch(batch_id, items)
+        except Exception as e:  # noqa: BLE001 - try again at the next poll
+            logger.warning("Polling batch job %s failed: %s", batch_id, e)
+            return None
+        if results is None:
+            return None
+
+        done: list[tuple[ClinicalNote, EntityValidationResult]] = []
+        failed: list[tuple[ClinicalNote, str]] = []
+        for note, (key, _) in zip(notes, items):
+            result = results.get(key)
+            if result is None:
+                failed.append((note, f"batch {batch_id} returned no result"))
+            elif result.error is not None:
+                failed.append((note, result.error))
+            else:
+                done.append((note, result))
+        for note, error in failed:
+            logger.warning("Extraction of note %s failed: %s", note.note_id, error)
+        self.ledger.finish_batch(batch_id, done, failed)
+        del self.pending[batch_id]
+        self.note_ids.difference_update(ids)
+
+        summary = self.summary
+        summary.batches_collected += 1
+        summary.extracted += len(done)
+        summary.failed += len(failed)
+        stage = summary.stages["extraction"]
+        stage.items += len(notes)
+        stage.errors += len(failed)
+        logger.info(
+            "Batch job %s finished: %d notes extracted, %d failed",
+            batch_id,
+            len(done),
+            len(failed),
+        )
+        return done
 
 
 class ChunkedRun:
@@ -907,11 +1211,23 @@ class ChunkedRun:
         total: Optional[int] = None,
         prices: Optional[Prices] = None,
         log_every: float = 60.0,
+        batch: bool = False,
+        poll_every: float = 60.0,
+        max_batches: int = 20,
     ) -> RunSummary:
         if chunk_size < 1:
             raise ValueError("chunk_size must be >= 1")
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
+        if max_batches < 1:
+            raise ValueError("max_batches must be >= 1")
+        if poll_every < 0:
+            raise ValueError("poll_every must be >= 0")
+        if batch and not _supports_batch(self.pipeline.extractor):
+            raise ValueError(
+                "batch=True needs an extractor that can submit provider batch jobs: "
+                "SimpleLLMExtractor with an openai, anthropic or gemini model"
+            )
         summary = RunSummary(
             output_dir=str(self.output_dir),
             kind="run",
@@ -923,13 +1239,22 @@ class ChunkedRun:
         ):
             self._recover(ledger)
             self._check(ledger, rebuilding=False)
+            # Jobs left pending by an earlier run are collected in either mode.
+            queue = _BatchQueue(self.pipeline.extractor, ledger, summary, poll_every)
+            queue.adopt()
             # While a chunk is built (in a thread), the next one is extracted.
             building: Optional[asyncio.Task] = None
             in_flight: set[int] = set()
             try:
                 for chunk in read_chunks(source, chunk_size, columns):
                     pairs = await self._prepare(
-                        ledger, chunk, summary, max_attempts, in_flight
+                        ledger,
+                        chunk,
+                        summary,
+                        max_attempts,
+                        in_flight,
+                        queue,
+                        max_batches if batch else None,
                     )
                     if building is not None:
                         await building
@@ -938,6 +1263,10 @@ class ChunkedRun:
                     building = asyncio.create_task(self._build(ledger, pairs, summary))
                 if building is not None:
                     await building
+                    building = None
+                while queue.pending:
+                    await self._build(ledger, await queue.collect(wait=True), summary)
+                    report.tick()
             finally:
                 # Stopped partway: still write the chunk being built.
                 if building is not None and not building.done():
@@ -996,11 +1325,17 @@ class ChunkedRun:
         summary: RunSummary,
         max_attempts: int,
         in_flight: set[int],
+        queue: _BatchQueue,
+        max_batches: Optional[int],
     ) -> list[tuple[ClinicalNote, EntityValidationResult]]:
         """Extract the notes of a chunk that need it; return those to build.
 
         `in_flight` holds the notes of the chunk being built meanwhile: they count as
         duplicates, since the ledger does not record them as built yet.
+
+        With `max_batches` (batch mode), the notes to extract are submitted as one
+        batch job, waiting first while `max_batches` jobs are pending. The notes of
+        jobs that finished meanwhile are returned with the chunk's.
         """
         summary.notes += len(chunk)
         notes: dict[int, ClinicalNote] = {}
@@ -1015,7 +1350,8 @@ class ChunkedRun:
                     f"note_id {note.note_id} is outside 0 to {MAX_NOTE_ID}"
                 )
             if note.note_id in notes or note.note_id in in_flight:
-                summary.duplicates += 1
+                if note.note_id not in queue.resumed_ids:
+                    summary.duplicates += 1
                 continue
             notes[note.note_id] = note
 
@@ -1024,10 +1360,17 @@ class ChunkedRun:
         stored: list[int] = []
         for note_id, note in notes.items():
             state = states.get(note_id)
+            resumed = note_id in queue.resumed_ids  # counted when its job is collected
             if state is None:
                 to_extract.append(note)
             elif state.status == "built":
-                summary.skipped += 1
+                if not resumed:
+                    summary.skipped += 1
+            elif state.status == "submitted" and note_id in queue.note_ids:
+                if not resumed:
+                    summary.duplicates += 1
+            elif state.status == "submitted":
+                to_extract.append(note)  # its job is gone from the ledger
             elif state.status == "extracted":
                 stored.append(note_id)
             elif state.attempts >= max_attempts:
@@ -1037,10 +1380,18 @@ class ChunkedRun:
             else:
                 stored.append(note_id)
 
-        extracted = await self._extract(ledger, to_extract, summary)
+        ready: list[tuple[ClinicalNote, EntityValidationResult]] = []
+        if max_batches is not None and to_extract:
+            while len(queue.pending) >= max_batches:
+                ready += await queue.collect(wait=True)
+            await queue.submit(to_extract)
+            extracted = []
+        else:
+            extracted = await self._extract(ledger, to_extract, summary)
+        ready += await queue.collect(wait=False)
         reused = ledger.load(stored)
         summary.reused += len(reused)
-        return extracted + reused
+        return extracted + reused + ready
 
     async def _extract(
         self, ledger: RunLedger, notes: list[ClinicalNote], summary: RunSummary
@@ -1322,9 +1673,18 @@ class OmopRun:
         ]
 
     def status(self) -> dict[str, int]:
-        """Notes per status: ``built``, ``extracted`` (not built yet), ``failed``."""
+        """Notes per status: ``built``, ``extracted`` (not built yet), ``failed``,
+        and ``submitted`` (in a pending batch job)."""
         ledger = RunLedger(self.output_dir / LEDGER_FILE)
         try:
             return ledger.counts()
+        finally:
+            ledger.close()
+
+    def batches(self) -> pd.DataFrame:
+        """The provider batch jobs of batch runs: id, model, status and notes."""
+        ledger = RunLedger(self.output_dir / LEDGER_FILE)
+        try:
+            return ledger.batches()
         finally:
             ledger.close()

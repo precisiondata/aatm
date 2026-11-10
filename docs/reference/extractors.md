@@ -18,6 +18,8 @@ LLM-based extractors. See the [Information extraction quick start](../getting-st
 
 ::: aatm.llm.usage
 
+::: aatm.llm.batch
+
 ## Legacy extractors
 
 ::: aatm.extractors.extractors
