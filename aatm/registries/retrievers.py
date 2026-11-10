@@ -29,6 +29,7 @@ from ..embedding_functions import (
 )
 from ..precision import COLLECTION_DTYPE_KEY, dtype_for_queries
 from ..retrievers import ChromaDBRetriever
+from ..vector_db import ChromaConnection
 
 
 @dataclass(slots=True, frozen=True)
@@ -67,6 +68,43 @@ class ChromaRetrieverModelSpec:
             The string path to the retriever's ChromaDB persistence directory.
         """
         return str(Path(".aatm/chroma_vector_dbs") / self.name)
+
+    @property
+    def cloud_collection_name(self) -> str:
+        """Return the collection name used in Chroma Cloud.
+
+        A local database holds one model's index, so its collection is simply
+        `collection_name`. In Chroma Cloud one database holds every model's
+        index, so the collection name includes the registry name.
+
+        Returns:
+            The collection name, e.g. ``expressions-qwen3-06B``.
+        """
+        return f"{self.collection_name}-{self.name}"
+
+    def chroma_location(
+        self, vector_db: str | None = None, local_path: str | None = None
+    ) -> tuple[ChromaConnection, str]:
+        """Return where this retriever's index lives and its collection name.
+
+        Args:
+            vector_db: ``local`` or ``cloud``. If ``None``, ``AATM_VECTOR_DB``
+                decides, and otherwise ``local``. See `aatm.vector_db`.
+            local_path: Directory of the local database. Defaults to
+                `chromadb_path`. Ignored in cloud mode.
+
+        Returns:
+            The connection and the collection name to use with it.
+
+        Raises:
+            VectorDatabaseConfigError: If the configuration is invalid.
+        """
+        connection = ChromaConnection.from_env(
+            local_path=local_path or self.chromadb_path, mode=vector_db
+        )
+        if connection.is_cloud:
+            return connection, self.cloud_collection_name
+        return connection, self.collection_name
 
     @property
     def output_path(self) -> str:
@@ -141,16 +179,21 @@ CHROMADB_RETRIEVER_MODEL_REGISTRY: dict[str, ChromaRetrieverModelSpec] = {
 }
 
 
-def load_retriever(model_name: str, **retriever_kwargs: Any) -> "ChromaDBRetriever":
+def load_retriever(
+    model_name: str, vector_db: str | None = None, **retriever_kwargs: Any
+) -> "ChromaDBRetriever":
     """Instantiate a registered ChromaDB retriever by model name.
 
     This function looks up a retriever specification in the model registry,
-    creates a persistent ChromaDB client for the configured storage path,
-    instantiates the corresponding embedding function, and returns a configured
+    opens a ChromaDB client for the configured location (a local persistent
+    database, or Chroma Cloud, see `aatm.vector_db`), instantiates the
+    corresponding embedding function, and returns a configured
     ``ChromaDBRetriever``.
 
     Args:
         model_name: Registry name of the retriever model to instantiate.
+        vector_db: ``local`` or ``cloud``. If ``None``, ``AATM_VECTOR_DB``
+            decides, and otherwise ``local``.
         **retriever_kwargs: Passed on to ``ChromaDBRetriever``, e.g. ``top_k``,
             ``filter_strategy`` or ``overfetch_factor``.
 
@@ -159,7 +202,7 @@ def load_retriever(model_name: str, **retriever_kwargs: Any) -> "ChromaDBRetriev
 
     Raises:
         ValueError: If the provided model name is not present in the retriever
-            registry.
+            registry, or the vector database configuration is invalid.
     """
     try:
         spec = CHROMADB_RETRIEVER_MODEL_REGISTRY[model_name]
@@ -169,13 +212,14 @@ def load_retriever(model_name: str, **retriever_kwargs: Any) -> "ChromaDBRetriev
             f"Unknown retriever model '{model_name}'. Available models: {available}"
         ) from e
 
-    client = chromadb.PersistentClient(spec.chromadb_path)
+    connection, collection_name = spec.chroma_location(vector_db)
+    client = connection.client()
 
     # Encode queries in the precision the database was built with.
     model_kwargs: dict[str, Any] = {}
     if getattr(spec.embedding_function_cls, "is_local", False):
         try:
-            metadata = client.get_collection(spec.collection_name).metadata or {}
+            metadata = client.get_collection(collection_name).metadata or {}
         except NotFoundError:
             metadata = {}
         dtype = dtype_for_queries(metadata.get(COLLECTION_DTYPE_KEY), get_device())
@@ -184,7 +228,7 @@ def load_retriever(model_name: str, **retriever_kwargs: Any) -> "ChromaDBRetriev
 
     retriever = ChromaDBRetriever(
         client=client,
-        collection_name=spec.collection_name,
+        collection_name=collection_name,
         embedding_function=spec.embedding_function_cls(
             model=spec.model_id,
             **model_kwargs,  # type: ignore[call-arg]

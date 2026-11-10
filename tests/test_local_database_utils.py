@@ -349,3 +349,136 @@ def test_batch_size_and_token_budget_are_exclusive(fake_local_project):
         ldu.build_local_vector_database(
             "fake-local", encode_batch_size=8, encode_max_batch_tokens=4096
         )
+
+
+# Chroma Cloud (simulated by a local database behind a cloud-mode connection)
+
+
+@pytest.fixture
+def cloud_project(fake_project, monkeypatch):
+    from aatm.registries import retrievers
+    from fake_cloud import fake_cloud
+
+    cloud_dir = fake_project.parent / "fake-cloud"
+    cloud_dir.mkdir(parents=True)
+
+    def chroma_location(self, vector_db=None, local_path=None):
+        assert vector_db == "cloud"
+        return fake_cloud(cloud_dir), self.cloud_collection_name
+
+    monkeypatch.setattr(
+        retrievers.ChromaRetrieverModelSpec, "chroma_location", chroma_location
+    )
+    return cloud_dir
+
+
+def cloud_ids(cloud_dir):
+    import chromadb
+
+    collection = chromadb.PersistentClient(path=str(cloud_dir)).get_collection(
+        "expressions-fake-model"
+    )
+    try:
+        return collection.get(include=[])["ids"]
+    finally:
+        del collection
+        ldu.release_chromadb_clients()
+
+
+def test_cloud_build_writes_to_the_model_collection(cloud_project, fake_project):
+    ldu.build_local_vector_database("fake-model", chunk_size=100, vector_db="cloud")
+
+    ids = cloud_ids(cloud_project)
+    assert len(ids) == len(set(ids)) == 280
+    assert not fake_project.exists()  # nothing built locally
+
+
+def test_cloud_overwrite_deletes_the_collection(cloud_project, monkeypatch):
+    ldu.build_local_vector_database("fake-model", chunk_size=100, vector_db="cloud")
+    FakeEmbeddingFunction.calls = []
+    answer_prompt(monkeypatch, "Overwrite")
+
+    ldu.build_local_vector_database("fake-model", chunk_size=100, vector_db="cloud")
+
+    assert sum(len(call) for call in FakeEmbeddingFunction.calls) == 280
+    assert len(cloud_ids(cloud_project)) == 280
+
+
+def test_cloud_build_rejects_a_local_directory(cloud_project, tmp_path):
+    with pytest.raises(ValueError, match="local vector database"):
+        ldu.build_local_vector_database(
+            "fake-model", vector_db_dir=tmp_path, vector_db="cloud"
+        )
+
+
+def test_upload_copies_the_local_index_without_re_embedding(fake_project, tmp_path):
+    import chromadb
+
+    from fake_cloud import fake_cloud
+
+    ldu.build_local_vector_database("fake-model", chunk_size=100)
+    FakeEmbeddingFunction.calls = []
+    cloud_dir = tmp_path / "fake-cloud"
+
+    summary = ldu.upload_vector_database_to_cloud(
+        "fake-model",
+        cloud_connection=fake_cloud(cloud_dir),
+        read_page_size=64,
+        write_batch_size=50,
+    )
+
+    assert (summary.total, summary.uploaded, summary.skipped) == (280, 280, 0)
+    assert FakeEmbeddingFunction.calls == []
+
+    local = chromadb.PersistentClient(path=str(fake_project)).get_collection(
+        "expressions"
+    )
+    cloud = chromadb.PersistentClient(path=str(cloud_dir)).get_collection(
+        "expressions-fake-model"
+    )
+    try:
+        expected = local.get(include=["embeddings", "documents", "metadatas"])
+        actual = cloud.get(
+            ids=expected["ids"], include=["embeddings", "documents", "metadatas"]
+        )
+        by_id = {
+            identifier: (list(vector), document, metadata)
+            for identifier, vector, document, metadata in zip(
+                actual["ids"],
+                actual["embeddings"],
+                actual["documents"],
+                actual["metadatas"],
+            )
+        }
+        for identifier, vector, document, metadata in zip(
+            expected["ids"],
+            expected["embeddings"],
+            expected["documents"],
+            expected["metadatas"],
+        ):
+            assert by_id[identifier] == (list(vector), document, metadata)
+        assert cloud.metadata == local.metadata
+    finally:
+        del local, cloud
+        ldu.release_chromadb_clients()
+
+
+def test_upload_resumes_by_skipping_rows_already_in_the_cloud(fake_project, tmp_path):
+    from fake_cloud import fake_cloud
+
+    ldu.build_local_vector_database("fake-model", chunk_size=100)
+    cloud = fake_cloud(tmp_path / "fake-cloud")
+    ldu.upload_vector_database_to_cloud("fake-model", cloud_connection=cloud)
+
+    summary = ldu.upload_vector_database_to_cloud("fake-model", cloud_connection=cloud)
+
+    assert (summary.uploaded, summary.skipped) == (0, 280)
+
+
+def test_upload_needs_a_local_database(fake_project, tmp_path):
+    from fake_cloud import fake_cloud
+
+    with pytest.raises(ValueError, match="No local vector database"):
+        ldu.upload_vector_database_to_cloud(
+            "fake-model", cloud_connection=fake_cloud(tmp_path / "c")
+        )

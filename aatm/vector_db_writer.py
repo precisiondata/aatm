@@ -22,7 +22,8 @@ Duplicate IDs are harmless: ChromaDB ignores an ``add`` for an ID that already
 exists and keeps the first version.
 
 The parent must not keep its own ChromaDB client open on the same directory
-while the writer runs.
+while the writer runs. For Chroma Cloud (see `aatm.vector_db`) that restriction
+does not apply, and the writer retries lookups and writes on transient errors.
 """
 
 from __future__ import annotations
@@ -32,9 +33,13 @@ import queue
 import threading
 import time
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from types import TracebackType
 from typing import Any
+
+from aatm.vector_db import ChromaConnection, call_with_retries
 
 _STOP = None
 """Message telling a child loop to finish."""
@@ -60,7 +65,7 @@ class WriteAck:
 
 
 def _writer_main(
-    path: str,
+    connection: ChromaConnection,
     collection_name: str,
     check_requests: Any,
     check_results: Any,
@@ -69,17 +74,29 @@ def _writer_main(
 ) -> None:
     """Entry point of the writer process. Runs in the child."""
     try:
-        import chromadb
+        collection = connection.client().get_collection(collection_name)
 
-        collection = chromadb.PersistentClient(path=path).get_collection(
-            collection_name
-        )
+        # Network calls to Chroma Cloud can fail transiently; local calls do not.
+        def retrying(func: Callable[[int], Any]) -> Any:
+            if connection.is_cloud:
+                return call_with_retries(func)
+            return func(0)
+
+        def write(attempt: int, **batch: Any) -> None:
+            # A retried ``add`` may have reached the server before it failed, so
+            # retries upsert the same rows instead, which is idempotent.
+            if attempt == 0:
+                collection.add(**batch)
+            else:
+                collection.upsert(**batch)
 
         def serve_lookups() -> None:
             try:
                 while (request := check_requests.get()) is not _STOP:
                     seq, ids = request
-                    found = collection.get(ids=ids, include=[])["ids"]
+                    found = retrying(
+                        lambda _: collection.get(ids=ids, include=[])["ids"]
+                    )
                     check_results.put((seq, found))
             except BaseException:
                 check_results.put(("error", traceback.format_exc()))
@@ -92,11 +109,14 @@ def _writer_main(
         while (request := add_requests.get()) is not _STOP:
             seq, ids, embeddings, documents, metadatas = request
             started = time.perf_counter()
-            collection.add(
-                ids=ids,
-                embeddings=embeddings,
-                documents=documents,
-                metadatas=metadatas,
+            retrying(
+                partial(
+                    write,
+                    ids=ids,
+                    embeddings=embeddings,
+                    documents=documents,
+                    metadatas=metadatas,
+                )
             )
             events.put(("added", seq, len(ids), time.perf_counter() - started))
 
@@ -114,7 +134,7 @@ class ChromaWriterProcess:
 
     def __init__(
         self,
-        path: str,
+        target: str | ChromaConnection,
         collection_name: str,
         max_pending_writes: int = 2,
         poll_interval: float = 0.2,
@@ -123,7 +143,9 @@ class ChromaWriterProcess:
         """Prepare the writer. The process starts when the ``with`` block opens.
 
         Args:
-            path: Directory of the persistent ChromaDB database.
+            target: Directory of a local persistent ChromaDB database, or a
+                `ChromaConnection` (local or Chroma Cloud). Cloud calls are
+                retried on transient errors.
             collection_name: Name of an existing collection in that database.
             max_pending_writes: Maximum number of batches queued for writing
                 before ``add`` blocks.
@@ -132,6 +154,9 @@ class ChromaWriterProcess:
             shutdown_timeout: Seconds to wait for the writer to finish after an
                 error before terminating it.
         """
+        connection = (
+            ChromaConnection.local(target) if isinstance(target, str) else target
+        )
         context = multiprocessing.get_context("spawn")
         self._check_requests = context.Queue()
         self._check_results = context.Queue()
@@ -140,7 +165,7 @@ class ChromaWriterProcess:
         self._process = context.Process(
             target=_writer_main,
             args=(
-                path,
+                connection,
                 collection_name,
                 self._check_requests,
                 self._check_results,

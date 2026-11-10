@@ -47,6 +47,7 @@ from aatm.precision import (
 )
 from aatm.data_models import ExpressionMetadata
 from aatm.timing_profiler import TimingProfiler
+from aatm.vector_db import ChromaConnection, call_with_retries
 from aatm.vector_db_writer import ChromaWriterProcess, WriteAck
 
 logger = get_logger(__name__)
@@ -594,14 +595,20 @@ def build_local_vector_database(
     profile_timing: bool = False,
     profile_sync_cuda: bool = False,
     profile_summary_every_n_batches: int = 20,
+    vector_db: str | None = None,
 ) -> None:
-    """Build or repair a local vector database for terminology mapping.
+    """Build or repair the vector database for terminology mapping.
+
+    The database is local by default. With ``vector_db="cloud"`` (or
+    ``AATM_VECTOR_DB=cloud``) it is built in Chroma Cloud instead; see
+    `aatm.vector_db`. Embeddings are still computed on this machine.
 
     Args:
         embedding_model_name: Registry key identifying the embedding model
             configuration to use.
-        vector_db_dir: Optional path to the vector database directory. If not
-            provided, the default path from the retriever model registry is used.
+        vector_db_dir: Optional path to the local vector database directory. If
+            not provided, the default path from the retriever model registry is
+            used. Not allowed in cloud mode.
         rate_limit: Optional maximum number of documents to embed per minute. If
             not provided, the default value from the model registry is used.
         chunk_size: Number of dataset rows read, checked against the database
@@ -628,6 +635,8 @@ def build_local_vector_database(
             This makes GPU timings more accurate but adds overhead.
         profile_summary_every_n_batches: Log cumulative profile summary every N
             processed batches.
+        vector_db: ``local`` or ``cloud``. If not provided, ``AATM_VECTOR_DB``
+            decides, and otherwise ``local``.
 
     Returns:
         None.
@@ -636,6 +645,8 @@ def build_local_vector_database(
         EmbeddingPrecisionError: If the requested precision cannot run on this
             machine, or differs from the precision of the database being
             repaired.
+        VectorDatabaseConfigError: If the vector database configuration is
+            invalid, e.g. cloud mode without ``CHROMA_API_KEY``.
     """
     from aatm.registries.retrievers import (
         CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry,
@@ -661,17 +672,31 @@ def build_local_vector_database(
         synchronize_cuda=profile_sync_cuda,
     )
 
-    if vector_db_dir is not None and not vector_db_dir.exists():
-        raise ValueError("vector_db_dir does not exist")
+    connection, collection_name = spec.chroma_location(vector_db)
+    client: Any | None = None
 
-    if vector_db_dir is None:
-        vector_db_dir = Path(spec.chromadb_path)
+    if connection.is_cloud:
+        if vector_db_dir is not None:
+            raise ValueError("vector_db_dir only applies to a local vector database.")
+        console.print(f"Using {connection.describe()}, collection '{collection_name}'")
+        # Opening the client authenticates, so bad credentials fail here.
+        with profiler.time_block("chromadb_client_init"):
+            client = connection.client()
+        already_exists = get_existing_collection(client, collection_name) is not None
+    else:
+        if vector_db_dir is not None and not vector_db_dir.exists():
+            raise ValueError("vector_db_dir does not exist")
 
-    # ChromaDB caches clients by path string; an absolute path keeps a cached
-    # client from pointing at another directory after a change of cwd.
-    vector_db_dir = vector_db_dir.resolve()
+        if vector_db_dir is None:
+            vector_db_dir = Path(spec.chromadb_path)
 
-    if vector_db_dir.exists():
+        # ChromaDB caches clients by path string; an absolute path keeps a cached
+        # client from pointing at another directory after a change of cwd.
+        vector_db_dir = vector_db_dir.resolve()
+        connection = ChromaConnection.local(str(vector_db_dir))
+        already_exists = vector_db_dir.exists()
+
+    if already_exists:
         user_preference = questionary.select(
             (
                 f"A vector database using the embedding model "
@@ -686,7 +711,10 @@ def build_local_vector_database(
 
         if user_preference == "Overwrite":
             with profiler.time_block("delete_existing_vector_db"):
-                shutil.rmtree(vector_db_dir)
+                if client is not None:
+                    client.delete_collection(collection_name)
+                else:
+                    shutil.rmtree(vector_db_dir)  # type: ignore[arg-type]
 
         elif user_preference == "Repair":
             pass
@@ -699,14 +727,12 @@ def build_local_vector_database(
 
     next_allowed_time = time.monotonic() if rate_limit is not None else 0.0
 
-    import chromadb
+    console.print(f"Creating vector database in {connection.describe()}...")
 
-    console.print("Creating local vector database...")
+    if client is None:
+        with profiler.time_block("chromadb_client_init"):
+            client = connection.client()
 
-    with profiler.time_block("chromadb_client_init"):
-        client = chromadb.PersistentClient(path=str(vector_db_dir))
-
-    collection_name = spec.collection_name
     existing_collection = get_existing_collection(client, collection_name)
 
     model_kwargs: dict[str, Any] = {}
@@ -774,7 +800,7 @@ def build_local_vector_database(
 
     with (
         GpuMemoryLimit(enabled=guard_gpu_memory) as memory_limit,
-        ChromaWriterProcess(str(vector_db_dir), collection_name) as writer,
+        ChromaWriterProcess(connection, collection_name) as writer,
         BackgroundIterator(
             prepare_chunks(
                 dataset_paths,
@@ -886,3 +912,170 @@ def build_local_vector_database(
         gpu_memory_cleanup(synchronize=True)
 
     profiler.log_summary(label="final")
+
+
+UPLOAD_READ_PAGE_SIZE = 5000
+"""Rows read from the local database per page when uploading it to the cloud.
+
+Reading uses offsets, so larger pages mean fewer, cheaper scans. Each page is
+written to the cloud in batches no larger than the cloud's maximum batch size.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class UploadSummary:
+    """Result of `upload_vector_database_to_cloud`.
+
+    Attributes:
+        collection_name: Cloud collection that received the rows.
+        total: Rows in the local collection.
+        uploaded: Rows written to the cloud by this run.
+        skipped: Rows already present in the cloud collection.
+    """
+
+    collection_name: str
+    total: int
+    uploaded: int
+    skipped: int
+
+
+def upload_vector_database_to_cloud(
+    embedding_model_name: str,
+    vector_db_dir: Path | None = None,
+    write_batch_size: int | None = None,
+    read_page_size: int = UPLOAD_READ_PAGE_SIZE,
+    cloud_connection: ChromaConnection | None = None,
+) -> UploadSummary:
+    """Copy a local vector database to Chroma Cloud without re-embedding.
+
+    Embeddings, documents and metadata are read from the local collection and
+    added to the model's cloud collection (see
+    `ChromaRetrieverModelSpec.cloud_collection_name`), which is created with the
+    local collection's metadata if needed. Rows already in the cloud are
+    skipped, so an interrupted upload can simply be run again.
+
+    Args:
+        embedding_model_name: Registry key of the embedding model whose index
+            to upload.
+        vector_db_dir: Local database directory. Defaults to the registry path.
+        write_batch_size: Rows per cloud write. Defaults to, and is capped at,
+            the cloud's maximum batch size.
+        read_page_size: Rows read from the local database at a time.
+        cloud_connection: Cloud connection. Defaults to the one configured by
+            ``CHROMA_API_KEY`` and related variables (see `aatm.vector_db`).
+
+    Returns:
+        How many rows were uploaded and skipped.
+
+    Raises:
+        ValueError: If the local database or collection does not exist, or the
+            sizes are not positive.
+        VectorDatabaseConfigError: If the cloud configuration is missing.
+    """
+    from aatm.registries.retrievers import (
+        CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry,
+    )
+
+    spec = model_registry[embedding_model_name]
+
+    if read_page_size <= 0:
+        raise ValueError("read_page_size must be > 0")
+    if write_batch_size is not None and write_batch_size <= 0:
+        raise ValueError("write_batch_size must be > 0")
+
+    local_dir = (vector_db_dir or Path(spec.chromadb_path)).resolve()
+    if not local_dir.exists():
+        raise ValueError(f"No local vector database at '{local_dir}'.")
+
+    if cloud_connection is None:
+        cloud_connection = ChromaConnection.from_env(
+            local_path=str(local_dir), mode="cloud"
+        )
+    if not cloud_connection.is_cloud:
+        raise ValueError("cloud_connection must point at Chroma Cloud.")
+
+    local_client = ChromaConnection.local(str(local_dir)).client()
+    local_collection = get_existing_collection(local_client, spec.collection_name)
+    if local_collection is None:
+        raise ValueError(
+            f"The local database at '{local_dir}' has no collection "
+            f"'{spec.collection_name}'."
+        )
+
+    # Keep the build's metadata, e.g. the embedding precision for query encoding.
+    collection_metadata = local_collection.metadata or None
+    cloud_client = cloud_connection.client()
+    collection_name = spec.cloud_collection_name
+    cloud_collection = call_with_retries(
+        lambda _: cloud_client.get_or_create_collection(
+            collection_name, metadata=collection_metadata
+        )
+    )
+
+    max_batch = cloud_client.get_max_batch_size()
+    batch_size = min(write_batch_size or max_batch, max_batch)
+
+    total = local_collection.count()
+    uploaded = 0
+    skipped = 0
+
+    console.print(
+        f"Uploading {total} rows from '{local_dir}' to {cloud_connection.describe()}, "
+        f"collection '{collection_name}'..."
+    )
+
+    def write(attempt: int, **batch: Any) -> None:
+        # A retried add may already have reached the server; upsert is idempotent.
+        if attempt == 0:
+            cloud_collection.add(**batch)
+        else:
+            cloud_collection.upsert(**batch)
+
+    with Progress(*Progress.get_default_columns(), console=console) as progress:
+        task = progress.add_task("Uploading embeddings", total=total)
+        for offset in range(0, total, read_page_size):
+            page = local_collection.get(
+                limit=read_page_size,
+                offset=offset,
+                include=["embeddings", "documents", "metadatas"],
+            )
+            for start in range(0, len(page["ids"]), batch_size):
+                end = start + batch_size
+                ids = page["ids"][start:end]
+                present = set(
+                    call_with_retries(
+                        lambda _: cloud_collection.get(ids=ids, include=[])["ids"]
+                    )
+                )
+                keep = [
+                    i for i, identifier in enumerate(ids) if identifier not in present
+                ]
+                skipped += len(ids) - len(keep)
+
+                if keep:
+                    embeddings = np.asarray(page["embeddings"][start:end])[keep]
+                    documents = page["documents"][start:end]
+                    metadatas = page["metadatas"][start:end]
+                    call_with_retries(
+                        partial(
+                            write,
+                            ids=[ids[i] for i in keep],
+                            embeddings=embeddings,
+                            documents=[documents[i] for i in keep],
+                            metadatas=[metadatas[i] for i in keep],
+                        )
+                    )
+                    uploaded += len(keep)
+
+                progress.advance(task, len(ids))
+
+    del local_collection, local_client
+    release_chromadb_clients()
+
+    console.print(f"Uploaded {uploaded} rows; {skipped} were already in the cloud.")
+    return UploadSummary(
+        collection_name=collection_name,
+        total=total,
+        uploaded=uploaded,
+        skipped=skipped,
+    )

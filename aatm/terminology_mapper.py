@@ -18,7 +18,6 @@ from typing import Any, List, Literal, Optional, Tuple
 from rich.console import Console
 from rich.progress import track
 from tqdm import tqdm
-import chromadb
 import pandas as pd
 
 from aatm.api.config import APIConfig
@@ -40,6 +39,7 @@ from aatm.translators import BaseTranslator, EmptyTranslator
 from aatm.retrievers import BaseRetriever, ChromaDBRetriever
 from aatm.selectors import FirstResultSelector, BaseSelector
 from aatm.embedding_functions import GoogleEmbeddingFunction
+from aatm.vector_db import ChromaConnection
 
 
 console = Console()
@@ -168,7 +168,8 @@ class TerminologyMapper:
         # Define retriever
         self.retriever: BaseRetriever
         if retriever is None:
-            client = chromadb.PersistentClient()
+            # ChromaDB's default local path, or Chroma Cloud (see aatm.vector_db).
+            client = ChromaConnection.from_env(local_path="./chroma").client()
             self.retriever = ChromaDBRetriever(
                 client=client,
                 collection_name="expressions",

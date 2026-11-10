@@ -240,6 +240,18 @@ def init(
             help=f"List of standard vocabularies to use. Available options: {STANDARD_VOCABULARIES}.",
         ),
     ] = None,
+    vector_db: Annotated[
+        Optional[str],
+        typer.Option(
+            "--vector-db",
+            help=(
+                "Where to build the vector database: 'local' (on this machine) "
+                "or 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY). "
+                "Overrides AATM_VECTOR_DB. Defaults to 'local'."
+            ),
+            show_default=False,
+        ),
+    ] = None,
 ) -> None:
     """Initialize the local AATM environment.
 
@@ -267,11 +279,15 @@ def init(
         standard_vocabs: List of standard vocabularies to include in the
             mapping datasets. If not provided, the user is prompted to
             select one or more interactively.
+        vector_db: Where to build the vector database, ``local`` or
+            ``cloud``. If not provided, `AATM_VECTOR_DB` is used, and
+            otherwise ``local``.
 
     Raises:
         typer.Exit: If the vocabulary directory does not exist, if the
-            embedding model is not supported, or if any provided
-            standard vocabulary is invalid.
+            embedding model is not supported, if any provided
+            standard vocabulary is invalid, or if the vector database
+            configuration is invalid.
 
     Examples:
         Initialize using the default vocabulary directory:
@@ -293,6 +309,10 @@ def init(
         Initialize with specific standard vocabularies:
 
             $ aatm init --standard-vocabs LOINC --standard-vocabs SNOMED
+
+        Build the vector database in Chroma Cloud (needs CHROMA_API_KEY):
+
+            $ aatm init --vector-db cloud
     """
     # Setup local directories
     LOCAL_HELPER_PATH.mkdir(exist_ok=True, parents=True)
@@ -339,6 +359,18 @@ def init(
             )
             raise typer.Exit()
 
+    # Validate the vector database settings before the long build steps.
+    from aatm.vector_db import ChromaConnection, VectorDatabaseConfigError
+
+    try:
+        vector_db_connection = ChromaConnection.from_env(
+            local_path=".aatm/chroma_vector_dbs", mode=vector_db
+        )
+    except VectorDatabaseConfigError as e:
+        console.print(f"[yellow]OOPS![/yellow] {e}\n")
+        raise typer.Exit()
+    vector_db = vector_db_connection.mode
+
     # Validate provided standard vocabs
     if standard_vocabs is not None:
         if not set(standard_vocabs).issubset(STANDARD_VOCABULARIES):
@@ -358,7 +390,10 @@ def init(
     build_local_sqlite_vocab_database(vocab_dir)
     console.print("[green]Done![/green]\n")
 
-    console.print("[blue]2) Building local vector database[/blue]")
+    console.print(
+        "[blue]2) Building vector database[/blue]"
+        + (" in Chroma Cloud" if vector_db == "cloud" else "")
+    )
 
     if embedding_model is None:
         supported_embedding_models_choices = [
@@ -397,11 +432,11 @@ def init(
     build_mapping_datasets(selected_standard_vocabularies)
 
     # Lazy import
-    console.print("Preparing local vector database builder...")
+    console.print("Preparing vector database builder...")
     from aatm.local_database_utils import build_local_vector_database
 
     build_local_vector_database(
-        selected_embedding_model, embedding_dtype=embedding_dtype
+        selected_embedding_model, embedding_dtype=embedding_dtype, vector_db=vector_db
     )
     console.print("[green]Done![/green]\n")
 
@@ -850,6 +885,123 @@ def doctor() -> None:
             console.print(command, markup=False, highlight=False, soft_wrap=True)
 
     if diagnosis.status == "action":
+        raise typer.Exit(code=1)
+
+
+vector_db_app = typer.Typer(
+    help="Check the vector database settings or upload a local index to Chroma Cloud"
+)
+app.add_typer(vector_db_app, name="vector-db")
+
+
+@vector_db_app.command(
+    "check", help="Show where the vector database lives and test the connection"
+)
+def vector_db_check(
+    vector_db: Annotated[
+        Optional[str],
+        typer.Option(
+            "--vector-db", help="'local' or 'cloud'. Overrides AATM_VECTOR_DB."
+        ),
+    ] = None,
+) -> None:
+    """Print the configured vector database and, in cloud mode, its collections.
+
+    Raises:
+        typer.Exit: With code 1 if the configuration is invalid or the
+            connection fails.
+    """
+    from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY
+    from aatm.vector_db import VectorDatabaseConfigError, resolve_vector_db_mode
+
+    try:
+        mode = resolve_vector_db_mode(vector_db)
+        locations = {
+            name: spec.chroma_location(mode)
+            for name, spec in CHROMADB_RETRIEVER_MODEL_REGISTRY.items()
+        }
+    except VectorDatabaseConfigError as e:
+        console.print(f"[yellow]OOPS![/yellow] {e}")
+        raise typer.Exit(code=1)
+
+    if mode == "local":
+        console.print("Vector database: [bold]local[/bold]")
+        for name, (connection, collection_name) in locations.items():
+            status = (
+                "[green]built[/green]"
+                if connection.path and Path(connection.path).exists()
+                else "not built"
+            )
+            console.print(f"  {name}: {connection.path} ({status})")
+        return
+
+    connection = next(iter(locations.values()))[0]
+    console.print(f"Vector database: [bold]{connection.describe()}[/bold]")
+    try:
+        client = connection.client()
+        existing = {collection.name for collection in client.list_collections()}
+    except Exception as e:
+        console.print(f"[red]Could not connect to Chroma Cloud:[/red] {e}")
+        raise typer.Exit(code=1)
+
+    console.print("[green]Connected.[/green]")
+    for name, (_, collection_name) in locations.items():
+        status = "[green]built[/green]" if collection_name in existing else "not built"
+        console.print(f"  {name}: collection '{collection_name}' ({status})")
+
+
+@vector_db_app.command(
+    "upload",
+    help="Copy a local vector database to Chroma Cloud without re-embedding",
+)
+def vector_db_upload(
+    embedding_model: Annotated[
+        str,
+        typer.Option(
+            "--embedding-model",
+            "-e",
+            help="Name of the embedding model whose index to upload.",
+        ),
+    ],
+    local_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--local-dir",
+            help="Local vector database directory. Defaults to the model's path "
+            "under .aatm/chroma_vector_dbs.",
+            show_default=False,
+        ),
+    ] = None,
+    batch_size: Annotated[
+        Optional[int],
+        typer.Option(
+            "--batch-size",
+            help="Rows per cloud write. Capped at the cloud's maximum batch size.",
+            show_default=False,
+        ),
+    ] = None,
+) -> None:
+    """Upload a local index to Chroma Cloud. Re-running resumes where it stopped.
+
+    Raises:
+        typer.Exit: With code 1 if the model is unknown, the local database is
+            missing, or the cloud configuration is invalid.
+    """
+    if embedding_model not in SUPPORTED_EMBEDDING_MODELS:
+        console.print(
+            f"[yellow]OOPS![/yellow] Unsupported embedding model: `{embedding_model}`. "
+            f"The supported embedding models are: {SUPPORTED_EMBEDDING_MODELS}"
+        )
+        raise typer.Exit(code=1)
+
+    from aatm.local_database_utils import upload_vector_database_to_cloud
+
+    try:
+        upload_vector_database_to_cloud(
+            embedding_model, vector_db_dir=local_dir, write_batch_size=batch_size
+        )
+    except ValueError as e:
+        console.print(f"[yellow]OOPS![/yellow] {e}")
         raise typer.Exit(code=1)
 
 

@@ -11,7 +11,6 @@ front end for terminology exploration and validation.
 """
 
 import streamlit as st
-import chromadb
 import dotenv
 
 from aatm.logs import configure_logging
@@ -26,7 +25,8 @@ dotenv.load_dotenv()
 # Safe on Streamlit reruns: the handler is only added once.
 configure_logging()
 
-client = chromadb.PersistentClient()
+# Retrievers open their own client, local or Chroma Cloud depending on
+# AATM_VECTOR_DB (see `aatm.vector_db`).
 
 
 @st.cache_resource

@@ -35,6 +35,36 @@ aatm.configure_logging(logging.DEBUG)  # everything
 logging.getLogger("aatm.data_models.extractors").setLevel(logging.DEBUG)  # one module only
 ```
 
+## Vector database location (Chroma Cloud)
+
+By default, AATM builds one ChromaDB vector database per embedding model on this machine, under `.aatm/chroma_vector_dbs/`. To keep the index in [Chroma Cloud](https://trychroma.com/) instead, which lets a team build it once and share it, set:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AATM_VECTOR_DB` | `local` | `local` or `cloud`. `aatm init --vector-db` overrides it for the build. |
+| `CHROMA_API_KEY` | unset | Chroma Cloud API key. Required in cloud mode. Never logged. |
+| `CHROMA_TENANT` | unset | Chroma Cloud tenant. Optional when the API key is scoped to one database. |
+| `CHROMA_DATABASE` | unset | Chroma Cloud database. Optional when the API key is scoped to one database. |
+| `CHROMA_CLOUD_HOST` | `api.trychroma.com` | Chroma Cloud host. |
+
+```env
+AATM_VECTOR_DB=cloud
+CHROMA_API_KEY=your_chroma_api_key
+CHROMA_DATABASE=aatm
+```
+
+In cloud mode, one database holds every model's index, so each embedding model gets its own collection, named `expressions-<model>` (e.g. `expressions-qwen3-06B`). Retrievers, `aatm map`, the search UI and the API then query Chroma Cloud with the same filters as locally. Embeddings for local models are still computed on the machine that runs the build.
+
+Useful commands:
+
+```bash
+aatm vector-db check                       # show the configured location and test the connection
+aatm init --vector-db cloud                # build the index directly in Chroma Cloud
+aatm vector-db upload -e embeddinggemma-300M  # copy an existing local index, without re-embedding
+```
+
+`aatm vector-db upload` skips rows already in the cloud, so an interrupted upload resumes when run again. Cloud writes are retried with backoff on rate limits, server errors and network failures.
+
 ## Device selection
 
 | Variable | Values | Effect |
