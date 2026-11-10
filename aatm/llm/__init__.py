@@ -26,7 +26,7 @@ from aatm.llm.limits import (
 )
 from aatm.llm.base import LLMResponseError, LLMSettings, ReasoningEffort, StructuredLLM
 from aatm.llm.registry import available_providers, create_llm, register_provider
-from aatm.llm.usage import TokenUsage, track_usage
+from aatm.llm.usage import ModelPrice, ModelTokens, TokenUsage, track_usage
 
 __all__ = [
     "LLMResponseError",
@@ -35,6 +35,8 @@ __all__ = [
     "RateLimits",
     "ReasoningEffort",
     "StructuredLLM",
+    "ModelPrice",
+    "ModelTokens",
     "TokenUsage",
     "available_providers",
     "create_llm",

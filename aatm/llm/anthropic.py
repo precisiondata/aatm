@@ -75,7 +75,9 @@ class AnthropicLLM:
         )
         usage = getattr(message, "usage", None)
         record_usage(
-            usage_attr(usage, "input_tokens"), usage_attr(usage, "output_tokens")
+            usage_attr(usage, "input_tokens"),
+            usage_attr(usage, "output_tokens"),
+            model_id=self.model_id,
         )
         if message.stop_reason == "refusal":
             details = message.stop_details

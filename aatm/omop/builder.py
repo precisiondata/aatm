@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, get_args
 
 import asyncio
 import re
+import time
 
 import pandas as pd
 from dateutil import parser as date_parser
@@ -55,6 +56,7 @@ from aatm.omop.vocabulary import (
 )
 
 if TYPE_CHECKING:
+    from aatm.llm.usage import Prices
     from aatm.omop.runner import RunSummary
 
 logger = get_logger(__name__)
@@ -168,7 +170,9 @@ class OmopTables:
     columns, in CDM order. Missing values are ``None``/``NaN``.
 
     ``cache_stats`` counts the coding cache's hits and misses for this batch, when the
-    builder has a cache.
+    builder has a cache. ``coded_texts`` counts the distinct texts coded (per coding
+    key and context), ``coding_errors`` those whose coder failed, and
+    ``coding_seconds`` the time spent coding.
     """
 
     rows: dict[str, list[OmopTableRow]] = field(default_factory=dict)
@@ -177,6 +181,9 @@ class OmopTables:
     mappings: list[ConceptMapping] = field(default_factory=list)
     extraction_results: list[EntityValidationResult] = field(default_factory=list)
     cache_stats: Optional[CacheStats] = None
+    coded_texts: int = 0
+    coding_errors: int = 0
+    coding_seconds: float = 0.0
 
     @property
     def tables(self) -> list[str]:
@@ -621,7 +628,11 @@ class OmopTableBuilder:
         records = [result.to_records() for result in results]
         cached = self.coder if isinstance(self.coder, CachedCoder) else None
         before = cached.stats.model_copy() if cached else None
+        coding_started = time.perf_counter()
         coded = self._code_texts(notes, records)
+        tables.coding_seconds = time.perf_counter() - coding_started
+        tables.coded_texts = len(coded)
+        tables.coding_errors = sum(1 for c in coded.values() if c.error)
         if cached and before:
             tables.cache_stats = cached.stats - before
 
@@ -1233,6 +1244,9 @@ class OmopExtractionPipeline:
         chunk_size: int = 100,
         columns: Optional[dict[str, str]] = None,
         max_attempts: int = 3,
+        total: Optional[int] = None,
+        prices: Optional["Prices"] = None,
+        log_every: float = 60.0,
     ) -> "RunSummary":
         """Process a dataset of any size in chunks, writing Parquet files as it goes.
 
@@ -1252,25 +1266,44 @@ class OmopExtractionPipeline:
             columns: Renames source columns to `ClinicalNote` fields, e.g.
                 ``{"note_text": "text"}``. Other unknown columns are ignored.
             max_attempts: Times a failing note is tried, across runs.
+            total: Notes in the source, for the estimated time left. Found by
+                itself for Parquet files, DataFrames and lists.
+            prices: Model prices per million input and output tokens, to estimate
+                the cost, e.g. ``{"openai/gpt-5-mini": (0.25, 2.0)}``.
+            log_every: Seconds between progress logs.
 
         Returns:
             What this run did: notes built, skipped and failed, rows per table,
-            coding cache hits.
+            coding cache hits, and items, time, tokens and cost per stage. It is
+            also saved as JSON in ``output_dir/runs``.
         """
         from aatm.omop.runner import ChunkedRun
 
         return await ChunkedRun(self, output_dir).run(
-            source, chunk_size=chunk_size, columns=columns, max_attempts=max_attempts
+            source,
+            chunk_size=chunk_size,
+            columns=columns,
+            max_attempts=max_attempts,
+            total=total,
+            prices=prices,
+            log_every=log_every,
         )
 
     async def rebuild(
-        self, output_dir: str | Path, chunk_size: int = 1000
+        self,
+        output_dir: str | Path,
+        chunk_size: int = 1000,
+        prices: Optional["Prices"] = None,
+        log_every: float = 60.0,
     ) -> "RunSummary":
         """Build the tables of a run again from its stored extraction results.
 
         Makes no extraction calls: use it after changing the ``omop`` blocks. Row ids
         stay the same. The coder may still be called for texts it has not cached.
+        `prices` and `log_every` are as for `run`.
         """
         from aatm.omop.runner import ChunkedRun
 
-        return await ChunkedRun(self, output_dir).rebuild(chunk_size=chunk_size)
+        return await ChunkedRun(self, output_dir).rebuild(
+            chunk_size=chunk_size, prices=prices, log_every=log_every
+        )

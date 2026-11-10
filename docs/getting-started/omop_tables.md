@@ -1104,6 +1104,39 @@ A run refuses to add rows built with other mappings to an existing folder until 
 rebuild, and refuses a folder made with other entity definitions or another extractor:
 use a new folder for those.
 
+**Watching a long run.** A progress line is logged every `log_every` seconds (60 by
+default), when a chunk is done:
+
+```text
+Progress: 12,400 of 100,000 notes done (12.4%) in 41m10s, 301 notes/min; about 4h17m left;
+12,380 built, 0 skipped, 20 failed; 31,950 LLM calls, 48,210,330 tokens; cost 14.2031;
+cache hits 63%
+```
+
+The time left needs the number of notes in the source. It is read from Parquet files,
+DataFrames and lists; for a CSV file or a query, pass `total=`. Logs are shown with
+`aatm.logs.configure_logging()`.
+
+At the end, the summary breaks the run down by stage (extraction, coding and
+building): notes or texts handled, time, errors, LLM calls and tokens per model.
+Give your models' prices, per million input and output tokens, to estimate the cost:
+
+```python
+summary = await pipeline.run(
+    "notes.parquet",
+    "output/ecog",
+    prices={"openai/gpt-5-mini": (0.25, 2.00)},  # check your provider's current prices
+)
+summary.stages["extraction"].usage.by_model  # calls and tokens per model
+summary.stages["coding"].cost                # coding is the agent's calls, if any
+summary.cost
+```
+
+Each `run` and `rebuild` also saves its summary as JSON in `output/ecog/runs/`. The
+file is updated at every progress line, so you can follow a run from another process,
+and it is kept with `completed: false` and the error when a run stops.
+`OmopRun("output/ecog").summaries()` reads them back, oldest first.
+
 **Row ids.** The primary keys of a run are derived from the note:
 `note_id * 65536 + n`, where `n` is the position of the mention in the note. The same
 note gets the same ids in any chunk, after a resume or a rebuild, and in separate runs

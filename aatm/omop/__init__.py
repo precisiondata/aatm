@@ -38,6 +38,7 @@ _LAZY = {
     "note_row_id": "aatm.omop.builder",
     "OmopRun": "aatm.omop.runner",
     "RunSummary": "aatm.omop.runner",
+    "StageStats": "aatm.omop.runner",
     "RunLedger": "aatm.omop.runner",
     "notes_from_sql": "aatm.omop.runner",
 }

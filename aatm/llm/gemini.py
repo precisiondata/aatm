@@ -116,7 +116,11 @@ class GeminiLLM:
         thoughts = usage_attr(usage, "thoughts_token_count")
         if thoughts is not None:
             output_tokens = (output_tokens or 0) + thoughts
-        record_usage(usage_attr(usage, "prompt_token_count"), output_tokens)
+        record_usage(
+            usage_attr(usage, "prompt_token_count"),
+            output_tokens,
+            model_id=self.model_id,
+        )
         if not response.text:
             reason = None
             if response.candidates:
