@@ -591,7 +591,10 @@ def run_sync(coroutine: Any) -> Any:
         asyncio.get_running_loop()
     except RuntimeError:
         return asyncio.run(coroutine)
+    import contextvars
     from concurrent.futures import ThreadPoolExecutor
 
+    # Copy the context so that `track_usage` blocks count the calls of the thread.
+    context = contextvars.copy_context()
     with ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(asyncio.run, coroutine).result()
+        return pool.submit(context.run, asyncio.run, coroutine).result()

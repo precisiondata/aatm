@@ -55,7 +55,9 @@ class OpenAILLM:
         )
         usage = getattr(response, "usage", None)
         record_usage(
-            usage_attr(usage, "input_tokens"), usage_attr(usage, "output_tokens")
+            usage_attr(usage, "input_tokens"),
+            usage_attr(usage, "output_tokens"),
+            model_id=self.model_id,
         )
         if response.output_parsed is None:
             raise LLMResponseError(
@@ -121,7 +123,9 @@ class OpenAICompatibleLLM:
         )
         usage = getattr(completion, "usage", None)
         record_usage(
-            usage_attr(usage, "prompt_tokens"), usage_attr(usage, "completion_tokens")
+            usage_attr(usage, "prompt_tokens"),
+            usage_attr(usage, "completion_tokens"),
+            model_id=self.model_id,
         )
         if not completion.choices:
             raise LLMResponseError(f"{self.model_id} returned no choices.")

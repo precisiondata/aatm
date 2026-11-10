@@ -33,6 +33,31 @@ note needs a unique one.
 While a chunk is built (coded and written, in a thread), the next one is extracted;
 at most two chunks are in memory.
 
+## Progress, tokens and cost
+
+A run logs a progress line every ``log_every`` seconds (60 by default), when a chunk
+is done: notes read, throughput, the estimated time left, LLM calls, tokens and cost
+so far, and the coding cache's hit rate. The time left needs the number of notes in
+the source: it is read from Parquet metadata, DataFrames and lists, and can be given
+with ``total`` for CSV files and queries.
+
+At the end, the summary breaks the work down by stage (extraction, coding and
+building): items, time, errors, LLM calls and tokens per model, counted with
+`aatm.llm.track_usage`. Cost is estimated from the prices you give, per million input
+and output tokens:
+
+```python
+summary = await pipeline.run(
+    "notes.parquet", "output/ecog",
+    prices={"openai/gpt-5-mini": (0.25, 2.00)},  # check your provider's prices
+)
+summary.stages["coding"].usage.by_model, summary.cost
+```
+
+The summary is printed (logged) and saved as JSON in ``runs/``, one file per call;
+`OmopRun.summaries` reads them back. The file is also saved at every progress log,
+so a long run can be watched from elsewhere, and kept when a run crashes.
+
 ## Rebuilding
 
 Extraction, the costly step, is stored apart from the tables. After changing the
@@ -50,6 +75,7 @@ output/ecog/
   provenance/part-000001.parquet  note id, entity id and span of each row
   issues/part-000001.parquet
   mappings/part-000001.parquet
+  runs/000001-20261110-091500-run.json  the summary of each run and rebuild
 ```
 
 Each chunk writes one part file per dataset. A part only counts once the ledger
@@ -64,7 +90,7 @@ the same whichever chunk, run or shard builds the note, and after a rebuild, and
 are unique across tables. They need a 64-bit (``BIGINT``) column.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from itertools import islice
 from pathlib import Path
 from typing import (
@@ -76,6 +102,7 @@ from typing import (
     Literal,
     Optional,
     Sequence,
+    Sized,
     Union,
     get_args,
     get_origin,
@@ -91,9 +118,10 @@ import time
 import types
 
 import pandas as pd
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from aatm.data_models.extractors import EntityValidationResult
+from aatm.llm.usage import Prices, TokenUsage, model_prices, track_usage
 from aatm.logs import get_logger
 from aatm.omop.builder import (
     MAX_NOTE_ID,
@@ -546,11 +574,84 @@ class RunLedger:
 # --- the run ------------------------------------------------------------------------
 
 
+STAGES = ("extraction", "coding", "building")
+
+
+class StageStats(BaseModel):
+    """What one stage of a run did, and what it cost.
+
+    The stages overlap: the next chunk is extracted while one is coded and built, so
+    their ``seconds`` can add up to more than the wall time.
+
+    Attributes:
+        items: Notes extracted (``extraction``), distinct texts coded (``coding``) or
+            notes built (``building``).
+        seconds: Time spent in the stage. For ``building``, the time to build and
+            write the rows, coding excluded.
+        errors: Notes whose extraction or build failed, or texts the coder failed on.
+        usage: LLM calls and tokens, in all and per model.
+        cost: Estimated cost, when the run was given ``prices``.
+        unpriced: Models called that had no price.
+    """
+
+    items: int = 0
+    seconds: float = 0.0
+    errors: int = 0
+    usage: TokenUsage = Field(default_factory=TokenUsage)
+    cost: Optional[float] = None
+    unpriced: list[str] = []
+
+    @property
+    def per_minute(self) -> Optional[float]:
+        return self.items / self.seconds * 60 if self.seconds else None
+
+    def describe(self, name: str) -> str:
+        unit = "texts" if name == "coding" else "notes"
+        text = f"{name}: {self.items:,} {unit} in {_duration(self.seconds)}"
+        if self.per_minute is not None:
+            text += f" ({self.per_minute:,.0f}/min)"
+        if self.errors:
+            text += f", {self.errors:,} errors"
+        if self.usage.calls:
+            text += (
+                f", {self.usage.calls:,} LLM calls, "
+                f"{self.usage.input_tokens:,} input and "
+                f"{self.usage.output_tokens:,} output tokens"
+            )
+        if self.cost is not None and self.usage.calls:
+            text += f", cost {self.cost:,.4f}"
+            if self.unpriced:
+                text += f" (no price for {', '.join(self.unpriced)})"
+        return text
+
+
+def _duration(seconds: float) -> str:
+    seconds = max(seconds, 0.0)
+    if seconds < 60:
+        return f"{seconds:.1f} s"
+    minutes, secs = divmod(int(round(seconds)), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h{minutes:02d}m"
+    return f"{minutes}m{secs:02d}s"
+
+
 class RunSummary(BaseModel):
     """What one call of `run` or `rebuild` did.
 
+    It is logged at the end and saved as JSON in the ``runs`` folder of the output
+    (see `OmopRun.summaries`). While the call goes on, the file is saved again at
+    every progress log, with ``completed`` false.
+
     Attributes:
         output_dir: The output folder.
+        kind: ``run`` or ``rebuild``.
+        started_at: When the call started (UTC).
+        finished_at: When it ended, also when it stopped with an error.
+        completed: Whether it went through the whole source.
+        error: The error that stopped it, if any.
+        total: Notes in the source, when known (see the ``total`` argument of
+            `run`); it gives the estimated time left.
         notes: Notes read from the source (or from the ledger, for a rebuild).
         built: Notes whose rows were written by this call.
         extracted: Notes extracted by this call: one model call each.
@@ -563,10 +664,19 @@ class RunSummary(BaseModel):
         rows: Rows written per table.
         issues: Issues written.
         cache_stats: Coding cache hits and misses, when the builder has a cache.
+        stages: Items, time, errors, tokens and cost of ``extraction``, ``coding``
+            and ``building``.
+        cost: Estimated cost of all stages, when the run was given ``prices``.
         seconds: Wall time.
     """
 
     output_dir: str
+    kind: Literal["run", "rebuild"] = "run"
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    completed: bool = False
+    error: Optional[str] = None
+    total: Optional[int] = None
     notes: int = 0
     built: int = 0
     extracted: int = 0
@@ -578,12 +688,77 @@ class RunSummary(BaseModel):
     rows: dict[str, int] = {}
     issues: int = 0
     cache_stats: Optional[CacheStats] = None
+    stages: dict[str, StageStats] = Field(
+        default_factory=lambda: {name: StageStats() for name in STAGES}
+    )
+    cost: Optional[float] = None
     seconds: float = 0.0
+
+    @property
+    def usage(self) -> TokenUsage:
+        """LLM calls and tokens of all stages."""
+        usage = TokenUsage()
+        for stage in self.stages.values():
+            usage.merge(stage.usage)
+        return usage
+
+    @property
+    def done(self) -> int:
+        """Notes finished: built, skipped, failed, given up or duplicates.
+
+        During a run it lags `notes` by the chunk being extracted ahead.
+        """
+        return self.built + self.skipped + self.failed + self.gave_up + self.duplicates
+
+    @property
+    def eta_seconds(self) -> Optional[float]:
+        """Estimated time left, from the notes finished so far and `total`."""
+        if self.total is None or not self.done or not self.seconds:
+            return None
+        return max(self.total - self.done, 0) * self.seconds / self.done
+
+    def price(self, prices: Optional[Prices]) -> None:
+        """Set the estimated cost of each stage, and in all, from `prices`."""
+        if not model_prices(prices):
+            return
+        for stage in self.stages.values():
+            stage.cost = stage.usage.cost(prices)
+            stage.unpriced = stage.usage.unpriced(prices)
+        self.cost = sum(s.cost or 0.0 for s in self.stages.values())
+
+    def progress(self) -> str:
+        """One log line: progress, throughput, time left, tokens and cost."""
+        rate = self.done / self.seconds * 60 if self.seconds else 0
+        if self.total:
+            share = self.done / self.total
+            done = f"{self.done:,} of {self.total:,} notes done ({share:.1%})"
+        else:
+            done = f"{self.done:,} notes done"
+        parts = [f"{done} in {_duration(self.seconds)}, {rate:,.0f} notes/min"]
+        eta = self.eta_seconds
+        if eta is not None:
+            parts.append(f"about {_duration(eta)} left")
+        parts.append(
+            f"{self.built:,} built, {self.skipped:,} skipped, {self.failed:,} failed"
+        )
+        usage = self.usage
+        if usage.calls:
+            tokens = usage.input_tokens + usage.output_tokens
+            parts.append(f"{usage.calls:,} LLM calls, {tokens:,} tokens")
+        if self.cost is not None:
+            parts.append(f"cost {self.cost:,.4f}")
+        if self.cache_stats is not None and self.cache_stats.hit_rate is not None:
+            parts.append(f"cache hits {self.cache_stats.hit_rate:.0%}")
+        return "; ".join(parts)
 
     def __str__(self) -> str:
         rate = self.notes / self.seconds * 3600 if self.seconds else 0
+        status = "completed" if self.completed else "stopped"
+        if self.error:
+            status += f" ({self.error})"
         lines = [
-            f"{self.notes:,} notes in {self.seconds:,.1f} s ({rate:,.0f} notes/hour): "
+            f"{self.kind} {status}: {self.notes:,} notes in "
+            f"{_duration(self.seconds)} ({rate:,.0f} notes/hour): "
             f"{self.built:,} built ({self.extracted:,} extracted, {self.reused:,} "
             f"from stored results), {self.skipped:,} already built, "
             f"{self.failed:,} failed, {self.gave_up:,} given up, "
@@ -592,6 +767,9 @@ class RunSummary(BaseModel):
             + (", ".join(f"{t} {n:,}" for t, n in self.rows.items()) or "none")
             + f"; {self.issues:,} issues",
         ]
+        for name, stage in self.stages.items():
+            if stage.items or stage.usage.calls or stage.errors:
+                lines.append(stage.describe(name))
         if self.cache_stats is not None:
             rate_text = (
                 f"{self.cache_stats.hit_rate:.0%}"
@@ -602,6 +780,8 @@ class RunSummary(BaseModel):
                 f"coding cache: {self.cache_stats.hits:,} hits, "
                 f"{self.cache_stats.misses:,} misses ({rate_text})"
             )
+        if self.cost is not None:
+            lines.append(f"estimated cost: {self.cost:,.4f}")
         lines.append(f"output: {self.output_dir}")
         return "\n".join(lines)
 
@@ -621,6 +801,9 @@ def _merge(parts: Sequence[OmopTables]) -> OmopTables:
         merged.mappings.extend(tables.mappings)
         if tables.cache_stats is not None:
             merged.cache_stats = _add_stats(merged.cache_stats, tables.cache_stats)
+        merged.coded_texts += tables.coded_texts
+        merged.coding_errors += tables.coding_errors
+        merged.coding_seconds += tables.coding_seconds
     return merged
 
 
@@ -721,30 +904,38 @@ class ChunkedRun:
         chunk_size: int = 100,
         columns: Optional[dict[str, str]] = None,
         max_attempts: int = 3,
+        total: Optional[int] = None,
+        prices: Optional[Prices] = None,
+        log_every: float = 60.0,
     ) -> RunSummary:
         if chunk_size < 1:
             raise ValueError("chunk_size must be >= 1")
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
-        started = time.monotonic()
-        summary = RunSummary(output_dir=str(self.output_dir))
-        with self._ledger() as ledger:
+        summary = RunSummary(
+            output_dir=str(self.output_dir),
+            kind="run",
+            total=total if total is not None else count_notes(source),
+        )
+        with (
+            self._ledger() as ledger,
+            self._report(summary, prices, log_every) as report,
+        ):
             self._recover(ledger)
             self._check(ledger, rebuilding=False)
             # While a chunk is built (in a thread), the next one is extracted.
             building: Optional[asyncio.Task] = None
             in_flight: set[int] = set()
             try:
-                for index, chunk in enumerate(read_chunks(source, chunk_size, columns)):
+                for chunk in read_chunks(source, chunk_size, columns):
                     pairs = await self._prepare(
                         ledger, chunk, summary, max_attempts, in_flight
                     )
                     if building is not None:
                         await building
+                        report.tick()
                     in_flight = {n.note_id for n, _ in pairs}  # type: ignore[misc]
                     building = asyncio.create_task(self._build(ledger, pairs, summary))
-                    summary.seconds = time.monotonic() - started
-                    self._log_progress(index, summary)
                 if building is not None:
                     await building
             finally:
@@ -752,47 +943,51 @@ class ChunkedRun:
                 if building is not None and not building.done():
                     with contextlib.suppress(Exception):
                         await building
-        summary.seconds = time.monotonic() - started
-        logger.info("Run finished\n%s", summary)
+            summary.completed = True
         return summary
 
-    async def rebuild(self, chunk_size: int = 1000) -> RunSummary:
+    async def rebuild(
+        self,
+        chunk_size: int = 1000,
+        prices: Optional[Prices] = None,
+        log_every: float = 60.0,
+    ) -> RunSummary:
         if chunk_size < 1:
             raise ValueError("chunk_size must be >= 1")
-        started = time.monotonic()
-        summary = RunSummary(output_dir=str(self.output_dir))
-        with self._ledger() as ledger:
+        summary = RunSummary(output_dir=str(self.output_dir), kind="rebuild")
+        with (
+            self._ledger() as ledger,
+            self._report(summary, prices, log_every) as report,
+        ):
             self._recover(ledger)
             self._check(ledger, rebuilding=True)
             ledger.reset_for_rebuild()
             self._recover(ledger)
-            after, index = -1, 0
+            summary.total = ledger.counts().get("extracted", 0)
+            after = -1
             while ids := ledger.extracted_ids(after, chunk_size):
                 after = ids[-1]
                 pairs = ledger.load(ids)
                 summary.notes += len(pairs)
                 await self._build(ledger, pairs, summary)
-                summary.seconds = time.monotonic() - started
-                self._log_progress(index, summary)
-                index += 1
-        summary.reused = summary.built
-        summary.seconds = time.monotonic() - started
-        logger.info("Rebuild finished\n%s", summary)
+                summary.reused = summary.built
+                report.tick()
+            summary.completed = True
         return summary
 
-    @staticmethod
-    def _log_progress(index: int, summary: RunSummary) -> None:
-        rate = summary.notes / summary.seconds * 3600 if summary.seconds else 0
-        logger.info(
-            "Chunk %d: %d notes so far, %d built, %d skipped, %d failed "
-            "(%.0f notes/hour)",
-            index + 1,
-            summary.notes,
-            summary.built,
-            summary.skipped,
-            summary.failed,
-            rate,
-        )
+    @contextlib.contextmanager
+    def _report(
+        self, summary: RunSummary, prices: Optional[Prices], log_every: float
+    ) -> Iterator["_Reporter"]:
+        """Log progress while the block runs, then log and save the summary."""
+        reporter = _Reporter(summary, self.output_dir, prices, log_every)
+        try:
+            yield reporter
+        except BaseException as e:
+            summary.error = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+            raise
+        finally:
+            reporter.finish()
 
     async def _prepare(
         self,
@@ -862,7 +1057,14 @@ class ChunkedRun:
             except Exception as e:
                 return e
 
-        results = await asyncio.gather(*(extract(n) for n in notes))
+        stage = summary.stages["extraction"]
+        started = time.perf_counter()
+        # The chunk being built meanwhile runs in another task: its calls are not
+        # counted here.
+        with track_usage() as usage:
+            results = await asyncio.gather(*(extract(n) for n in notes))
+        stage.seconds += time.perf_counter() - started
+        stage.usage.merge(usage)
         done: list[tuple[ClinicalNote, EntityValidationResult]] = []
         failed: list[tuple[ClinicalNote, str]] = []
         for note, result in zip(notes, results):
@@ -879,6 +1081,8 @@ class ChunkedRun:
         ledger.save_failed(failed, "extract")
         summary.extracted += len(done)
         summary.failed += len(failed)
+        stage.items += len(notes)
+        stage.errors += len(failed)
         return done
 
     async def _build(
@@ -891,29 +1095,33 @@ class ChunkedRun:
             return
         notes = [n for n, _ in pairs]
         results = [r for _, r in pairs]
-        try:
-            # Building may call the terminology mapper, which blocks.
-            tables = await asyncio.to_thread(
-                self.builder.build, notes, results, row_ids="note"
-            )
-            built = notes
-        except Exception:
-            # Build the notes one by one to find those that fail.
-            parts, built, failed = [], [], []
-            for note, result in pairs:
-                try:
-                    parts.append(
-                        await asyncio.to_thread(
-                            self.builder.build, [note], [result], row_ids="note"
+        started = time.perf_counter()
+        failed: list[tuple[ClinicalNote, str]] = []
+        # The coder's calls, made in the build thread, count as coding.
+        with track_usage() as usage:
+            try:
+                # Building may call the terminology mapper, which blocks.
+                tables = await asyncio.to_thread(
+                    self.builder.build, notes, results, row_ids="note"
+                )
+                built = notes
+            except Exception:
+                # Build the notes one by one to find those that fail.
+                parts, built = [], []
+                for note, result in pairs:
+                    try:
+                        parts.append(
+                            await asyncio.to_thread(
+                                self.builder.build, [note], [result], row_ids="note"
+                            )
                         )
-                    )
-                    built.append(note)
-                except Exception as e:
-                    logger.warning("Building note %s failed: %s", note.note_id, e)
-                    failed.append((note, f"{type(e).__name__}: {e}"))
-            ledger.save_failed(failed, "build")
-            summary.failed += len(failed)
-            tables = _merge(parts)
+                        built.append(note)
+                    except Exception as e:
+                        logger.warning("Building note %s failed: %s", note.note_id, e)
+                        failed.append((note, f"{type(e).__name__}: {e}"))
+                ledger.save_failed(failed, "build")
+                summary.failed += len(failed)
+                tables = _merge(parts)
 
         part = ledger.new_part()
         counts = await asyncio.to_thread(_write_part, self.output_dir, part, tables)
@@ -923,6 +1131,103 @@ class ChunkedRun:
             summary.rows[table] = summary.rows.get(table, 0) + n
         summary.issues += len(tables.issues)
         summary.cache_stats = _add_stats(summary.cache_stats, tables.cache_stats)
+
+        coding = summary.stages["coding"]
+        coding.items += tables.coded_texts
+        coding.errors += tables.coding_errors
+        coding.seconds += tables.coding_seconds
+        coding.usage.merge(usage)
+        building = summary.stages["building"]
+        building.items += len(built)
+        building.errors += len(failed)
+        building.seconds += max(
+            time.perf_counter() - started - tables.coding_seconds, 0.0
+        )
+
+
+RUNS = "runs"
+
+
+class _Reporter:
+    """Logs the progress of a run every `log_every` seconds and saves its summary."""
+
+    def __init__(
+        self,
+        summary: RunSummary,
+        output_dir: Path,
+        prices: Optional[Prices],
+        log_every: float,
+    ):
+        self.summary = summary
+        self.prices = prices
+        self.log_every = log_every
+        self.started = time.perf_counter()
+        self.last_log: Optional[float] = None
+        summary.started_at = datetime.now(timezone.utc)
+        # Numbered, so that the files sort in order even when the clock does not.
+        folder = output_dir / RUNS
+        number = 1 + max(
+            (int(p.name[:6]) for p in folder.glob("*.json") if p.name[:6].isdigit()),
+            default=0,
+        )
+        stamp = summary.started_at.strftime("%Y%m%d-%H%M%S")
+        self.path = folder / f"{number:06d}-{stamp}-{summary.kind}.json"
+        self.save()
+
+    def _update(self) -> None:
+        self.summary.seconds = time.perf_counter() - self.started
+        self.summary.price(self.prices)
+
+    def save(self) -> None:
+        """Write the summary as JSON, atomically, so it can be read during the run."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.path.with_name(f".{self.path.name}.tmp")
+        temporary.write_text(self.summary.model_dump_json(indent=2), encoding="utf-8")
+        os.replace(temporary, self.path)
+
+    def tick(self) -> None:
+        """Called after each chunk: log and save if `log_every` seconds went by."""
+        now = time.perf_counter()
+        if self.last_log is not None and now - self.last_log < self.log_every:
+            return
+        self.last_log = now
+        self._update()
+        logger.info("Progress: %s", self.summary.progress())
+        with contextlib.suppress(OSError):
+            self.save()
+
+    def finish(self) -> None:
+        self._update()
+        self.summary.finished_at = datetime.now(timezone.utc)
+        title = "Run" if self.summary.kind == "run" else "Rebuild"
+        state = "finished" if self.summary.completed else "stopped"
+        logger.info("%s %s\n%s", title, state, self.summary)
+        try:
+            self.save()
+            logger.info("Summary saved to %s", self.path)
+        except OSError as e:
+            logger.warning("Could not save the run summary to %s: %s", self.path, e)
+
+
+def count_notes(source: Any) -> Optional[int]:
+    """The number of notes in a source, when it is cheap to know, else ``None``.
+
+    Known for DataFrames, sized collections (lists) and Parquet files or folders
+    (from their metadata). Not for CSV files, queries or iterators: pass ``total``.
+    """
+    if isinstance(source, (str, Path)):
+        path = Path(source)
+        if path.exists() and (path.is_dir() or path.suffix == ".parquet"):
+            import pyarrow.dataset as ds
+
+            with contextlib.suppress(Exception):
+                return ds.dataset(path, format="parquet").count_rows()
+        return None
+    if isinstance(source, _FrameSource):
+        return None
+    if isinstance(source, Sized):
+        return len(source)
+    return None
 
 
 # --- reading the output -------------------------------------------------------------
@@ -1001,6 +1306,20 @@ class OmopRun:
             return ledger.failures()
         finally:
             ledger.close()
+
+    def summaries(self) -> list[RunSummary]:
+        """The summaries of the runs and rebuilds made in this folder, oldest first.
+
+        A run still going on, or one that stopped without finishing (a crash), has
+        ``completed`` false.
+        """
+        folder = self.output_dir / RUNS
+        if not folder.is_dir():
+            return []
+        return [
+            RunSummary.model_validate_json(path.read_text(encoding="utf-8"))
+            for path in sorted(folder.glob("*.json"))
+        ]
 
     def status(self) -> dict[str, int]:
         """Notes per status: ``built``, ``extracted`` (not built yet), ``failed``."""
