@@ -1022,6 +1022,110 @@ the datetime columns.
 
 ---
 
+## Processing large datasets
+
+`await pipeline(notes)` holds every note and row in memory, and a failure partway
+loses the model calls already made. For a full dataset, use `pipeline.run`: it reads
+the notes in chunks, writes each chunk's rows to Parquet files as it goes, and records
+its progress, so a run that stops can be resumed.
+
+```python
+import asyncio
+from aatm.omop import OmopExtractionPipeline, OmopRun
+
+pipeline = OmopExtractionPipeline(
+    "ecog_performance_status",
+    model_id="openai/gpt-5-mini",
+    max_concurrency=16,  # notes extracted at once
+    cache=True,          # code each distinct text once, across chunks and runs
+)
+summary = asyncio.run(
+    pipeline.run(
+        "notes.parquet",               # or .csv, a folder of Parquet files, a DataFrame...
+        "output/ecog",
+        chunk_size=200,
+        columns={"note_text": "text"}, # source column -> ClinicalNote field
+    )
+)
+print(summary)  # notes built, skipped and failed, rows per table, cache hit rate
+```
+
+**Sources.** A CSV or Parquet file, a folder of Parquet files, a DataFrame, an iterable
+of `ClinicalNote` objects or dicts, or a database query:
+
+```python
+import sqlite3
+from aatm.omop import notes_from_sql
+
+con = sqlite3.connect("cdm.db")  # or a SQLAlchemy engine for other databases
+source = notes_from_sql(
+    "SELECT note_id, note_text AS text, person_id, note_date, visit_occurrence_id "
+    "FROM note WHERE note_date >= '2024-01-01'",
+    con,
+)
+summary = await pipeline.run(source, "output/ecog")
+```
+
+Columns that are not `ClinicalNote` fields are ignored. Every note needs a unique
+**`note_id`**: it is how a resumed run knows what is done.
+
+**Reading the output.** Each table, and the provenance, issues and mappings of its rows,
+is a folder of Parquet files:
+
+```python
+run = OmopRun("output/ecog")
+run.table("measurement")    # a DataFrame
+run.provenance()            # note_id, entity_id and span of each row (table, row_id)
+run.issues()
+run.mappings()
+run.failures()              # notes that could not be extracted or built, and why
+run.status()                # {"built": 9850, "failed": 3}
+run.dataset("measurement")  # a pyarrow Dataset, to filter without loading it all
+```
+
+DuckDB, Polars and Spark read the folders directly, e.g.
+`SELECT * FROM 'output/ecog/measurement/*.parquet'`.
+
+**Resuming.** Run the same call again. Notes already built are skipped; notes extracted
+but not yet written are built from their stored extraction result, without another
+model call. A note that fails (an API error once retries are spent, a result that
+cannot be built) is recorded with its error and the run goes on; the next run tries it
+again, up to `max_attempts` times in all (3 by default).
+
+**Changing the mappings.** Extraction results are stored apart from the tables
+(in `output/ecog/ledger.db`). After editing an `omop` block, rebuild the tables from
+them, with no extraction calls:
+
+```python
+await pipeline.rebuild("output/ecog")
+```
+
+A run refuses to add rows built with other mappings to an existing folder until you
+rebuild, and refuses a folder made with other entity definitions or another extractor:
+use a new folder for those.
+
+**Row ids.** The primary keys of a run are derived from the note:
+`note_id * 65536 + n`, where `n` is the position of the mention in the note. The same
+note gets the same ids in any chunk, after a resume or a rebuild, and in separate runs
+over parts of a dataset; ids never repeat across tables. They need a 64-bit (`BIGINT`)
+column. `OmopTableBuilder.build(..., row_ids="note")` numbers rows the same way.
+
+!!! tip "Speed and cost"
+    `max_concurrency` (default 1) sets how many notes are extracted at once; set
+    [rate limits](#rate-limits-for-long-runs) to stay under your provider's quota.
+    With `cache=True`, a text seen in an earlier chunk or run is not coded again.
+    `chunk_size` bounds memory; larger chunks let the builder group more repeated
+    texts per coding call.
+
+    While a chunk is built (coded and written), the next one is extracted, so the
+    slower of the two stages sets the pace. This pays off when coding takes about as
+    long as extraction, e.g. with the [agent](#searching-with-an-agent); without a
+    mapper, building takes milliseconds and extraction is all the time. At most two
+    chunks are in memory. The two stages share the per-minute rate limits, but each
+    gets its own `max_concurrency`, so up to twice as many calls may be in flight.
+
+---
+
 ## Troubleshooting
 
 | You see | Why | Fix |
@@ -1038,6 +1142,9 @@ the datetime columns.
 | `Coding cache ...: the vocabulary or search index of this coder changed since N results were cached` | The vocabulary database or index was rebuilt; the old results are no longer used | Nothing is wrong; run the `aatm cache clear --coder ...` it shows to free their space |
 | `Coding cache ...: changes to the content of ... cannot be detected` | A retriever whose data the cache cannot fingerprint | After rebuilding its index, run `aatm cache clear` |
 | `trace` shows `error: ...` and `budget_exhausted` in `usage` | The agent ran out of tool calls before an answer | Raise `max_tool_calls`, or use a stronger model |
+| `Every note needs a note_id in a chunked run` | `pipeline.run` was given notes without ids | Add a unique `note_id` to every note, e.g. from the `note` table |
+| `The omop mappings changed since tables were written to ...` | An `omop` block was edited after a run wrote tables to that folder | `await pipeline.rebuild(output_dir)`, then run again |
+| `... holds results extracted with other entity definitions or another extractor` | The definitions (other than `omop`) or the model differ from the folder's run | Use a new output folder |
 
 ---
 

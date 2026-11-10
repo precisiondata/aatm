@@ -23,7 +23,7 @@ across batches and runs; see `aatm.omop.cache`.
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal, Optional, Sequence, get_args
+from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, get_args
 
 import asyncio
 import re
@@ -53,6 +53,9 @@ from aatm.omop.vocabulary import (
     ConceptLookup,
     SqliteConceptLookup,
 )
+
+if TYPE_CHECKING:
+    from aatm.omop.runner import RunSummary
 
 logger = get_logger(__name__)
 
@@ -254,6 +257,37 @@ class _RowContext:
                 detail=detail,
             )
         )
+
+
+ROW_ID_BITS = 16
+"""Bits of a note-derived row id that hold the mention's position in the note."""
+MAX_MENTIONS_PER_NOTE = 2**ROW_ID_BITS - 1
+MAX_NOTE_ID = 2 ** (63 - ROW_ID_BITS) - 1
+
+
+def note_row_id(note_id: Optional[int], ordinal: int) -> int:
+    """A row's primary key derived from its note: ``note_id * 65536 + ordinal``.
+
+    `ordinal` is the position (from 1) of the mention among the note's top-level
+    mentions, in document order, whatever their table. It depends only on the
+    extraction result, so the id stays the same when the note is built again, in
+    another batch, run or shard, or after the mappings change. Ids are unique across
+    tables and fit a signed 64-bit integer (``BIGINT``); they do not fit 32 bits once
+    ``note_id`` exceeds 32767.
+
+    Raises:
+        ValueError: If `note_id` is missing or outside 0 to `MAX_NOTE_ID`, or the note
+            has more than 65535 top-level mentions.
+    """
+    if note_id is None:
+        raise ValueError("Row ids derived from notes need every note to have a note_id")
+    if not 0 <= note_id <= MAX_NOTE_ID:
+        raise ValueError(f"note_id {note_id} is outside 0 to {MAX_NOTE_ID}")
+    if not 1 <= ordinal <= MAX_MENTIONS_PER_NOTE:
+        raise ValueError(
+            f"Note {note_id} has more than {MAX_MENTIONS_PER_NOTE} mentions"
+        )
+    return (note_id << ROW_ID_BITS) | ordinal
 
 
 def _parse_date(text: str, dayfirst: bool) -> tuple[Optional[date], bool]:
@@ -556,6 +590,7 @@ class OmopTableBuilder:
         notes: Sequence[ClinicalNote | str],
         results: Sequence[EntityValidationResult],
         id_start: int = 1,
+        row_ids: Literal["sequential", "note"] = "sequential",
     ) -> OmopTables:
         """Build table rows from extraction results.
 
@@ -563,7 +598,14 @@ class OmopTableBuilder:
             notes: The notes, in the same order as `results`. Plain strings are
                 accepted when no context (person, dates, visits) is available.
             results: The extractor's output for each note.
-            id_start: First primary key value of each table.
+            id_start: First primary key value of each table, with
+                ``row_ids="sequential"``.
+            row_ids: How primary keys are numbered. ``"sequential"`` (default):
+                ``id_start``, ``id_start + 1``, ... per table and call.
+                ``"note"``: derived from the note id and the position of the mention
+                in the note (see `note_row_id`), so they are the same whichever
+                batch, run or shard builds the note. Every note then needs a
+                `note_id`.
 
         Returns:
             The rows of each mapped table, with provenance and issues.
@@ -572,6 +614,8 @@ class OmopTableBuilder:
             raise ValueError(
                 f"Got {len(notes)} notes but {len(results)} extraction results"
             )
+        if row_ids not in ("sequential", "note"):
+            raise ValueError("row_ids must be 'sequential' or 'note'")
         tables = OmopTables(extraction_results=list(results))
         next_id: dict[str, int] = {}
         records = [result.to_records() for result in results]
@@ -584,13 +628,16 @@ class OmopTableBuilder:
         for note_index, (note, note_records) in enumerate(zip(notes, records)):
             if isinstance(note, str):
                 note = ClinicalNote(text=note)
-            for record in note_records:
+            for ordinal, record in enumerate(note_records, start=1):
                 mapping = self.mappings.get(record.key)
                 if mapping is None:
                     continue
                 table = mapping.table
-                row_id = next_id.get(table, id_start)
-                next_id[table] = row_id + 1
+                if row_ids == "note":
+                    row_id = note_row_id(note.note_id, ordinal)
+                else:
+                    row_id = next_id.get(table, id_start)
+                    next_id[table] = row_id + 1
                 ctx = _RowContext(table, note_index, note, record.id, coded)
                 row = self._build_row(mapping, record, ctx, row_id)
                 for issue in ctx.issues:
@@ -1178,3 +1225,52 @@ class OmopExtractionPipeline:
         return await asyncio.to_thread(
             self.builder.build, clinical_notes, results, id_start
         )
+
+    async def run(
+        self,
+        source: Any,
+        output_dir: str | Path,
+        chunk_size: int = 100,
+        columns: Optional[dict[str, str]] = None,
+        max_attempts: int = 3,
+    ) -> "RunSummary":
+        """Process a dataset of any size in chunks, writing Parquet files as it goes.
+
+        A run that stops partway resumes where it left off when called again with the
+        same `output_dir`: notes already built are skipped, and notes already
+        extracted are built from their stored result without another model call.
+        Notes that fail are recorded and retried by a later run, up to
+        `max_attempts` times. See `aatm.omop.runner`.
+
+        Args:
+            source: The notes: an iterable of `ClinicalNote` or dicts, a DataFrame,
+                a path to a CSV or Parquet file (or a folder of Parquet files), or
+                `aatm.omop.notes_from_sql`. Every note needs a unique `note_id`.
+            output_dir: Where the tables and the run's ledger are written.
+            chunk_size: Notes extracted and built together. Memory use grows with
+                it, not with the dataset.
+            columns: Renames source columns to `ClinicalNote` fields, e.g.
+                ``{"note_text": "text"}``. Other unknown columns are ignored.
+            max_attempts: Times a failing note is tried, across runs.
+
+        Returns:
+            What this run did: notes built, skipped and failed, rows per table,
+            coding cache hits.
+        """
+        from aatm.omop.runner import ChunkedRun
+
+        return await ChunkedRun(self, output_dir).run(
+            source, chunk_size=chunk_size, columns=columns, max_attempts=max_attempts
+        )
+
+    async def rebuild(
+        self, output_dir: str | Path, chunk_size: int = 1000
+    ) -> "RunSummary":
+        """Build the tables of a run again from its stored extraction results.
+
+        Makes no extraction calls: use it after changing the ``omop`` blocks. Row ids
+        stay the same. The coder may still be called for texts it has not cached.
+        """
+        from aatm.omop.runner import ChunkedRun
+
+        return await ChunkedRun(self, output_dir).rebuild(chunk_size=chunk_size)
