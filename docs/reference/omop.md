@@ -9,6 +9,8 @@ Mapping extracted entities to OMOP CDM table rows. See
 
 ::: aatm.omop.coding
 
+::: aatm.omop.cache
+
 ::: aatm.omop.tables
 
 ::: aatm.omop.vocabulary

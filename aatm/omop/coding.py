@@ -54,7 +54,11 @@ class CodedText(BaseModel):
         standard: Whether the concept is standard. ``None`` when unknown.
         rationale: Why the concept was chosen, for coders that explain (the agent).
         trace: The searches made to find it, for coders that search (the agent).
-        usage: Tool calls, LLM calls, tokens and seconds spent, when reported.
+        usage: Tool calls, LLM calls, tokens and seconds spent, when reported. For a
+            cached result, what was spent when it was first coded.
+        error: The error that stopped the coder, if any. Such results are not cached.
+        cached: Whether the result came from a `aatm.omop.CodingCache`, rather than
+            being coded in this run.
     """
 
     text: str
@@ -68,6 +72,8 @@ class CodedText(BaseModel):
     rationale: Optional[str] = None
     trace: Optional[list[dict[str, Any]]] = None
     usage: Optional[dict[str, Any]] = None
+    error: Optional[str] = None
+    cached: bool = False
 
 
 class TextCoder(Protocol):
@@ -77,6 +83,10 @@ class TextCoder(Protocol):
     `aatm.concept_search.CodingContext` per text (related values, the sentence of the
     note, the target column). The builder then codes each distinct text *in its
     context* once, rather than each distinct text once.
+
+    To be cached (`aatm.omop.CachedCoder`), a coder also describes itself with
+    ``cache_identity()``: JSON-compatible values covering everything that changes its
+    results (models, settings, prompts, index).
     """
 
     def code(
@@ -122,6 +132,15 @@ class TerminologyMapperCoder:
     @property
     def uses_context(self) -> bool:
         return uses_context(getattr(self.mapper, "selector", None))
+
+    def cache_identity(self) -> dict[str, Any]:
+        """The mapper's components and settings, for `aatm.omop.CachedCoder`."""
+        from aatm.omop.cache import describe_component
+
+        return {
+            "coder": "TerminologyMapperCoder",
+            "mapper": describe_component(self.mapper),
+        }
 
     def code(
         self,
@@ -224,6 +243,15 @@ class AgenticCoder:
         )
         self.max_concurrency = max_concurrency
 
+    def cache_identity(self) -> dict[str, Any]:
+        """The agent's model, settings, tools and prompts, for `aatm.omop.CachedCoder`.
+
+        ``max_concurrency`` is left out: it does not change the results.
+        """
+        from aatm.omop.cache import describe_component
+
+        return {"coder": "AgenticCoder", "agent": describe_component(self.agent)}
+
     def code(
         self,
         texts: Sequence[str],
@@ -266,4 +294,5 @@ def coded_text(text: str, result: "ConceptSearchResult") -> CodedText:
         rationale=result.rationale,
         trace=result.trace,
         usage=result.usage(),
+        error=result.error,
     )
