@@ -629,6 +629,22 @@ method returning JSON-compatible values that cover everything that changes its r
 Otherwise wrap it yourself and say what it is:
 `CachedCoder(my_coder, cache, identity={"name": "my_coder", "version": 2})`.
 
+### Rate limits for long runs
+
+No rate limits are set by default: the pipeline sends model calls as fast as it can,
+and retries rate-limit and transient errors on its own. For large datasets, or a
+provider quota you must stay under, set limits once before the run; they cover
+extraction and coding together:
+
+```python
+from aatm.llm import set_rate_limits
+
+set_rate_limits("openai", max_concurrency=32, requests_per_minute=5000)
+```
+
+See [Rate limits and retries](quick_start_extraction.md#rate-limits-and-retries-optional)
+for every option.
+
 ### Code lookups
 
 `lookup: <VOCABULARY>` finds the extracted text as a code of a vocabulary. It suits

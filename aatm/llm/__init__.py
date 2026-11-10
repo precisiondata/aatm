@@ -11,8 +11,9 @@ Supported prefixes: ``openai``, ``gemini``, ``anthropic`` (needs ``aatm[anthropi
 ``ollama``, ``openrouter`` and ``openai-compatible`` (any OpenAI-compatible server,
 with ``base_url``). More can be added with `register_provider`.
 
-Every call goes through one limiter per model, with retries on rate limits and
-transient errors; set its limits with `set_rate_limits` (see `aatm.llm.limits`).
+Calls are retried on rate limits and transient errors. No rate limits are set by
+default; set them, per model, provider or for all, with `set_rate_limits`
+(see `aatm.llm.limits`).
 """
 
 from aatm.llm.limits import (

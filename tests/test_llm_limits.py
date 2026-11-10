@@ -101,6 +101,14 @@ def test_retry_after_header():
 # --- configuration --------------------------------------------------------------------
 
 
+def test_no_limits_by_default_but_retries_on():
+    limits = get_rate_limits("openai/gpt-5")
+    assert limits.max_concurrency is None
+    assert limits.requests_per_minute is None
+    assert limits.tokens_per_minute is None
+    assert limits.max_retries > 0
+
+
 def test_limits_resolve_by_model_then_provider_then_default():
     assert get_rate_limits("openai/gpt-5") == RateLimits()
     set_rate_limits("*", max_concurrency=4)

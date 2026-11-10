@@ -97,9 +97,9 @@ class SimpleLLMExtractor:
         settings: Generation settings, as an `aatm.llm.LLMSettings` or a compatible
             dict, e.g. ``{"temperature": 0, "max_tokens": 8000}``.
         max_concurrency: Maximum number of concurrent model calls made by this
-            extractor. ``None`` (default) leaves the cap to the model's shared rate
-            limiter (`aatm.llm.set_rate_limits`), which also retries rate-limit and
-            transient errors.
+            extractor. ``None`` (default) sets no cap: all texts are sent at once,
+            within any limits set for the model with `aatm.llm.set_rate_limits`
+            (none by default). Rate-limit and transient errors are retried either way.
         max_segment_chars: If set, lines longer than this are split at sentence
             boundaries into separately numbered segments before being sent to the
             model. ``None`` (default) keeps every line whole.

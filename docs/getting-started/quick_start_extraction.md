@@ -107,36 +107,62 @@ Several notes can be passed at once and are extracted concurrently:
 results = await extractor(list_of_notes)
 ```
 
-### Concurrency, rate limits and retries
+### Rate limits and retries (optional)
 
-Every LLM call in AATM (extraction, the concept search agent, ...) goes through one
-limiter per model, shared by every component. By default it allows 16 calls in flight
-per model and retries rate-limit errors (429), server errors (5xx), timeouts and
-connection errors up to 6 times, with exponential backoff and jitter, honouring the
-provider's `Retry-After`. A 429 also pauses every call to that model for the wait.
+**By default AATM sets no limits.** All the notes you pass are sent to the model at
+the same time, and calls run as fast as the provider accepts them. That is fine for a
+handful of notes. For larger batches, or a provider with a tight quota, you can set
+limits yourself; nothing else needs to change.
 
-Set the limits once, for every model (`"*"`), a provider or one model:
+Limits are set once per process with `aatm.llm.set_rate_limits`, and apply to every
+LLM call AATM makes for that model: extraction, the concept search agent and the LLM
+selectors share one budget per model.
 
 ```python
 from aatm.llm import set_rate_limits
 
+# Every model: at most 16 calls in flight.
 set_rate_limits("*", max_concurrency=16)
+
+# Every Anthropic model: stay under the account's quota.
 set_rate_limits("anthropic", requests_per_minute=1000, tokens_per_minute=400_000)
-set_rate_limits("openai/gpt-5-mini", max_concurrency=64, max_retries=8)
+
+# One model.
+set_rate_limits("openai/gpt-5-mini", max_concurrency=64)
 ```
 
-Limits are looked up by model id, then provider, then `"*"`. Each model has its own
-limiter, even when its limits come from the provider entry. The token limit counts
-input and output tokens; a call reserves an estimate of its prompt before it starts,
-corrected with the provider's count when it returns.
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `max_concurrency` | `None` (no limit) | Calls in flight at the same time |
+| `requests_per_minute` | `None` (no limit) | Calls started in any 60-second window |
+| `tokens_per_minute` | `None` (no limit) | Input and output tokens in any 60-second window |
+| `max_retries` | `6` | Retries after a rate-limit or transient error; `0` turns retries off |
+| `initial_backoff` | `1.0` | Upper bound, in seconds, of the first retry's random wait; doubles each retry |
+| `max_backoff` | `60.0` | Cap, in seconds, of the wait between retries |
 
-An error that persists after the retries stops the batch by default. With
-`on_error="record"`, the note gets an empty result with the error in its `error`
-field instead, and the other notes go on:
+The key is a model id (`"openai/gpt-5-mini"`), a provider (`"openai"`) or `"*"` for
+every model; the most specific one that is set applies. Each model keeps its own
+counters, even when its limits come from the provider or `"*"` entry. Fields left out
+take the defaults above. Use `get_rate_limits("openai/gpt-5-mini")` to see what applies
+to a model, and `reset_rate_limits()` to go back to no limits.
+
+The token limit is approximate: a call reserves an estimate of its prompt (about 4
+characters per token) before it starts, and the provider's count replaces it when the
+call returns.
+
+**Retries are on even without limits.** Rate-limit errors (429), server errors (5xx),
+timeouts and connection errors are retried with exponential backoff and jitter,
+waiting as long as the provider's `Retry-After` header asks when it sends one. After a
+429, every call to that model waits too, so they don't all keep hitting the limit.
+Other errors, such as an invalid API key or a request the model refuses, fail at once.
+
+**Errors per note.** An error that persists after the retries stops the batch by
+default. With `on_error="record"`, that note gets an empty result with the error in
+its `error` field, and the other notes go on:
 
 ```python
 extractor = SimpleLLMExtractor(
-    model_id="openai/gpt-5",
+    model_id="openai/gpt-5-mini",
     entity_definitions=entity_definitions,
     on_error="record",
 )
@@ -144,7 +170,8 @@ results = await extractor(list_of_notes)
 failed = [i for i, r in enumerate(results) if r.error]
 ```
 
-`max_concurrency` on the extractor adds a cap of its own on top of the model's limiter.
+`SimpleLLMExtractor(max_concurrency=...)` still works: it caps the calls of that one
+extractor, on top of any limit set with `set_rate_limits`.
 
 ---
 
@@ -513,7 +540,7 @@ segments=segment_text(note, max_segment_chars=400))`.
 | `base_url` | `None` | Server URL for OpenAI-compatible providers |
 | `settings` | `None` | `aatm.llm.LLMSettings` or a dict, e.g. `{"temperature": 0, "max_tokens": 8000}` |
 | `llm` | `None` | A ready-made `aatm.llm.StructuredLLM`, used instead of `model_id` |
-| `max_concurrency` | `None` | Parallel model calls from this extractor; `None` leaves it to the model's limiter (`aatm.llm.set_rate_limits`) |
+| `max_concurrency` | `None` | Parallel model calls from this extractor; `None` means no cap of its own (see [Rate limits and retries](#rate-limits-and-retries-optional)) |
 | `on_error` | `"raise"` | `"record"` returns an empty result with the error for a note that fails after retries |
 | `max_segment_chars` | `None` | Split lines longer than this at sentence boundaries |
 | `instructions` | built-in prompt | Custom system prompt; `{output_format}` and `{entity_definitions}` are filled in |

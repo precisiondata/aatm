@@ -1,24 +1,30 @@
-"""Shared rate limits and retries for every LLM call.
+"""Optional rate limits, and retries, for every LLM call.
 
 Every call made through the adapters in `aatm.llm` goes through the `RateLimiter` of
-its model, so all the components of a pipeline (extractor, concept search agent,
-selectors...) share one budget per model. Limits are set in one place:
+its model, shared by all the components of a pipeline (extractor, concept search
+agent, selectors...).
+
+**No limits are set by default**: calls run as fast and as concurrently as the code
+issues them. Set limits when a provider's quota requires it, or to keep long runs
+under it, once for the whole process:
 
 ```python
 from aatm.llm import set_rate_limits
 
-set_rate_limits("*", max_concurrency=16)  # default for every model
+set_rate_limits("*", max_concurrency=16)  # every model
 set_rate_limits("anthropic", requests_per_minute=1000, tokens_per_minute=400_000)
-set_rate_limits("openai/gpt-5-mini", max_concurrency=64, max_retries=8)
+set_rate_limits("openai/gpt-5-mini", max_concurrency=64)  # one model
 ```
 
 Limits are looked up by model id (``"provider/model"``), then provider, then ``"*"``.
 Each model has its own limiter, even when its limits come from the provider entry.
+Set them before or during a run; models already in use pick them up on their next call.
 
-Rate-limit errors (429), server errors (5xx), timeouts and connection errors are
-retried with exponential backoff and full jitter, honouring ``Retry-After`` when the
-provider sends it. A 429 also pauses every call to that model for the wait, so
-concurrent calls don't keep hitting the limit. Other errors are raised at once.
+**Retries are on by default.** Rate-limit errors (429), server errors (5xx), timeouts
+and connection errors are retried up to 6 times with exponential backoff and full
+jitter, honouring ``Retry-After`` when the provider sends it. A 429 also pauses every
+call to that model for the wait, so concurrent calls don't keep hitting the limit.
+Other errors are raised at once. Turn retries off with ``max_retries=0``.
 """
 
 from __future__ import annotations
@@ -57,6 +63,8 @@ _CONNECTION_ERROR_NAMES = {
 class RateLimits(BaseModel):
     """Concurrency, rate limits and retries for the calls to one model.
 
+    Every limit defaults to ``None`` (no limit); only retries are on by default.
+
     Attributes:
         max_concurrency: Calls in flight at the same time. ``None`` for no cap.
         requests_per_minute: Calls started in any 60-second window. ``None`` for no
@@ -72,7 +80,7 @@ class RateLimits(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    max_concurrency: Optional[int] = Field(default=16, gt=0)
+    max_concurrency: Optional[int] = Field(default=None, gt=0)
     requests_per_minute: Optional[float] = Field(default=None, gt=0)
     tokens_per_minute: Optional[float] = Field(default=None, gt=0)
     max_retries: int = Field(default=6, ge=0)
