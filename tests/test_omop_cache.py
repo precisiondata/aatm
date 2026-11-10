@@ -457,3 +457,21 @@ def test_agentic_coder_identity_follows_the_vocabulary(tmp_path, vocab_db):  # n
     con.commit()
     con.close()
     assert CachedCoder(agentic(vocab_db), path).coder_hash != before.coder_hash
+
+
+@pytest.mark.parametrize("as_dict", [False, True])
+def test_timeout_is_not_part_of_the_identity(as_dict):
+    from aatm.llm import LLMSettings
+    from aatm.omop.cache import describe_component
+
+    class LLM:
+        model_id = "openai/m"
+
+        def __init__(self, **settings):
+            self.settings = settings if as_dict else LLMSettings(**settings)
+
+    fast = describe_component(LLM(timeout=5, temperature=0))
+    slow = describe_component(LLM(timeout=60, temperature=0))
+    assert fast == slow
+    assert "timeout" not in fast["settings"]
+    assert describe_component(LLM(timeout=5, temperature=1)) != fast

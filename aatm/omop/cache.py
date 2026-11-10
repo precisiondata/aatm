@@ -521,6 +521,9 @@ _SETTING_ATTRS = (
     "limit_to",
     "settings",
 )
+# Generation settings (`aatm.llm.LLMSettings`) left out of identities: changing them
+# does not change the results, so it should not start a new cache.
+_RESULT_NEUTRAL_SETTINGS = ("timeout",)
 # Attributes holding nested components.
 _COMPONENT_ATTRS = (
     "translator",
@@ -549,6 +552,11 @@ def describe_component(obj: Any, _depth: int = 0) -> Any:
     described: dict[str, Any] = {"class": f"{cls.__module__}.{cls.__qualname__}"}
     for name in _SETTING_ATTRS:
         value = _plain(getattr(obj, name, None))
+        if name == "settings" and isinstance(value, dict):
+            # Generation settings, minus those that do not change the answer.
+            value = {
+                k: v for k, v in value.items() if k not in _RESULT_NEUTRAL_SETTINGS
+            }
         if value is not _UNSET and value is not None:
             described[name] = value
     base_url = getattr(getattr(obj, "client", None), "base_url", None)
