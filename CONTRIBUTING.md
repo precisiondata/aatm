@@ -103,7 +103,17 @@ Ready to submit your changes? Follow this standard workflow:
 
 ## Releasing (maintainers)
 
-Docs are deployed to GitHub Pages automatically on every push to `main`.
+Docs are versioned with [mike](https://github.com/jimporter/mike) and
+deployed to GitHub Pages by `.github/workflows/docs.yml`:
+
+* every push to `main` updates `dev`, the latest unreleased docs;
+* every `v*` tag publishes that version, aliases it `latest` and makes it
+  the default the site root redirects to;
+* older tags can be (re)built from the Actions tab: run **Docs** manually
+  with the tag, ticking *latest* only for the newest release.
+
+To preview the version selector locally, run `mike serve` after a
+`mike deploy dev` (this only touches your local `gh-pages` branch).
 PyPI releases are published by `.github/workflows/release.yml` when a `v*`
 tag is pushed. Only repository admins can create `v*` tags.
 
