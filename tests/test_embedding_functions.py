@@ -7,8 +7,21 @@ from aatm import embedding_functions as ef
 from aatm import precision
 
 
+class FakeTokenizer:
+    """One token per word."""
+
+    def __call__(self, texts: Any, add_special_tokens: bool = True) -> dict:
+        if isinstance(texts, str):
+            return {"input_ids": texts.split()}
+        return {"input_ids": [text.split() for text in texts]}
+
+
 class FakeSentenceTransformer:
-    """Stand-in for SentenceTransformer that records how it was used."""
+    """Stand-in for SentenceTransformer that records how it was used.
+
+    Each embedding is ``[word count, 0, 0]``, so tests can tell which text an
+    embedding belongs to.
+    """
 
     instances: list["FakeSentenceTransformer"] = []
 
@@ -16,6 +29,11 @@ class FakeSentenceTransformer:
         self.model_id = model_id
         self.init_kwargs = kwargs
         self.encode_calls: list[dict[str, Any]] = []
+        self.encoded_texts: list[list[str]] = []
+        self.tokenizer = FakeTokenizer()
+        self.prompts = {"query": "Instruct: find"}
+        self.default_prompt_name = None
+        self.max_seq_length = 100
         FakeSentenceTransformer.instances.append(self)
 
     def eval(self) -> "FakeSentenceTransformer":
@@ -23,7 +41,10 @@ class FakeSentenceTransformer:
 
     def encode(self, texts: list[str], **kwargs: Any) -> np.ndarray:
         self.encode_calls.append(kwargs)
-        return np.ones((len(texts), 3), dtype=np.float32)
+        self.encoded_texts.append(list(texts))
+        embeddings = np.zeros((len(texts), 3), dtype=np.float32)
+        embeddings[:, 0] = [len(text.split()) for text in texts]
+        return embeddings
 
 
 @pytest.fixture
@@ -57,12 +78,66 @@ def test_local_models_are_marked_local_before_instantiation(cls):
 )
 def test_local_models_use_configured_batch_size(fake_st, cls, model_id):
     function = cls(model=model_id, batch_size=7)
-    function.batch_size = 128  # the builder overwrites it after estimating
+    function.batch_size = 2  # the builder may overwrite it
 
-    embeddings = function(["a", "b"])
+    embeddings = function(["a", "b", "c", "d", "e"])
 
-    assert len(embeddings) == 2
-    assert fake_st.instances[0].encode_calls[0]["batch_size"] == 128
+    assert len(embeddings) == 5
+    sizes = [call["batch_size"] for call in fake_st.instances[0].encode_calls]
+    assert sizes == [2, 2, 1]
+
+
+def test_local_models_batch_by_token_length_and_keep_input_order(fake_st):
+    function = ef.GemmaEmbeddingFunction(
+        model=ef.GemmaEmbeddingModels.EMBEDDING_GEMMA_300M.value, batch_size=2
+    )
+    texts = ["a", "a b c d", "a b", "a b c", "a b c d e"]
+
+    embeddings = function(texts)
+
+    # Longest first, so texts of similar length share a batch.
+    assert fake_st.instances[0].encoded_texts == [
+        ["a b c d e", "a b c d"],
+        ["a b c", "a b"],
+        ["a"],
+    ]
+    assert [int(vector[0]) for vector in embeddings] == [1, 4, 2, 3, 5]
+
+
+def test_local_models_fill_batches_up_to_token_budget(fake_st):
+    function = ef.GemmaEmbeddingFunction(
+        model=ef.GemmaEmbeddingModels.EMBEDDING_GEMMA_300M.value,
+        max_batch_tokens=8,
+    )
+    texts = ["a b c d"] * 3 + ["a"] * 10
+
+    function(texts)
+
+    # A batch starting with a 4-token text holds two; one of 1-token texts, eight.
+    sizes = [call["batch_size"] for call in fake_st.instances[0].encode_calls]
+    assert sizes == [2, 2, 8, 1]
+
+
+def test_token_lengths_include_prompt_and_respect_max_length(fake_st):
+    function = ef.Qwen3EmbeddingFunction(model=ef.Qwen3EmbeddingModels.QWEN3_06B.value)
+    fake_st.instances[0].max_seq_length = 5
+
+    # The "query" prompt adds two tokens.
+    assert function.token_lengths(["a", "a b", "a b c d e f"]) == [3, 4, 5]
+
+
+@pytest.mark.parametrize(
+    ("lengths", "batch_size", "max_batch_tokens", "expected"),
+    [
+        ([1, 3, 2], 2, None, [[1, 2], [0]]),
+        ([1, 3, 2], 5, None, [[1, 2, 0]]),
+        # A text longer than the budget still gets a batch of its own.
+        ([10, 2, 2, 2], 99, 4, [[0], [1, 2], [3]]),
+        ([], 4, None, []),
+    ],
+)
+def test_plan_batches(lengths, batch_size, max_batch_tokens, expected):
+    assert ef.plan_batches(lengths, batch_size, max_batch_tokens) == expected
 
 
 def test_qwen3_encodes_with_query_prompt(fake_st):

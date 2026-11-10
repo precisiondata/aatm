@@ -199,7 +199,9 @@ class FakeLocalModel(FakeEmbeddingFunction):
 
     def __init__(self, model, dtype="float32", *args, **kwargs):
         FakeLocalModel.loaded_dtypes.append(dtype)
+        FakeLocalModel.last = self
         self.batch_size = 8
+        self.max_batch_tokens = None
 
 
 @pytest.fixture
@@ -329,3 +331,21 @@ def test_repair_of_untracked_database_fails(fake_local_project, monkeypatch):
 def test_embedding_dtype_is_rejected_for_api_models(fake_project):
     with pytest.raises(ValueError, match="only applies to local models"):
         ldu.build_local_vector_database("fake-model", embedding_dtype="bfloat16")
+
+
+def test_token_budget_is_passed_to_local_model(fake_local_project):
+    ldu.build_local_vector_database("fake-local", encode_max_batch_tokens=4096)
+    assert FakeLocalModel.last.max_batch_tokens == 4096
+
+
+def test_fixed_batch_size_turns_off_token_budget(fake_local_project):
+    build_local()
+    assert FakeLocalModel.last.batch_size == 8
+    assert FakeLocalModel.last.max_batch_tokens is None
+
+
+def test_batch_size_and_token_budget_are_exclusive(fake_local_project):
+    with pytest.raises(ValueError, match="not both"):
+        ldu.build_local_vector_database(
+            "fake-local", encode_batch_size=8, encode_max_batch_tokens=4096
+        )

@@ -47,6 +47,7 @@ Notes:
     module.
 """
 
+from collections.abc import Sequence
 from enum import Enum
 from typing import Any, ClassVar
 from chromadb import Documents, EmbeddingFunction, Embeddings
@@ -130,6 +131,42 @@ class Qwen3EmbeddingModels(Enum):
     QWEN3_8B = "Qwen/Qwen3-Embedding-8B"
 
 
+def plan_batches(
+    token_lengths: Sequence[int],
+    batch_size: int,
+    max_batch_tokens: int | None = None,
+) -> list[list[int]]:
+    """Group texts into batches of similar token length.
+
+    Every row of a batch is padded to the batch's longest text, so texts of
+    similar length are batched together, longest first. SentenceTransformers
+    sorts by characters, which for short clinical terms matches the token
+    count poorly and left 30-55% of the tokens on the GPU as padding.
+
+    Args:
+        token_lengths: Token count of each text.
+        batch_size: Texts per batch. Used when ``max_batch_tokens`` is ``None``.
+        max_batch_tokens: Padded tokens per batch (texts times the length of the
+            batch's longest text). Short texts then form large batches and long
+            texts small ones. A text longer than the budget gets a batch of its
+            own.
+
+    Returns:
+        The indices of the texts in each batch.
+    """
+    order = sorted(range(len(token_lengths)), key=lambda i: -token_lengths[i])
+    batches: list[list[int]] = []
+    start = 0
+    while start < len(order):
+        if max_batch_tokens is None:
+            size = batch_size
+        else:
+            size = max(1, max_batch_tokens // max(1, token_lengths[order[start]]))
+        batches.append(order[start : start + size])
+        start += size
+    return batches
+
+
 class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
     """Shared base for embedding models run locally with SentenceTransformers.
 
@@ -149,7 +186,11 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
         model_id: Fully qualified identifier of the loaded model.
         dtype: Precision the model runs in.
         model: SentenceTransformer instance used to encode documents.
-        batch_size: Number of texts encoded per forward pass.
+        batch_size: Number of texts encoded per forward pass, when
+            ``max_batch_tokens`` is ``None``.
+        max_batch_tokens: Padded tokens per forward pass. When set, it replaces
+            ``batch_size``: batches of short texts hold more texts. The vector
+            database builder measures the best value on CUDA.
     """
 
     is_local: ClassVar[bool] = True
@@ -161,16 +202,23 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
     """Precisions known to produce broken embeddings with this model."""
 
     def __init__(
-        self, model_id: str, batch_size: int = 32, dtype: str | None = None
+        self,
+        model_id: str,
+        batch_size: int = 32,
+        dtype: str | None = None,
+        max_batch_tokens: int | None = None,
     ) -> None:
         """Load the model onto the selected device.
 
         Args:
             model_id: Fully qualified identifier of the model to load.
-            batch_size: Number of texts encoded per forward pass.
+            batch_size: Number of texts encoded per forward pass, when
+                ``max_batch_tokens`` is not set.
             dtype: Precision to load the model in (``float32``, ``bfloat16`` or
                 ``float16``). If not provided, ``AATM_EMBEDDING_DTYPE`` is used,
                 and otherwise the precision the checkpoint is stored in.
+            max_batch_tokens: Padded tokens per forward pass. When set, it
+                replaces ``batch_size``. See `plan_batches`.
 
         Returns:
             None
@@ -203,24 +251,61 @@ class LocalSentenceTransformerEmbeddingFunction(EmbeddingFunction):
         )
         self.model.eval()
         self.batch_size = batch_size
+        self.max_batch_tokens = max_batch_tokens
+
+    def token_lengths(self, texts: Sequence[str]) -> list[int]:
+        """Return the number of tokens the model sees for each text.
+
+        Includes the encode prompt and special tokens, and is capped at the
+        model's maximum sequence length, like the encoding itself.
+        """
+        tokenizer = self.model.tokenizer
+        prompt_name = self.encode_kwargs.get(
+            "prompt_name", getattr(self.model, "default_prompt_name", None)
+        )
+        prompt = self.model.prompts.get(prompt_name, "") if prompt_name else ""
+        prompt_tokens = (
+            len(tokenizer(prompt, add_special_tokens=False)["input_ids"])
+            if prompt
+            else 0
+        )
+        limit = self.model.max_seq_length
+        return [
+            min(len(ids) + prompt_tokens, limit) if limit else len(ids) + prompt_tokens
+            for ids in tokenizer(list(texts))["input_ids"]
+        ]
 
     def __call__(self, input: Documents) -> Embeddings:
         """Generate embeddings for the provided documents.
+
+        Texts are batched by token length (see `plan_batches`), so little of
+        the GPU's work goes to padding.
 
         Args:
             input: Documents to be embedded.
 
         Returns:
-            One float32 vector per document, already on the CPU.
+            One float32 vector per document, already on the CPU, in input order.
         """
+        texts = list(input)
+        if not texts:
+            return []
+
+        batches = plan_batches(
+            self.token_lengths(texts), self.batch_size, self.max_batch_tokens
+        )
+        embeddings: list[Any] = [None] * len(texts)
         with torch.inference_mode():
-            embeddings = self.model.encode(
-                input,
-                batch_size=self.batch_size,
-                convert_to_numpy=True,
-                **self.encode_kwargs,
-            )
-        return list(embeddings)
+            for batch in batches:
+                encoded = self.model.encode(
+                    [texts[i] for i in batch],
+                    batch_size=len(batch),
+                    convert_to_numpy=True,
+                    **self.encode_kwargs,
+                )
+                for index, vector in zip(batch, encoded):
+                    embeddings[index] = vector
+        return embeddings
 
 
 class Qwen3EmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
@@ -236,6 +321,7 @@ class Qwen3EmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
         model: str,
         batch_size: int = 32,
         dtype: str | None = None,
+        max_batch_tokens: int | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -246,6 +332,8 @@ class Qwen3EmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
                 model.
             batch_size: Number of texts encoded per forward pass.
             dtype: Precision to load the model in. See
+                `LocalSentenceTransformerEmbeddingFunction`.
+            max_batch_tokens: Padded tokens per forward pass. See
                 `LocalSentenceTransformerEmbeddingFunction`.
             *args: Additional positional arguments accepted for interface
                 compatibility.
@@ -260,7 +348,10 @@ class Qwen3EmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
                 value.
         """
         super().__init__(
-            Qwen3EmbeddingModels(model).value, batch_size=batch_size, dtype=dtype
+            Qwen3EmbeddingModels(model).value,
+            batch_size=batch_size,
+            dtype=dtype,
+            max_batch_tokens=max_batch_tokens,
         )
 
 
@@ -288,6 +379,7 @@ class GemmaEmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
         model: str,
         batch_size: int = 32,
         dtype: str | None = None,
+        max_batch_tokens: int | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -298,6 +390,8 @@ class GemmaEmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
                 model.
             batch_size: Number of texts encoded per forward pass.
             dtype: Precision to load the model in. See
+                `LocalSentenceTransformerEmbeddingFunction`.
+            max_batch_tokens: Padded tokens per forward pass. See
                 `LocalSentenceTransformerEmbeddingFunction`.
             *args: Additional positional arguments accepted for interface
                 compatibility.
@@ -312,7 +406,10 @@ class GemmaEmbeddingFunction(LocalSentenceTransformerEmbeddingFunction):
                 value.
         """
         super().__init__(
-            GemmaEmbeddingModels(model).value, batch_size=batch_size, dtype=dtype
+            GemmaEmbeddingModels(model).value,
+            batch_size=batch_size,
+            dtype=dtype,
+            max_batch_tokens=max_batch_tokens,
         )
 
 
