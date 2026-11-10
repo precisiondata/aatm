@@ -1,0 +1,4497 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Any-to-Any Terminology Mapping, a tool for mapping between different terminologies in the healthcare domain.">
+      
+      
+        <meta name="author" content="Vinicius Anjos de Almeida (https://github.com/almeidava93) supported by Precision Data.">
+      
+      
+        <link rel="canonical" href="https://precisiondata.github.io/aatm/getting-started/omop_tables/">
+      
+      
+        <link rel="prev" href="../entity_definitions/">
+      
+      
+        <link rel="next" href="../../reference/cli/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>From notes to OMOP tables - Any-to-Any Terminology Mapping</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#from-notes-to-omop-tables" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden="">
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Any-to-Any Terminology Mapping" class="md-header__button md-logo" aria-label="Any-to-Any Terminology Mapping" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Any-to-Any Terminology Mapping
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              From notes to OMOP tables
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard="" data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"></path></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/precisiondata/aatm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    precisiondata/aatm
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/cli/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Any-to-Any Terminology Mapping" class="md-nav__button md-logo" aria-label="Any-to-Any Terminology Mapping" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    Any-to-Any Terminology Mapping
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/precisiondata/aatm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    precisiondata/aatm
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked="">
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project artifacts created locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Basic concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_6">
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Quick start
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick_start_cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command Line Interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick_start_python_api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick_start_extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Information extraction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../entity_definitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing entity definitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    From notes to OMOP tables
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    From notes to OMOP tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key terms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your first run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Your first run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the result
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-get-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you get back
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What you get back">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-your-own-body-weight-step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write your own: body weight, step by step
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Write your own: body weight, step by step">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-describe-what-to-extract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Describe what to extract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-say-where-each-value-goes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Say where each value goes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-check-the-codes-before-spending-model-calls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Check the codes before spending model calls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-run-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Run it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-read-the-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Read the issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-the-omop-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference: the omop block
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference: the omop block">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#column-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-codes-standard-concepts-and-domains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed codes, standard concepts and domains
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coding-text-with-the-terminology-mapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coding text with the terminology mapper
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Coding text with the terminology mapper">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#searching-with-an-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Searching with an agent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Searching with an agent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-between-the-mapper-and-the-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing between the mapper and the agent
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keeping-results-across-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping results across runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rate-limits-for-long-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rate limits for long runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-lookups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code lookups
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-observation-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The observation table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-condition_occurrence-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The condition_occurrence table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-drug_exposure-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The drug_exposure table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-device_exposure-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The device_exposure table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#processing-large-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Processing large datasets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3">
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command Line Interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2">
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipeline components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/translators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/embedding_functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedding functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/extractors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extractors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/retrievers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Retrievers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/rerankers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rerankers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/selectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Selectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/concept_search/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concept search agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/terminology_mapper/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminology mapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3">
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User interface
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User interface
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/search_ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search engine interface
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_4">
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registries
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Registries
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/registries/rerankers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rerankers registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/registries/retrievers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Retrievers registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/registries/selectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Selectors registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/registries/translators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translators registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_5">
+        
+          
+          <label class="md-nav__link" for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Other modules
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Other modules
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/data_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/extraction_data_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction data models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/omop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OMOP tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/debug/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debug
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/device/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/local_database_utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local database utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/logs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/prompt_helpers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompt helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#before-you-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-terms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key terms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your first run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Your first run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the result
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-get-back" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you get back
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What you get back">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-your-own-body-weight-step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write your own: body weight, step by step
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Write your own: body weight, step by step">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-describe-what-to-extract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Describe what to extract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-say-where-each-value-goes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Say where each value goes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-check-the-codes-before-spending-model-calls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Check the codes before spending model calls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-run-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Run it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-read-the-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Read the issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-the-omop-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference: the omop block
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference: the omop block">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#column-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-codes-standard-concepts-and-domains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed codes, standard concepts and domains
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coding-text-with-the-terminology-mapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coding text with the terminology mapper
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Coding text with the terminology mapper">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#searching-with-an-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Searching with an agent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Searching with an agent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-between-the-mapper-and-the-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing between the mapper and the agent
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keeping-results-across-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping results across runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rate-limits-for-long-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rate limits for long runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#code-lookups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Code lookups
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-observation-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The observation table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-condition_occurrence-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The condition_occurrence table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-drug_exposure-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The drug_exposure table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-device_exposure-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The device_exposure table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#processing-large-datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Processing large datasets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation">
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Getting Started
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/precisiondata/aatm/edit/master/docs/getting-started/omop_tables.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"></path></svg>
+    </a>
+  
+  
+
+
+<h1 id="from-notes-to-omop-tables">From notes to OMOP tables</h1>
+<p>This page shows how to turn clinical notes into rows of
+<a href="https://ohdsi.github.io/CommonDataModel/cdm55.html">OMOP CDM</a> tables. You describe
+what to find in the notes and where each piece goes in the table; AATM extracts it with
+an LLM, codes it with the OMOP vocabularies and fills the rows as far as the notes
+allow.</p>
+<p>Five tables are supported: <code>measurement</code> (scores, lab results), <code>observation</code>
+(smoking, family and medical history, and other facts), <code>condition_occurrence</code>
+(diagnoses, signs and symptoms), <code>drug_exposure</code> (drugs prescribed, given or taken) and
+<code>device_exposure</code> (implants, equipment and supplies).</p>
+<p>If you have not extracted entities from a note before, read the
+<a href="../quick_start_extraction/">Information extraction quick start</a> first: this page builds
+on its <em>entity definitions</em>.</p>
+<hr>
+<h2 id="before-you-start">Before you start</h2>
+<ol>
+<li><strong>Install AATM</strong> (<a href="../installation/">Installation</a>).</li>
+<li><strong>Download the OMOP vocabularies</strong> from <a href="https://athena.ohdsi.org/vocabulary/list">Athena</a>.
+   The predefined definitions on this page use <strong>SNOMED</strong>, <strong>LOINC</strong> and <strong>UCUM</strong>
+   (units), so include at least those three.</li>
+<li><strong>Run <code>aatm init</code></strong> (<a href="../quick_start_cli/">CLI quick start</a>). It builds the local
+   vocabulary database (<code>.aatm/omop.db</code>), which every example on this page reads, and
+   the search index the terminology mapper uses. Note the embedding model you choose
+   (for example <code>text-embedding-3-small</code>): you pass the same name to the mapper later.</li>
+<li><strong>Set an API key</strong> for the model provider, e.g. <code>OPENAI_API_KEY</code>
+   (<a href="../env/">Environment variables</a>).</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Which definitions need what</p>
+<table>
+<thead>
+<tr>
+<th>Definition</th>
+<th>Table</th>
+<th>Needs the terminology mapper?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ecog_performance_status</code></td>
+<td><code>measurement</code></td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>smoking_status</code></td>
+<td><code>observation</code></td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>lab_results</code></td>
+<td><code>measurement</code></td>
+<td>yes, to code test names</td>
+</tr>
+<tr>
+<td><code>family_history</code></td>
+<td><code>observation</code></td>
+<td>yes, to code conditions</td>
+</tr>
+<tr>
+<td><code>medical_history</code></td>
+<td><code>observation</code></td>
+<td>yes, to code conditions</td>
+</tr>
+<tr>
+<td><code>condition_occurrence</code></td>
+<td><code>condition_occurrence</code></td>
+<td>yes, to code conditions</td>
+</tr>
+<tr>
+<td><code>drug_exposure</code></td>
+<td><code>drug_exposure</code></td>
+<td>yes, to code drugs</td>
+</tr>
+<tr>
+<td><code>device_exposure</code></td>
+<td><code>device_exposure</code></td>
+<td>yes, to code devices</td>
+</tr>
+</tbody>
+</table>
+<p>Definitions without the mapper only need the vocabulary database and an LLM, so
+they are the easiest way to start.</p>
+</div>
+<hr>
+<h2 id="key-terms">Key terms</h2>
+<p>You do not need to know OMOP well to follow this page, but these words come up often.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CDM table</strong></td>
+<td>A table of the OMOP Common Data Model, e.g. <code>measurement</code>. Each row is one fact about a patient.</td>
+</tr>
+<tr>
+<td><strong>Concept</strong></td>
+<td>An entry of the OMOP vocabularies, e.g. <em>Body weight</em>. Columns ending in <code>_concept_id</code> hold concept ids, numbers such as <code>3025315</code>.</td>
+</tr>
+<tr>
+<td><strong>Vocabulary and code</strong></td>
+<td>Where a concept comes from and its code there, e.g. LOINC <code>29463-7</code>. On this page codes are written <code>LOINC:29463-7</code>.</td>
+</tr>
+<tr>
+<td><strong>Standard concept</strong></td>
+<td>The concept OMOP uses for analysis when several mean the same thing. <code>*_concept_id</code> columns must hold standard concepts, from any vocabulary. A non-standard concept usually <strong>maps to</strong> a standard one.</td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>The kind of concept: Measurement, Observation, Condition, Unit... Each column expects certain domains, e.g. <code>measurement_concept_id</code> takes Measurement concepts.</td>
+</tr>
+<tr>
+<td><strong>Source value</strong></td>
+<td>The text as written in the note, kept next to the code, e.g. <code>measurement_source_value = "ECOG 4"</code>.</td>
+</tr>
+<tr>
+<td><strong><code>0</code> and <code>NULL</code></strong></td>
+<td><code>0</code> means "there is a value, but it has no concept". Empty (<code>NULL</code>) means "nothing there".</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="your-first-run">Your first run</h2>
+<p>This uses the predefined ECOG performance status definition, which needs no mapper.</p>
+<div class="language-python highlight"><span class="filename">ecog_to_omop.py</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClinicalNote</span><span class="p">,</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span><span class="s2">"ecog_performance_status"</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">notes</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">ClinicalNote</span><span class="p">(</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="n">text</span><span class="o">=</span><span class="s2">"Assessment 05/12/2025</span><span class="se">\n</span><span class="s2">Oncology follow-up. Bedbound, ECOG 4."</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="n">note_id</span><span class="o">=</span><span class="mi">107</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="n">person_id</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="n">note_date</span><span class="o">=</span><span class="s2">"2025-06-01"</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        <span class="n">visit_occurrence_id</span><span class="o">=</span><span class="mi">507</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="p">),</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">]</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">tables</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">pipeline</span><span class="p">(</span><span class="n">notes</span><span class="p">))</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="n">measurement</span> <span class="o">=</span> <span class="n">tables</span><span class="p">[</span><span class="s2">"measurement"</span><span class="p">]</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="nb">print</span><span class="p">(</span><span class="n">measurement</span><span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">"all"</span><span class="p">)</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>  <span class="c1"># only the filled columns</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Scripts and notebooks</p>
+<p>The pipeline is asynchronous. In a script, wrap the call in <code>asyncio.run(...)</code> as
+above. In a Jupyter notebook, write <code>tables = await pipeline(notes)</code> instead.</p>
+</div>
+<p>The table has every column of the CDM <code>measurement</code> table; <code>dropna</code> leaves out the
+empty ones when printing:</p>
+<table>
+<thead>
+<tr>
+<th>measurement_id</th>
+<th>person_id</th>
+<th>measurement_concept_id</th>
+<th>measurement_date</th>
+<th>measurement_type_concept_id</th>
+<th>value_as_number</th>
+<th>value_as_concept_id</th>
+<th>visit_occurrence_id</th>
+<th>measurement_source_value</th>
+<th>measurement_source_concept_id</th>
+<th>value_source_value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>3</td>
+<td>36305384</td>
+<td>2025-05-12</td>
+<td>32858</td>
+<td>4.0</td>
+<td>4174251</td>
+<td>507</td>
+<td>ECOG 4</td>
+<td>4308014</td>
+<td>4</td>
+</tr>
+</tbody>
+</table>
+<h3 id="reading-the-result">Reading the result</h3>
+<ul>
+<li><code>measurement_id</code> is generated, numbered from 1.</li>
+<li><code>person_id</code> and <code>visit_occurrence_id</code> come from the <code>ClinicalNote</code>, not from the
+  text. They identify the patient and visit in your database, which the note cannot
+  know.</li>
+<li><code>measurement_concept_id</code> <strong>36305384</strong> is the standard concept <em>ECOG Performance
+  Status score</em> (LOINC 89247-1).</li>
+<li><code>measurement_date</code> is <strong>2025-05-12</strong>, the assessment date written in the note. When a
+  note gives no date, the note date (<code>2025-06-01</code>) is used instead.</li>
+<li><code>measurement_type_concept_id</code> <strong>32858</strong> means <em>NLP</em>: the row was derived from text.</li>
+<li><code>value_as_number</code> <strong>4.0</strong> and <code>value_as_concept_id</code> <strong>4174251</strong> (<em>ECOG performance
+  status - grade 4</em>) are the grade, as a number and as a concept.</li>
+<li><code>measurement_source_value</code> and <code>value_source_value</code> keep what the note said.</li>
+</ul>
+<p><code>ClinicalNote</code> takes the note <code>text</code> and the values that come <strong>with</strong> the note:
+<code>person_id</code>, <code>note_id</code>, <code>note_date</code>, <code>visit_occurrence_id</code>, <code>visit_detail_id</code> and
+<code>provider_id</code>. All but <code>text</code> are optional; columns that need a missing value stay
+empty and are reported (see <a href="#issues">Issues</a>). You can also pass plain strings instead
+of <code>ClinicalNote</code> objects.</p>
+<hr>
+<h2 id="what-you-get-back">What you get back</h2>
+<p><code>pipeline(notes)</code> returns an <code>OmopTables</code> object:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">tables</span><span class="p">[</span><span class="s2">"measurement"</span><span class="p">]</span>                                 <span class="c1"># the rows, as a pandas DataFrame</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">tables</span><span class="o">.</span><span class="n">to_dataframes</span><span class="p">(</span><span class="n">provenance</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s2">"measurement"</span><span class="p">]</span>  <span class="c1"># plus where each row came from</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">tables</span><span class="o">.</span><span class="n">issues_dataframe</span><span class="p">()</span>                             <span class="c1"># what could not be filled, and why</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">tables</span><span class="o">.</span><span class="n">mappings_dataframe</span><span class="p">()</span>                           <span class="c1"># how extracted text was coded</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">tables</span><span class="o">.</span><span class="n">extraction_results</span>                             <span class="c1"># the extractor's raw output</span>
+</span></code></pre></div>
+<p>With <code>provenance=True</code>, each row gets extra columns (<code>_note_id</code>, <code>_entity_id</code>, <code>_text</code>,
+<code>_start</code>, <code>_end</code>) pointing at the exact words of the note it was built from, so every
+row can be checked by a person.</p>
+<h3 id="issues">Issues</h3>
+<p>Rows are always returned, even when some columns could not be filled. Each gap is listed
+in <code>tables.issues_dataframe()</code>, with the row, the column, a reason and a detail.</p>
+<table>
+<thead>
+<tr>
+<th>Reason</th>
+<th>Meaning</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>missing_required</code></td>
+<td>A column the CDM requires is empty, e.g. <code>person_id</code></td>
+<td>Pass it in the <code>ClinicalNote</code></td>
+</tr>
+<tr>
+<td><code>unparsable_date</code></td>
+<td>A date is not a full date, e.g. "on admission". The next source (often the note date) was used</td>
+<td>Usually nothing; check the detail</td>
+</tr>
+<tr>
+<td><code>imputed_date_parts</code></td>
+<td>A date had no day or month, e.g. "March 2024", and was read as 2024-03-01</td>
+<td>Decide if day-level precision matters</td>
+</tr>
+<tr>
+<td><code>unmapped_label</code></td>
+<td>The model chose a label that has no concept; <code>0</code> was stored</td>
+<td>Add the label to <code>concepts</code>, or accept <code>0</code></td>
+</tr>
+<tr>
+<td><code>unmapped</code></td>
+<td>No standard concept was found for a text, e.g. the unit "lb"; <code>0</code> was stored</td>
+<td>Review in <code>mappings_dataframe()</code></td>
+</tr>
+<tr>
+<td><code>low_confidence</code></td>
+<td>The mapper's score was below your <code>min_score</code>; <code>0</code> was stored</td>
+<td>Review the candidate in <code>mappings_dataframe()</code></td>
+</tr>
+<tr>
+<td><code>domain_mismatch</code></td>
+<td>A coded concept is not of the domain the column expects</td>
+<td>Review the mapping</td>
+</tr>
+<tr>
+<td><code>invalid_value</code></td>
+<td>A value does not fit its column, e.g. text that is not a number</td>
+<td>Check the extracted text</td>
+</tr>
+<tr>
+<td><code>truncated</code></td>
+<td>A text was longer than its column (50 characters for <code>*_source_value</code>)</td>
+<td>Usually nothing</td>
+</tr>
+<tr>
+<td><code>multiple_children</code></td>
+<td>A mention had two children of the same kind, e.g. two dates; the first was used</td>
+<td>Check the note</td>
+</tr>
+<tr>
+<td><code>single_date</code></td>
+<td>The note gave only an end date, earlier than the fallback start date (often the note date); the end date was used for both, as the CDM allows</td>
+<td>Usually nothing</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="write-your-own-body-weight-step-by-step">Write your own: body weight, step by step</h2>
+<p>This walkthrough builds a definition from scratch: body weight, stored in the
+<code>measurement</code> table with its unit. It needs no mapper.</p>
+<h3 id="1-describe-what-to-extract">1. Describe what to extract</h3>
+<p>An entity definition says what the model should find. Body weight has a value and a
+unit, so they are children of the weight mention (see
+<a href="../entity_definitions/">Writing entity definitions</a>):</p>
+<div class="language-yaml highlight"><span class="filename">body_weight.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Body weight</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">body_weight</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">definition</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="no">The patient's measured body weight: the word for weight, the value and the unit,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="no">copied as written, e.g. "weight 72 kg" or "Wt: 158 lb". Stop at the unit: no</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="no">words or punctuation after it. Does not include target or ideal weights, weight</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="no">changes such as "lost 5 kg", or the weight of anyone other than the patient.</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Weight value</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">weight_value</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">  </span><span class="nt">definition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">The number of a body weight, without the unit, e.g. "72" from "weight 72 kg".</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">  </span><span class="nt">has_parent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">  </span><span class="nt">parent_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">body_weight</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Weight unit</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">weight_unit</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">  </span><span class="nt">definition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">The unit of a body weight, copied as written without punctuation, e.g. "kg" or "lb".</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">  </span><span class="nt">has_parent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">  </span><span class="nt">parent_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">body_weight</span>
+</span></code></pre></div>
+<h3 id="2-say-where-each-value-goes">2. Say where each value goes</h3>
+<p>Add an <code>omop</code> block to the top-level entity. Each line names a column of the
+<code>measurement</code> table and where its value comes from:</p>
+<div class="language-yaml highlight"><span class="filename">body_weight.yaml (first entity)</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Body weight</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">body_weight</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">definition</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="no">...</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">omop</span><span class="p">:</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">measurement</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">fields</span><span class="p">:</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">      </span><span class="nt">person_id</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">context.person_id</span><span class="p p-Indicator">}</span><span class="w">               </span><span class="c1"># from the ClinicalNote</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">      </span><span class="nt">measurement_concept_id</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">concept</span><span class="p">:</span><span class="w"> </span><span class="s">"LOINC:29463-7"</span><span class="p p-Indicator">}</span><span class="w">  </span><span class="c1"># Body weight, always the same</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">      </span><span class="nt">measurement_date</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">context.note_date</span><span class="p p-Indicator">}</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">      </span><span class="nt">measurement_type_concept_id</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="nv">32858</span><span class="p p-Indicator">}</span><span class="w">         </span><span class="c1"># NLP</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">      </span><span class="nt">measurement_source_value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">text</span><span class="p p-Indicator">}</span><span class="w">              </span><span class="c1"># the words of the mention</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">      </span><span class="nt">value_as_number</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">child.weight_value</span><span class="p p-Indicator">,</span><span class="nt"> as</span><span class="p">:</span><span class="w"> </span><span class="nv">float</span><span class="p p-Indicator">}</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">      </span><span class="nt">unit_concept_id</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">child.weight_unit</span><span class="p p-Indicator">,</span><span class="nt"> lookup</span><span class="p">:</span><span class="w"> </span><span class="nv">UCUM</span><span class="p p-Indicator">}</span><span class="w">  </span><span class="c1"># "kg" -&gt; kilogram</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">      </span><span class="nt">unit_source_value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">child.weight_unit</span><span class="p p-Indicator">}</span>
+</span></code></pre></div>
+<p>The <code>omop</code> block is <strong>never sent to the model</strong>: it only tells AATM how to fill the
+table. You can check what the model will read with
+<code>definitions.to_prompt_str()</code>.</p>
+<h3 id="3-check-the-codes-before-spending-model-calls">3. Check the codes before spending model calls</h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.data_models.extractors</span><span class="w"> </span><span class="kn">import</span> <span class="n">EntityDefinitions</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">OmopTableBuilder</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">definitions</span> <span class="o">=</span> <span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="s2">"body_weight.yaml"</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">OmopTableBuilder</span><span class="p">(</span><span class="n">definitions</span><span class="p">)</span><span class="o">.</span><span class="n">describe_concepts</span><span class="p">()</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>entity</th>
+<th>column</th>
+<th>label</th>
+<th>code</th>
+<th>concept_id</th>
+<th>concept_name</th>
+<th>vocabulary_id</th>
+<th>domain_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body_weight</td>
+<td>measurement_concept_id</td>
+<td></td>
+<td>LOINC:29463-7</td>
+<td>3025315</td>
+<td>Body weight</td>
+<td>LOINC</td>
+<td>Measurement</td>
+</tr>
+</tbody>
+</table>
+<p>Loading the file and creating the builder already check a lot: unknown columns,
+typos in <code>child.</code> or <code>attribute.</code> names, codes missing from the vocabulary, and
+non-standard concepts all fail here, with a message saying what is wrong
+(see <a href="#troubleshooting">Troubleshooting</a>).</p>
+<h3 id="4-run-it">4. Run it</h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClinicalNote</span><span class="p">,</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">notes</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">ClinicalNote</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">"Weight 72 kg today. Goal weight 65 kg."</span><span class="p">,</span> <span class="n">person_id</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">note_date</span><span class="o">=</span><span class="s2">"2025-06-01"</span><span class="p">),</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">ClinicalNote</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">"Wt: 158 lb. Lost 5 lb since March."</span><span class="p">,</span> <span class="n">person_id</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">note_date</span><span class="o">=</span><span class="s2">"2025-06-02"</span><span class="p">),</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">]</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span><span class="n">definitions</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">)</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="n">tables</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">pipeline</span><span class="p">(</span><span class="n">notes</span><span class="p">))</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="n">tables</span><span class="p">[</span><span class="s2">"measurement"</span><span class="p">]</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>measurement_id</th>
+<th>person_id</th>
+<th>measurement_concept_id</th>
+<th>measurement_date</th>
+<th>measurement_type_concept_id</th>
+<th>value_as_number</th>
+<th>unit_concept_id</th>
+<th>measurement_source_value</th>
+<th>unit_source_value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>3025315</td>
+<td>2025-06-01</td>
+<td>32858</td>
+<td>72.0</td>
+<td>9529</td>
+<td>Weight 72 kg</td>
+<td>kg</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2</td>
+<td>3025315</td>
+<td>2025-06-02</td>
+<td>32858</td>
+<td>158.0</td>
+<td>0</td>
+<td>Wt: 158 lb</td>
+<td>lb</td>
+</tr>
+</tbody>
+</table>
+<p>The goal weight and the weight loss were left out, as the definition asks.</p>
+<h3 id="5-read-the-issues">5. Read the issues</h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">tables</span><span class="o">.</span><span class="n">issues_dataframe</span><span class="p">()</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>row_id</th>
+<th>column</th>
+<th>reason</th>
+<th>detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td>unit_concept_id</td>
+<td>unmapped</td>
+<td>No concept for 'lb' with a UCUM code lookup; stored 0</td>
+</tr>
+</tbody>
+</table>
+<p>"kg" is a UCUM code, so it was found (<em>kilogram</em>, 9529). "lb" is not: UCUM writes
+pounds as <code>[lb_av]</code>. The row is kept with <code>unit_concept_id = 0</code>, which the CDM uses for
+"there is a unit, but it is not mapped", and <code>unit_source_value</code> keeps <code>"lb"</code>.</p>
+<div class="admonition tip">
+<p class="admonition-title">Iterate on real notes</p>
+<p>Most fixes are in the wording of the definitions. The first version of this example
+said only "copied as written", and the model returned "Weight 72 kg today." and
+"lb.". Adding "Stop at the unit: no words or punctuation after it" fixed both.</p>
+</div>
+<hr>
+<h2 id="reference-the-omop-block">Reference: the <code>omop</code> block</h2>
+<h3 id="column-sources">Column sources</h3>
+<p>Each column has one source:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Value</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{from: text}</code></td>
+<td>The words of the mention</td>
+<td><code>"ECOG 4"</code></td>
+</tr>
+<tr>
+<td><code>{from: attribute.&lt;key&gt;}</code></td>
+<td>The label the model chose for an attribute</td>
+<td><code>"4"</code></td>
+</tr>
+<tr>
+<td><code>{from: child.&lt;key&gt;}</code></td>
+<td>The text of the mention's child with that key</td>
+<td><code>"05/12/2025"</code></td>
+</tr>
+<tr>
+<td><code>{from: context.&lt;name&gt;}</code></td>
+<td>A field of the <code>ClinicalNote</code></td>
+<td><code>person_id</code></td>
+</tr>
+<tr>
+<td><code>{value: &lt;constant&gt;}</code></td>
+<td>A fixed value</td>
+<td><code>32858</code></td>
+</tr>
+<tr>
+<td><code>{concept: "&lt;VOCABULARY&gt;:&lt;code&gt;"}</code></td>
+<td>The concept id of a code</td>
+<td><code>"LOINC:29463-7"</code></td>
+</tr>
+</tbody>
+</table>
+<p>A <strong>list</strong> of sources is tried in order, and the first that gives a value wins. The ECOG
+definition uses this for the date: the assessment date if the note states a full one,
+else the note date:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="w">      </span><span class="nt">measurement_date</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">child.assessment_date</span><span class="p p-Indicator">,</span><span class="nt"> as</span><span class="p">:</span><span class="w"> </span><span class="nv">date</span><span class="p p-Indicator">}</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">context.note_date</span><span class="p p-Indicator">}</span>
+</span></code></pre></div>
+<h3 id="options">Options</h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Use with</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>as: int</code>, <code>float</code>, <code>str</code> or <code>date</code></td>
+<td><code>from:</code></td>
+<td>Convert the text. Dates are read from text such as <code>"05/12/2025"</code> or <code>"March 2024"</code>; decimal commas (<code>"11,2"</code>) are accepted</td>
+</tr>
+<tr>
+<td><code>as: days</code></td>
+<td><code>from:</code></td>
+<td>Read a duration as a number of days: <code>"7 days"</code>, <code>"x7d"</code>, <code>"2 weeks"</code>, <code>"1 month"</code> (30 days), <code>"14 dias"</code></td>
+</tr>
+<tr>
+<td><code>period_start: &lt;column&gt;</code></td>
+<td><code>as: days</code>, or an integer <code>value:</code></td>
+<td>Store the last day of a period of N days starting on that column's date: the date + N - 1. The column must be mapped before this one</td>
+</tr>
+<tr>
+<td><code>when: {attribute.&lt;key&gt;: [&lt;label&gt;, ...]}</code></td>
+<td>any source</td>
+<td>Use the source only when the attribute has one of these labels; otherwise try the next source</td>
+</tr>
+<tr>
+<td><code>concepts: {&lt;label&gt;: "&lt;VOCABULARY&gt;:&lt;code&gt;"}</code></td>
+<td><code>from: attribute.&lt;key&gt;</code></td>
+<td>Store the concept of the chosen label instead of the label</td>
+</tr>
+<tr>
+<td><code>maps_to: true</code></td>
+<td><code>concept:</code> or <code>concepts:</code></td>
+<td>Store the standard concept the code maps to</td>
+</tr>
+<tr>
+<td><code>lookup: &lt;VOCABULARY&gt;</code></td>
+<td><code>from:</code></td>
+<td>Find the text as a code of that vocabulary, e.g. units in UCUM</td>
+</tr>
+<tr>
+<td><code>map: {...}</code></td>
+<td><code>from:</code></td>
+<td>Code the text with the terminology mapper (see <a href="#coding-text-with-the-terminology-mapper">below</a>)</td>
+</tr>
+</tbody>
+</table>
+<p>The table's id column (<code>measurement_id</code>, <code>observation_id</code>) is generated, numbered from
+<code>id_start</code> (default 1). Only top-level entities can have an <code>omop</code> block; a child's text
+is used from its parent with <code>from: child.&lt;key&gt;</code>.</p>
+<h3 id="fixed-codes-standard-concepts-and-domains">Fixed codes, standard concepts and domains</h3>
+<p>Write codes as <code>VOCABULARY:code</code>, as they appear in the vocabulary, rather than as
+concept ids, so the file stays readable. They are looked up when the builder is
+created, and these fail before any model call:</p>
+<ul>
+<li>a code that is not in the vocabulary;</li>
+<li>a non-standard concept in a <code>*_concept_id</code> column. Add <code>maps_to: true</code> to use the
+  standard concept it maps to;</li>
+<li>a concept of a domain the column does not accept, e.g. a Condition concept in
+  <code>measurement_concept_id</code>;</li>
+<li><code>maps_to: true</code> on a code without exactly one standard mapping.</li>
+</ul>
+<p><code>*_source_concept_id</code> columns keep the code as written, standard or not, as the CDM
+asks. The ECOG definition shows why both exist:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="w">      </span><span class="nt">measurement_concept_id</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">concept</span><span class="p">:</span><span class="w"> </span><span class="s">"SNOMED:423740007"</span><span class="p p-Indicator">,</span><span class="nt"> maps_to</span><span class="p">:</span><span class="w"> </span><span class="nv">true</span><span class="p p-Indicator">}</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">      </span><span class="nt">measurement_source_concept_id</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">concept</span><span class="p">:</span><span class="w"> </span><span class="s">"SNOMED:423740007"</span><span class="p p-Indicator">}</span>
+</span></code></pre></div>
+<p>SNOMED 423740007 <em>ECOG performance status</em> is not standard; it maps to LOINC 89247-1
+<em>ECOG Performance Status score</em>, which goes to <code>measurement_concept_id</code>, while the
+SNOMED concept is kept in <code>measurement_source_concept_id</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Standard, from any vocabulary</p>
+<p>A <code>*_concept_id</code> column needs a <strong>standard</strong> concept of the right domain. Its
+vocabulary does not matter: SNOMED, LOINC, RxNorm or any other. The rule applies to
+every source: fixed codes and label maps are checked when the builder is created,
+and a <code>map</code> or <code>lookup</code> that finds only a non-standard concept stores <code>0</code> and
+reports <code>unmapped</code>.</p>
+</div>
+<hr>
+<h2 id="coding-text-with-the-terminology-mapper">Coding text with the terminology mapper</h2>
+<p>Some concepts never change (body weight is always <em>Body weight</em>), but many depend on
+what the note says: the name of a lab test, a condition. A <code>map</code> source sends the
+extracted text to the same <code>TerminologyMapper</code> used for
+<a href="../quick_start_python_api/">terminology mapping</a>, which searches the vocabularies and
+picks the best standard concept.</p>
+<p>The predefined <code>lab_results</code> definition codes the test name this way:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="w">      </span><span class="nt">measurement_concept_id</span><span class="p">:</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">        </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">text</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">        </span><span class="nt">map</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span><span class="w">          </span><span class="c1"># any standard concept of the column's domain (Measurement)</span>
+</span></code></pre></div>
+<p>The YAML says <strong>what</strong> to code. Your code chooses <strong>how</strong>, by configuring the mapper,
+because that involves search models, LLMs and API keys:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClinicalNote</span><span class="p">,</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.selectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLMSelector</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.terminology_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminologyMapper</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span>          <span class="c1"># the embedding model chosen in `aatm init`</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="n">selector</span><span class="o">=</span><span class="n">OpenAILLMSelector</span><span class="p">(</span><span class="s2">"gpt-5-mini"</span><span class="p">),</span>    <span class="c1"># an LLM picks among the candidates</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="p">)</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="n">mapper</span><span class="o">.</span><span class="n">retriever</span><span class="o">.</span><span class="n">top_k</span> <span class="o">=</span> <span class="mi">30</span>                      <span class="c1"># how many candidates it sees</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span><span class="s2">"lab_results"</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span> <span class="n">mapper</span><span class="o">=</span><span class="n">mapper</span><span class="p">)</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="n">notes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ClinicalNote</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">"Labs 03/15/2025: Hb 11.2 g/dL, creatinine 1.4 mg/dl."</span><span class="p">,</span> <span class="n">person_id</span><span class="o">=</span><span class="mi">10</span><span class="p">)]</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="n">tables</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">pipeline</span><span class="p">(</span><span class="n">notes</span><span class="p">))</span>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="n">tables</span><span class="o">.</span><span class="n">mappings_dataframe</span><span class="p">()</span>
+</span></code></pre></div>
+<p><code>mappings_dataframe()</code> has one row per coded text, so you can review every choice:</p>
+<table>
+<thead>
+<tr>
+<th>row_id</th>
+<th>column</th>
+<th>text</th>
+<th>method</th>
+<th>concept_id</th>
+<th>concept_name</th>
+<th>score</th>
+<th>stored</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>measurement_concept_id</td>
+<td>Hb</td>
+<td>map</td>
+<td>3000963</td>
+<td>Hemoglobin [Mass/volume] in Blood</td>
+<td>0.30</td>
+<td>3000963</td>
+</tr>
+<tr>
+<td>1</td>
+<td>unit_concept_id</td>
+<td>g/dL</td>
+<td>lookup</td>
+<td>8713</td>
+<td>gram per deciliter</td>
+<td></td>
+<td>8713</td>
+</tr>
+</tbody>
+</table>
+<p>How it works:</p>
+<ul>
+<li><strong>The search is limited to a domain, not a vocabulary.</strong> By default it is the domain
+  the column requires (Measurement here). <code>map: {domain: Condition}</code> sets it
+  explicitly, and <code>map: {vocabularies: [LOINC]}</code> narrows the search further if your
+  data must use one vocabulary.</li>
+<li><strong>Each distinct text is coded once per run</strong>: a hundred notes mentioning "Hb" make
+  one mapper query.</li>
+<li><strong><code>min_score</code></strong> (<code>map: {min_score: 0.8}</code>) stores <code>0</code> and reports <code>low_confidence</code>
+  below that score. Scores depend on the retriever, so look at real scores in
+  <code>mappings_dataframe()</code> before choosing a threshold.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Review the mappings</p>
+<p>Short names are ambiguous. In a small test with nine lab results, the default
+selector, which takes the closest match, coded only 2 test names correctly; with
+<code>OpenAILLMSelector</code> choosing among 30 candidates, 7 of 9 were correct. Without a
+vocabulary filter, some tests map to general SNOMED procedures such as <em>Potassium
+measurement</em> rather than the more specific LOINC <em>Potassium [Moles/volume] in Serum
+or Plasma</em>; both are valid standard concepts.</p>
+</div>
+<h3 id="searching-with-an-agent">Searching with an agent</h3>
+<p>The mapper makes one search with the text alone, then picks from what it found. That
+fails in two ways: the right concept is not among the candidates ("creatinine" brings
+back urine and 24-hour tests, but not serum creatinine), or the text does not say which
+variant it is, while the rest of the note does (<code>mg/dL</code> means a mass concentration,
+<code>mmol/L</code> a molar one).</p>
+<p><code>AgenticCoder</code> codes each text with an LLM agent instead. The agent gets the text
+<strong>with its context</strong>, and searches the vocabularies with tools until it finds the
+concept or concludes there is none:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgenticCoder</span><span class="p">,</span> <span class="n">ClinicalNote</span><span class="p">,</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">coder</span> <span class="o">=</span> <span class="n">AgenticCoder</span><span class="p">(</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span>                 <span class="c1"># any aatm.llm model id</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span>  <span class="c1"># the embedding model chosen in `aatm init`</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="n">max_tool_calls</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>                    <span class="c1"># per text</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="p">)</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span><span class="s2">"lab_results"</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span> <span class="n">mapper</span><span class="o">=</span><span class="n">coder</span><span class="p">)</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="n">notes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ClinicalNote</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="s2">"Labs 03/15/2025: Hb 11.2 g/dL, creatinine 1.4 mg/dl."</span><span class="p">,</span> <span class="n">person_id</span><span class="o">=</span><span class="mi">10</span><span class="p">)]</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="n">tables</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">pipeline</span><span class="p">(</span><span class="n">notes</span><span class="p">))</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="n">tables</span><span class="o">.</span><span class="n">mappings_dataframe</span><span class="p">()[[</span><span class="s2">"text"</span><span class="p">,</span> <span class="s2">"concept_name"</span><span class="p">,</span> <span class="s2">"score"</span><span class="p">,</span> <span class="s2">"rationale"</span><span class="p">,</span> <span class="s2">"trace"</span><span class="p">,</span> <span class="s2">"usage"</span><span class="p">]]</span>
+</span></code></pre></div>
+<p><strong>The context.</strong> The builder gives the agent, for each coded text: the other values of
+the mention (its attributes, and the first text of each child, e.g. the value
+<code>1.4</code> and unit <code>mg/dl</code> of a lab test), the line of the note it comes from, and the
+target column (<code>measurement.measurement_concept_id</code>). The domain and vocabularies of
+the <code>map</code> source still restrict the answer. Nothing changes in the YAML.</p>
+<p><strong>The tools.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Semantic search</td>
+<td>The retriever's embedding search, with the agent's own queries: expansions ("Hb" → "hemoglobin"), translations ("potássio" → "potassium"), the specimen or unit added</td>
+</tr>
+<tr>
+<td>Lexical search</td>
+<td>Concept names and synonyms containing every word of a query, in <code>.aatm/omop.db</code></td>
+</tr>
+<tr>
+<td>Code lookup</td>
+<td>A code in any vocabulary, with the standard concepts it maps to</td>
+</tr>
+<tr>
+<td>Concept details</td>
+<td>Synonyms, "Maps to" and the LOINC axes (component, property, time, system, scale, method), to check that the specimen and property match the unit</td>
+</tr>
+<tr>
+<td>Hierarchy</td>
+<td>Direct parents and children, to move to a more general or more specific concept</td>
+</tr>
+</tbody>
+</table>
+<p>The answer is checked against the vocabulary: it must be a standard, valid concept of
+the required domain and vocabularies, or the agent is asked again.</p>
+<p><strong>What you get back.</strong> <code>mappings_dataframe()</code> gains three columns:</p>
+<ul>
+<li><code>rationale</code>: the agent's reason, e.g. <em>"mg/dl is a mass concentration; serum is the
+  usual specimen for creatinine"</em>;</li>
+<li><code>trace</code>: every action with its query and the candidates it returned;</li>
+<li><code>usage</code>: tool calls, LLM calls, input and output tokens, seconds, and whether the
+  budget ran out.</li>
+</ul>
+<p><strong>The score</strong> is the agent's confidence on a fixed scale, so <code>min_score</code> means the same
+thing whatever the retriever:</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Score</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>high</td>
+<td>0.9</td>
+<td>Matches the text and everything the context states</td>
+</tr>
+<tr>
+<td>medium</td>
+<td>0.6</td>
+<td>The right concept, but a detail the context does not state was assumed</td>
+</tr>
+<tr>
+<td>low</td>
+<td>0.3</td>
+<td>The closest concept available, with a known mismatch or real ambiguity</td>
+</tr>
+</tbody>
+</table>
+<p><code>min_score: 0.5</code> keeps <em>high</em> and <em>medium</em>. When the budget runs out the agent must
+answer from what it has seen, and its score is capped at <em>low</em>.</p>
+<p><strong>Caching.</strong> Within a batch, the plain mapper codes each distinct text once. The agent
+codes each distinct text <em>in its context</em> once: "creatinine 1.4 mg/dL" in two notes is
+one search, but "creatinine 1.4 mg/dL" and "urine creatinine 80 mg/dL" are two. To keep
+results across batches and runs, see <a href="#keeping-results-across-runs">Keeping results across runs</a>.</p>
+<h4 id="choosing-between-the-mapper-and-the-agent">Choosing between the mapper and the agent</h4>
+<p>On 30 lab results with gold LOINC codes (abbreviations, Portuguese names, 24-hour and
+urine tests; LOINC Measurement concepts only; <code>text-embedding-3-small</code> index;
+<code>gpt-5-mini</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Correct</th>
+<th>LLM calls per text</th>
+<th>Tokens per text (in / out)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nearest candidate (<code>FirstResultSelector</code>)</td>
+<td>1 / 30</td>
+<td>0</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code>OpenAILLMSelector</code> over the top 30</td>
+<td>14 / 30</td>
+<td>1</td>
+<td>not reported</td>
+</tr>
+<tr>
+<td>Agent, text only</td>
+<td>27 / 30</td>
+<td>2.2</td>
+<td>3,300 / 940</td>
+</tr>
+<tr>
+<td><strong>Agent, text with context</strong></td>
+<td><strong>29 / 30</strong></td>
+<td>2.2</td>
+<td>3,400 / 900</td>
+</tr>
+</tbody>
+</table>
+<p>The agent used 2.2 tool calls per text on average (at most 5 of the 8 allowed) and
+never ran out of budget. Its one miss was <em>BUN</em>, coded to urea nitrogen in blood rather
+than in serum or plasma. The LLM selector failed mostly because the right concept was
+not among its 30 candidates ("creatinine", "K", "potássio"). With context, the agent
+also told <em>Hb</em> (mass concentration, not "by calculation") and the albumin/creatinine
+<em>mass</em> ratio (from <code>mg/g</code>) apart.</p>
+<p>Most of the time per text goes to the vector search, not to the LLM: a ChromaDB query
+filtered by domain takes about 5 seconds on a full index (2.5 million expressions),
+against a few milliseconds unfiltered.</p>
+<p>The benchmark and its gold codes are in <code>benchmarks/concept_search/</code>; run it with your
+own retriever and model before choosing.</p>
+<ul>
+<li><strong>The plain mapper</strong> costs one search (and one LLM call with an LLM selector) per
+  distinct text, and is the choice when texts are explicit ("Creatinine in serum") or
+  cost and speed matter most.</li>
+<li><strong>The agent</strong> costs a few LLM calls per distinct text in context, and is the choice
+  when texts are short, abbreviated or not in English, and when variants of a test
+  differ by specimen or unit.</li>
+</ul>
+<p>The agent is also available as the selector of a <code>TerminologyMapper</code>, so CSV
+terminology mapping and a mapper you already configured can use it:
+<code>TerminologyMapper(retriever=..., selector=AgenticSelector("openai/gpt-5-mini"))</code>. In a
+builder, that mapper also receives the context.</p>
+<h3 id="keeping-results-across-runs">Keeping results across runs</h3>
+<p>Coding is usually the most expensive step. Without a cache, every batch and every rerun
+(after a crash, or to rebuild the tables after changing a mapping) pays for the same
+texts again. Turn on the coding cache to store each result on disk and reuse it:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">CodingCache</span><span class="p">,</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="s2">"lab_results"</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span> <span class="n">mapper</span><span class="o">=</span><span class="n">coder</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="kc">True</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="p">)</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="n">tables</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pipeline</span><span class="p">(</span><span class="n">notes</span><span class="p">)</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="n">tables</span><span class="o">.</span><span class="n">cache_stats</span>  <span class="c1"># CacheStats(hits=..., misses=..., stored=...), and .hit_rate</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th><code>cache=</code></th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>None</code> or <code>False</code> (default)</td>
+<td>No cache</td>
+</tr>
+<tr>
+<td><code>True</code></td>
+<td><code>.aatm/coding_cache.db</code></td>
+</tr>
+<tr>
+<td><code>"path/to/cache.db"</code></td>
+<td>That file</td>
+</tr>
+<tr>
+<td><code>CodingCache(path, max_entries=..., max_bytes=...)</code></td>
+<td>That file, with a size limit</td>
+</tr>
+</tbody>
+</table>
+<p>The same argument works on <code>OmopTableBuilder</code>. In <code>mappings_dataframe()</code>, <code>cached</code>
+tells which concepts came from the cache; their <code>usage</code> was spent in the run that
+first coded them.</p>
+<p><strong>A result is only reused for exactly the same input.</strong> The cache never changes what a
+run produces:</p>
+<ul>
+<li>The agent (and a mapper with <code>AgenticSelector</code>) reads context, so its key is the text
+  <strong>with its full context</strong>: the related values (such as the lab value and unit), the
+  line of the note and the target column. "Hb 11.2 g/dL" in two notes with the same
+  line is one search; the same "Hb" on a different line is searched again. Hits
+  therefore come from reruns, rebuilds and repeated lines (templated notes), rather
+  than from the same text in different notes.</li>
+<li>The plain mapper ignores context, so its key is the text, domain and vocabularies:
+  each distinct text is coded once, across all runs.</li>
+<li>Every key includes <strong>the coder's identity</strong>: its class, models, generation settings,
+  retriever and index, tool budget, the agent's prompts, the server URL of
+  OpenAI-compatible providers and the aatm version. Changing any of these, or upgrading
+  aatm, starts from an empty cache for that coder. The old entries stay in the file
+  until they are evicted or cleared.</li>
+<li>The identity also covers <strong>the data the coder reads</strong>: the vocabulary releases in
+  the vocabulary database (e.g. <code>LOINC 2.78</code>) and its size, and the id and size of the
+  ChromaDB collection. Rebuilding either from other data starts from an empty cache,
+  and a warning names the old entries so you can clear them.</li>
+<li>Results that ended in an error (e.g. an API failure) are not stored, so they are
+  retried on the next run.</li>
+</ul>
+<p>Each batch codes its most frequent texts first and writes results as it goes, so a
+run that stops partway keeps what it paid for.</p>
+<p><strong>Size.</strong> By default the cache grows without limit. Set <code>max_entries</code> (results kept) or
+<code>max_bytes</code> (bytes of results kept; the file is somewhat larger) to cap it. When a write
+goes over a limit, the entries used least recently are deleted first:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">cache</span> <span class="o">=</span> <span class="n">CodingCache</span><span class="p">(</span><span class="s2">".aatm/coding_cache.db"</span><span class="p">,</span> <span class="n">max_entries</span><span class="o">=</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>Clearing.</strong> Delete everything and shrink the file, or one coder's entries:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">cache</span><span class="o">.</span><span class="n">info</span><span class="p">()</span>   <span class="c1"># entries, size on disk, and the coders they belong to</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">cache</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>  <span class="c1"># everything</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">cache</span><span class="o">.</span><span class="n">clear</span><span class="p">(</span><span class="n">coder</span><span class="o">=</span><span class="s2">"&lt;hash from info()&gt;"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>or from the command line:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>aatm<span class="w"> </span>cache<span class="w"> </span>info
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>aatm<span class="w"> </span>cache<span class="w"> </span>clear<span class="w">            </span><span class="c1"># asks for confirmation; --yes to skip it</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>aatm<span class="w"> </span>cache<span class="w"> </span>clear<span class="w"> </span>--coder<span class="w"> </span>&lt;hash&gt;
+</span></code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Rebuilt data the cache cannot see</p>
+<p>The data of a retriever that is not a ChromaDB collection (a retriever of your own,
+for example) cannot be fingerprinted. When the cache opens, a warning names such
+components: <code>changes to the content of ... cannot be detected</code>. If you rebuild
+their index, run <code>aatm cache clear</code>, or results coded against the old data will be
+reused without any error.</p>
+<p>Model aliases are another blind spot: <code>openai/gpt-5-mini</code> names whatever the
+provider currently serves under that name. Pin a dated model version when results
+must stay reproducible, and clear the cache when you change it.</p>
+</div>
+<p><strong>Custom coders.</strong> A coder of your own is cached when it has a <code>cache_identity()</code>
+method returning JSON-compatible values that cover everything that changes its results.
+Otherwise wrap it yourself and say what it is:
+<code>CachedCoder(my_coder, cache, identity={"name": "my_coder", "version": 2})</code>.</p>
+<h3 id="rate-limits-for-long-runs">Rate limits for long runs</h3>
+<p>No rate limits are set by default: the pipeline sends model calls as fast as it can,
+and retries rate-limit and transient errors on its own. For large datasets, or a
+provider quota you must stay under, set limits once before the run; they cover
+extraction and coding together:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">set_rate_limits</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">set_rate_limits</span><span class="p">(</span><span class="s2">"openai"</span><span class="p">,</span> <span class="n">max_concurrency</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">requests_per_minute</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span>
+</span></code></pre></div>
+<p>See <a href="../quick_start_extraction/#rate-limits-and-retries-optional">Rate limits and retries</a>
+for every option.</p>
+<h3 id="code-lookups">Code lookups</h3>
+<p><code>lookup: &lt;VOCABULARY&gt;</code> finds the extracted text as a code of a vocabulary. It suits
+units: <code>"g/dL"</code> is the UCUM code of <em>gram per deciliter</em>. An exact match wins; otherwise
+a single standard concept matching while ignoring case is used (<code>"mg/dl"</code> → <code>mg/dL</code>).
+Texts that are not codes, such as <code>"lb"</code> or <code>"x10^3/uL"</code>, are reported as <code>unmapped</code>.</p>
+<hr>
+<h2 id="the-observation-table">The observation table</h2>
+<p>The <code>observation</code> table holds facts that are not measurements, conditions, procedures,
+drugs or devices: smoking, family history, social and lifestyle facts. Each row pairs
+an <code>observation_concept_id</code> (what was observed) with a value: a concept, a number, a
+text or a date.</p>
+<p>Several definitions can run together, so each note is sent to the model only once:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClinicalNote</span><span class="p">,</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.selectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLMSelector</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.terminology_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminologyMapper</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span><span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span> <span class="n">selector</span><span class="o">=</span><span class="n">OpenAILLMSelector</span><span class="p">(</span><span class="s2">"gpt-5-mini"</span><span class="p">))</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="n">mapper</span><span class="o">.</span><span class="n">retriever</span><span class="o">.</span><span class="n">top_k</span> <span class="o">=</span> <span class="mi">30</span>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span>
+</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>    <span class="p">[</span><span class="s2">"smoking_status"</span><span class="p">,</span> <span class="s2">"family_history"</span><span class="p">,</span> <span class="s2">"medical_history"</span><span class="p">],</span>  <span class="c1"># names, YAML paths, or both</span>
+</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>    <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span>
+</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>    <span class="n">mapper</span><span class="o">=</span><span class="n">mapper</span><span class="p">,</span>  <span class="c1"># family_history and medical_history code conditions with it</span>
+</span><span id="__span-17-14"><a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a><span class="p">)</span>
+</span><span id="__span-17-15"><a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a><span class="n">notes</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-17-16"><a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a>    <span class="n">ClinicalNote</span><span class="p">(</span>
+</span><span id="__span-17-17"><a id="__codelineno-17-17" name="__codelineno-17-17" href="#__codelineno-17-17"></a>        <span class="n">text</span><span class="o">=</span><span class="p">(</span>
+</span><span id="__span-17-18"><a id="__codelineno-17-18" name="__codelineno-17-18" href="#__codelineno-17-18"></a>            <span class="s2">"Former smoker, 30 pack-years. Mother had breast cancer at 45. "</span>
+</span><span id="__span-17-19"><a id="__codelineno-17-19" name="__codelineno-17-19" href="#__codelineno-17-19"></a>            <span class="s2">"History of appendicitis."</span>
+</span><span id="__span-17-20"><a id="__codelineno-17-20" name="__codelineno-17-20" href="#__codelineno-17-20"></a>        <span class="p">),</span>
+</span><span id="__span-17-21"><a id="__codelineno-17-21" name="__codelineno-17-21" href="#__codelineno-17-21"></a>        <span class="n">person_id</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+</span><span id="__span-17-22"><a id="__codelineno-17-22" name="__codelineno-17-22" href="#__codelineno-17-22"></a>        <span class="n">note_date</span><span class="o">=</span><span class="s2">"2025-06-01"</span><span class="p">,</span>
+</span><span id="__span-17-23"><a id="__codelineno-17-23" name="__codelineno-17-23" href="#__codelineno-17-23"></a>    <span class="p">),</span>
+</span><span id="__span-17-24"><a id="__codelineno-17-24" name="__codelineno-17-24" href="#__codelineno-17-24"></a><span class="p">]</span>
+</span><span id="__span-17-25"><a id="__codelineno-17-25" name="__codelineno-17-25" href="#__codelineno-17-25"></a><span class="n">tables</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">pipeline</span><span class="p">(</span><span class="n">notes</span><span class="p">))</span>
+</span><span id="__span-17-26"><a id="__codelineno-17-26" name="__codelineno-17-26" href="#__codelineno-17-26"></a><span class="n">tables</span><span class="p">[</span><span class="s2">"observation"</span><span class="p">]</span>
+</span></code></pre></div>
+<p>A typical result (concept names added in italics):</p>
+<table>
+<thead>
+<tr>
+<th>observation_id</th>
+<th>observation_concept_id</th>
+<th>observation_source_value</th>
+<th>value_as_number</th>
+<th>value_as_concept_id</th>
+<th>value_source_value</th>
+<th>qualifier_concept_id</th>
+<th>unit_concept_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>43054909 <em>Tobacco smoking status</em></td>
+<td>Former smoker</td>
+<td></td>
+<td>45883458 <em>Former smoker</em></td>
+<td>former</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>3003421 <em>Cigarettes smoked total (pack per year)</em></td>
+<td>30 pack-years</td>
+<td>30.0</td>
+<td></td>
+<td>30</td>
+<td></td>
+<td>0</td>
+</tr>
+<tr>
+<td>3</td>
+<td>4167217 <em>Family history of clinical finding</em></td>
+<td>breast cancer</td>
+<td></td>
+<td>4112853 <em>Malignant tumor of breast</em></td>
+<td>breast cancer</td>
+<td>4248584 <em>Mother</em></td>
+<td></td>
+</tr>
+<tr>
+<td>4</td>
+<td>3002660 <em>History of Past illness Narrative</em></td>
+<td>appendicitis</td>
+<td></td>
+<td>440448 <em>Appendicitis</em></td>
+<td>appendicitis</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>smoking_status</code></strong> gives up to two rows per mention:</p>
+<ul>
+<li><em>Smoking status</em>, with the status as a concept in <code>value_as_concept_id</code>: never,
+  former, current every day, current some day, or current without a frequency.
+  "Non-smoker" or "denies smoking" do not say whether the patient ever smoked, so they
+  get the label <code>not_current</code>, stored as <code>0</code> and reported as <code>unmapped_label</code>.</li>
+<li><em>Pack-years</em>, with the number in <code>value_as_number</code>. UCUM has no code for pack-years,
+  so <code>unit_concept_id</code> is <code>0</code> and <code>unit_source_value</code> is <code>"pack-years"</code>.</li>
+</ul>
+<p><strong><code>family_history</code></strong> follows the CDM convention for family history:
+<code>observation_concept_id</code> is <em>Family history of clinical finding</em>, <code>value_as_concept_id</code>
+is the condition, coded by the mapper, and <code>qualifier_concept_id</code> is the relative
+(<em>Mother</em>, <em>Sister</em>...). The CDM has no column for the relative, so that last choice is
+a convention of this definition; <code>qualifier_source_value</code> keeps the label.</p>
+<p><strong><code>medical_history</code></strong> takes the patient's past conditions, which the CDM keeps out of
+<code>condition_occurrence</code>: "history of appendicitis", "h/o stroke, no sequelae",
+"hepatitis C, treated and cured". <code>observation_concept_id</code> is LOINC 11348-0 <em>History of
+Past illness Narrative</em> and <code>value_as_concept_id</code> is the condition, coded by the mapper,
+as for family history. Conditions the patient still has, even when listed under past
+medical history ("PMH: hypertension"), go to <code>condition_occurrence</code>, and past surgeries
+("s/p appendectomy") are not extracted. When the past condition happened is not
+captured: <code>observation_date</code> is the note date.</p>
+<div class="admonition note">
+<p class="admonition-title">Why LOINC 11348-0</p>
+<p>SNOMED <em>History of clinical finding in subject</em> is not a standard concept. The
+vocabulary maps precoordinated SNOMED concepts such as <em>History of myocardial
+infarction</em> to the condition with <em>Maps to value</em>. Their <em>Maps to</em> target is in
+the OMOP Extension vocabulary, which the other predefined definitions do not need.
+To use a different concept, copy <code>medical_history.yaml</code> and change
+<code>observation_concept_id</code>.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Which concepts the observation table accepts</p>
+<p>The CDM sends Condition, Procedure, Drug, Measurement, Device and Specimen concepts
+to their own tables, so <code>observation_concept_id</code> rejects them. <code>value_as_concept_id</code>
+accepts any domain: for family history it holds a condition.</p>
+</div>
+<p>When you combine definitions, every entity key must be unique. A clash fails with a
+message naming the files:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>Entity keys must be unique across the combined definitions, since the model's output is matched to definitions by key:
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>  - key 'smoking_status' is defined in predefined 'smoking_status' and definitions/alcohol_use.yaml
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>List each file once, and rename keys that clash in your own files.
+</span></code></pre></div>
+<hr>
+<h2 id="the-condition_occurrence-table">The condition_occurrence table</h2>
+<p>The <code>condition_occurrence</code> table holds the patient's diagnoses, problems, signs and
+symptoms. Each row is one mention of a condition, with its standard concept, its dates
+and a status.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClinicalNote</span><span class="p">,</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.selectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLMSelector</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.terminology_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminologyMapper</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span><span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span> <span class="n">selector</span><span class="o">=</span><span class="n">OpenAILLMSelector</span><span class="p">(</span><span class="s2">"gpt-5-mini"</span><span class="p">))</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="n">mapper</span><span class="o">.</span><span class="n">retriever</span><span class="o">.</span><span class="n">top_k</span> <span class="o">=</span> <span class="mi">30</span>
+</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>
+</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span>
+</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>    <span class="s2">"condition_occurrence"</span><span class="p">,</span>
+</span><span id="__span-19-12"><a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>    <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span>
+</span><span id="__span-19-13"><a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>    <span class="n">mapper</span><span class="o">=</span><span class="n">mapper</span><span class="p">,</span>  <span class="c1"># codes condition names</span>
+</span><span id="__span-19-14"><a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a><span class="p">)</span>
+</span><span id="__span-19-15"><a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a><span class="n">notes</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-19-16"><a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>    <span class="n">ClinicalNote</span><span class="p">(</span>
+</span><span id="__span-19-17"><a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>        <span class="n">text</span><span class="o">=</span><span class="p">(</span>
+</span><span id="__span-19-18"><a id="__codelineno-19-18" name="__codelineno-19-18" href="#__codelineno-19-18"></a>            <span class="s2">"Type 2 diabetes since 2019. Probable community-acquired pneumonia. "</span>
+</span><span id="__span-19-19"><a id="__codelineno-19-19" name="__codelineno-19-19" href="#__codelineno-19-19"></a>            <span class="s2">"History of appendicitis. Rule out PE. Denies chest pain. "</span>
+</span><span id="__span-19-20"><a id="__codelineno-19-20" name="__codelineno-19-20" href="#__codelineno-19-20"></a>            <span class="s2">"Mother had breast cancer."</span>
+</span><span id="__span-19-21"><a id="__codelineno-19-21" name="__codelineno-19-21" href="#__codelineno-19-21"></a>        <span class="p">),</span>
+</span><span id="__span-19-22"><a id="__codelineno-19-22" name="__codelineno-19-22" href="#__codelineno-19-22"></a>        <span class="n">person_id</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+</span><span id="__span-19-23"><a id="__codelineno-19-23" name="__codelineno-19-23" href="#__codelineno-19-23"></a>        <span class="n">note_date</span><span class="o">=</span><span class="s2">"2025-06-01"</span><span class="p">,</span>
+</span><span id="__span-19-24"><a id="__codelineno-19-24" name="__codelineno-19-24" href="#__codelineno-19-24"></a>    <span class="p">),</span>
+</span><span id="__span-19-25"><a id="__codelineno-19-25" name="__codelineno-19-25" href="#__codelineno-19-25"></a><span class="p">]</span>
+</span><span id="__span-19-26"><a id="__codelineno-19-26" name="__codelineno-19-26" href="#__codelineno-19-26"></a><span class="n">tables</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">pipeline</span><span class="p">(</span><span class="n">notes</span><span class="p">))</span>
+</span><span id="__span-19-27"><a id="__codelineno-19-27" name="__codelineno-19-27" href="#__codelineno-19-27"></a><span class="n">tables</span><span class="p">[</span><span class="s2">"condition_occurrence"</span><span class="p">]</span>
+</span></code></pre></div>
+<p>A run with <code>gpt-5-mini</code> gave two rows (concept names added in italics):</p>
+<table>
+<thead>
+<tr>
+<th>condition_occurrence_id</th>
+<th>condition_concept_id</th>
+<th>condition_source_value</th>
+<th>condition_start_date</th>
+<th>condition_status_concept_id</th>
+<th>condition_status_source_value</th>
+<th>condition_type_concept_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>201826 <em>Type 2 diabetes mellitus</em></td>
+<td>Type 2 diabetes</td>
+<td>2019-01-01</td>
+<td>32893 <em>Confirmed diagnosis</em></td>
+<td>confirmed</td>
+<td>32858 <em>NLP</em></td>
+</tr>
+<tr>
+<td>2</td>
+<td>4293463 <em>Community acquired pneumonia</em></td>
+<td>community-acquired pneumonia</td>
+<td>2025-06-01</td>
+<td>32899 <em>Preliminary diagnosis</em></td>
+<td>preliminary</td>
+<td>32858 <em>NLP</em></td>
+</tr>
+</tbody>
+</table>
+<p>The only issue is <code>imputed_date_parts</code> on row 1: "2019" has no month or day and is
+read as 2019-01-01.</p>
+<p><strong>What is not a row.</strong> The definition follows the
+<a href="https://ohdsi.github.io/CommonDataModel/cdm55.html#condition_occurrence">CDM conventions for this table</a>,
+so the other four conditions of the note are left out:</p>
+<table>
+<thead>
+<tr>
+<th>In the note</th>
+<th>Why it is not here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"History of appendicitis"</td>
+<td>Past diagnoses belong in <code>observation</code>, says the CDM: add <code>medical_history</code> to the list of definitions to keep it. Long-standing conditions the patient still has, e.g. "PMH: hypertension", are kept.</td>
+</tr>
+<tr>
+<td>"Rule out PE"</td>
+<td>Rule-out and "question of" diagnoses are not recorded in this table.</td>
+</tr>
+<tr>
+<td>"Denies chest pain"</td>
+<td>Negated.</td>
+</tr>
+<tr>
+<td>"Mother had breast cancer"</td>
+<td>Family history belongs in <code>observation</code>: add <code>family_history</code> to the list of definitions to keep it.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Status.</strong> Each condition gets a required <code>status</code> label, stored in
+<code>condition_status_concept_id</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Means</th>
+<th>Concept</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>confirmed</code></td>
+<td>Stated as a fact, e.g. "hypertension", "diagnosed with asthma in 2010"</td>
+<td>32893 <em>Confirmed diagnosis</em></td>
+</tr>
+<tr>
+<td><code>preliminary</code></td>
+<td>A likely working diagnosis, e.g. "probable pneumonia", "presumed sepsis"</td>
+<td>32899 <em>Preliminary diagnosis</em></td>
+</tr>
+</tbody>
+</table>
+<p>The CDM's own examples of a status are the point in the visit when the diagnosis was
+given (admitting, principal, secondary diagnosis). Notes rarely say that, so it is not
+extracted.</p>
+<p><strong>Dates.</strong> <code>condition_start_date</code> is the first that applies:</p>
+<ol>
+<li>the start date the note gives for that condition ("since 2019" → 2019-01-01,
+   reported as <code>imputed_date_parts</code>);</li>
+<li>the note date. The condition is known to be present then, but may have started much
+   earlier, so read these start dates as "recorded on" rather than "onset".</li>
+</ol>
+<p>When the note gives only an end date before the note date ("pneumonia, resolved
+2024-04-10"), that date is used for both start and end, as the CDM allows for a single
+date, and reported as <code>single_date</code>.</p>
+<p>The CDM notes that most sources have no condition start date, and records most
+conditions as snapshots without an end date. <code>condition_end_date</code> is the end date the
+note gives, e.g. for an episode in a discharge summary ("pneumonia from 03/01/2025 to
+03/10/2025"). An end date before the start date is left empty and reported as
+<code>invalid_value</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Which concepts the condition_occurrence table accepts</p>
+<p><code>condition_concept_id</code> takes standard concepts of the Condition domain only. The
+mapper searches that domain, and a concept of another domain, e.g. a procedure, is
+stored but reported as <code>domain_mismatch</code>. Check the coded conditions with
+<code>tables.mappings_dataframe()</code>.</p>
+</div>
+<h2 id="the-drug_exposure-table">The drug_exposure table</h2>
+<p>The <code>drug_exposure</code> table holds the drugs a patient is prescribed, is given or takes:
+medicines, vaccines and biologics. Each row is one mention of a drug, with its standard
+concept, its dates, the route and the dosing instructions. The predefined definition
+follows the <a href="https://ohdsi.github.io/CommonDataModel/cdm55.html#drug_exposure">CDM conventions for this table</a>
+and the <a href="https://ohdsi.github.io/Themis/drug_exposure.html">THEMIS conventions for drug_exposure</a>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClinicalNote</span><span class="p">,</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.selectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLMSelector</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.terminology_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminologyMapper</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span><span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span> <span class="n">selector</span><span class="o">=</span><span class="n">OpenAILLMSelector</span><span class="p">(</span><span class="s2">"gpt-5-mini"</span><span class="p">))</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="n">mapper</span><span class="o">.</span><span class="n">retriever</span><span class="o">.</span><span class="n">top_k</span> <span class="o">=</span> <span class="mi">30</span>
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>
+</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span>
+</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>    <span class="s2">"drug_exposure"</span><span class="p">,</span>
+</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a>    <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span>
+</span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a>    <span class="n">mapper</span><span class="o">=</span><span class="n">mapper</span><span class="p">,</span>  <span class="c1"># codes drug names</span>
+</span><span id="__span-20-14"><a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a><span class="p">)</span>
+</span><span id="__span-20-15"><a id="__codelineno-20-15" name="__codelineno-20-15" href="#__codelineno-20-15"></a><span class="n">notes</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-20-16"><a id="__codelineno-20-16" name="__codelineno-20-16" href="#__codelineno-20-16"></a>    <span class="n">ClinicalNote</span><span class="p">(</span>
+</span><span id="__span-20-17"><a id="__codelineno-20-17" name="__codelineno-20-17" href="#__codelineno-20-17"></a>        <span class="n">text</span><span class="o">=</span><span class="p">(</span>
+</span><span id="__span-20-18"><a id="__codelineno-20-18" name="__codelineno-20-18" href="#__codelineno-20-18"></a>            <span class="s2">"Home meds: lisinopril 10 mg PO daily since 2020, metformin 500 mg tablet BID.</span><span class="se">\n</span><span class="s2">"</span>
+</span><span id="__span-20-19"><a id="__codelineno-20-19" name="__codelineno-20-19" href="#__codelineno-20-19"></a>            <span class="s2">"Ceftriaxone 1 g IV given in the ED.</span><span class="se">\n</span><span class="s2">"</span>
+</span><span id="__span-20-20"><a id="__codelineno-20-20" name="__codelineno-20-20" href="#__codelineno-20-20"></a>            <span class="s2">"Plan: start amoxicillin 875 mg PO BID for 7 days. Consider a statin.</span><span class="se">\n</span><span class="s2">"</span>
+</span><span id="__span-20-21"><a id="__codelineno-20-21" name="__codelineno-20-21" href="#__codelineno-20-21"></a>            <span class="s2">"Allergic to penicillin. Not on anticoagulation."</span>
+</span><span id="__span-20-22"><a id="__codelineno-20-22" name="__codelineno-20-22" href="#__codelineno-20-22"></a>        <span class="p">),</span>
+</span><span id="__span-20-23"><a id="__codelineno-20-23" name="__codelineno-20-23" href="#__codelineno-20-23"></a>        <span class="n">person_id</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+</span><span id="__span-20-24"><a id="__codelineno-20-24" name="__codelineno-20-24" href="#__codelineno-20-24"></a>        <span class="n">note_date</span><span class="o">=</span><span class="s2">"2025-06-01"</span><span class="p">,</span>
+</span><span id="__span-20-25"><a id="__codelineno-20-25" name="__codelineno-20-25" href="#__codelineno-20-25"></a>        <span class="n">visit_occurrence_id</span><span class="o">=</span><span class="mi">900</span><span class="p">,</span>
+</span><span id="__span-20-26"><a id="__codelineno-20-26" name="__codelineno-20-26" href="#__codelineno-20-26"></a>        <span class="n">provider_id</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+</span><span id="__span-20-27"><a id="__codelineno-20-27" name="__codelineno-20-27" href="#__codelineno-20-27"></a>    <span class="p">),</span>
+</span><span id="__span-20-28"><a id="__codelineno-20-28" name="__codelineno-20-28" href="#__codelineno-20-28"></a><span class="p">]</span>
+</span><span id="__span-20-29"><a id="__codelineno-20-29" name="__codelineno-20-29" href="#__codelineno-20-29"></a><span class="n">tables</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">pipeline</span><span class="p">(</span><span class="n">notes</span><span class="p">))</span>
+</span><span id="__span-20-30"><a id="__codelineno-20-30" name="__codelineno-20-30" href="#__codelineno-20-30"></a><span class="n">tables</span><span class="p">[</span><span class="s2">"drug_exposure"</span><span class="p">]</span>
+</span></code></pre></div>
+<p>A run with <code>gpt-5-mini</code> gave four rows (concept names added in italics; <code>drug_type_concept_id</code>
+is 32858 <em>NLP</em> in every row):</p>
+<table>
+<thead>
+<tr>
+<th>drug_exposure_id</th>
+<th>drug_concept_id</th>
+<th>drug_source_value</th>
+<th>start</th>
+<th>end</th>
+<th>route_concept_id</th>
+<th>sig</th>
+<th>visit_occurrence_id</th>
+<th>provider_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1308304 <em>lisinopril 10 MG</em></td>
+<td>lisinopril 10 mg</td>
+<td>2020-01-01</td>
+<td>2025-06-01</td>
+<td>4132161 <em>Oral</em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>40164929 <em>metformin hydrochloride 500 MG Oral Tablet</em></td>
+<td>metformin 500 mg tablet</td>
+<td>2025-06-01</td>
+<td>2025-06-01</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td>46287328 <em>ceftriaxone 1000 MG Injection</em></td>
+<td>Ceftriaxone 1 g</td>
+<td>2025-06-01</td>
+<td>2025-06-01</td>
+<td>4171047 <em>Intravenous</em></td>
+<td></td>
+<td>900</td>
+<td>12</td>
+</tr>
+<tr>
+<td>4</td>
+<td>19083494 <em>amoxicillin 875 MG</em></td>
+<td>amoxicillin 875 mg</td>
+<td>2025-06-01</td>
+<td>2025-06-07</td>
+<td>4132161 <em>Oral</em></td>
+<td>875 mg PO BID for 7 days</td>
+<td>900</td>
+<td>12</td>
+</tr>
+</tbody>
+</table>
+<p>"Consider a statin" is only considered, the penicillin is an allergy and
+anticoagulation is negated, so none of them is a row. Drug classes such as
+"antihypertensives" are left out too: the CDM would store them with
+<code>drug_concept_id = 0</code>.</p>
+<p><strong>Kind.</strong> Each drug gets a required <code>kind</code> label, which decides the end date and the
+visit:</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Means</th>
+<th>Visit and provider</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>administered</code></td>
+<td>Given to the patient, e.g. "ceftriaxone 1 g IV given in the ED"</td>
+<td>From the note</td>
+</tr>
+<tr>
+<td><code>prescribed</code></td>
+<td>Started, prescribed or changed in this note, e.g. "start amoxicillin"</td>
+<td>From the note</td>
+</tr>
+<tr>
+<td><code>taking</code></td>
+<td>On the patient's medication list, or reported use</td>
+<td>Left empty: the CDM fills the visit only when the exposure was started in it</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Dates.</strong> <code>drug_exposure_start_date</code> is the start date the note gives, else the note
+date. <code>drug_exposure_end_date</code> is required by the CDM; when the note gives none, it is
+inferred as THEMIS ratified:</p>
+<ol>
+<li>the end date the note gives ("until 06/10/2025"), also kept in <code>verbatim_end_date</code>;</li>
+<li>the start date + the planned duration - 1 day ("for 7 days" → 2025-06-07);</li>
+<li>for a <code>prescribed</code> drug, the start date + 29 days;</li>
+<li>for a <code>taking</code> drug, the note date: the last date it is known to be taken. THEMIS has
+   no rule for medication lists, so this is a convention of this definition;</li>
+<li>for an <code>administered</code> drug, the start date.</li>
+</ol>
+<p>When the note gives only a stop date before the note date ("aspirin stopped on
+05/01/2025"), that date is used for both start and end and reported as <code>single_date</code>,
+rather than a start after the stop.</p>
+<p><strong>Route.</strong> The optional <code>route</code> label (<code>oral</code>, <code>intravenous</code>, <code>subcutaneous</code>,
+<code>inhaled</code>, ...) is stored as its standard SNOMED route concept in <code>route_concept_id</code>.</p>
+<p><strong>Not filled.</strong> The CDM fills <code>days_supply</code> only from a verbatim days supply, never
+from other fields, so a duration in a note does not go there. <code>quantity</code>, <code>refills</code>,
+<code>stop_reason</code> and <code>lot_number</code> are left empty, and <code>dose_unit_source_value</code> is a legacy
+column the CDM plans to deprecate.</p>
+<div class="admonition note">
+<p class="admonition-title">Check the coded drugs</p>
+<p><code>drug_concept_id</code> takes standard concepts of the Drug domain. The CDM prefers the
+most detailed concept the source supports, such as a clinical drug, over an
+ingredient, so the mention keeps the strength and dose form. A name without detail
+can be coded too specifically: in one run "Influenza vaccine" was coded as one
+seasonal formulation, with a score of 0.41. Review low scores with
+<code>tables.mappings_dataframe()</code>.</p>
+</div>
+<h2 id="the-device_exposure-table">The device_exposure table</h2>
+<p>The <code>device_exposure</code> table holds the medical devices a patient has or is given:
+implants (pacemakers, stents, artificial joints), equipment and supplies (crutches,
+catheters, insulin pumps, CPAP) and materials such as sutures. Each row is one mention
+of a device, with its standard concept, its dates and the number of devices. The
+predefined definition follows the
+<a href="https://ohdsi.github.io/CommonDataModel/cdm55.html#device_exposure">CDM conventions for this table</a>;
+THEMIS has no device conventions.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClinicalNote</span><span class="p">,</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.selectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLMSelector</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.terminology_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminologyMapper</span>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>
+</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span><span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span> <span class="n">selector</span><span class="o">=</span><span class="n">OpenAILLMSelector</span><span class="p">(</span><span class="s2">"gpt-5-mini"</span><span class="p">))</span>
+</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="n">mapper</span><span class="o">.</span><span class="n">retriever</span><span class="o">.</span><span class="n">top_k</span> <span class="o">=</span> <span class="mi">30</span>
+</span><span id="__span-21-9"><a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>
+</span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span>
+</span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>    <span class="s2">"device_exposure"</span><span class="p">,</span>
+</span><span id="__span-21-12"><a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>    <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span>
+</span><span id="__span-21-13"><a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>    <span class="n">mapper</span><span class="o">=</span><span class="n">mapper</span><span class="p">,</span>  <span class="c1"># codes device names</span>
+</span><span id="__span-21-14"><a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a><span class="p">)</span>
+</span><span id="__span-21-15"><a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a><span class="n">notes</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-21-16"><a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>    <span class="n">ClinicalNote</span><span class="p">(</span>
+</span><span id="__span-21-17"><a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>        <span class="n">text</span><span class="o">=</span><span class="p">(</span>
+</span><span id="__span-21-18"><a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a>            <span class="s2">"s/p PCI with 2 drug-eluting stents in 2021. Dual-chamber pacemaker since 2019.</span><span class="se">\n</span><span class="s2">"</span>
+</span><span id="__span-21-19"><a id="__codelineno-21-19" name="__codelineno-21-19" href="#__codelineno-21-19"></a>            <span class="s2">"Foley catheter inserted today for retention. Walks with crutches.</span><span class="se">\n</span><span class="s2">"</span>
+</span><span id="__span-21-20"><a id="__codelineno-21-20" name="__codelineno-21-20" href="#__codelineno-21-20"></a>            <span class="s2">"No indwelling lines. Candidate for ICD. Nicotine patch 21 mg daily."</span>
+</span><span id="__span-21-21"><a id="__codelineno-21-21" name="__codelineno-21-21" href="#__codelineno-21-21"></a>        <span class="p">),</span>
+</span><span id="__span-21-22"><a id="__codelineno-21-22" name="__codelineno-21-22" href="#__codelineno-21-22"></a>        <span class="n">person_id</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span>
+</span><span id="__span-21-23"><a id="__codelineno-21-23" name="__codelineno-21-23" href="#__codelineno-21-23"></a>        <span class="n">note_date</span><span class="o">=</span><span class="s2">"2025-06-01"</span><span class="p">,</span>
+</span><span id="__span-21-24"><a id="__codelineno-21-24" name="__codelineno-21-24" href="#__codelineno-21-24"></a>        <span class="n">visit_occurrence_id</span><span class="o">=</span><span class="mi">950</span><span class="p">,</span>
+</span><span id="__span-21-25"><a id="__codelineno-21-25" name="__codelineno-21-25" href="#__codelineno-21-25"></a>        <span class="n">provider_id</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span>
+</span><span id="__span-21-26"><a id="__codelineno-21-26" name="__codelineno-21-26" href="#__codelineno-21-26"></a>    <span class="p">),</span>
+</span><span id="__span-21-27"><a id="__codelineno-21-27" name="__codelineno-21-27" href="#__codelineno-21-27"></a><span class="p">]</span>
+</span><span id="__span-21-28"><a id="__codelineno-21-28" name="__codelineno-21-28" href="#__codelineno-21-28"></a><span class="n">tables</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">pipeline</span><span class="p">(</span><span class="n">notes</span><span class="p">))</span>
+</span><span id="__span-21-29"><a id="__codelineno-21-29" name="__codelineno-21-29" href="#__codelineno-21-29"></a><span class="n">tables</span><span class="p">[</span><span class="s2">"device_exposure"</span><span class="p">]</span>
+</span></code></pre></div>
+<p>A run with <code>gpt-5-mini</code> gave four rows (concept names added in italics;
+<code>device_type_concept_id</code> is 32858 <em>NLP</em> in every row):</p>
+<table>
+<thead>
+<tr>
+<th>device_exposure_id</th>
+<th>device_concept_id</th>
+<th>device_source_value</th>
+<th>start</th>
+<th>end</th>
+<th>quantity</th>
+<th>visit_occurrence_id</th>
+<th>provider_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>4131681 <em>Drug eluting stent</em></td>
+<td>drug-eluting stents</td>
+<td>2021-01-01</td>
+<td></td>
+<td>2</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>40481477 <em>Dual chamber pulse generator, device</em></td>
+<td>Dual-chamber pacemaker</td>
+<td>2019-01-01</td>
+<td></td>
+<td>1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td>40625746 <em>Foley catheter</em></td>
+<td>Foley catheter</td>
+<td>2025-06-01</td>
+<td></td>
+<td>1</td>
+<td>950</td>
+<td>14</td>
+</tr>
+<tr>
+<td>4</td>
+<td>4251933 <em>Crutch</em></td>
+<td>crutches</td>
+<td>2025-06-01</td>
+<td></td>
+<td>1</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>The PCI is a procedure, the action of placing the stents: only the stents are a
+device. "No indwelling lines" is negated, the ICD is only considered, and the nicotine
+patch is a drug, which belongs in <code>drug_exposure</code>. So none of them is a row.</p>
+<p><strong>Kind.</strong> Each device gets a required <code>kind</code> label:</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Means</th>
+<th>Visit and provider</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>placed</code></td>
+<td>Implanted, inserted, applied, prescribed or supplied in this encounter, e.g. "Foley catheter inserted today"</td>
+<td>From the note</td>
+</tr>
+<tr>
+<td><code>existing</code></td>
+<td>The patient already has or uses it, e.g. "has a pacemaker", "walks with crutches"</td>
+<td>Left empty: the CDM fills the visit only when the exposure was started in it</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Dates.</strong> <code>device_exposure_start_date</code> is the date the note gives (e.g. the implant
+date, "since 2019" → 2019-01-01, reported as <code>imputed_date_parts</code>), else the note date.
+Unlike <code>drug_exposure</code>, the end date is optional, and the CDM fills it only when the
+source gives it, so it is never inferred. When the note gives only a removal date
+("PICC line removed on 05/20/2025"), it is used for both dates and reported as
+<code>single_date</code>.</p>
+<p><strong>Quantity.</strong> The number the note gives ("2 drug-eluting stents"), else 1: the CDM
+stores 1 when a device exposure exists without a quantity.</p>
+<p><strong>Not filled.</strong> <code>unique_device_id</code> and <code>production_id</code> (the UDI, rarely written in
+notes), the unit columns, which the CDM leaves NULL when the source has no unit, and
+the datetime columns.</p>
+<div class="admonition note">
+<p class="admonition-title">Check the coded devices</p>
+<p><code>device_concept_id</code> takes standard concepts of the Device domain. Device names in
+notes are often short ("CPAP", "brace"), and mapper scores were low even for right
+answers in our runs, e.g. "left knee brace" → <em>Knee orthosis</em> at 0.31. Review them
+with <code>tables.mappings_dataframe()</code> before setting a <code>min_score</code>.</p>
+</div>
+<hr>
+<h2 id="processing-large-datasets">Processing large datasets</h2>
+<p><code>await pipeline(notes)</code> holds every note and row in memory, and a failure partway
+loses the model calls already made. For a full dataset, use <code>pipeline.run</code>: it reads
+the notes in chunks, writes each chunk's rows to Parquet files as it goes, and records
+its progress, so a run that stops can be resumed.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">OmopExtractionPipeline</span><span class="p">,</span> <span class="n">OmopRun</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span>
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>    <span class="s2">"ecog_performance_status"</span><span class="p">,</span>
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    <span class="n">max_concurrency</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>  <span class="c1"># notes extracted at once</span>
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>    <span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>          <span class="c1"># code each distinct text once, across chunks and runs</span>
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="p">)</span>
+</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="n">summary</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-22-11"><a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>    <span class="n">pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-22-12"><a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a>        <span class="s2">"notes.parquet"</span><span class="p">,</span>               <span class="c1"># or .csv, a folder of Parquet files, a DataFrame...</span>
+</span><span id="__span-22-13"><a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a>        <span class="s2">"output/ecog"</span><span class="p">,</span>
+</span><span id="__span-22-14"><a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a>        <span class="n">chunk_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+</span><span id="__span-22-15"><a id="__codelineno-22-15" name="__codelineno-22-15" href="#__codelineno-22-15"></a>        <span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">"note_text"</span><span class="p">:</span> <span class="s2">"text"</span><span class="p">},</span> <span class="c1"># source column -&gt; ClinicalNote field</span>
+</span><span id="__span-22-16"><a id="__codelineno-22-16" name="__codelineno-22-16" href="#__codelineno-22-16"></a>    <span class="p">)</span>
+</span><span id="__span-22-17"><a id="__codelineno-22-17" name="__codelineno-22-17" href="#__codelineno-22-17"></a><span class="p">)</span>
+</span><span id="__span-22-18"><a id="__codelineno-22-18" name="__codelineno-22-18" href="#__codelineno-22-18"></a><span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span>  <span class="c1"># notes built, skipped and failed, rows per table, cache hit rate</span>
+</span></code></pre></div>
+<p><strong>Sources.</strong> A CSV or Parquet file, a folder of Parquet files, a DataFrame, an iterable
+of <code>ClinicalNote</code> objects or dicts, or a database query:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sqlite3</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">notes_from_sql</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="n">con</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"cdm.db"</span><span class="p">)</span>  <span class="c1"># or a SQLAlchemy engine for other databases</span>
+</span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="n">source</span> <span class="o">=</span> <span class="n">notes_from_sql</span><span class="p">(</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>    <span class="s2">"SELECT note_id, note_text AS text, person_id, note_date, visit_occurrence_id "</span>
+</span><span id="__span-23-7"><a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>    <span class="s2">"FROM note WHERE note_date &gt;= '2024-01-01'"</span><span class="p">,</span>
+</span><span id="__span-23-8"><a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>    <span class="n">con</span><span class="p">,</span>
+</span><span id="__span-23-9"><a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="p">)</span>
+</span><span id="__span-23-10"><a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="n">summary</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="s2">"output/ecog"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Columns that are not <code>ClinicalNote</code> fields are ignored. Every note needs a unique
+<strong><code>note_id</code></strong>: it is how a resumed run knows what is done.</p>
+<p><strong>Reading the output.</strong> Each table, and the provenance, issues and mappings of its rows,
+is a folder of Parquet files:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">run</span> <span class="o">=</span> <span class="n">OmopRun</span><span class="p">(</span><span class="s2">"output/ecog"</span><span class="p">)</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="n">run</span><span class="o">.</span><span class="n">table</span><span class="p">(</span><span class="s2">"measurement"</span><span class="p">)</span>    <span class="c1"># a DataFrame</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="n">run</span><span class="o">.</span><span class="n">provenance</span><span class="p">()</span>            <span class="c1"># note_id, entity_id and span of each row (table, row_id)</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="n">run</span><span class="o">.</span><span class="n">issues</span><span class="p">()</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="n">run</span><span class="o">.</span><span class="n">mappings</span><span class="p">()</span>
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="n">run</span><span class="o">.</span><span class="n">failures</span><span class="p">()</span>              <span class="c1"># notes that could not be extracted or built, and why</span>
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="n">run</span><span class="o">.</span><span class="n">status</span><span class="p">()</span>                <span class="c1"># {"built": 9850, "failed": 3}</span>
+</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="n">run</span><span class="o">.</span><span class="n">dataset</span><span class="p">(</span><span class="s2">"measurement"</span><span class="p">)</span>  <span class="c1"># a pyarrow Dataset, to filter without loading it all</span>
+</span></code></pre></div>
+<p>DuckDB, Polars and Spark read the folders directly, e.g.
+<code>SELECT * FROM 'output/ecog/measurement/*.parquet'</code>.</p>
+<p><strong>Resuming.</strong> Run the same call again. Notes already built are skipped; notes extracted
+but not yet written are built from their stored extraction result, without another
+model call. A note that fails (an API error once retries are spent, a result that
+cannot be built) is recorded with its error and the run goes on; the next run tries it
+again, up to <code>max_attempts</code> times in all (3 by default).</p>
+<p><strong>Changing the mappings.</strong> Extraction results are stored apart from the tables
+(in <code>output/ecog/ledger.db</code>). After editing an <code>omop</code> block, rebuild the tables from
+them, with no extraction calls:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">rebuild</span><span class="p">(</span><span class="s2">"output/ecog"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>A run refuses to add rows built with other mappings to an existing folder until you
+rebuild, and refuses a folder made with other entity definitions or another extractor:
+use a new folder for those.</p>
+<p><strong>Watching a long run.</strong> A progress line is logged every <code>log_every</code> seconds (60 by
+default), when a chunk is done:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>Progress: 12,400 of 100,000 notes done (12.4%) in 41m10s, 301 notes/min; about 4h17m left;
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>12,380 built, 0 skipped, 20 failed; 31,950 LLM calls, 48,210,330 tokens; cost 14.2031;
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>cache hits 63%
+</span></code></pre></div>
+<p>The time left needs the number of notes in the source. It is read from Parquet files,
+DataFrames and lists; for a CSV file or a query, pass <code>total=</code>. Logs are shown with
+<code>aatm.logs.configure_logging()</code>.</p>
+<p>At the end, the summary breaks the run down by stage (extraction, coding and
+building): notes or texts handled, time, errors, LLM calls and tokens per model.
+Give your models' prices, per million input and output tokens, to estimate the cost:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="n">summary</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>    <span class="s2">"notes.parquet"</span><span class="p">,</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>    <span class="s2">"output/ecog"</span><span class="p">,</span>
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>    <span class="n">prices</span><span class="o">=</span><span class="p">{</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">:</span> <span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">2.00</span><span class="p">)},</span>  <span class="c1"># check your provider's current prices</span>
+</span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="p">)</span>
+</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="n">summary</span><span class="o">.</span><span class="n">stages</span><span class="p">[</span><span class="s2">"extraction"</span><span class="p">]</span><span class="o">.</span><span class="n">usage</span><span class="o">.</span><span class="n">by_model</span>  <span class="c1"># calls and tokens per model</span>
+</span><span id="__span-27-7"><a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="n">summary</span><span class="o">.</span><span class="n">stages</span><span class="p">[</span><span class="s2">"coding"</span><span class="p">]</span><span class="o">.</span><span class="n">cost</span>                <span class="c1"># coding is the agent's calls, if any</span>
+</span><span id="__span-27-8"><a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a><span class="n">summary</span><span class="o">.</span><span class="n">cost</span>
+</span></code></pre></div>
+<p>Each <code>run</code> and <code>rebuild</code> also saves its summary as JSON in <code>output/ecog/runs/</code>. The
+file is updated at every progress line, so you can follow a run from another process,
+and it is kept with <code>completed: false</code> and the error when a run stops.
+<code>OmopRun("output/ecog").summaries()</code> reads them back, oldest first.</p>
+<p><strong>Row ids.</strong> The primary keys of a run are derived from the note:
+<code>note_id * 65536 + n</code>, where <code>n</code> is the position of the mention in the note. The same
+note gets the same ids in any chunk, after a resume or a rebuild, and in separate runs
+over parts of a dataset; ids never repeat across tables. They need a 64-bit (<code>BIGINT</code>)
+column. <code>OmopTableBuilder.build(..., row_ids="note")</code> numbers rows the same way.</p>
+<div class="admonition tip">
+<p class="admonition-title">Speed and cost</p>
+<p><code>max_concurrency</code> (default 1) sets how many notes are extracted at once; set
+<a href="#rate-limits-for-long-runs">rate limits</a> to stay under your provider's quota.
+With <code>cache=True</code>, a text seen in an earlier chunk or run is not coded again.
+<code>chunk_size</code> bounds memory; larger chunks let the builder group more repeated
+texts per coding call.</p>
+<p>While a chunk is built (coded and written), the next one is extracted, so the
+slower of the two stages sets the pace. This pays off when coding takes about as
+long as extraction, e.g. with the <a href="#searching-with-an-agent">agent</a>; without a
+mapper, building takes milliseconds and extraction is all the time. At most two
+chunks are in memory. The two stages share the per-minute rate limits, but each
+gets its own <code>max_concurrency</code>, so up to twice as many calls may be in flight.</p>
+</div>
+<hr>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>You see</th>
+<th>Why</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OMOP vocabulary database not found: .aatm/omop.db. Run aatm init to build it.</code></td>
+<td>The vocabulary database is missing, or the script runs from another folder</td>
+<td>Run <code>aatm init</code>, or pass <code>vocabulary="path/to/omop.db"</code></td>
+</tr>
+<tr>
+<td><code>Concepts not found in the vocabulary: ['LOINC:29463-8']</code></td>
+<td>A typo in a code, or that vocabulary was not downloaded from Athena</td>
+<td>Check the code on Athena and that its vocabulary was included in <code>aatm init</code></td>
+</tr>
+<tr>
+<td><code>... is not a standard concept. Add 'maps_to: true' to use the standard concept it maps to</code></td>
+<td>A <code>*_concept_id</code> column got a non-standard code</td>
+<td>Add <code>maps_to: true</code>, or use the standard concept's code</td>
+</tr>
+<tr>
+<td><code>Table 'measurement' has no column 'value_as_numbr'</code></td>
+<td>A typo in a column name</td>
+<td>Use the column names of the <a href="https://ohdsi.github.io/CommonDataModel/cdm55.html">CDM table</a></td>
+</tr>
+<tr>
+<td><code>'weight_val' is not a child entity of 'body_weight'</code></td>
+<td><code>from: child.&lt;key&gt;</code> names an entity that is not a child of this one</td>
+<td>Use the child's <code>key</code>, and check its <code>parent_key</code></td>
+</tr>
+<tr>
+<td><code>... uses 'map', so the builder needs a terminology mapper</code></td>
+<td>The definition codes text, but no mapper was given</td>
+<td>Pass <code>mapper=TerminologyMapper(...)</code></td>
+</tr>
+<tr>
+<td><code>SyntaxError: 'await' outside function</code></td>
+<td><code>await</code> used in a script</td>
+<td>Use <code>asyncio.run(pipeline(notes))</code>, or run it in a notebook</td>
+</tr>
+<tr>
+<td>Every <code>map</code> is <code>unmapped</code></td>
+<td>The mapper found no candidates, e.g. the search index for its retriever was not built</td>
+<td>Use the embedding model you chose in <code>aatm init</code> as the <code>retriever</code></td>
+</tr>
+<tr>
+<td><code>... has no cache_identity(): pass identity=...</code></td>
+<td><code>cache=</code> was given with a custom coder that does not describe itself</td>
+<td>Add a <code>cache_identity()</code> method, or wrap it in <code>CachedCoder(coder, cache, identity=...)</code></td>
+</tr>
+<tr>
+<td><code>Coding cache ...: the vocabulary or search index of this coder changed since N results were cached</code></td>
+<td>The vocabulary database or index was rebuilt; the old results are no longer used</td>
+<td>Nothing is wrong; run the <code>aatm cache clear --coder ...</code> it shows to free their space</td>
+</tr>
+<tr>
+<td><code>Coding cache ...: changes to the content of ... cannot be detected</code></td>
+<td>A retriever whose data the cache cannot fingerprint</td>
+<td>After rebuilding its index, run <code>aatm cache clear</code></td>
+</tr>
+<tr>
+<td><code>trace</code> shows <code>error: ...</code> and <code>budget_exhausted</code> in <code>usage</code></td>
+<td>The agent ran out of tool calls before an answer</td>
+<td>Raise <code>max_tool_calls</code>, or use a stronger model</td>
+</tr>
+<tr>
+<td><code>Every note needs a note_id in a chunked run</code></td>
+<td><code>pipeline.run</code> was given notes without ids</td>
+<td>Add a unique <code>note_id</code> to every note, e.g. from the <code>note</code> table</td>
+</tr>
+<tr>
+<td><code>The omop mappings changed since tables were written to ...</code></td>
+<td>An <code>omop</code> block was edited after a run wrote tables to that folder</td>
+<td><code>await pipeline.rebuild(output_dir)</code>, then run again</td>
+</tr>
+<tr>
+<td><code>... holds results extracted with other entity definitions or another extractor</code></td>
+<td>The definitions (other than <code>omop</code>) or the model differ from the folder's run</td>
+<td>Use a new output folder</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="current-limits">Current limits</h2>
+<ul>
+<li>Only the <code>measurement</code>, <code>observation</code>, <code>condition_occurrence</code>, <code>drug_exposure</code> and
+  <code>device_exposure</code> tables are supported so far.</li>
+<li><code>drug_exposure</code> end dates are not inferred from the quantity and daily dose (the
+  second THEMIS rule), and mail-order prescriptions are not told apart from others.</li>
+<li><code>condition_start_date</code> falls back to the note date when the note gives no date, which
+  is later than the real onset of long-standing conditions.</li>
+<li>With the plain mapper, <code>map</code> searches with the extracted text alone: a unit such as
+  mg/dL, which hints at a serum test, is only used by the
+  <a href="#searching-with-an-agent">agent</a>.</li>
+<li>Mapper scores are not comparable across retrievers and selectors. The agent's score
+  is a self-reported confidence level, not calibrated yet.</li>
+<li>Units written outside UCUM ("lb", "x10^3/uL", "mEq/L") are not converted before the
+  lookup.</li>
+<li>Relative dates ("on admission", "after cycle 2") are not resolved: the next source,
+  usually the note date, is used and the issue is reported.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden="">
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer">
+        
+          
+          <a href="../entity_definitions/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Writing entity definitions">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Writing entity definitions
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../reference/cli/" class="md-footer__link md-footer__link--next" aria-label="Next: Command Line Interface">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Command Line Interface
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"></path></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["search.suggest", "search.highlight", "search.share", "navigation.instant", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.footer", "navigation.top", "navigation.tracking", "toc.follow", "content.code.copy", "content.code.select", "content.code.annotate", "content.tabs.link", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": "0.1.0"}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>
