@@ -27,6 +27,7 @@ dependencies = [
     "sentence-transformers>=5.2.2",
     "transformers>=4.57.3",
     "python-dateutil>=2.9.0",
+    "pyarrow>=17",
 ]
 license = "MIT"
 license-files = ["LICEN[CS]E*"]

@@ -35,6 +35,11 @@ _LAZY = {
     "CodingCache": "aatm.omop.cache",
     "CachedCoder": "aatm.omop.cache",
     "CacheStats": "aatm.omop.cache",
+    "note_row_id": "aatm.omop.builder",
+    "OmopRun": "aatm.omop.runner",
+    "RunSummary": "aatm.omop.runner",
+    "RunLedger": "aatm.omop.runner",
+    "notes_from_sql": "aatm.omop.runner",
 }
 
 

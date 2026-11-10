@@ -5,6 +5,8 @@ Mapping extracted entities to OMOP CDM table rows. See
 
 ::: aatm.omop.builder
 
+::: aatm.omop.runner
+
 ::: aatm.omop.mapping
 
 ::: aatm.omop.coding
