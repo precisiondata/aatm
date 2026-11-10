@@ -6,6 +6,7 @@ from aatm.gpu_memory import (
     GpuMemoryError,
     GpuMemoryLimit,
     calibrate_batch_size,
+    calibrate_max_batch_tokens,
     encode_with_oom_backoff,
 )
 
@@ -113,6 +114,23 @@ def test_no_data_returns_smallest_candidate():
     assert calibrate(gpu, [], []) == 8
 
 
+def test_token_budget_worst_case_holds_as_many_longest_texts_as_fit():
+    gpu = FakeGpu(limit_gib=100, fastest_batch=64)
+    calibrate_max_batch_tokens(
+        gpu.encode,
+        ["x" * 20] * 1024,
+        20,
+        ["x" * 5] * 256,
+        limit_bytes=gpu.limit,
+        candidates=(400, 1280),
+        probe=gpu,
+        timer=gpu.timer,
+    )
+    # 400 tokens of 20-token texts is 20 texts; 1280 tokens is 64.
+    assert (20, 400) in gpu.calls
+    assert (64, 1280) in gpu.calls
+
+
 class FlakyEmbeddingFunction:
     def __init__(self, max_working_batch):
         self.batch_size = 64
@@ -124,6 +142,29 @@ class FlakyEmbeddingFunction:
         if self.batch_size > self.max_working_batch:
             raise torch.OutOfMemoryError("simulated")
         return [[0.0]] * len(texts)
+
+
+class FlakyTokenBudgetFunction:
+    def __init__(self, max_working_budget):
+        self.batch_size = 32
+        self.max_batch_tokens = 8192
+        self.max_working_budget = max_working_budget
+        self.attempts = []
+
+    def __call__(self, texts):
+        self.attempts.append(self.max_batch_tokens)
+        if self.max_batch_tokens > self.max_working_budget:
+            raise torch.OutOfMemoryError("simulated")
+        return [[0.0]] * len(texts)
+
+
+def test_oom_backoff_halves_token_budget_when_batching_by_tokens():
+    function = FlakyTokenBudgetFunction(max_working_budget=2048)
+
+    assert len(encode_with_oom_backoff(function, ["a"])) == 1
+    assert function.attempts == [8192, 4096, 2048]
+    assert function.max_batch_tokens == 2048
+    assert function.batch_size == 32  # untouched
 
 
 def test_oom_backoff_halves_batch_size_and_keeps_it():

@@ -33,7 +33,7 @@ from aatm.device import get_device
 from aatm.gpu_memory import (
     CANDIDATE_BATCH_SIZES,
     GpuMemoryLimit,
-    calibrate_batch_size,
+    calibrate_max_batch_tokens,
     encode_with_oom_backoff,
 )
 from aatm.logs import get_logger
@@ -302,11 +302,11 @@ def build_mapping_datasets(standard_vocabularies: list[str]) -> None:
 def collect_calibration_texts(
     dataset_paths: Iterable[Path],
     n_longest: int = max(CANDIDATE_BATCH_SIZES),
-    n_typical: int = 1024,
+    n_typical: int = 4096,
     token_lengths: Callable[[list[str]], list[int]] | None = None,
     seed: int = 0,
 ) -> tuple[list[str], list[str]]:
-    """Collect texts for `calibrate_batch_size`: the longest and a typical sample.
+    """Collect texts for GPU calibration: the longest and a typical sample.
 
     Args:
         dataset_paths: CSV files built by `build_mapping_datasets`.
@@ -350,14 +350,17 @@ def collect_calibration_texts(
     return longest[:n_longest], typical.tolist()
 
 
-def _encode_with_batch_size(
-    embedding_function: Any, texts: Sequence[str], batch_size: int
+def _encode_with_max_batch_tokens(
+    embedding_function: Any, texts: Sequence[str], max_batch_tokens: int
 ) -> Any:
-    embedding_function.batch_size = batch_size
+    embedding_function.max_batch_tokens = max_batch_tokens
     return embedding_function(list(texts))
 
 
 def _token_lengths(embedding_function: Any) -> Callable[[list[str]], list[int]]:
+    if hasattr(embedding_function, "token_lengths"):
+        return lambda texts: embedding_function.token_lengths(texts)
+
     tokenizer = embedding_function.model.tokenizer
 
     def lengths(texts: list[str]) -> list[int]:
@@ -586,6 +589,7 @@ def build_local_vector_database(
     rate_limit: int | None = None,
     chunk_size: int | None = None,
     encode_batch_size: int | None = None,
+    encode_max_batch_tokens: int | None = None,
     embedding_dtype: str | None = None,
     profile_timing: bool = False,
     profile_sync_cuda: bool = False,
@@ -604,10 +608,15 @@ def build_local_vector_database(
             and written to it per round-trip. Defaults to
             `LOCAL_MODEL_CHUNK_SIZE` for local models and
             `API_MODEL_CHUNK_SIZE` for API models.
-        encode_batch_size: Number of texts a local model encodes per forward
-            pass. If not provided, on CUDA it is calibrated on the datasets'
-            longest and typical texts (see `aatm.gpu_memory`); otherwise the
-            embedding function's default is used. Ignored for API models.
+        encode_batch_size: Fixed number of texts a local model encodes per
+            forward pass. Turns off batching by token budget. Ignored for API
+            models.
+        encode_max_batch_tokens: Padded tokens a local model encodes per
+            forward pass; batches of short texts then hold more texts. If
+            neither this nor ``encode_batch_size`` is provided, on CUDA the
+            budget is calibrated on the datasets' longest and typical texts
+            (see `aatm.gpu_memory`); otherwise the embedding function's default
+            batch size is used. Ignored for API models.
         embedding_dtype: Precision for local models: ``float32``,
             ``bfloat16`` or ``float16``. If not provided,
             ``AATM_EMBEDDING_DTYPE`` is used, and otherwise the precision the
@@ -723,10 +732,19 @@ def build_local_vector_database(
             **model_kwargs,  # type: ignore[call-arg]
         )
 
+    if encode_batch_size is not None and encode_max_batch_tokens is not None:
+        raise ValueError("Pass encode_batch_size or encode_max_batch_tokens, not both.")
+
     if is_local and encode_batch_size is not None:
         if encode_batch_size <= 0:
             raise ValueError("encode_batch_size must be > 0")
         embedding_function.batch_size = encode_batch_size  # type: ignore[attr-defined]
+        embedding_function.max_batch_tokens = None  # type: ignore[attr-defined]
+
+    if is_local and encode_max_batch_tokens is not None:
+        if encode_max_batch_tokens <= 0:
+            raise ValueError("encode_max_batch_tokens must be > 0")
+        embedding_function.max_batch_tokens = encode_max_batch_tokens  # type: ignore[attr-defined]
 
     # Cap GPU memory and size batches by measurement, so the build never
     # overflows GPU memory. See `aatm.gpu_memory`.
@@ -778,23 +796,34 @@ def build_local_vector_database(
         )
         seq = 0
 
-        if guard_gpu_memory and encode_batch_size is None:
-            with profiler.time_block("calibrate_batch_size"):
+        if (
+            guard_gpu_memory
+            and encode_batch_size is None
+            and encode_max_batch_tokens is None
+        ):
+            with profiler.time_block("calibrate_max_batch_tokens"):
+                token_lengths = _token_lengths(embedding_function)
                 longest_texts, typical_texts = collect_calibration_texts(
                     dataset_paths,
-                    token_lengths=_token_lengths(embedding_function),
+                    token_lengths=token_lengths,
                 )
-                embedding_function.batch_size = calibrate_batch_size(  # type: ignore[attr-defined]
-                    partial(_encode_with_batch_size, embedding_function),
+                longest_tokens = max(token_lengths(longest_texts[:1]), default=1)
+                embedding_function.max_batch_tokens = calibrate_max_batch_tokens(  # type: ignore[attr-defined]
+                    partial(_encode_with_max_batch_tokens, embedding_function),
                     longest_texts,
+                    longest_tokens,
                     typical_texts,
                     limit_bytes=memory_limit.limit_bytes,
                 )
 
         if is_local:
-            logger.info(
-                f"Encoding with batch size {embedding_function.batch_size}"  # type: ignore[attr-defined]
-            )
+            max_batch_tokens = getattr(embedding_function, "max_batch_tokens", None)
+            if max_batch_tokens is not None:
+                logger.info(f"Encoding with up to {max_batch_tokens} tokens per batch")
+            else:
+                logger.info(
+                    f"Encoding with batch size {embedding_function.batch_size}"  # type: ignore[attr-defined]
+                )
 
         for chunk in chunks:
             tracker.handle_acks(writer.poll())

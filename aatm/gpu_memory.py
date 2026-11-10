@@ -8,13 +8,20 @@ prevents overflows in three layers:
 1. `GpuMemoryLimit` caps how much memory PyTorch may use, below what is free on
    the GPU. PyTorch then raises `torch.OutOfMemoryError` before the driver would
    start spilling to system RAM.
-2. `calibrate_batch_size` picks the batch size by encoding real texts: the
-   longest ones, to measure the worst-case memory, and typical ones, to measure
-   speed. It returns the fastest batch size whose worst case fits comfortably
-   under the cap.
-3. `encode_with_oom_backoff` halves the batch size and retries if an
-   out-of-memory error happens anyway, for example because another program
+2. `calibrate_max_batch_tokens` picks the token budget per batch by encoding
+   real texts: the longest ones, to measure the worst-case memory, and typical
+   ones, to measure speed. It returns the fastest budget whose worst case fits
+   comfortably under the cap. `calibrate_batch_size` does the same for a fixed
+   number of texts per batch.
+3. `encode_with_oom_backoff` halves the budget (or batch size) and retries if
+   an out-of-memory error happens anyway, for example because another program
    started using the GPU.
+
+The fastest setting usually needs far less memory than the GPU has. On an RTX
+4090, EmbeddingGemma-300M and Qwen3-Embedding-0.6B are fastest at 4-8k tokens
+per batch, about 2 GiB; larger batches no longer fit in the GPU's on-chip cache
+and get slower. Free memory is not idle compute here, so calibration does not
+try to fill it.
 """
 
 from __future__ import annotations
@@ -36,6 +43,18 @@ GIB = 1024**3
 
 CANDIDATE_BATCH_SIZES: tuple[int, ...] = (8, 16, 32, 64, 128, 256, 512, 1024)
 """Batch sizes `calibrate_batch_size` tries, smallest first."""
+
+CANDIDATE_BATCH_TOKENS: tuple[int, ...] = (
+    1024,
+    2048,
+    4096,
+    8192,
+    16384,
+    32768,
+    65536,
+    131072,
+)
+"""Token budgets `calibrate_max_batch_tokens` tries, smallest first."""
 
 CALIBRATION_MEMORY_MARGIN = 0.85
 """Share of the memory limit a worst-case batch may use during calibration."""
@@ -138,14 +157,16 @@ def calibrate_batch_size(
     memory_margin: float = CALIBRATION_MEMORY_MARGIN,
     probe: CudaMemoryProbe | None = None,
     timer: Callable[[], float] = time.perf_counter,
+    worst_case_rows: Callable[[int], int] | None = None,
+    unit: str = "batch size",
 ) -> int:
     """Pick the fastest batch size whose worst case fits in GPU memory.
 
     For each candidate, smallest first:
 
-    1. Encode that many of the longest texts in one batch. Padding makes every
-       row as long as the longest, so this is the most memory any batch of that
-       size can need. Stop if it uses more than ``memory_margin`` of
+    1. Encode a batch of the longest texts: ``worst_case_rows(size)`` of them,
+       by default ``size``. Padding makes every row as long as the longest, so
+       this is the most memory any batch of that size can need. Stop if it uses more than ``memory_margin`` of
        ``limit_bytes`` or raises an out-of-memory error.
     2. Encode ``typical_texts`` and measure texts per second. Stop once a size
        is not at least `MIN_SPEEDUP_FOR_LARGER_BATCH` times faster than the best
@@ -161,6 +182,9 @@ def calibrate_batch_size(
         memory_margin: Share of ``limit_bytes`` a worst-case batch may use.
         probe: Reads peak GPU memory.
         timer: Clock used to measure speed.
+        worst_case_rows: Number of longest texts in the worst-case batch for a
+            candidate. Defaults to the candidate itself.
+        unit: What a candidate is, for log messages.
 
     Returns:
         The chosen batch size.
@@ -182,8 +206,9 @@ def calibrate_batch_size(
     for size in candidates:
         # Repeat the longest texts if there are fewer than `size`: no real batch
         # can hold longer ones, so this is still the worst case.
-        repeats = -(-size // len(longest_texts))
-        worst_case = (list(longest_texts) * repeats)[:size]
+        rows = worst_case_rows(size) if worst_case_rows else size
+        repeats = -(-rows // len(longest_texts))
+        worst_case = (list(longest_texts) * repeats)[:rows]
 
         probe.reset_peak()
         out_of_memory = False
@@ -194,12 +219,14 @@ def calibrate_batch_size(
             out_of_memory = True
         if out_of_memory:
             free_cached_gpu_memory()
-            logger.debug(f"Batch size {size}: out of memory on the longest texts.")
+            logger.debug(
+                f"{unit.capitalize()} {size}: out of memory on the longest texts."
+            )
             break
 
         if peak > budget:
             logger.debug(
-                f"Batch size {size}: worst case needs {peak / GIB:.2f} GiB, "
+                f"{unit.capitalize()} {size}: worst case needs {peak / GIB:.2f} GiB, "
                 f"over the {budget / GIB:.2f} GiB budget."
             )
             break
@@ -209,7 +236,8 @@ def calibrate_batch_size(
         probe.synchronize()
         rate = len(typical_texts) / max(timer() - started, 1e-9)
         logger.debug(
-            f"Batch size {size}: worst case {peak / GIB:.2f} GiB, {rate:.0f} texts/s."
+            f"{unit.capitalize()} {size}: worst case {peak / GIB:.2f} GiB, "
+            f"{rate:.0f} texts/s."
         )
 
         # A larger batch needs more memory, so it must be clearly faster to win.
@@ -222,23 +250,74 @@ def calibrate_batch_size(
 
     if best_size is None:
         raise GpuMemoryError(
-            f"The model does not fit in GPU memory even with batch size "
+            f"The model does not fit in GPU memory even with {unit} "
             f"{candidates[0]}. Try half precision (embedding_dtype='bfloat16'), "
             "a smaller model, or closing other programs that use the GPU."
         )
 
-    logger.info(f"Encoding with batch size {best_size} ({best_rate:.0f} texts/s).")
+    logger.info(f"Encoding with {unit} {best_size} ({best_rate:.0f} texts/s).")
     return best_size
+
+
+def calibrate_max_batch_tokens(
+    encode: Callable[[Sequence[str], int], Any],
+    longest_texts: Sequence[str],
+    longest_tokens: int,
+    typical_texts: Sequence[str],
+    limit_bytes: int,
+    candidates: Sequence[int] = CANDIDATE_BATCH_TOKENS,
+    memory_margin: float = CALIBRATION_MEMORY_MARGIN,
+    probe: CudaMemoryProbe | None = None,
+    timer: Callable[[], float] = time.perf_counter,
+) -> int:
+    """Pick the fastest token budget per batch whose worst case fits in memory.
+
+    Works like `calibrate_batch_size`, with token budgets as candidates. The
+    worst case for a budget is a batch of the longest texts, as many as the
+    budget allows: it has the most tokens per row, so attention needs the most
+    memory.
+
+    Args:
+        encode: Encodes texts with the given token budget.
+        longest_texts: Longest texts in the data, longest first.
+        longest_tokens: Token count of the longest text.
+        typical_texts: A random sample of the data, for measuring speed.
+        limit_bytes: GPU memory PyTorch may use, from `GpuMemoryLimit`.
+        candidates: Token budgets to try, in increasing order.
+        memory_margin: Share of ``limit_bytes`` a worst-case batch may use.
+        probe: Reads peak GPU memory.
+        timer: Clock used to measure speed.
+
+    Returns:
+        The chosen token budget.
+
+    Raises:
+        GpuMemoryError: If even the smallest candidate does not fit.
+    """
+    return calibrate_batch_size(
+        encode,
+        longest_texts,
+        typical_texts,
+        limit_bytes=limit_bytes,
+        candidates=candidates,
+        memory_margin=memory_margin,
+        probe=probe,
+        timer=timer,
+        worst_case_rows=lambda budget: max(1, budget // max(1, longest_tokens)),
+        unit="token budget",
+    )
 
 
 def encode_with_oom_backoff(embedding_function: Any, texts: Sequence[str]) -> Any:
     """Encode texts, halving the batch size after each out-of-memory error.
 
-    The smaller batch size is kept for later calls.
+    Halves ``max_batch_tokens`` when the embedding function batches by token
+    budget, and ``batch_size`` otherwise. The smaller value is kept for later
+    calls.
 
     Args:
         embedding_function: Local embedding function with a ``batch_size``
-            attribute.
+            attribute and, optionally, a ``max_batch_tokens`` one.
         texts: Texts to encode.
 
     Returns:
@@ -258,15 +337,20 @@ def encode_with_oom_backoff(embedding_function: Any, texts: Sequence[str]) -> An
 
         if out_of_memory:
             free_cached_gpu_memory()
-            size = embedding_function.batch_size
+            attribute = (
+                "max_batch_tokens"
+                if getattr(embedding_function, "max_batch_tokens", None) is not None
+                else "batch_size"
+            )
+            size = getattr(embedding_function, attribute)
             if size <= 1:
                 raise GpuMemoryError(
                     "Ran out of GPU memory even with batch size 1. Try half "
                     "precision (embedding_dtype='bfloat16'), a smaller model, or "
                     "closing other programs that use the GPU."
                 )
-            embedding_function.batch_size = size // 2
+            setattr(embedding_function, attribute, size // 2)
+            label = "token budget" if attribute == "max_batch_tokens" else "batch size"
             logger.warning(
-                f"Ran out of GPU memory with batch size {size}; retrying with "
-                f"{embedding_function.batch_size}."
+                f"Ran out of GPU memory with {label} {size}; retrying with {size // 2}."
             )
