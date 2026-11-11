@@ -22,6 +22,7 @@ import subprocess
 import sys
 import time
 import zipfile
+import zlib
 from dataclasses import dataclass
 from http.client import HTTPException
 from pathlib import Path, PurePosixPath
@@ -70,7 +71,7 @@ class VocabFilesExistError(VocabBundleError):
     def __init__(self, directory: Path, conflicts: list[str]) -> None:
         self.directory = directory
         self.conflicts = conflicts
-        shown = ", ".join(conflicts[:5]) + (" …" if len(conflicts) > 5 else "")
+        shown = ", ".join(conflicts[:5]) + (", ..." if len(conflicts) > 5 else "")
         super().__init__(
             f"{len(conflicts)} file(s) already exist in `{directory}`: {shown}"
         )
@@ -87,6 +88,12 @@ class BundleVocabulary:
     vocabulary_id: str
     name: str
     version: str
+    reference: str = ""
+
+    @property
+    def omop_generated(self) -> bool:
+        """Whether OMOP made this vocabulary for its own use (e.g. Visit, Gender)."""
+        return self.reference.strip().lower() == "omop generated"
 
 
 def is_url(value: str) -> bool:
@@ -200,7 +207,7 @@ def _download_once(
     chunk_size: int,
     progress: Optional[ProgressCallback],
 ) -> None:
-    headers = {"User-Agent": "aatm"}
+    headers = {"User-Agent": "aatm", "Accept-Encoding": "identity"}
     if offset:
         headers["Range"] = f"bytes={offset}-"
     with urlopen(Request(url, headers=headers), timeout=timeout) as response:
@@ -209,21 +216,39 @@ def _download_once(
             raise BundleDownloadError(
                 f"The link returned a web page instead of a zip file. {_LOGIN_HINT}"
             )
-        if offset and response.status != 206:
+        # Athena gzips the zip in transit (Content-Encoding: gzip) even when
+        # asked not to, so decode it while streaming. A gzipped response
+        # cannot be resumed from a byte offset of the decoded file.
+        encoding = response.headers.get("Content-Encoding", "").strip().lower()
+        if encoding not in ("", "identity", "gzip", "x-gzip"):
+            raise BundleDownloadError(
+                f"The server sent the bundle with an unsupported encoding: {encoding}"
+            )
+        decoder = (
+            zlib.decompressobj(16 + zlib.MAX_WBITS)
+            if encoding in ("gzip", "x-gzip")
+            else None
+        )
+        if offset and (response.status != 206 or decoder is not None):
             offset = 0  # The server ignored the Range header; start over.
         length = response.headers.get("Content-Length")
         total = offset + int(length) if length is not None else None
-        done = offset
+        received = offset  # bytes as sent by the server, for progress
         if progress:
-            progress(done, total)
+            progress(received, total)
         with part.open("ab" if offset else "wb") as f:
             while chunk := response.read(chunk_size):
-                f.write(chunk)
-                done += len(chunk)
+                received += len(chunk)
+                f.write(decoder.decompress(chunk) if decoder else chunk)
                 if progress:
-                    progress(done, total)
-    if total is not None and done < total:
-        raise HTTPException(f"connection closed after {done} of {total} bytes")
+                    progress(received, total)
+            if decoder is not None:
+                f.write(decoder.flush())
+    if total is not None and received < total:
+        raise HTTPException(f"connection closed after {received} of {total} bytes")
+    if decoder is not None and not decoder.eof:
+        part.unlink(missing_ok=True)
+        raise HTTPException("connection closed before the end of the gzip stream")
 
 
 def _check_zip(path: Path) -> None:
@@ -302,6 +327,7 @@ def read_bundle_vocabularies(vocab_dir: Path) -> list[BundleVocabulary]:
                 vocabulary_id=row.get("vocabulary_id") or "",
                 name=row.get("vocabulary_name") or "",
                 version=row.get("vocabulary_version") or "",
+                reference=row.get("vocabulary_reference") or "",
             )
             for row in reader
             if row.get("vocabulary_id")
