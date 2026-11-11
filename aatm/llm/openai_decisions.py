@@ -1,12 +1,10 @@
 """The OpenAI Decisions API (``POST /v1/decisions``) as a `DecisionModel`.
 
-``openai`` 3.x has a typed method for the endpoint, ``client.decisions.create``,
-which is used when the installed SDK has it. Older SDKs (2.x) go through the
-client's generic ``post`` instead, with the same body, authentication, base URL and
-error types (the shared limiter retries 429 and 5xx).
+Requests go through ``client.decisions.create`` (``openai`` 3.x). Its errors carry
+the HTTP status, so the shared limiter retries 429 and 5xx.
 """
 
-from typing import Any, Optional, Sequence, cast
+from typing import Any, Optional, Sequence
 
 from openai import AsyncOpenAI
 
@@ -85,25 +83,15 @@ class OpenAIDecisionModel:
         )
 
     async def _post(self, body: dict[str, Any]) -> Any:
-        """Send the request; return the response as a dict."""
-        decisions = getattr(self.client, "decisions", None)
-        if decisions is not None:  # openai >= 3
-            kwargs = {k: body[k] for k in _SDK_PARAMS if k in body}
-            extra = {k: v for k, v in body.items() if k not in _SDK_PARAMS}
-            if extra:
-                kwargs["extra_body"] = extra
-            if self.settings.timeout is not None:
-                kwargs["timeout"] = self.settings.timeout
-            decision = await decisions.create(**kwargs)
-            return (
-                decision.model_dump() if hasattr(decision, "model_dump") else decision
-            )
-        options: dict[str, Any] = {}
+        """Send the request with ``client.decisions.create``; return a dict."""
+        kwargs = {k: body[k] for k in _SDK_PARAMS if k in body}
+        extra = {k: v for k, v in body.items() if k not in _SDK_PARAMS}
+        if extra:
+            kwargs["extra_body"] = extra
         if self.settings.timeout is not None:
-            options["timeout"] = self.settings.timeout
-        return await self.client.post(
-            "/decisions", body=body, cast_to=object, options=cast(Any, options)
-        )
+            kwargs["timeout"] = self.settings.timeout
+        decision = await self.client.decisions.create(**kwargs)
+        return decision.model_dump()
 
     async def _decide(
         self, body: dict[str, Any], questions: Sequence[Question]

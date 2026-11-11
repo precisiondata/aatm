@@ -545,7 +545,7 @@ def test_alpha_endpoints_warn_once(caplog, monkeypatch):
 
 
 class FakeDecisionsResource:
-    """`client.decisions` of openai >= 3: records kwargs, returns a model."""
+    """`client.decisions`: records the kwargs, returns a model."""
 
     def __init__(self, response: dict):
         self.response = response
@@ -556,7 +556,7 @@ class FakeDecisionsResource:
         return SimpleNamespace(model_dump=lambda: self.response)
 
 
-def test_openai_uses_the_sdk_decisions_method_when_available():
+def test_openai_passes_settings_to_the_sdk():
     resource = FakeDecisionsResource(OPENAI_RESPONSE)
     client = SimpleNamespace(decisions=resource)
     model = OpenAIDecisionModel(
