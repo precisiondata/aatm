@@ -41,6 +41,11 @@ _LAZY = {
     "StageStats": "aatm.omop.runner",
     "RunLedger": "aatm.omop.runner",
     "notes_from_sql": "aatm.omop.runner",
+    "run_sharded": "aatm.omop.shards",
+    "shard_of": "aatm.omop.shards",
+    "shard_dir": "aatm.omop.shards",
+    "combine_summaries": "aatm.omop.shards",
+    "ShardedRunError": "aatm.omop.shards",
 }
 
 

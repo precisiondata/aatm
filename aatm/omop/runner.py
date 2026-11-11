@@ -159,6 +159,7 @@ from aatm.omop.builder import (
 )
 from aatm.omop.cache import CacheStats
 from aatm.omop.mapping import ClinicalNote
+from aatm.omop.shards import check_shard, shard_dirs, shard_of
 from aatm.omop.tables import OMOP_TABLES
 
 if TYPE_CHECKING:
@@ -281,10 +282,22 @@ def _iter_notes(
 
 
 def read_chunks(
-    source: Any, chunk_size: int, columns: Optional[dict[str, str]] = None
+    source: Any,
+    chunk_size: int,
+    columns: Optional[dict[str, str]] = None,
+    shard: Optional[tuple[int, int]] = None,
 ) -> Iterator[list[ClinicalNote]]:
-    """Read notes from a source in lists of `chunk_size` (the last may be shorter)."""
+    """Read notes from a source in lists of `chunk_size` (the last may be shorter).
+
+    With `shard` ``(index, count)``, only the notes of that shard are kept (see
+    `aatm.omop.shards.shard_of`); notes without a `note_id` are kept, to be refused.
+    """
     notes = _iter_notes(source, columns, read_size=max(chunk_size, 1000))
+    if shard is not None and shard[1] > 1:
+        index, count = check_shard(shard)
+        notes = (
+            n for n in notes if n.note_id is None or shard_of(n.note_id, count) == index
+        )
     while chunk := list(islice(notes, chunk_size)):
         yield chunk
 
@@ -651,6 +664,9 @@ class RunLedger:
     def drop_part(self, part: int) -> None:
         with self.con:
             self.con.execute("DELETE FROM parts WHERE part = ?", (part,))
+
+    def has_notes(self) -> bool:
+        return self.con.execute("SELECT 1 FROM notes LIMIT 1").fetchone() is not None
 
     def has_built(self) -> bool:
         return (
@@ -1157,6 +1173,25 @@ class ChunkedRun:
             }
         )
 
+    def _check_shard(self, ledger: RunLedger, shard: tuple[int, int]) -> None:
+        """Refuse a folder that holds another shard, or notes of the whole dataset."""
+        wanted = f"{shard[0]}/{shard[1]}"
+        stored = ledger.get_meta("shard")
+        if stored is None and ledger.has_notes():
+            stored = "0/1"  # made before shards were recorded: a whole dataset
+        if stored not in (None, wanted):
+            def describe(value: str) -> str:
+                index, count = value.split("/")
+                if count == "1":
+                    return "the whole dataset"
+                return f"shard {index} of {count}"
+
+            raise ValueError(
+                f"{self.output_dir} holds {describe(stored)}, not "
+                f"{describe(wanted)}: use another output folder"
+            )
+        ledger.set_meta("shard", wanted)
+
     def _check(self, ledger: RunLedger, rebuilding: bool) -> None:
         extraction = self._extraction_fingerprint()
         stored = ledger.get_meta("extraction")
@@ -1214,7 +1249,9 @@ class ChunkedRun:
         batch: bool = False,
         poll_every: float = 60.0,
         max_batches: int = 20,
+        shard: Optional[tuple[int, int]] = None,
     ) -> RunSummary:
+        shard = check_shard(shard) if shard is not None else (0, 1)
         if chunk_size < 1:
             raise ValueError("chunk_size must be >= 1")
         if max_attempts < 1:
@@ -1228,16 +1265,22 @@ class ChunkedRun:
                 "batch=True needs an extractor that can submit provider batch jobs: "
                 "SimpleLLMExtractor with an openai, anthropic or gemini model"
             )
-        summary = RunSummary(
-            output_dir=str(self.output_dir),
-            kind="run",
-            total=total if total is not None else count_notes(source),
-        )
+        if total is None:
+            total = count_notes(source)
+            if total is not None and shard[1] > 1:
+                total = -(-total // shard[1])  # an estimate of the shard's notes
+        if shard_dirs(self.output_dir):
+            raise ValueError(
+                f"{self.output_dir} holds the folders of a sharded run: run the "
+                "shards again with run_sharded (or shard= and each shard's folder)"
+            )
+        summary = RunSummary(output_dir=str(self.output_dir), kind="run", total=total)
         with (
             self._ledger() as ledger,
             self._report(summary, prices, log_every) as report,
         ):
             self._recover(ledger)
+            self._check_shard(ledger, shard)
             self._check(ledger, rebuilding=False)
             # Jobs left pending by an earlier run are collected in either mode.
             queue = _BatchQueue(self.pipeline.extractor, ledger, summary, poll_every)
@@ -1246,7 +1289,7 @@ class ChunkedRun:
             building: Optional[asyncio.Task] = None
             in_flight: set[int] = set()
             try:
-                for chunk in read_chunks(source, chunk_size, columns):
+                for chunk in read_chunks(source, chunk_size, columns, shard):
                     pairs = await self._prepare(
                         ledger,
                         chunk,
@@ -1283,6 +1326,17 @@ class ChunkedRun:
     ) -> RunSummary:
         if chunk_size < 1:
             raise ValueError("chunk_size must be >= 1")
+        shards = shard_dirs(self.output_dir)
+        if shards and not (self.output_dir / LEDGER_FILE).exists():
+            from aatm.omop.shards import combine_summaries
+
+            summaries = [
+                await ChunkedRun(self.pipeline, folder).rebuild(
+                    chunk_size, prices, log_every
+                )
+                for folder in shards
+            ]
+            return combine_summaries(summaries, self.output_dir)
         summary = RunSummary(output_dir=str(self.output_dir), kind="rebuild")
         with (
             self._ledger() as ledger,
@@ -1591,34 +1645,49 @@ class OmopRun:
     DataFrame. For datasets larger than memory, `dataset` returns a
     `pyarrow.dataset.Dataset` to filter and scan lazily (or read the folders with
     DuckDB, Polars or Spark).
+
+    Given the parent folder of a sharded run (`aatm.omop.run_sharded`), it reads every
+    shard as one run: the tables hold the rows of all shards, and `status`,
+    `failures`, `batches` and `summaries` cover them all.
     """
 
     def __init__(self, output_dir: str | Path):
         self.output_dir = Path(output_dir)
-        if not (self.output_dir / LEDGER_FILE).exists():
+        if (self.output_dir / LEDGER_FILE).exists():
+            self.folders = [self.output_dir]
+        else:
+            self.folders = [
+                f for f in shard_dirs(self.output_dir) if (f / LEDGER_FILE).exists()
+            ]
+        if not self.folders:
             raise FileNotFoundError(f"{self.output_dir} is not the output of a run")
+
+    @property
+    def sharded(self) -> bool:
+        """Whether this is the parent folder of a sharded run."""
+        return self.folders != [self.output_dir]
+
+    def _parts(self, name: str) -> list[Path]:
+        return [p for f in self.folders for p in sorted((f / name).glob("part-*.parquet"))]
 
     @property
     def tables(self) -> list[str]:
         """The OMOP tables with rows."""
-        return sorted(
-            p.name
-            for p in self.output_dir.iterdir()
-            if p.is_dir() and p.name in OMOP_TABLES and any(p.glob("part-*.parquet"))
-        )
+        return sorted(name for name in OMOP_TABLES if self._parts(name))
 
     def dataset(self, name: str) -> Any:
         """A `pyarrow.dataset.Dataset` of a table, or of ``provenance``, ``issues``
         or ``mappings``."""
         import pyarrow.dataset as ds
 
-        return ds.dataset(self.output_dir / name, format="parquet")
+        if not self.sharded:
+            return ds.dataset(self.output_dir / name, format="parquet")
+        return ds.dataset([str(p) for p in self._parts(name)], format="parquet")
 
     def _read(self, name: str, schema: "pa.Schema") -> pd.DataFrame:
         import pyarrow as pa
 
-        folder = self.output_dir / name
-        if not any(folder.glob("part-*.parquet")):
+        if not self._parts(name):
             return schema.empty_table().to_pandas()
         table = self.dataset(name).to_table()
         mapping = {pa.int64(): pd.Int64Dtype()}
@@ -1650,41 +1719,52 @@ class OmopRun:
         """The coded texts; ``trace`` and ``usage`` are JSON strings."""
         return self._read(MAPPINGS, _schema(ConceptMapping))
 
+    def _ledgers(self) -> Iterator[RunLedger]:
+        for folder in self.folders:
+            ledger = RunLedger(folder / LEDGER_FILE)
+            try:
+                yield ledger
+            finally:
+                ledger.close()
+
+    def _concat(self, frames: list[pd.DataFrame], by: str) -> pd.DataFrame:
+        if len(frames) == 1:
+            return frames[0]
+        frames = [f for f in frames if not f.empty] or frames[:1]
+        return pd.concat(frames, ignore_index=True).sort_values(by, ignore_index=True)
+
     def failures(self) -> pd.DataFrame:
         """Notes that could not be extracted or built: their stage, error and tries."""
-        ledger = RunLedger(self.output_dir / LEDGER_FILE)
-        try:
-            return ledger.failures()
-        finally:
-            ledger.close()
+        return self._concat([ledger.failures() for ledger in self._ledgers()], "note_id")
 
     def summaries(self) -> list[RunSummary]:
         """The summaries of the runs and rebuilds made in this folder, oldest first.
 
         A run still going on, or one that stopped without finishing (a crash), has
-        ``completed`` false.
+        ``completed`` false. For a sharded run, each shard's runs are listed, by
+        shard; combine them with `aatm.omop.shards.combine_summaries`.
         """
-        folder = self.output_dir / RUNS
-        if not folder.is_dir():
-            return []
-        return [
-            RunSummary.model_validate_json(path.read_text(encoding="utf-8"))
-            for path in sorted(folder.glob("*.json"))
-        ]
+        summaries = []
+        for folder in self.folders:
+            runs = folder / RUNS
+            if runs.is_dir():
+                summaries += [
+                    RunSummary.model_validate_json(path.read_text(encoding="utf-8"))
+                    for path in sorted(runs.glob("*.json"))
+                ]
+        return summaries
 
     def status(self) -> dict[str, int]:
         """Notes per status: ``built``, ``extracted`` (not built yet), ``failed``,
         and ``submitted`` (in a pending batch job)."""
-        ledger = RunLedger(self.output_dir / LEDGER_FILE)
-        try:
-            return ledger.counts()
-        finally:
-            ledger.close()
+        counts: dict[str, int] = {}
+        for ledger in self._ledgers():
+            for status, n in ledger.counts().items():
+                counts[status] = counts.get(status, 0) + n
+        return counts
 
     def batches(self) -> pd.DataFrame:
         """The provider batch jobs of batch runs: id, model, status and notes."""
-        ledger = RunLedger(self.output_dir / LEDGER_FILE)
-        try:
-            return ledger.batches()
-        finally:
-            ledger.close()
+        return self._concat(
+            [ledger.batches() for ledger in self._ledgers()], "submitted_at"
+        )
