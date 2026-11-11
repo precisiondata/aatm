@@ -135,13 +135,37 @@ class VectorStore(ABC):
 # --- ChromaDB --------------------------------------------------------------------
 
 
+CHROMA_MAX_QUERY_RESULTS = 30_000
+"""Default cap on the records one ChromaDB query call returns, over all its queries.
+
+A local ChromaDB fetches the metadata of every returned record in one SQLite
+statement with one variable per record, so a call returning more than SQLite's
+32,766-variable limit fails with ``too many SQL variables`` (e.g. 33 queries of
+1,000 results, or 328 of 100). The filter does not matter, only
+``len(embeddings) * top_k``. 30,000 leaves some headroom.
+"""
+
+
 class ChromaVectorStore(VectorStore):
     """A ChromaDB collection, local or in Chroma Cloud."""
 
-    def __init__(self, collection: Any):
-        """Wrap an open ``chromadb`` collection."""
+    def __init__(
+        self, collection: Any, max_query_results: int = CHROMA_MAX_QUERY_RESULTS
+    ):
+        """Wrap an open ``chromadb`` collection.
+
+        Args:
+            collection: The collection.
+            max_query_results: Most records one ``collection.query`` call may
+                return. `query` splits its embeddings into calls of at most
+                ``max_query_results // top_k`` queries (at least one). See
+                `CHROMA_MAX_QUERY_RESULTS`.
+        """
+        if max_query_results < 1:
+            raise ValueError(f"max_query_results must be positive: {max_query_results}")
         self.collection = collection
         self.name = collection.name
+        self.max_query_results = max_query_results
 
     def query(
         self,
@@ -149,14 +173,13 @@ class ChromaVectorStore(VectorStore):
         top_k: int,
         where: Mapping[str, Any] | None = None,
     ) -> list[list[Hit]]:
-        kwargs: dict[str, Any] = {"where": dict(where)} if where else {}
-        results = self.collection.query(
+        return chroma_query(
+            self.collection,
+            top_k,
             query_embeddings=embeddings,
-            n_results=top_k,
-            include=["metadatas", "distances"],
-            **kwargs,
+            where=where,
+            max_query_results=self.max_query_results,
         )
-        return chroma_hits(results)
 
     def existing_ids(self, ids: Sequence[str]) -> set[str]:
         return set(self.collection.get(ids=list(ids), include=[])["ids"])
@@ -189,6 +212,54 @@ class ChromaVectorStore(VectorStore):
 
     def fingerprint(self) -> dict[str, Any]:
         return {"collection_id": str(self.collection.id), "count": self.count()}
+
+
+def chroma_query(
+    collection: Any,
+    n_results: int,
+    query_texts: Sequence[str] | None = None,
+    query_embeddings: Sequence[Sequence[float]] | None = None,
+    where: Mapping[str, Any] | None = None,
+    max_query_results: int = CHROMA_MAX_QUERY_RESULTS,
+) -> list[list[Hit]]:
+    """Query a ChromaDB collection, split into calls ChromaDB can answer.
+
+    Each call holds at most ``max_query_results // n_results`` queries (at
+    least one), so it returns at most about ``max_query_results`` records; see
+    `CHROMA_MAX_QUERY_RESULTS`. Results keep the order of the queries.
+
+    Args:
+        collection: The collection.
+        n_results: Results per query.
+        query_texts: Query texts, embedded by the collection's embedding
+            function. Give these or ``query_embeddings``.
+        query_embeddings: Query vectors.
+        where: Optional metadata filter.
+        max_query_results: Most records one call may return.
+
+    Returns:
+        For each query, ``(distance, metadata)`` pairs, nearest first.
+    """
+    if (query_texts is None) == (query_embeddings is None):
+        raise ValueError("Give exactly one of query_texts and query_embeddings")
+    queries: list[Any]
+    if query_texts is not None:
+        key, queries = "query_texts", list(query_texts)
+    else:
+        assert query_embeddings is not None
+        key, queries = "query_embeddings", list(query_embeddings)
+    kwargs: dict[str, Any] = {"where": dict(where)} if where else {}
+    batch_size = max(1, max_query_results // max(n_results, 1))
+    hits: list[list[Hit]] = []
+    for batch in _chunks(queries, batch_size):
+        results = collection.query(
+            n_results=n_results,
+            include=["metadatas", "distances"],
+            **{key: list(batch)},
+            **kwargs,
+        )
+        hits.extend(chroma_hits(results))
+    return hits
 
 
 def chroma_hits(results: Mapping[str, Any]) -> list[list[Hit]]:

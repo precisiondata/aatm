@@ -20,7 +20,12 @@ import chromadb
 from .data_models import RetrievedExpressionMetadata, RetrieverResults, Translation
 from .pipeline import PipelineBaseClass
 from .vector_stores import Hit as _Hit
-from .vector_stores import UnsupportedFilterError, VectorStore, chroma_hits
+from .vector_stores import (
+    ChromaVectorStore,
+    UnsupportedFilterError,
+    VectorStore,
+    chroma_query,
+)
 
 FilterStrategy = Literal["overfetch_fallback", "overfetch", "native", "chroma"]
 """How a `VectorStoreRetriever` applies a `where` metadata filter.
@@ -471,6 +476,8 @@ class ChromaDBRetriever(VectorStoreRetriever):
     ``"overfetch_fallback"``.
     """
 
+    store: ChromaVectorStore
+
     def __init__(
         self,
         client: chromadb.ClientAPI,
@@ -513,8 +520,6 @@ class ChromaDBRetriever(VectorStoreRetriever):
             *args: Additional positional arguments reserved for compatibility.
             **kwargs: Additional keyword arguments reserved for compatibility.
         """
-        from .vector_stores import ChromaVectorStore
-
         self.client = client
         self.collection_name = collection_name
         self.embedding_function = embedding_function
@@ -540,18 +545,16 @@ class ChromaDBRetriever(VectorStoreRetriever):
         }
 
     def _query(self, n_results: int, **kwargs: Any) -> list[list[_Hit]]:  # type: ignore[override]
-        """Run one ChromaDB query and return each query's (distance, metadata)."""
-        if kwargs.get("where") is None:
-            kwargs.pop("where", None)
-        for key in ("query_texts", "query_embeddings"):
-            if kwargs.get(key) is None:
-                kwargs.pop(key, None)
-        results = self.collection.query(
-            n_results=n_results,
-            include=["metadatas", "distances"],
+        """Run one ChromaDB query and return each query's (distance, metadata).
+
+        Many queries are split into several calls; see `chroma_query`.
+        """
+        return chroma_query(
+            self.collection,
+            n_results,
+            max_query_results=self.store.max_query_results,
             **kwargs,
         )
-        return chroma_hits(results)
 
 
 class PineconeRetriever(VectorStoreRetriever):

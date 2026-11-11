@@ -376,3 +376,55 @@ def test_default_overfetch_sizes(client):
     assert retriever.overfetch_sizes(10) == [1000, 5000]
     assert retriever.overfetch_sizes(100) == [2000, 5000]
     assert retriever.overfetch_sizes(300) == [6000]
+
+
+# --- Many queries in one call ----------------------------------------------------
+
+
+def test_filtered_query_returning_more_records_than_sqlite_allows(client):
+    """A local ChromaDB fails past ~32,766 returned records in one query call.
+
+    200 queries of every Condition record (267) return 53,400 records, which
+    used to raise ``too many SQL variables``.
+    """
+    retriever = make_retriever(client, filter_strategy="native")
+    where = {"std_domain_id": "Condition"}
+    queries = [f"lab test {i}" for i in range(200)]
+
+    results = retriever.retrieve(queries, where=where, top_k=300)
+
+    assert len(results.results) == len(queries)
+    assert all(len(query) == 267 for query in results.results)
+    assert all(r.std_domain_id == "Condition" for q in results.results for r in q)
+
+
+def test_overfetch_fallback_with_many_queries(client):
+    # The default strategy's fallback is a filtered query of every pending text.
+    retriever = make_retriever(client, min_overfetch=300, max_overfetch=300)
+    queries = [f"lab test {i}" for i in range(200)]
+
+    results = retriever.retrieve(queries, where={"std_domain_id": "Device"}, top_k=5)
+
+    assert all(len(query) == 3 for query in results.results)
+
+
+def test_queries_are_split_into_calls_and_keep_their_order(client):
+    retriever = make_retriever(client, filter_strategy="native")
+    retriever.store.max_query_results = 12  # 12 // top_k 5 = 2 queries per call
+    where = {"std_domain_id": "Measurement"}
+    queries = [f"query {i}" for i in range(7)]
+
+    got = retriever.retrieve(queries, where=where)
+
+    calls = retriever.collection.calls
+    assert [len(call["query_texts"]) for call in calls] == [2, 2, 2, 1]
+    assert all(call["where"] == where for call in calls)
+    expected = [concept_ids(retriever.retrieve([q], where=where))[0] for q in queries]
+    assert concept_ids(got) == expected
+
+
+def test_max_query_results_must_be_positive(client):
+    from aatm.vector_stores import ChromaVectorStore
+
+    with pytest.raises(ValueError, match="max_query_results"):
+        ChromaVectorStore(client.get_collection(COLLECTION), max_query_results=0)
