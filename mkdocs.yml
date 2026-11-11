@@ -30,6 +30,7 @@ nav:
       - Rerankers: 'reference/rerankers.md'
       - Selectors: 'reference/selectors.md'
       - Concept search agent: 'reference/concept_search.md'
+      - Decision models: 'reference/decision_models.md'
       - Terminology mapper: 'reference/terminology_mapper.md'
     - User interface:
       - Search engine interface: 'reference/search_ui.md'
