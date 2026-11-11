@@ -20,7 +20,7 @@ start and end offsets computed from the source text.
 from typing import List, Optional
 import dotenv
 from abc import ABC, abstractmethod
-from google import genai
+from aatm.llm.gemini import gemini_client
 
 from aatm.data_models import ExtractedConcept, ExtractionTask, ListOfExtractedConcepts
 from aatm.pipeline import PipelineBaseClass
@@ -123,7 +123,7 @@ class GeminiExtractor(BaseExtractor):
 
         self.model_id = model_id
         self.api_key = api_key
-        self.client = genai.Client(api_key=api_key)
+        self.client = gemini_client(api_key)
 
     def _get_start_and_end_indices(self, text: str, prompt: str) -> List[int]:
         """Compute character offsets for an extracted span in the source text.

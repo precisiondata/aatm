@@ -11,6 +11,10 @@ Supported prefixes: ``openai``, ``gemini``, ``anthropic`` (needs ``aatm[anthropi
 ``ollama``, ``openrouter`` and ``openai-compatible`` (any OpenAI-compatible server,
 with ``base_url``). More can be added with `register_provider`.
 
+Decision models answer closed-set questions (choice, score, yes/no) with
+probabilities instead of writing text: see `aatm.llm.decisions` and
+`create_decision_model`.
+
 Calls are retried on rate limits and transient errors. No rate limits are set by
 default; set them, per model, provider or for all, with `set_rate_limits`
 (see `aatm.llm.limits`).
@@ -26,10 +30,38 @@ from aatm.llm.limits import (
     set_rate_limits,
 )
 from aatm.llm.base import LLMResponseError, LLMSettings, ReasoningEffort, StructuredLLM
-from aatm.llm.registry import available_providers, create_llm, register_provider
+from aatm.llm.decisions import (
+    Answer,
+    Decision,
+    DecisionError,
+    DecisionModel,
+    DecisionSettings,
+    LLMDecisionModel,
+    Option,
+    Question,
+)
+from aatm.llm.registry import (
+    available_decision_providers,
+    available_providers,
+    create_decision_model,
+    create_llm,
+    register_decision_provider,
+    register_provider,
+)
 from aatm.llm.usage import ModelPrice, ModelTokens, TokenUsage, track_usage
 
 __all__ = [
+    "Answer",
+    "Decision",
+    "DecisionError",
+    "DecisionModel",
+    "DecisionSettings",
+    "LLMDecisionModel",
+    "Option",
+    "Question",
+    "available_decision_providers",
+    "create_decision_model",
+    "register_decision_provider",
     "LLMResponseError",
     "LLMSettings",
     "RateLimiter",

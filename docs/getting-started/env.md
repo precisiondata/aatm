@@ -15,6 +15,8 @@ AATM loads environment variables automatically with `python-dotenv`.
 
 The [information extraction](quick_start_extraction.md) pipeline needs the key of the provider you use: `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY` or `OPENROUTER_API_KEY`. Local OpenAI-compatible servers such as Ollama usually need none. `OPENAI_API_KEY` and `GOOGLE_API_KEY` are also used by the OpenAI- and Gemini-based mapping components.
 
+[Decision models](../reference/decision_models.md) use `OPENAI_API_KEY` (`openai/gpt-6-luna`), `GOOGLE_API_KEY` (`gemini/gemini-decision-1`) or `OPENROUTER_API_KEY` (`openrouter/typesafe/jev-1.13`). They send the state they decide on, e.g. a sentence of a note, to that provider. Check its data processing terms before sending protected health information.
+
 ## Optional settings
 
 | Variable | Default | Purpose |

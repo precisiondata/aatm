@@ -604,19 +604,20 @@ def test_upload_copies_the_local_index_without_re_embedding(fake_project, tmp_pa
     )
     try:
         expected = local.get(include=["embeddings", "metadatas"])
-        query = np.asarray(expected["embeddings"][:3])
-        chroma_hits = local.query(
-            query_embeddings=query, n_results=10, include=["distances"]
-        )
     finally:
         del local
         ldu.release_chromadb_clients()
+    embeddings = np.asarray(expected["embeddings"], dtype=np.float64)
+    query = embeddings[:3]
 
     store = index_store(connection)
     hits = store.query(query, top_k=10)
-    # The fake embeddings have many ties, so compare distances, not the order of
-    # records at equal distance.
-    for got, want_distances in zip(hits, chroma_hits["distances"]):
+    # The fake embeddings ([len(text)] * 4) have many exact ties, so compare
+    # distances, not the order of records at equal distance. Compare with the exact
+    # nearest distances, not ChromaDB's: its HNSW search is approximate and, with
+    # so many duplicates, sometimes misses records at distance 0.
+    for got, q in zip(hits, query):
+        want_distances = np.sort(((embeddings - q) ** 2).sum(axis=1))[:10]
         assert [d for d, _ in got] == pytest.approx(want_distances, abs=1e-4)
 
     by_id = {m["expression_id"]: m for query_hits in hits for _, m in query_hits}

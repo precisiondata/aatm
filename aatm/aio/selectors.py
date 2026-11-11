@@ -2,6 +2,8 @@ import asyncio
 from typing import List
 import dotenv
 from openai import AsyncOpenAI
+
+from aatm.llm.base import PerEventLoop
 from google.genai import types
 
 from aatm.data_models import (
@@ -30,7 +32,8 @@ class AsyncOpenAILLMSelector(OpenAILLMSelector):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.client = AsyncOpenAI()
+        # One client per event loop: openai 3.x binds its pool to the first loop.
+        self.async_clients = PerEventLoop(AsyncOpenAI)
 
     async def select(self, results: RetrieverResults) -> SelectorResults:  # type: ignore[override]
         selector_results = SelectorResults(results=[], queries=results.queries)
@@ -50,7 +53,7 @@ class AsyncOpenAILLMSelector(OpenAILLMSelector):
 
                 tasks.append(
                     tg.create_task(
-                        self.client.responses.parse(  # type: ignore[arg-type]
+                        self.async_clients.get().responses.parse(  # type: ignore[arg-type]
                             model=self.model_id,
                             input=prompt,  # type: ignore[arg-type]
                             text_format=SelectedResult,

@@ -8,7 +8,7 @@ from openai import AsyncOpenAI
 from openai.lib._parsing._responses import type_to_text_format_param
 from pydantic import BaseModel
 
-from aatm.llm.base import LLMResponseError, LLMSettings, T
+from aatm.llm.base import LLMResponseError, LLMSettings, PerEventLoop, T
 from aatm.llm.batch import (
     BatchRequest,
     BatchResult,
@@ -35,8 +35,20 @@ class OpenAILLM:
         self.model = model
         self.model_id = f"openai/{model}"
         self.settings = settings or LLMSettings()
-        # Retries are handled by the shared limiter (`aatm.llm.limits`).
-        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url, max_retries=0)
+        # Retries are handled by the shared limiter (`aatm.llm.limits`). One client
+        # per event loop: openai 3.x binds its connection pool to the first loop.
+        self._clients = PerEventLoop(
+            lambda: AsyncOpenAI(api_key=api_key, base_url=base_url, max_retries=0)
+        )
+
+    @property
+    def client(self) -> AsyncOpenAI:
+        """The client of the running event loop."""
+        return self._clients.get()
+
+    @client.setter
+    def client(self, value: AsyncOpenAI) -> None:
+        self._clients.set(value)
 
     def _request_kwargs(self) -> dict[str, Any]:
         s = self.settings
@@ -219,10 +231,22 @@ class OpenAICompatibleLLM:
         self.model = model
         self.model_id = f"{provider}/{model}"
         self.settings = settings or LLMSettings()
-        # Local servers usually need no key, but the OpenAI client requires one.
-        self.client = AsyncOpenAI(
-            api_key=api_key or "not-needed", base_url=base_url, max_retries=0
+        # Local servers usually need no key, but the OpenAI client requires one. One
+        # client per event loop: openai 3.x binds its connection pool to the first.
+        self._clients = PerEventLoop(
+            lambda: AsyncOpenAI(
+                api_key=api_key or "not-needed", base_url=base_url, max_retries=0
+            )
         )
+
+    @property
+    def client(self) -> AsyncOpenAI:
+        """The client of the running event loop."""
+        return self._clients.get()
+
+    @client.setter
+    def client(self, value: AsyncOpenAI) -> None:
+        self._clients.set(value)
 
     def _request_kwargs(self) -> dict[str, Any]:
         s = self.settings

@@ -51,7 +51,7 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import Any, ClassVar
 from chromadb import Documents, EmbeddingFunction, Embeddings
-from google import genai
+from aatm.llm.gemini import gemini_client
 import os
 import dotenv
 import numpy as np
@@ -96,7 +96,7 @@ class GoogleEmbeddingFunction(EmbeddingFunction):
         Returns:
             None
         """
-        self.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+        self.client = gemini_client(os.getenv("GOOGLE_API_KEY"))
         self.model = model
 
     def __call__(self, input: Documents) -> Embeddings:

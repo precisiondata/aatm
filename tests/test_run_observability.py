@@ -51,6 +51,28 @@ def test_cost_from_prices():
     assert usage.unpriced(prices) == []
 
 
+def test_cost_reported_by_provider():
+    with track_usage() as usage:
+        record_usage(100, 0, model_id="openrouter/typesafe/jev-1.13", cost=0.002)
+        record_usage(100, 0, model_id="openrouter/typesafe/jev-1.13", cost=0.003)
+        record_usage(1_000_000, 0, model_id="openai/a")
+
+    assert usage.reported_cost == pytest.approx(0.005)
+    # Without prices, only the reported cost counts.
+    assert usage.cost(None) == pytest.approx(0.005)
+    assert usage.unpriced(None) == ["openai/a"]
+    # A price takes precedence over the reported cost.
+    prices = {"openai/a": (1.0, 0.0), "openrouter/typesafe/jev-1.13": (10.0, 0.0)}
+    assert usage.cost(prices) == pytest.approx(1.0 + 0.002)
+
+    with track_usage() as merged:
+        pass
+    merged.merge(usage)
+    assert merged.by_model["openrouter/typesafe/jev-1.13"].reported_cost == (
+        pytest.approx(0.005)
+    )
+
+
 def test_merge_adds_counts():
     with track_usage() as a:
         record_usage(1, 2, model_id="m")

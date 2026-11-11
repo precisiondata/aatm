@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Optional, Any, Dict, List
 import dotenv
 from abc import ABC, abstractmethod
-from google import genai
+from aatm.llm.gemini import gemini_client
 from google.genai import types
 
 from openai import OpenAI
@@ -350,7 +350,7 @@ class GeminiLLMSelector(BaseSelector):
                 ``GeminiLLMModels``.
         """
         self.model_id = GeminiLLMModels(model_id).value
-        self.client = genai.Client()
+        self.client = gemini_client()
 
         if prompt_template is None:
             self.prompt_template = [

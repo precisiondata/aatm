@@ -5,6 +5,8 @@ from typing import List
 
 from openai import AsyncOpenAI
 
+from aatm.llm.base import PerEventLoop
+
 # Custom modules
 from aatm.data_models import Translation
 from aatm.prompt_helpers import format_prompt
@@ -52,13 +54,14 @@ class AsyncGeminiTranslator(GeminiTranslator):
 class AsyncOpenAITranslator(OpenAITranslator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.client = AsyncOpenAI()
+        # One client per event loop: openai 3.x binds its pool to the first loop.
+        self.async_clients = PerEventLoop(AsyncOpenAI)
 
     async def translate(self, texts):
         async with asyncio.TaskGroup() as tg:
             tasks = [
                 tg.create_task(
-                    self.client.responses.parse(
+                    self.async_clients.get().responses.parse(
                         model=self.model_id,
                         input=format_prompt(self.prompt_template, {"text": t}),
                         text_format=Translation,
