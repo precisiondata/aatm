@@ -89,7 +89,8 @@ def _level_text(question: Question) -> list[str]:
     ]
 
 
-def _question(question: Question) -> dict[str, Any]:
+def jev_question(question: Question) -> dict[str, Any]:
+    """A question in Jev's shape (also the Gemini Decisions API's)."""
     body: dict[str, Any] = {
         "type": _KINDS[question.kind],
         "instructions": question.instructions,
@@ -140,7 +141,7 @@ class JevDecisionModel:
         return {
             "model": self.model,
             "state": state,
-            "questions": {q.name: _question(q) for q in questions},
+            "questions": {q.name: jev_question(q) for q in questions},
             **self.settings.provider_kwargs,
         }
 
@@ -190,7 +191,9 @@ class JevDecisionModel:
             raise DecisionError(f"{self.model_id} returned no answers: {response!r}")
         return Decision(
             model=response.get("model") or self.model,
-            answers=[_answer(self.model_id, q, answers.get(q.name)) for q in questions],
+            answers=[
+                jev_answer(self.model_id, q, answers.get(q.name)) for q in questions
+            ],
         )
 
 
@@ -207,7 +210,12 @@ def _level_of(question: Question, key: str) -> Optional[str]:
     return None
 
 
-def _answer(model_id: str, question: Question, raw: Any) -> Answer:
+def jev_answer(model_id: str, question: Question, raw: Any) -> Answer:
+    """Parse an answer in Jev's shape (also the Gemini Decisions API's).
+
+    Raises:
+        DecisionError: If the answer is missing, of the wrong type or malformed.
+    """
     if not isinstance(raw, Mapping):
         raise DecisionError(f"{model_id} returned no answer for {question.name!r}.")
     kind = raw.get("type")

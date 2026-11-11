@@ -139,6 +139,14 @@ def _openai_decisions(model: str, *, api_key, base_url, settings) -> "DecisionMo
     )
 
 
+def _gemini_decisions(model: str, *, api_key, base_url, settings) -> "DecisionModel":
+    from aatm.llm.gemini_decisions import GeminiDecisionModel
+
+    if base_url is not None:
+        raise ValueError("base_url is not supported for the gemini provider.")
+    return GeminiDecisionModel(model, api_key=api_key, settings=settings)
+
+
 def _openrouter_decisions(
     model: str, *, api_key, base_url, settings
 ) -> "DecisionModel":
@@ -178,6 +186,7 @@ def _llm_decisions(model: str, *, api_key, base_url, settings) -> "DecisionModel
 
 _DECISION_PROVIDERS: dict[str, DecisionFactory] = {
     "openai": _openai_decisions,
+    "gemini": _gemini_decisions,
     "openrouter": _openrouter_decisions,
     "jev-compatible": _jev_compatible,
     "llm": _llm_decisions,
@@ -209,6 +218,8 @@ def create_decision_model(
         model_id: Provider-prefixed model id:
 
             - ``"openai/gpt-6-luna"``: the OpenAI Decisions API;
+            - ``"gemini/gemini-decision-1"``: the Gemini Decisions API (key from
+              ``GOOGLE_API_KEY`` or ``GEMINI_API_KEY``);
             - ``"openrouter/typesafe/jev-1.13"``: OpenRouter's decisions endpoint
               (key from ``OPENROUTER_API_KEY``);
             - ``"jev-compatible/<model>"``: any endpoint with Jev's request shape,

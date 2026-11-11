@@ -43,6 +43,7 @@ decision["is_lab"].probability      # probability of yes
 | Model id | Backend | Key | Probabilities |
 |---|---|---|---|
 | `openai/gpt-6-luna` | [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions) | `OPENAI_API_KEY` | yes |
+| `gemini/gemini-decision-1` | [Gemini Decisions API](https://aistudio.google.com/docs/decisions-api) (`v1beta`) | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | yes |
 | `openrouter/typesafe/jev-1.13` | [OpenRouter decisions endpoint](https://openrouter.ai/docs/guides/community/jev) (alpha), serving TypeSafe's Jev | `OPENROUTER_API_KEY` | yes |
 | `jev-compatible/<model>` + `base_url` | Any endpoint with Jev's request shape: TypeSafe, Eden AI, a self-hosted model | `api_key=` | yes |
 | `llm/<llm id>`, e.g. `llm/anthropic/claude-haiku-5-5` | Any `aatm.llm.create_llm` model, through structured output | the LLM's | **no** |
@@ -62,7 +63,7 @@ Calls share the rate limits and retries of `aatm.llm.limits`, and are counted by
 
 !!! warning "Data governance"
     Decision backends send the state, e.g. a sentence of a clinical note, to the
-    provider: OpenAI, OpenRouter and TypeSafe, or Eden AI. Before sending protected
+    provider: OpenAI, Google, OpenRouter and TypeSafe, or Eden AI. Before sending protected
     health information, check the provider's data processing agreement (and BAA,
     where required) and its data retention. Use `llm/` with a local model to keep
     data on your machine.
@@ -74,6 +75,8 @@ Calls share the rate limits and retries of `aatm.llm.limits`, and are counted by
 ::: aatm.llm.decisions
 
 ::: aatm.llm.openai_decisions
+
+::: aatm.llm.gemini_decisions
 
 ::: aatm.llm.jev
 

@@ -36,6 +36,7 @@ Question kinds:
 Backends (see `create_decision_model`):
 
 - ``openai/gpt-6-luna``: the OpenAI Decisions API.
+- ``gemini/gemini-decision-1``: the Gemini Decisions API.
 - ``openrouter/<model>``: OpenRouter's decisions endpoint, e.g. TypeSafe's Jev
   (``openrouter/typesafe/jev-1.13``).
 - ``jev-compatible/<model>``: any endpoint with the same request shape as Jev's

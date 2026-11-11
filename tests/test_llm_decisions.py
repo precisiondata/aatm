@@ -578,6 +578,119 @@ def test_openai_passes_settings_to_the_sdk():
     assert decision["is_lab"].probability == pytest.approx(0.97)
 
 
+# --- Gemini Decisions API ----------------------------------------------------------------
+
+GEMINI_RESPONSE = {
+    "answers": {
+        "specimen": JEV_RESPONSE["answers"]["specimen"],
+        "certainty": JEV_RESPONSE["answers"]["certainty"],
+        "is_lab": {"type": "noul", "noul": 0.9, "confidence": 0.8},
+    },
+    "prompt_feedback": None,
+    "usage": {"total_input_tokens": 90, "total_output_tokens": 0, "total_tokens": 90},
+}
+
+
+def gemini_model(response: dict, **kwargs):
+    from aatm.llm.gemini_decisions import GeminiDecisionModel
+
+    resource = FakeDecisionsResource(response)
+    client = SimpleNamespace(aio=SimpleNamespace(decisions=resource))
+    return GeminiDecisionModel("gemini-decision-1", client=client, **kwargs), resource
+
+
+def test_gemini_request_and_answers():
+    model, resource = gemini_model(
+        GEMINI_RESPONSE, settings=DecisionSettings(provider_kwargs={"extra": 1})
+    )
+    with track_usage() as usage:
+        decision = asyncio.run(model.decide(STATE, QUESTIONS))
+
+    call = resource.calls[0]
+    assert call["model"] == "gemini-decision-1"
+    assert call["input"] == '{"text": "creatinine", "unit": "mg/dl"}'
+    assert call["extra"] == 1
+    assert call["questions"]["is_lab"] == {
+        "type": "noul",
+        "instructions": "Is the text the name of a lab test?",
+    }
+    assert call["questions"]["specimen"]["criteria"]["serum"] == "Serum or plasma"
+    assert call["questions"]["certainty"]["criteria"] == ["low", "medium", "high"]
+
+    assert decision.model == "gemini-decision-1"
+    assert decision["specimen"].value == "serum"
+    assert decision["certainty"].label == "low"
+    assert decision["is_lab"].value is True
+    assert decision["is_lab"].probability == pytest.approx(0.9)
+    assert decision["is_lab"].confidence == pytest.approx(0.8)
+    assert usage.by_model["gemini/gemini-decision-1"].input_tokens == 90
+
+
+def test_gemini_blocked_prompt_refuses_every_question(caplog):
+    blocked = {
+        "answers": None,
+        "prompt_feedback": {"block_reason": "safety", "block_reason_message": "x"},
+        "usage": None,
+    }
+    model, _ = gemini_model(blocked)
+    logger = logging.getLogger("aatm.llm.gemini_decisions")
+    logger.addHandler(caplog.handler)
+    try:
+        with caplog.at_level(logging.WARNING, logger="aatm.llm.gemini_decisions"):
+            decision = asyncio.run(model.decide("x", [IS_LAB, SPECIMEN]))
+    finally:
+        logger.removeHandler(caplog.handler)
+    assert [a.refused for a in decision.answers] == [True, True]
+    assert "blocked the prompt (safety: x)" in caplog.text
+
+
+def test_gemini_without_answers_or_block_reason():
+    model, _ = gemini_model({"answers": None, "prompt_feedback": None})
+    with pytest.raises(DecisionError, match="no answers"):
+        asyncio.run(model.decide("x", [IS_LAB]))
+
+
+def test_create_gemini_decision_model(monkeypatch):
+    from aatm.llm.gemini import GEMINI_API_VERSION
+    from aatm.llm.gemini_decisions import GeminiDecisionModel
+
+    model = create_decision_model("gemini/gemini-decision-1", api_key="k")
+    assert isinstance(model, GeminiDecisionModel)
+    assert model.model_id == "gemini/gemini-decision-1"
+
+    async def clients():
+        return model.client, model.client
+
+    first, again = asyncio.run(clients())
+    other, _ = asyncio.run(clients())
+    # One client per event loop: the SDK's async pool is bound to its first loop.
+    assert first is again and first is not other
+    assert first._api_client._http_options.api_version == GEMINI_API_VERSION
+    with pytest.raises(ValueError, match="base_url"):
+        create_decision_model(
+            "gemini/gemini-decision-1", api_key="k", base_url="https://x.test"
+        )
+
+
+def test_openai_clients_are_per_event_loop(monkeypatch):
+    from aatm.llm.openai import OpenAILLM
+
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    llm = OpenAILLM("gpt-5-mini")
+
+    async def clients():
+        return llm.client, llm.client
+
+    first, again = asyncio.run(clients())
+    other, _ = asyncio.run(clients())
+    # openai 3.x binds a client's pool to its first loop: "Event loop is closed".
+    assert first is again and first is not other
+    assert llm.client is llm.client  # outside any loop: one shared client
+    fake = object()
+    llm.client = fake  # type: ignore[assignment]
+    assert asyncio.run(clients()) == (fake, fake)
+
+
 # --- Live --------------------------------------------------------------------------------
 
 LIVE = os.getenv("AATM_LIVE_LLM_TESTS") == "1"
@@ -589,6 +702,7 @@ LIVE = os.getenv("AATM_LIVE_LLM_TESTS") == "1"
     [
         ("openai/gpt-6-luna", "OPENAI_API_KEY"),
         ("openrouter/typesafe/jev-1.13", "OPENROUTER_API_KEY"),
+        ("gemini/gemini-decision-1", "GOOGLE_API_KEY"),
     ],
 )
 def test_live_decision(model_id, key_env):
