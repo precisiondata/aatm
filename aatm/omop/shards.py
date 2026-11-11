@@ -47,6 +47,13 @@ notes; it must be a path, a DataFrame, a list, or a function that returns a sour
 (for a database query, a function that opens its own connection and returns
 `notes_from_sql`).
 
+## Database sources
+
+A query read with `notes_from_sql` is filtered in the database: each shard runs
+``SELECT * FROM (<query>) WHERE <its condition>``, where the condition
+(`shard_condition`) computes `shard_of` in SQL, so a shard fetches only its notes.
+Other sources are read whole by every shard, which keeps its own notes.
+
 ## Rate limits
 
 Rate limits apply per process (`aatm.llm.limits`). `run_sharded` takes the limits set
@@ -80,7 +87,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence
 
 import asyncio
-import hashlib
 import multiprocessing
 import re
 from concurrent.futures import ProcessPoolExecutor
@@ -97,18 +103,56 @@ logger = get_logger(__name__)
 _SHARD_DIR = re.compile(r"^shard-(\d+)-of-(\d+)$")
 
 
+# The shard hash: ((note_id mod P) * A + B) mod P, then mod the number of shards. Plain
+# integer arithmetic, so a database can compute it too (`shard_condition`): every
+# product stays below 2**62, within a signed 64-bit integer.
+_HASH_MODULUS = 2_147_483_647  # 2**31 - 1, a prime
+_HASH_MULTIPLIER = 1_640_531_527
+_HASH_INCREMENT = 12_345
+
+
 def shard_of(note_id: int, num_shards: int) -> int:
     """The shard of a note: a stable hash of its `note_id`, modulo `num_shards`.
 
     The hash spreads notes evenly whatever pattern the ids follow (sequential, with a
-    stride, by site...), and is the same on every machine and Python version.
+    stride, offset by site...), and is the same on every machine and Python version.
+    A database computes the same value with `shard_condition`.
     """
     if num_shards < 1:
         raise ValueError("num_shards must be >= 1")
     if num_shards == 1:
         return 0
-    digest = hashlib.blake2b(note_id.to_bytes(8, "little", signed=True), digest_size=8)
-    return int.from_bytes(digest.digest(), "little") % num_shards
+    mixed = (note_id % _HASH_MODULUS) * _HASH_MULTIPLIER + _HASH_INCREMENT
+    return mixed % _HASH_MODULUS % num_shards
+
+
+def shard_condition(
+    index: int, num_shards: int, column: str = "note_id", cast: Optional[str] = "BIGINT"
+) -> str:
+    """A SQL condition true for the notes of a shard, the same as `shard_of`.
+
+    For example ``shard_condition(1, 4)`` gives ``(((CAST(note_id AS BIGINT) %
+    2147483647) * 1640531527 + 12345) % 2147483647) % 4 = 1``. `notes_from_sql`
+    adds it to the query of a sharded run, so the database sends each shard only its
+    notes.
+
+    Args:
+        index: The shard.
+        num_shards: The number of shards.
+        column: The note id column, or an expression.
+        cast: The 64-bit integer type the id is cast to, so the arithmetic cannot
+            overflow a 32-bit column: ``"BIGINT"`` (PostgreSQL, SQL Server, SQLite,
+            DuckDB, Spark...), ``"SIGNED"`` for MySQL, or ``None`` when the column is
+            already 64-bit. The database must have a ``%`` operator.
+    """
+    check_shard((index, num_shards))
+    if num_shards == 1:
+        return "1 = 1"
+    value = f"CAST({column} AS {cast})" if cast else column
+    return (
+        f"((({value} % {_HASH_MODULUS}) * {_HASH_MULTIPLIER} + {_HASH_INCREMENT}) "
+        f"% {_HASH_MODULUS}) % {num_shards} = {index}"
+    )
 
 
 def check_shard(shard: tuple[int, int]) -> tuple[int, int]:

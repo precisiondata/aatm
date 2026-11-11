@@ -165,7 +165,7 @@ from aatm.omop.builder import (
 )
 from aatm.omop.cache import CacheStats
 from aatm.omop.mapping import ClinicalNote
-from aatm.omop.shards import check_shard, shard_dirs, shard_of
+from aatm.omop.shards import check_shard, shard_condition, shard_dirs, shard_of
 from aatm.omop.tables import OMOP_TABLES
 
 if TYPE_CHECKING:
@@ -185,17 +185,70 @@ _SQL_BATCH = 500
 # --- sources ------------------------------------------------------------------
 
 
-class _FrameSource:
-    """A source that yields DataFrames, e.g. a database query read in chunks."""
+class SqlSource:
+    """A database query read in chunks; made by `notes_from_sql`.
 
-    def __init__(self, frames: Iterable[pd.DataFrame]):
-        self.frames = frames
+    The query runs when the source is read. In a sharded run, it is wrapped so the
+    database returns only the shard's notes (see `aatm.omop.shards.shard_condition`).
+    """
+
+    def __init__(
+        self,
+        query: str,
+        con: Any,
+        chunk_size: int = 10_000,
+        params: Any = None,
+        id_column: Optional[str] = None,
+        cast: Optional[str] = "BIGINT",
+    ):
+        self.query = query
+        self.con = con
+        self.chunk_size = chunk_size
+        self.params = params
+        self.id_column = id_column
+        self.cast = cast
+
+    def sql(
+        self,
+        shard: Optional[tuple[int, int]] = None,
+        columns: Optional[dict[str, str]] = None,
+    ) -> str:
+        """The query to run, filtered to `shard` ``(index, count)`` when given."""
+        if shard is None or shard[1] == 1:
+            return self.query
+        column = self.id_column
+        if column is None:
+            renamed = [k for k, v in (columns or {}).items() if v == "note_id"]
+            column = renamed[0] if renamed else "note_id"
+        condition = shard_condition(*shard, column=column, cast=self.cast)
+        query = self.query.strip().rstrip(";")
+        return f"SELECT * FROM ({query}) shard_source WHERE {condition}"
+
+    def frames(
+        self,
+        shard: Optional[tuple[int, int]] = None,
+        columns: Optional[dict[str, str]] = None,
+    ) -> Iterable[pd.DataFrame]:
+        return pd.read_sql(
+            self.sql(shard, columns),
+            self.con,
+            chunksize=self.chunk_size,
+            params=self.params,
+        )
 
 
 def notes_from_sql(
-    query: str, con: Any, chunk_size: int = 10_000, params: Any = None
-) -> _FrameSource:
+    query: str,
+    con: Any,
+    chunk_size: int = 10_000,
+    params: Any = None,
+    id_column: Optional[str] = None,
+    cast: Optional[str] = "BIGINT",
+) -> SqlSource:
     """Read notes from a database query, in chunks, for `OmopExtractionPipeline.run`.
+
+    In a sharded run (``shard=``), the query is wrapped as ``SELECT * FROM (<query>)
+    WHERE <the shard's condition>``, so the database sends each shard only its notes.
 
     Args:
         query: A query returning a ``text`` column and any other `ClinicalNote`
@@ -205,8 +258,13 @@ def notes_from_sql(
             databases (see `pandas.read_sql`).
         chunk_size: Rows fetched at a time.
         params: Query parameters, passed to `pandas.read_sql`.
+        id_column: The column of the query that holds the note id, for sharded runs.
+            By default ``note_id``, or the column renamed to it with ``columns``.
+        cast: The 64-bit integer type of the database, for the shard condition:
+            ``"BIGINT"``, ``"SIGNED"`` for MySQL, or ``None`` (see
+            `aatm.omop.shards.shard_condition`).
     """
-    return _FrameSource(pd.read_sql(query, con, chunksize=chunk_size, params=params))
+    return SqlSource(query, con, chunk_size, params, id_column, cast)
 
 
 def _plain(value: Any) -> Any:
@@ -238,7 +296,10 @@ def _notes_from_frame(
 
 
 def _iter_notes(
-    source: Any, columns: Optional[dict[str, str]], read_size: int
+    source: Any,
+    columns: Optional[dict[str, str]],
+    read_size: int,
+    shard: Optional[tuple[int, int]] = None,
 ) -> Iterator[ClinicalNote]:
     if isinstance(source, (str, Path)):
         path = Path(source)
@@ -268,8 +329,8 @@ def _iter_notes(
             yield from _notes_from_frame(
                 source.iloc[start : start + read_size], columns
             )
-    elif isinstance(source, _FrameSource):
-        for frame in source.frames:
+    elif isinstance(source, SqlSource):
+        for frame in source.frames(shard, columns):
             yield from _notes_from_frame(frame, columns)
     else:
         rename = columns or {}
@@ -297,8 +358,9 @@ def read_chunks(
 
     With `shard` ``(index, count)``, only the notes of that shard are kept (see
     `aatm.omop.shards.shard_of`); notes without a `note_id` are kept, to be refused.
+    A `SqlSource` filters them in the database already.
     """
-    notes = _iter_notes(source, columns, read_size=max(chunk_size, 1000))
+    notes = _iter_notes(source, columns, max(chunk_size, 1000), shard)
     if shard is not None and shard[1] > 1:
         index, count = check_shard(shard)
         notes = (
@@ -1634,7 +1696,7 @@ def count_notes(source: Any) -> Optional[int]:
             with contextlib.suppress(Exception):
                 return ds.dataset(path, format="parquet").count_rows()
         return None
-    if isinstance(source, _FrameSource):
+    if isinstance(source, SqlSource):
         return None
     if isinstance(source, Sized):
         return len(source)

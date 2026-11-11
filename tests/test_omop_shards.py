@@ -1,5 +1,7 @@
 import json
 import os
+import sqlite3
+import uuid
 from collections import Counter
 from datetime import datetime, timezone
 
@@ -11,12 +13,13 @@ from aatm.llm.limits import (
     reset_rate_limits,
     set_rate_limits,
 )
-from aatm.omop import OmopExtractionPipeline, OmopRun
+from aatm.omop import OmopExtractionPipeline, OmopRun, notes_from_sql
 from aatm.omop.runner import RunSummary, StageStats
 from aatm.omop.shards import (
     ShardedRunError,
     combine_summaries,
     run_sharded,
+    shard_condition,
     shard_dir,
     shard_dirs,
     shard_of,
@@ -48,12 +51,19 @@ def test_shard_of_is_stable_and_even():
     assert [shard_of(i, 4) for i in range(8)] == [shard_of(i, 4) for i in range(8)]
     assert shard_of(12345, 1) == 0
     pinned = [shard_of(i, 7) for i in (*range(10), 10**12)]
-    assert pinned == [3, 3, 3, 2, 5, 3, 1, 1, 6, 3, 3]
+    assert pinned == [4, 2, 6, 3, 0, 5, 2, 6, 3, 1, 0]
 
-    for ids in (range(20_000), range(0, 200_000, 10)):  # sequential, and a stride
-        counts = Counter(shard_of(i, 4) for i in ids)
-        assert set(counts) == {0, 1, 2, 3}
-        assert max(counts.values()) / min(counts.values()) < 1.1
+    patterns = {
+        "sequential": range(20_000),
+        "stride 10": range(0, 200_000, 10),
+        "stride 2**32": range(0, 20_000 * 2**32, 2**32),
+        "site offset": range(10**12, 10**12 + 20_000),
+    }
+    for name, ids in patterns.items():
+        for n in (2, 4, 7, 16):
+            counts = Counter(shard_of(i, n) for i in ids)
+            assert len(counts) == n, name
+            assert max(counts.values()) / min(counts.values()) < 1.1, (name, n)
 
 
 def test_shard_folders(tmp_path):
@@ -71,6 +81,53 @@ def test_shard_folders(tmp_path):
     shard_dir(tmp_path, 0, 3).mkdir()
     with pytest.raises(ValueError, match="different splits"):
         shard_dirs(tmp_path)
+
+
+# --- shards in the database ------------------------------------------------------------
+
+
+def test_database_computes_the_same_shards():
+    ids = [*range(500), 2**31 - 2, 2**31, 2**40 + 7, 10**12, 2**47 - 1]
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE note (note_id INTEGER)")
+    con.executemany("INSERT INTO note VALUES (?)", [(i,) for i in ids])
+    for n in (1, 2, 5, 16):
+        for index in range(n):
+            query = f"SELECT note_id FROM note WHERE {shard_condition(index, n)}"
+            found = sorted(row[0] for row in con.execute(query))
+            assert found == sorted(i for i in ids if shard_of(i, n) == index)
+    assert shard_condition(0, 2, "n.id", cast=None).startswith("(((n.id % ")
+    assert "CAST(note_id AS SIGNED)" in shard_condition(0, 2, cast="SIGNED")
+
+
+def note_db(path, rows):
+    import pandas as pd
+
+    con = sqlite3.connect(path)
+    frame = pd.DataFrame(rows).rename(columns={"note_id": "nid", "text": "body"})
+    frame.to_sql("note", con, index=False)
+    return con
+
+
+def test_sql_source_fetches_only_the_shard(tmp_path):
+    source_notes = notes(40)
+    con = note_db(":memory:", source_notes)
+    source = notes_from_sql("SELECT * FROM note;", con, chunk_size=7)
+    columns = {"nid": "note_id", "body": "text"}
+    assert source.sql() == "SELECT * FROM note;"
+    filtered = source.sql((1, 3), columns)
+    assert filtered.startswith("SELECT * FROM (SELECT * FROM note) shard_source WHERE")
+    assert "CAST(nid AS BIGINT)" in filtered  # the column renamed to note_id
+    assert len(list(con.execute(filtered))) == sum(
+        1 for n in source_notes if shard_of(n["note_id"], 3) == 1
+    )
+
+    summaries, _ = run_in_shards(source, tmp_path, 3, chunk_size=5, columns=columns)
+
+    assert sum(s.built for s in summaries) == 40  # the source is read again per shard
+    assert sorted(OmopRun(tmp_path).provenance()["note_id"].unique()) == list(
+        range(1, 41)
+    )
 
 
 # --- shards together equal a single run --------------------------------------------
@@ -229,10 +286,11 @@ LIMITS_LOG = "AATM_TEST_LIMITS_LOG"
 def build_pipeline():
     """The factory of run_sharded: importable by the worker processes."""
     log = os.environ.get(LIMITS_LOG)
-    if log:
+    if log:  # one file per call: appends from several processes may be lost
         limits = get_rate_limits("openai/gpt-5-mini")
-        with open(log, "a", encoding="utf-8") as f:
-            f.write(limits.model_dump_json() + "\n")
+        path = os.path.join(log, f"{os.getpid()}-{uuid.uuid4().hex}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(limits.model_dump_json())
     definitions = ecog_definitions()
     return OmopExtractionPipeline(
         definitions, extractor=FakeExtractor(definitions), vocabulary=FakeLookup()
@@ -241,7 +299,8 @@ def build_pipeline():
 
 def test_run_sharded_in_processes(tmp_path, monkeypatch):
     source = notes(24)
-    log = tmp_path / "limits.jsonl"
+    log = tmp_path / "limits"
+    log.mkdir()
     monkeypatch.setenv(LIMITS_LOG, str(log))
     reset_rate_limits()
     set_rate_limits("openai", requests_per_minute=600, max_concurrency=8)
@@ -254,7 +313,7 @@ def test_run_sharded_in_processes(tmp_path, monkeypatch):
 
     assert summary.completed and summary.built == 24 and summary.total == 24
     assert summary.rows == {"measurement": 36}
-    seen = [json.loads(line) for line in log.read_text().splitlines()]
+    seen = [json.loads(path.read_text()) for path in log.iterdir()]
     assert len(seen) == 3
     assert {(s["requests_per_minute"], s["max_concurrency"]) for s in seen} == {
         (200.0, 3)
@@ -270,6 +329,26 @@ def test_run_sharded_in_processes(tmp_path, monkeypatch):
     assert again.skipped == 24 and again.extracted == 0
     with pytest.raises(ValueError, match="split into 3"):
         run_sharded(build_pipeline, source, tmp_path / "out", num_shards=2)
+
+
+NOTE_DB = "AATM_TEST_NOTE_DB"
+
+
+def sql_source():
+    """A source function: each worker opens its own connection."""
+    con = sqlite3.connect(os.environ[NOTE_DB])
+    return notes_from_sql("SELECT nid AS note_id, body AS text FROM note", con)
+
+
+def test_run_sharded_from_a_database(tmp_path, monkeypatch):
+    path = tmp_path / "notes.db"
+    note_db(path, notes(12)).close()
+    monkeypatch.setenv(NOTE_DB, str(path))
+
+    summary = run_sharded(build_pipeline, sql_source, tmp_path / "out", num_shards=2)
+
+    assert summary.completed and summary.built == 12
+    assert summary.total is None  # unknown for queries
 
 
 def test_run_sharded_reports_a_failed_shard(tmp_path):

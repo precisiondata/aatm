@@ -1201,9 +1201,25 @@ stops with an error, the others finish, and `ShardedRunError` reports it with th
 combined summary.
 
 Rate limits apply per process: `run_sharded` divides the limits you set among the
-processes running at once (`processes`, all shards by default). The source is read by
-every process, which keeps its own notes, so pass a path, a DataFrame or a list, or,
-for a database, a function that opens its own connection and returns `notes_from_sql`.
+processes running at once (`processes`, all shards by default). Pass the source as a
+path, a DataFrame or a list, which every process reads, keeping its own notes, or, for
+a database, as a function that opens its own connection and returns `notes_from_sql`.
+A query is filtered in the database, so each shard fetches only its notes:
+
+```python
+import sqlite3
+from aatm.omop import notes_from_sql
+
+def note_source():  # in my_pipeline.py, next to make_pipeline
+    con = sqlite3.connect("cdm.db")
+    return notes_from_sql("SELECT note_id, note_text AS text, person_id FROM note", con)
+
+run_sharded(make_pipeline, note_source, "output/ecog", num_shards=4)
+```
+
+The filter is integer arithmetic on the note id, cast to `BIGINT`; for MySQL, pass
+`notes_from_sql(..., cast="SIGNED")`. `shard_condition(index, count)` returns it, to
+filter a query yourself.
 
 On several machines (or jobs of a scheduler), run one shard on each with
 `shard=(index, count)`, then gather the folders under one parent and read it with
