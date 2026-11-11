@@ -130,6 +130,7 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
+    Callable,
     Iterable,
     Iterator,
     Literal,
@@ -154,6 +155,7 @@ import pandas as pd
 from pydantic import BaseModel, Field
 
 from aatm.data_models.extractors import EntityValidationResult
+from aatm.llm.limits import get_rate_limits
 from aatm.llm.usage import Prices, TokenUsage, model_prices, track_usage
 from aatm.logs import get_logger
 from aatm.omop.builder import (
@@ -1353,36 +1355,33 @@ class ChunkedRun:
             # Jobs left pending by an earlier run are collected in either mode.
             queue = _BatchQueue(self.pipeline.extractor, ledger, summary, poll_every)
             queue.adopt()
-            # While a chunk is built (in a thread), the next one is extracted.
-            building: Optional[asyncio.Task] = None
-            in_flight: set[int] = set()
+            stream = _Stream(
+                self,
+                ledger,
+                summary,
+                report,
+                chunk_size,
+                _concurrency(self.pipeline.extractor) or chunk_size,
+            )
             try:
                 for chunk in read_chunks(source, chunk_size, columns, shard):
-                    pairs = await self._prepare(
+                    await self._prepare(
                         ledger,
                         chunk,
                         summary,
                         max_attempts,
-                        in_flight,
+                        stream,
                         queue,
                         max_batches if batch else None,
                     )
-                    if building is not None:
-                        await building
-                        report.tick()
-                    in_flight = {n.note_id for n, _ in pairs}  # type: ignore[misc]
-                    building = asyncio.create_task(self._build(ledger, pairs, summary))
-                if building is not None:
-                    await building
-                    building = None
+                await stream.drain()
                 while queue.pending:
-                    await self._build(ledger, await queue.collect(wait=True), summary)
-                    report.tick()
-            finally:
-                # Stopped partway: still write the chunk being built.
-                if building is not None and not building.done():
-                    with contextlib.suppress(Exception):
-                        await building
+                    stream.flush()
+                    await stream.add(await queue.collect(wait=True))
+                await stream.close()
+            except BaseException as e:
+                await stream.stop(e)
+                raise
             summary.completed = True
         return summary
 
@@ -1446,19 +1445,22 @@ class ChunkedRun:
         chunk: list[ClinicalNote],
         summary: RunSummary,
         max_attempts: int,
-        in_flight: set[int],
+        stream: "_Stream",
         queue: _BatchQueue,
         max_batches: Optional[int],
-    ) -> list[tuple[ClinicalNote, EntityValidationResult]]:
-        """Extract the notes of a chunk that need it; return those to build.
+    ) -> None:
+        """Send the notes of a chunk read from the source on their way to be built.
 
-        `in_flight` holds the notes of the chunk being built meanwhile: they count as
-        duplicates, since the ledger does not record them as built yet.
+        Notes with a stored result go to `stream` to be built; notes to extract are
+        extracted by `stream`, waiting for a free slot, so this returns once the last
+        of them is on its way. Notes still in `stream` (being extracted or built)
+        count as duplicates, since the ledger does not record them as built yet.
 
         With `max_batches` (batch mode), the notes to extract are submitted as one
         batch job, waiting first while `max_batches` jobs are pending. The notes of
-        jobs that finished meanwhile are returned with the chunk's.
+        jobs that finished meanwhile go to `stream` too.
         """
+        in_flight = stream.in_flight
         summary.notes += len(chunk)
         notes: dict[int, ClinicalNote] = {}
         for note in chunk:
@@ -1502,61 +1504,18 @@ class ChunkedRun:
             else:
                 stored.append(note_id)
 
-        ready: list[tuple[ClinicalNote, EntityValidationResult]] = []
-        if max_batches is not None and to_extract:
-            while len(queue.pending) >= max_batches:
-                ready += await queue.collect(wait=True)
-            await queue.submit(to_extract)
-            extracted = []
-        else:
-            extracted = await self._extract(ledger, to_extract, summary)
-        ready += await queue.collect(wait=False)
         reused = ledger.load(stored)
         summary.reused += len(reused)
-        return extracted + reused + ready
-
-    async def _extract(
-        self, ledger: RunLedger, notes: list[ClinicalNote], summary: RunSummary
-    ) -> list[tuple[ClinicalNote, EntityValidationResult]]:
-        """Extract notes one by one, so that one failure does not lose the others."""
-        if not notes:
-            return []
-        extractor = self.pipeline.extractor
-
-        async def extract(note: ClinicalNote) -> EntityValidationResult | Exception:
-            try:
-                (result,) = await extractor([note.text])
-                return result
-            except Exception as e:
-                return e
-
-        stage = summary.stages["extraction"]
-        started = time.perf_counter()
-        # The chunk being built meanwhile runs in another task: its calls are not
-        # counted here.
-        with track_usage() as usage:
-            results = await asyncio.gather(*(extract(n) for n in notes))
-        stage.seconds += time.perf_counter() - started
-        stage.usage.merge(usage)
-        done: list[tuple[ClinicalNote, EntityValidationResult]] = []
-        failed: list[tuple[ClinicalNote, str]] = []
-        for note, result in zip(notes, results):
-            if isinstance(result, Exception):
-                failed.append((note, f"{type(result).__name__}: {result}"))
-            elif result.error is not None:
-                failed.append((note, result.error))
-            else:
-                done.append((note, result))
-        for note, error in failed:
-            logger.warning("Extraction of note %s failed: %s", note.note_id, error)
-        # Store the results right away: they are what the run paid for.
-        ledger.save_extracted(done)
-        ledger.save_failed(failed, "extract")
-        summary.extracted += len(done)
-        summary.failed += len(failed)
-        stage.items += len(notes)
-        stage.errors += len(failed)
-        return done
+        await stream.add(reused)
+        if max_batches is not None and to_extract:
+            while len(queue.pending) >= max_batches:
+                stream.flush()  # build what is ready while waiting
+                await stream.add(await queue.collect(wait=True))
+            await queue.submit(to_extract)
+        else:
+            for note in to_extract:
+                await stream.extract(note)
+        await stream.add(await queue.collect(wait=False))
 
     async def _build(
         self,
@@ -1616,6 +1575,196 @@ class ChunkedRun:
         building.seconds += max(
             time.perf_counter() - started - tables.coding_seconds, 0.0
         )
+
+
+def _concurrency(extractor: Any) -> Optional[int]:
+    """The cap on the extractor's calls in flight, if any: its own or its model's."""
+    caps: list[int] = []
+    own = getattr(extractor, "max_concurrency", None)
+    if isinstance(own, int):
+        caps.append(own)
+    model_id = getattr(extractor, "model_id", None)
+    if isinstance(model_id, str):
+        limit = get_rate_limits(model_id).max_concurrency
+        if limit is not None:
+            caps.append(limit)
+    return min(caps) if caps else None
+
+
+_Pair = tuple[ClinicalNote, EntityValidationResult]
+
+
+class _Stream:
+    """The notes on their way through a run: extracted, then built a chunk at a time.
+
+    Up to `max_extracting` extraction calls are in flight at once, each started as
+    soon as a slot frees up, so a slow call holds up no other note. Each result is
+    stored in the ledger as soon as it comes back. Extracted notes wait in `buffer`
+    and are built `chunk_size` at a time, one chunk at a time (in a thread), while
+    extraction goes on. `extract` and `add` wait while two chunks are waiting, so
+    memory stays flat when building is the slower stage.
+
+    A build that raises (other than the per-note failures `ChunkedRun._build`
+    records) stops the run: the error is raised by the next call that waits.
+    """
+
+    def __init__(
+        self,
+        runner: ChunkedRun,
+        ledger: RunLedger,
+        summary: RunSummary,
+        report: "_Reporter",
+        chunk_size: int,
+        max_extracting: int,
+    ):
+        self.runner = runner
+        self.ledger = ledger
+        self.summary = summary
+        self.report = report
+        self.chunk_size = chunk_size
+        self.max_extracting = max(max_extracting, 1)
+        self.max_waiting = 2 * chunk_size
+        self.buffer: list[_Pair] = []
+        # The notes being extracted, waiting to be built, or being built: the ledger
+        # does not record them as built yet.
+        self.in_flight: set[int] = set()
+        self.extracting: set[asyncio.Task] = set()
+        self.building: Optional[asyncio.Task] = None
+        self.flushing = False  # build a partial chunk
+        self.closing = False  # nothing more is coming: build every note
+        self.failure: Optional[BaseException] = None
+        self.changed = asyncio.Event()
+        self.busy_since = 0.0
+
+    async def _wait(self, ready: Callable[[], bool]) -> None:
+        while True:
+            if self.failure is not None:
+                raise self.failure
+            if ready():
+                return
+            self.changed.clear()
+            await self.changed.wait()
+
+    async def extract(self, note: ClinicalNote) -> None:
+        """Start extracting `note`, once a slot is free."""
+        await self._wait(
+            lambda: len(self.extracting) < self.max_extracting
+            and len(self.buffer) < self.max_waiting
+        )
+        if not self.extracting:
+            self.busy_since = time.perf_counter()
+        self.in_flight.add(note.note_id)  # type: ignore[arg-type]
+        task = asyncio.create_task(self._extract(note))
+        self.extracting.add(task)
+        task.add_done_callback(self._extracted)
+
+    def _extracted(self, task: asyncio.Task) -> None:
+        self.extracting.discard(task)
+        if not self.extracting:
+            stage = self.summary.stages["extraction"]
+            stage.seconds += time.perf_counter() - self.busy_since
+        if not task.cancelled() and task.exception() is not None:
+            self.failure = self.failure or task.exception()
+        self.changed.set()
+
+    async def _extract(self, note: ClinicalNote) -> None:
+        stage = self.summary.stages["extraction"]
+        result: Optional[EntityValidationResult] = None
+        with track_usage() as usage:
+            try:
+                (result,) = await self.runner.pipeline.extractor([note.text])
+                error = result.error
+            except Exception as e:
+                error = f"{type(e).__name__}: {e}"
+        stage.usage.merge(usage)
+        stage.items += 1
+        if error is None and result is not None:
+            # Store the result right away: it is what the run paid for.
+            self.ledger.save_extracted([(note, result)])
+            self.summary.extracted += 1
+            self.buffer.append((note, result))
+            self._kick()
+        else:
+            logger.warning("Extraction of note %s failed: %s", note.note_id, error)
+            self.ledger.save_failed([(note, str(error))], "extract")
+            self.summary.failed += 1
+            stage.errors += 1
+            self.in_flight.discard(note.note_id)  # type: ignore[arg-type]
+
+    async def add(self, pairs: Sequence[_Pair]) -> None:
+        """Queue notes extracted already to be built."""
+        for pair in pairs:
+            await self._wait(lambda: len(self.buffer) < self.max_waiting)
+            self.in_flight.add(pair[0].note_id)  # type: ignore[arg-type]
+            self.buffer.append(pair)
+            self._kick()
+
+    def flush(self) -> None:
+        """Build the notes waiting even if they are fewer than a chunk."""
+        self.flushing = True
+        self._kick()
+
+    def _kick(self) -> None:
+        """Start building the next chunk, if one is ready and no build is running."""
+        if self.building is not None or self.failure is not None or not self.buffer:
+            return
+        if len(self.buffer) < self.chunk_size and not (self.flushing or self.closing):
+            return
+        pairs = self.buffer[: self.chunk_size]
+        del self.buffer[: self.chunk_size]
+        if not self.buffer:
+            self.flushing = False
+        self.building = asyncio.create_task(self._build(pairs))
+        self.changed.set()
+
+    async def _build(self, pairs: list[_Pair]) -> None:
+        try:
+            await self.runner._build(self.ledger, pairs, self.summary)
+        except asyncio.CancelledError:
+            raise
+        except BaseException as e:  # raised again by the run
+            self.failure = self.failure or e
+            return
+        finally:
+            self.building = None
+            self.changed.set()
+        self.in_flight.difference_update(n.note_id for n, _ in pairs)  # type: ignore[misc]
+        if not (self.closing and not self.buffer):  # else the summary follows
+            self.report.tick()
+        self._kick()
+
+    async def drain(self) -> None:
+        """Wait for the extraction calls in flight."""
+        await self._wait(lambda: not self.extracting)
+
+    async def close(self) -> None:
+        """Wait for every note to be extracted and built."""
+        await self.drain()
+        self.closing = True
+        self._kick()
+        await self._wait(lambda: not self.buffer and self.building is None)
+
+    async def stop(self, error: BaseException) -> None:
+        """The run stopped with `error`: keep what it paid for, as far as possible.
+
+        Cancelled (e.g. Ctrl+C), the calls in flight are cancelled. Otherwise they
+        are awaited, their results stored, and the notes waiting are built, unless
+        building is what failed. Either way, the chunk being built is written.
+        """
+        cancelled = isinstance(error, asyncio.CancelledError)
+        tasks = list(self.extracting)
+        if cancelled:
+            for task in tasks:
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        if not cancelled and self.failure is None:
+            self.closing = True
+            self._kick()
+            with contextlib.suppress(Exception):
+                await self._wait(lambda: not self.buffer and self.building is None)
+        if self.building is not None:
+            with contextlib.suppress(Exception):
+                await self.building
 
 
 RUNS = "runs"
