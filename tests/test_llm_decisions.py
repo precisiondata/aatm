@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import os
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -515,6 +516,66 @@ def test_moving_aliases_warn(caplog):
         assert caplog.text == ""
     finally:
         logger.removeHandler(caplog.handler)
+
+
+def test_alpha_endpoints_warn_once(caplog, monkeypatch):
+    from aatm.llm import jev
+
+    monkeypatch.setattr(jev, "_WARNED_ALPHA", set())
+    logger = logging.getLogger("aatm.llm.jev")
+    logger.addHandler(caplog.handler)
+    try:
+        with caplog.at_level(logging.WARNING, logger="aatm.llm.jev"):
+            create_decision_model("openrouter/typesafe/jev-1.13", api_key="k")
+            create_decision_model("openrouter/typesafe/jev-1.14", api_key="k")
+            create_decision_model(
+                "jev-compatible/jev-1.13",
+                base_url="https://decisions.example.org/v1/decide",
+            )
+    finally:
+        logger.removeHandler(caplog.handler)
+    # caplog may see a record twice: through the handler and through propagation.
+    alpha = {
+        (r.created, r.getMessage())
+        for r in caplog.records
+        if "alpha endpoint" in r.getMessage()
+    }
+    assert len(alpha) == 1
+    assert OPENROUTER_DECISIONS_URL in next(iter(alpha))[1]
+
+
+class FakeDecisionsResource:
+    """`client.decisions` of openai >= 3: records kwargs, returns a model."""
+
+    def __init__(self, response: dict):
+        self.response = response
+        self.calls: list[dict] = []
+
+    async def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(model_dump=lambda: self.response)
+
+
+def test_openai_uses_the_sdk_decisions_method_when_available():
+    resource = FakeDecisionsResource(OPENAI_RESPONSE)
+    client = SimpleNamespace(decisions=resource)
+    model = OpenAIDecisionModel(
+        "gpt-6-luna",
+        client=client,  # type: ignore[arg-type]
+        settings=DecisionSettings(
+            timeout=7, provider_kwargs={"prompt_cache_key": "k", "store": False}
+        ),
+    )
+    decision = asyncio.run(model.decide("creatinine", QUESTIONS))
+
+    call = resource.calls[0]
+    assert call["model"] == "gpt-6-luna" and call["input"] == "creatinine"
+    assert [q["name"] for q in call["questions"]] == ["specimen", "certainty", "is_lab"]
+    assert call["prompt_cache_key"] == "k"
+    assert call["extra_body"] == {"store": False}
+    assert call["timeout"] == 7
+    assert decision["specimen"].value == "serum"
+    assert decision["is_lab"].probability == pytest.approx(0.97)
 
 
 # --- Live --------------------------------------------------------------------------------

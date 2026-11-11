@@ -1,7 +1,8 @@
 """The OpenAI Decisions API (``POST /v1/decisions``) as a `DecisionModel`.
 
-The installed ``openai`` SDK has no typed method for the endpoint, so requests go
-through the client's generic ``post``, which keeps its authentication, base URL and
+``openai`` 3.x has a typed method for the endpoint, ``client.decisions.create``,
+which is used when the installed SDK has it. Older SDKs (2.x) go through the
+client's generic ``post`` instead, with the same body, authentication, base URL and
 error types (the shared limiter retries 429 and 5xx).
 """
 
@@ -83,15 +84,31 @@ class OpenAIDecisionModel:
             ),
         )
 
-    async def _decide(
-        self, body: dict[str, Any], questions: Sequence[Question]
-    ) -> Decision:
+    async def _post(self, body: dict[str, Any]) -> Any:
+        """Send the request; return the response as a dict."""
+        decisions = getattr(self.client, "decisions", None)
+        if decisions is not None:  # openai >= 3
+            kwargs = {k: body[k] for k in _SDK_PARAMS if k in body}
+            extra = {k: v for k, v in body.items() if k not in _SDK_PARAMS}
+            if extra:
+                kwargs["extra_body"] = extra
+            if self.settings.timeout is not None:
+                kwargs["timeout"] = self.settings.timeout
+            decision = await decisions.create(**kwargs)
+            return (
+                decision.model_dump() if hasattr(decision, "model_dump") else decision
+            )
         options: dict[str, Any] = {}
         if self.settings.timeout is not None:
             options["timeout"] = self.settings.timeout
-        response: Any = await self.client.post(
+        return await self.client.post(
             "/decisions", body=body, cast_to=object, options=cast(Any, options)
         )
+
+    async def _decide(
+        self, body: dict[str, Any], questions: Sequence[Question]
+    ) -> Decision:
+        response = await self._post(body)
         if not isinstance(response, dict):
             raise DecisionError(f"{self.model_id} returned no decision: {response!r}")
         usage = response.get("usage") or {}
@@ -110,6 +127,18 @@ class OpenAIDecisionModel:
             model=response.get("model") or self.model,
             answers=[_answer(self.model_id, q, a) for q, a in zip(questions, answers)],
         )
+
+
+#: Keyword arguments of ``client.decisions.create`` (openai 3.x); other body fields
+#: are sent as ``extra_body``.
+_SDK_PARAMS = (
+    "model",
+    "input",
+    "questions",
+    "prompt_cache_key",
+    "prompt_cache_options",
+    "safety_identifier",
+)
 
 
 def _described(key: str, value: str, description: Optional[str]) -> dict[str, Any]:
