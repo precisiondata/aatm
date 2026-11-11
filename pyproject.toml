@@ -27,7 +27,9 @@ dependencies = [
     "sentence-transformers>=5.2.2",
     "transformers>=4.57.3",
     "python-dateutil>=2.9.0",
-    "pyarrow>=17",
+    # pyarrow 24 crashes on Windows (access violation in arrow.dll) when
+    # chromadb is imported before sentence-transformers; 25+ is fine.
+    "pyarrow>=25",
 ]
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
