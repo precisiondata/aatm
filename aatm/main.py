@@ -1013,6 +1013,17 @@ def vector_db_upload(
             help="Destination: 'cloud' (Chroma Cloud) or 'pinecone'.",
         ),
     ] = "cloud",
+    ids_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--ids-file",
+            help=(
+                "Only upload the rows whose IDs this file lists, one per line, "
+                "e.g. a subset that fits a free plan."
+            ),
+            show_default=False,
+        ),
+    ] = None,
 ) -> None:
     """Upload a local index to Chroma Cloud or Pinecone. Re-running resumes where it stopped.
 
@@ -1029,12 +1040,22 @@ def vector_db_upload(
 
     from aatm.local_database_utils import upload_vector_database_to_cloud
 
+    ids = None
+    if ids_file is not None:
+        if not ids_file.exists():
+            console.print(f"[yellow]OOPS![/yellow] No IDs file at '{ids_file}'.")
+            raise typer.Exit(code=1)
+        ids = [
+            line.strip() for line in ids_file.read_text().splitlines() if line.strip()
+        ]
+
     try:
         upload_vector_database_to_cloud(
             embedding_model,
             vector_db_dir=local_dir,
             write_batch_size=batch_size,
             to=to.strip().lower(),
+            ids=ids,
         )
     except ValueError as e:
         console.print(f"[yellow]OOPS![/yellow] {e}")

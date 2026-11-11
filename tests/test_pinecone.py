@@ -710,3 +710,47 @@ def test_vector_db_check_needs_the_pinecone_key(monkeypatch):
 
     assert result.exit_code == 1
     assert "PINECONE_API_KEY" in result.output
+
+
+def test_null_metadata_fields_come_back_as_none(tmp_path):
+    # Pinecone cannot store nulls; several metadata fields are optional but required.
+    pc = fake_pinecone(tmp_path / "pinecone.db").client()
+    create_pinecone_index(pc, "nulls", DIM, "aws", "us-east-1")
+    store = PineconeVectorStore.open(pc, "nulls")
+    metadata = record_metadata(0, "Condition") | {
+        "std_vocabulary_code": None,
+        "expression_concept_id": None,
+    }
+    store.write(
+        ["0"], np.zeros((1, DIM), dtype=np.float32), ["expression 0"], [metadata]
+    )
+
+    (results,) = make_pinecone_retriever(store).retrieve(["q"]).results
+
+    # The same as a ChromaDB record that stores the nulls.
+    from aatm.data_models import RetrievedExpressionMetadata
+
+    expected = RetrievedExpressionMetadata(distance=results[0].distance, **metadata)
+    assert results[0] == expected
+
+
+def test_upload_copies_only_the_given_ids(fake_project, tmp_path):
+    ldu.build_local_vector_database("fake-model", chunk_size=100)
+    local = stored_ids_of(fake_project)
+    subset = local[:37] + ["not-in-the-index"]
+    connection = fake_pinecone(tmp_path / "pinecone.db")
+
+    summary = ldu.upload_vector_database_to_cloud(
+        "fake-model", cloud_connection=connection, ids=subset, read_page_size=10
+    )
+
+    assert (summary.total, summary.uploaded, summary.skipped) == (38, 37, 0)
+    store = index_store(connection)
+    assert store.count() == 37
+    assert store.existing_ids(local) == set(local[:37])
+
+
+def stored_ids_of(db_path):
+    from test_local_database_utils import stored_ids
+
+    return sorted(stored_ids(db_path))

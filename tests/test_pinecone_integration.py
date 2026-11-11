@@ -1,14 +1,17 @@
 """Against a real Pinecone project. Runs only when ``PINECONE_API_KEY`` is set.
 
-It creates a small serverless index named ``aatm-test-<random>`` (in
-``PINECONE_CLOUD`` / ``PINECONE_REGION``, default ``aws`` / ``us-east-1``),
-writes, queries and deletes it.
+The key is read from the environment or from a ``.env`` file in the working
+directory. The test creates a small serverless index named
+``aatm-test-<random>`` (in ``PINECONE_CLOUD`` / ``PINECONE_REGION``, default
+``aws`` / ``us-east-1``), writes, queries and deletes it. It costs a few hundred
+write and read units.
 """
 
 import os
 import time
 import uuid
 
+import dotenv
 import numpy as np
 import pytest
 
@@ -22,10 +25,11 @@ from aatm.vector_stores import (
 )
 
 # Read at import: the autouse fixture in conftest.py clears it for other tests.
+_SETTINGS = {**dotenv.dotenv_values(".env"), **os.environ}
 ENV = {
-    name: os.environ[name]
+    name: str(_SETTINGS[name])
     for name in ("PINECONE_API_KEY", "PINECONE_CLOUD", "PINECONE_REGION")
-    if os.environ.get(name)
+    if _SETTINGS.get(name)
 }
 
 pytestmark = pytest.mark.skipif(
@@ -80,9 +84,13 @@ def vectors(store):
     metadatas = [
         {
             "expression": f"expression {i}",
+            "expression_concept_id": str(i),
+            "expression_origin": "standard_concept",
             "std_concept_id": str(i),
+            "std_concept_name": f"concept {i}",
             "std_domain_id": domain,
             "std_vocabulary_id": "LOINC" if i % 2 else "SNOMED",
+            "std_vocabulary_code": str(i),
             "target_vocabulary_id": None,
         }
         for i, domain in enumerate(DOMAINS)

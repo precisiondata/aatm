@@ -225,7 +225,10 @@ CHROMADB_RETRIEVER_MODEL_REGISTRY: dict[str, ChromaRetrieverModelSpec] = {
 
 
 def load_retriever(
-    model_name: str, vector_db: str | None = None, **retriever_kwargs: Any
+    model_name: str,
+    vector_db: str | None = None,
+    local_path: str | None = None,
+    **retriever_kwargs: Any,
 ) -> VectorStoreRetriever:
     """Instantiate a registered retriever by model name.
 
@@ -238,6 +241,8 @@ def load_retriever(
         model_name: Registry name of the retriever model to instantiate.
         vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
+        local_path: Directory of the local database, in local mode. Defaults
+            to the model's directory under ``.aatm/chroma_vector_dbs``.
         **retriever_kwargs: Passed on to the retriever, e.g. ``top_k``,
             ``filter_strategy`` or ``overfetch_factor``.
 
@@ -259,7 +264,7 @@ def load_retriever(
     if resolve_vector_db_mode(vector_db) == "pinecone":
         return _load_pinecone_retriever(spec, **retriever_kwargs)
 
-    connection, collection_name = spec.chroma_location(vector_db)
+    connection, collection_name = spec.chroma_location(vector_db, local_path)
     client = connection.client()
 
     # Encode queries in the precision the database was built with.

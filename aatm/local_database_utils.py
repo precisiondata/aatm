@@ -1025,6 +1025,7 @@ def upload_vector_database_to_cloud(
     read_page_size: int = UPLOAD_READ_PAGE_SIZE,
     cloud_connection: VectorDbConnection | None = None,
     to: str = "cloud",
+    ids: Sequence[str] | None = None,
 ) -> UploadSummary:
     """Copy a local vector database to Chroma Cloud or Pinecone without re-embedding.
 
@@ -1035,6 +1036,8 @@ def upload_vector_database_to_cloud(
     created with the local collection's metadata if needed; a new Pinecone
     index takes its dimension from the local embeddings. Rows already in the
     destination are skipped, so an interrupted upload can simply be run again.
+    With ``ids``, only those rows are copied, e.g. a subset that fits a free
+    plan.
 
     Args:
         embedding_model_name: Registry key of the embedding model whose index
@@ -1049,6 +1052,8 @@ def upload_vector_database_to_cloud(
             configured for ``to`` (see `aatm.vector_db`).
         to: ``cloud`` (Chroma Cloud, the default) or ``pinecone``. Ignored when
             ``cloud_connection`` is given.
+        ids: Only copy the rows with these IDs. IDs missing from the local
+            collection are reported and skipped. Defaults to every row.
 
     Returns:
         How many rows were uploaded and skipped.
@@ -1097,7 +1102,25 @@ def upload_vector_database_to_cloud(
 
     # Keep the build's metadata, e.g. the embedding precision for query encoding.
     collection_metadata = local_collection.metadata or None
-    total = local_collection.count()
+    selected = None if ids is None else list(dict.fromkeys(ids))
+    total = local_collection.count() if selected is None else len(selected)
+
+    def pages(collection: Any) -> Iterator[tuple[int, dict[str, Any]]]:
+        """Yield how many rows each page covers, and the page."""
+        include = ["embeddings", "documents", "metadatas"]
+        if selected is None:
+            for offset in range(0, total, read_page_size):
+                page = collection.get(
+                    limit=read_page_size, offset=offset, include=include
+                )
+                yield len(page["ids"]), page
+            return
+        for start in range(0, total, read_page_size):
+            wanted = selected[start : start + read_page_size]
+            page = collection.get(ids=wanted, include=include)
+            if missing := len(wanted) - len(page["ids"]):
+                logger.warning(f"{missing} of the given IDs are not in the local index")
+            yield len(wanted), page
 
     store: VectorStore
     retry: Callable[[Callable[[int], Any]], Any]
@@ -1139,12 +1162,9 @@ def upload_vector_database_to_cloud(
 
     with Progress(*Progress.get_default_columns(), console=console) as progress:
         task = progress.add_task("Uploading embeddings", total=total)
-        for offset in range(0, total, read_page_size):
-            page = local_collection.get(
-                limit=read_page_size,
-                offset=offset,
-                include=["embeddings", "documents", "metadatas"],
-            )
+        for covered, page in pages(local_collection):
+            # IDs missing from the local index count as done.
+            progress.advance(task, covered - len(page["ids"]))
             for start in range(0, len(page["ids"]), batch_size):
                 end = start + batch_size
                 ids = page["ids"][start:end]

@@ -372,10 +372,7 @@ class VectorStoreRetriever(BaseRetriever):
             )
 
         processed_results = [
-            [
-                RetrievedExpressionMetadata(distance=distance, **metadata)  # type: ignore[arg-type]
-                for distance, metadata in query_hits
-            ]
+            [self._to_result(distance, metadata) for distance, metadata in query_hits]
             for query_hits in hits
         ]
 
@@ -383,6 +380,12 @@ class VectorStoreRetriever(BaseRetriever):
             results=processed_results,
             queries=queries,
         )
+
+    def _to_result(
+        self, distance: float, metadata: dict[str, Any]
+    ) -> RetrievedExpressionMetadata:
+        """Turn one retrieved record into a result."""
+        return RetrievedExpressionMetadata(distance=distance, **metadata)  # type: ignore[arg-type]
 
     def overfetch_sizes(self, top_k: int) -> list[int]:
         """The sizes of the unfiltered queries the over-fetch runs, in order."""
@@ -582,6 +585,23 @@ class PineconeRetriever(VectorStoreRetriever):
     def collection_name(self) -> str:
         """Name of the Pinecone index, under the name `ChromaDBRetriever` uses."""
         return self.store.name
+
+    def _to_result(
+        self, distance: float, metadata: dict[str, Any]
+    ) -> RetrievedExpressionMetadata:
+        # Pinecone cannot store nulls, so `None` fields were left out on write.
+        # Restore them: several metadata fields are optional but required.
+        return RetrievedExpressionMetadata(
+            distance=distance,
+            **(_NULL_EXPRESSION_FIELDS | metadata),  # type: ignore[arg-type]
+        )
+
+
+_NULL_EXPRESSION_FIELDS: dict[str, Any] = {
+    name: None
+    for name in RetrievedExpressionMetadata.model_fields
+    if name not in ("distance", "rerank_score")
+}
 
 
 def _check_strategy(strategy: str) -> FilterStrategy:

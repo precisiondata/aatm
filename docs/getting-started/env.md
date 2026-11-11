@@ -103,6 +103,8 @@ aatm init --vector-db pinecone                                # build the index 
 aatm vector-db upload --to pinecone -e embeddinggemma-300M    # copy a local index, without re-embedding
 ```
 
+On Pinecone's free plan the full index does not fit: writes cost one write unit per KB of request, and a 768-dimension record is about 16.6 KB, so the 2 million monthly write units cover roughly 120,000 records. `--ids-file` uploads only the rows a file lists, one ID per line; `benchmarks/vector_db_backends/make_subset.py` makes such a subset. Set `PINECONE_INDEX_PREFIX` (e.g. `aatm-subset`) so the subset does not take the full index's name.
+
 How the index maps to Pinecone:
 
 - **Scores.** The indexes use the `euclidean` metric, whose score is the squared Euclidean distance, the same as ChromaDB's default `l2` distance. A record has the same `distance` on both backends, so the confidence score (`1 - distance`), selectors and thresholds work unchanged.

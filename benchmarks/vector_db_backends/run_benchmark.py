@@ -13,8 +13,11 @@ with ``aatm init``, then copy it with ``aatm vector-db upload --to pinecone``):
 uv run python benchmarks/vector_db_backends/run_benchmark.py --retriever text-embedding-3-small
 ```
 
-``--chroma`` picks the ChromaDB side (``local``, the default, or ``cloud``). Writes one
-row per query, filter and method to ``results/<retriever>.csv`` and prints a summary.
+``--chroma`` picks the ChromaDB side (``local``, the default, or ``cloud``), and
+``--chroma-dir`` a local database other than the model's default one, e.g. the subset
+made by ``make_subset.py``. ``PINECONE_INDEX_PREFIX`` picks the Pinecone index. Writes
+one row per query, filter and method to ``results/<retriever><--label>.csv`` and prints
+a summary.
 """
 
 import argparse
@@ -78,7 +81,9 @@ def load_queries(n_lab: int) -> list[str]:
 def run(args: argparse.Namespace) -> pd.DataFrame:
     queries = load_queries(args.lab_queries)
     retrievers = {
-        "chroma": load_retriever(args.retriever, vector_db=args.chroma),
+        "chroma": load_retriever(
+            args.retriever, vector_db=args.chroma, local_path=args.chroma_dir
+        ),
         "pinecone": load_retriever(args.retriever, vector_db="pinecone"),
     }
     # Both backends hold the same vectors: embed once, with the model the index
@@ -142,6 +147,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--retriever", default="text-embedding-3-small")
     parser.add_argument("--chroma", default="local", choices=["local", "cloud"])
+    parser.add_argument(
+        "--chroma-dir", default=None, help="Local ChromaDB directory (local mode)."
+    )
+    parser.add_argument(
+        "--label", default="", help="Suffix of the results file, e.g. 'subset-50k'."
+    )
     parser.add_argument("--top-k", type=int, default=20)
     parser.add_argument("--lab-queries", type=int, default=20)
     parser.add_argument(
@@ -150,7 +161,8 @@ def main() -> None:
     args = parser.parse_args()
 
     df = run(args)
-    out = HERE / "results" / f"{args.retriever}.csv"
+    suffix = f"--{args.label}" if args.label else ""
+    out = HERE / "results" / f"{args.retriever}{suffix}.csv"
     out.parent.mkdir(exist_ok=True)
     df.to_csv(out, index=False)
 
