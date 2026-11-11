@@ -96,11 +96,15 @@ class ModelTokens(BaseModel):
         input_tokens: Prompt tokens, as reported by the provider.
         output_tokens: Output tokens, reasoning tokens included when the provider
             counts them as output.
+        reported_cost: Cost reported by the provider itself (e.g. OpenRouter's
+            ``usage.cost``, in USD), summed over the calls that reported one. Used
+            for models without a price in `TokenUsage.cost`.
     """
 
     calls: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    reported_cost: float = 0.0
 
     def cost_at(self, price: ModelPrice) -> float:
         """The cost of these tokens at `price`."""
@@ -124,6 +128,7 @@ class TokenUsage(ModelTokens):
         input_tokens: Optional[int],
         output_tokens: Optional[int],
         model_id: Optional[str] = None,
+        cost: Optional[float] = None,
     ) -> None:
         with _LOCK:
             model = self.by_model.get(model_id or UNKNOWN_MODEL)
@@ -133,6 +138,7 @@ class TokenUsage(ModelTokens):
                 counts.calls += 1
                 counts.input_tokens += input_tokens or 0
                 counts.output_tokens += output_tokens or 0
+                counts.reported_cost += cost or 0.0
 
     def merge(self, other: "TokenUsage") -> None:
         """Add the counts of another tracker to this one."""
@@ -140,33 +146,44 @@ class TokenUsage(ModelTokens):
             self.calls += other.calls
             self.input_tokens += other.input_tokens
             self.output_tokens += other.output_tokens
+            self.reported_cost += other.reported_cost
             for model_id, counts in other.by_model.items():
                 mine = self.by_model.setdefault(model_id, ModelTokens())
                 mine.calls += counts.calls
                 mine.input_tokens += counts.input_tokens
                 mine.output_tokens += counts.output_tokens
+                mine.reported_cost += counts.reported_cost
 
     def cost(self, prices: Optional[Prices]) -> Optional[float]:
-        """The estimated cost of the calls, or ``None`` when no prices are given.
+        """The estimated cost of the calls, or ``None`` when nothing gives a cost.
 
-        Models without a price are left out: see `unpriced`. Batch calls
-        (``<model>@batch``) cost the model's price times `BATCH_DISCOUNT`, unless
-        `prices` has the ``@batch`` id.
+        Each model costs its tokens at its price in `prices` or, without one, the
+        cost its provider reported (`ModelTokens.reported_cost`). Models with
+        neither are left out: see `unpriced`. Batch calls (``<model>@batch``) cost
+        the model's price times `BATCH_DISCOUNT`, unless `prices` has the ``@batch``
+        id. Returns ``None`` when no prices are given and no provider reported a
+        cost.
         """
         normalized = model_prices(prices)
-        if not normalized:
+        if not normalized and not self.reported_cost:
             return None
         total = 0.0
         for model_id, counts in self.by_model.items():
             price = price_of(model_id, normalized)
             if price is not None:
                 total += counts.cost_at(price)
+            else:
+                total += counts.reported_cost
         return total
 
     def unpriced(self, prices: Optional[Prices]) -> list[str]:
-        """The models called that have no price in `prices`."""
+        """The models called that have no price in `prices` and reported no cost."""
         normalized = model_prices(prices)
-        return sorted(m for m in self.by_model if price_of(m, normalized) is None)
+        return sorted(
+            m
+            for m, counts in self.by_model.items()
+            if price_of(m, normalized) is None and not counts.reported_cost
+        )
 
 
 _TRACKERS: ContextVar[tuple[TokenUsage, ...]] = ContextVar(
@@ -189,10 +206,15 @@ def record_usage(
     input_tokens: Optional[int],
     output_tokens: Optional[int],
     model_id: Optional[str] = None,
+    cost: Optional[float] = None,
 ) -> None:
-    """Add one call to every active tracker. Called by the provider adapters."""
+    """Add one call to every active tracker. Called by the provider adapters.
+
+    Args:
+        cost: The call's cost, when the provider reports it (e.g. OpenRouter).
+    """
     for usage in _TRACKERS.get():
-        usage.add(input_tokens, output_tokens, model_id)
+        usage.add(input_tokens, output_tokens, model_id, cost)
 
 
 def usage_attr(obj: Any, *names: str) -> Optional[int]:

@@ -854,8 +854,14 @@ class RunSummary(BaseModel):
         return max(self.total - self.done, 0) * self.seconds / self.done
 
     def price(self, prices: Optional[Prices]) -> None:
-        """Set the estimated cost of each stage, and in all, from `prices`."""
-        if not model_prices(prices):
+        """Set the estimated cost of each stage, and in all, from `prices`.
+
+        Costs reported by providers (`aatm.llm.ModelTokens.reported_cost`) count
+        for models without a price, even when no `prices` are given.
+        """
+        if not model_prices(prices) and not any(
+            s.usage.reported_cost for s in self.stages.values()
+        ):
             return
         for stage in self.stages.values():
             stage.cost = stage.usage.cost(prices)
