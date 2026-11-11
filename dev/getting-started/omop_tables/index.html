@@ -2720,10 +2720,12 @@ on its <em>entity definitions</em>.</p>
 <h2 id="before-you-start">Before you start</h2>
 <ol>
 <li><strong>Install AATM</strong> (<a href="../installation/">Installation</a>).</li>
-<li><strong>Download the OMOP vocabularies</strong> from <a href="https://athena.ohdsi.org/vocabulary/list">Athena</a>.
+<li><strong>Request the OMOP vocabularies</strong> on <a href="https://athena.ohdsi.org/vocabulary/list">Athena</a>.
    The predefined definitions on this page use <strong>SNOMED</strong>, <strong>LOINC</strong> and <strong>UCUM</strong>
-   (units), so include at least those three.</li>
-<li><strong>Run <code>aatm init</code></strong> (<a href="../quick_start_cli/">CLI quick start</a>). It builds the local
+   (units), so include at least those three. Athena emails you a link to the bundle.</li>
+<li><strong>Run <code>aatm init --vocab-zip "&lt;link from Athena&gt;"</code></strong>
+   (<a href="../quick_start_cli/#1-get-your-omop-vocabularies">CLI quick start</a>). It downloads
+   and unpacks the bundle, then builds the local
    vocabulary database (<code>.aatm/omop.db</code>), which every example on this page reads, and
    the search index the terminology mapper uses. Note the embedding model you choose
    (for example <code>text-embedding-3-small</code>): you pass the same name to the mapper later.</li>

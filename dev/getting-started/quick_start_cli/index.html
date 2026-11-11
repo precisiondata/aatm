@@ -693,13 +693,30 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#1-prepare-your-omop-vocabularies-directory" class="md-nav__link">
+  <a href="#1-get-your-omop-vocabularies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Prepare your OMOP vocabularies directory
+        1. Get your OMOP vocabularies
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="1. Get your OMOP vocabularies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-an-unpacked-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using an unpacked directory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -981,6 +998,39 @@
     <span class="md-ellipsis">
       
         aatm init says the vocabulary directory does not exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aatm-init-vocab-zip-says-the-link-returned-a-web-page-or-has-expired" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm init --vocab-zip says the link returned a web page or has expired
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aatm-init-vocab-zip-says-files-already-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm init --vocab-zip says files already exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aatm-init-vocab-zip-warns-about-cpt4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm init --vocab-zip warns about CPT4
       
     </span>
   </a>
@@ -2309,13 +2359,30 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#1-prepare-your-omop-vocabularies-directory" class="md-nav__link">
+  <a href="#1-get-your-omop-vocabularies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Prepare your OMOP vocabularies directory
+        1. Get your OMOP vocabularies
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="1. Get your OMOP vocabularies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-an-unpacked-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using an unpacked directory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2604,6 +2671,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#aatm-init-vocab-zip-says-the-link-returned-a-web-page-or-has-expired" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm init --vocab-zip says the link returned a web page or has expired
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aatm-init-vocab-zip-says-files-already-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm init --vocab-zip says files already exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aatm-init-vocab-zip-warns-about-cpt4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm init --vocab-zip warns about CPT4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#aatm-init-says-the-embedding-model-is-unsupported" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2786,12 +2886,29 @@
 <li><code>aatm search-ui</code></li>
 </ul>
 <hr>
-<h2 id="1-prepare-your-omop-vocabularies-directory">1. Prepare your OMOP vocabularies directory</h2>
-<p>Before running <code>aatm init</code>, download the OMOP vocabularies you want to use and place them in a directory. You can find them at https://athena.ohdsi.org/vocabulary/list</p>
-<p>By default, the CLI expects it at the root directory:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>./vocabularies
+<h2 id="1-get-your-omop-vocabularies">1. Get your OMOP vocabularies</h2>
+<p>AATM cannot ship the OMOP vocabularies because several of them have their own licences. You request them from <a href="https://athena.ohdsi.org/vocabulary/list">Athena</a>, which has no API for this, so this step is done in the browser:</p>
+<ol>
+<li>Log in to <a href="https://athena.ohdsi.org/vocabulary/list">Athena</a> and open <strong>Download</strong>.</li>
+<li>Select the vocabularies you need (for example SNOMED, LOINC, RxNorm and UCUM) and accept the licences of the restricted ones.</li>
+<li>Click <strong>Download vocabularies</strong> and name the bundle. Athena emails you a link to a zip file when it is ready, which can take a while.</li>
+</ol>
+<p>Then let <code>aatm init</code> do the rest by passing it the link, or the zip if you already downloaded it:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>aatm<span class="w"> </span>init<span class="w"> </span>--vocab-zip<span class="w"> </span><span class="s2">"https://athena.ohdsi.org/api/v1/vocabularies/zip/&lt;bundle-id&gt;"</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>aatm<span class="w"> </span>init<span class="w"> </span>--vocab-zip<span class="w"> </span>~/Downloads/vocabulary_download_v5_&lt;bundle-id&gt;.zip
 </span></code></pre></div>
-<p>If you do not use that location, you can point the CLI to a different directory with the option <code>--vocab-dir</code> or <code>-vd</code>. The CLI validates this path during initialization.</p>
+<p>With <code>--vocab-zip</code>, <code>aatm init</code>:</p>
+<ul>
+<li>downloads the bundle into <code>.aatm/downloads</code> (resuming if the connection drops). If Athena returns a login page or the link has expired, it says so: request the bundle again, or download it in your browser and pass the zip's path instead;</li>
+<li>unpacks it into <code>./vocabularies</code>, or into <code>--vocab-dir</code>. It asks before overwriting existing files; pass <code>--force</code> to overwrite without asking;</li>
+<li>checks that the required files (<code>CONCEPT.csv</code>, <code>CONCEPT_RELATIONSHIP.csv</code>, <code>CONCEPT_SYNONYM.csv</code>, <code>VOCABULARY.csv</code>, <code>DOMAIN.csv</code>) are present, and lists the vocabularies and versions in the bundle;</li>
+<li>adds the CPT4 concept names when the bundle includes CPT4. This needs <a href="https://adoptium.net">Java</a> and a <a href="https://uts.nlm.nih.gov/uts/profile">UMLS API key</a>, passed with <code>--umls-api-key</code> or the <code>UMLS_API_KEY</code> environment variable. Without a key, CPT4 concepts are kept without names.</li>
+</ul>
+<h3 id="using-an-unpacked-directory">Using an unpacked directory</h3>
+<p>If you unpacked the zip yourself, put the CSVs in <code>./vocabularies</code>, where the CLI looks by default:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>./vocabularies
+</span></code></pre></div>
+<p>To use another location, pass <code>--vocab-dir</code> or <code>-vd</code>. The CLI validates this path during initialization. In that case, add the CPT4 names yourself by following the <code>readme.txt</code> in the bundle.</p>
 <hr>
 <h2 id="2-run-the-initialization-command">2. Run the initialization command</h2>
 <p>The <code>init</code> command is the main CLI setup workflow.</p>
@@ -2807,25 +2924,25 @@
 </ul>
 <p>That means you do <strong>not</strong> need to call Python setup functions manually for the normal setup flow. At the end, you will be ready to run terminology mapping tasks.</p>
 <h3 id="simplest-setup">Simplest setup</h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>aatm<span class="w"> </span>init
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aatm<span class="w"> </span>init
 </span></code></pre></div>
 <p>This uses the default vocab directory and interactively asks you to choose the embedding model, standard vocabularies and other options.</p>
 <h3 id="setup-with-a-custom-vocab-directory">Setup with a custom vocab directory</h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aatm<span class="w"> </span>init<span class="w"> </span>--vocab-dir<span class="w"> </span>./my_vocabularies
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aatm<span class="w"> </span>init<span class="w"> </span>--vocab-dir<span class="w"> </span>./my_vocabularies
 </span></code></pre></div>
 <h3 id="setup-with-an-explicit-embedding-model">Setup with an explicit embedding model</h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aatm<span class="w"> </span>init<span class="w"> </span>--embedding-model<span class="w"> </span>embeddinggemma-300M
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aatm<span class="w"> </span>init<span class="w"> </span>--embedding-model<span class="w"> </span>embeddinggemma-300M
 </span></code></pre></div>
 <h3 id="setup-with-explicit-standard-vocabularies">Setup with explicit standard vocabularies</h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>aatm<span class="w"> </span>init<span class="w"> </span>--standard-vocabs<span class="w"> </span>LOINC<span class="w"> </span>--standard-vocabs<span class="w"> </span>SNOMED<span class="w"> </span>--standard-vocabs<span class="w"> </span>RxNorm
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aatm<span class="w"> </span>init<span class="w"> </span>--standard-vocabs<span class="w"> </span>LOINC<span class="w"> </span>--standard-vocabs<span class="w"> </span>SNOMED<span class="w"> </span>--standard-vocabs<span class="w"> </span>RxNorm
 </span></code></pre></div>
 <h3 id="fully-explicit-setup">Fully explicit setup</h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>aatm<span class="w"> </span>init<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--vocab-dir<span class="w"> </span>./vocabularies<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--embedding-model<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>LOINC<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>SNOMED<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>RxNorm
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>aatm<span class="w"> </span>init<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--vocab-dir<span class="w"> </span>./vocabularies<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--embedding-model<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>LOINC<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>SNOMED<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>RxNorm
 </span></code></pre></div>
 <h2 id="3-prepare-your-input-csv">3. Prepare your input CSV</h2>
 <p>After initialization, prepare the CSV you want to map.</p>
@@ -2840,9 +2957,9 @@
 <li><code>invalid_reason</code></li>
 </ul>
 <p>Example:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>source_code,source_concept_id,source_vocabulary_id,source_code_description,valid_start_date,valid_end_date,invalid_reason
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>A01,,LOCAL,"Dor no peito",2020-01-01,2099-12-31,
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>B02,,LOCAL,"Diabetes mellitus tipo 2",2020-01-01,2099-12-31,
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>source_code,source_concept_id,source_vocabulary_id,source_code_description,valid_start_date,valid_end_date,invalid_reason
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>A01,,LOCAL,"Dor no peito",2020-01-01,2099-12-31,
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>B02,,LOCAL,"Diabetes mellitus tipo 2",2020-01-01,2099-12-31,
 </span></code></pre></div>
 <hr>
 <h2 id="4-run-mapping-directly-from-the-cli">4. Run mapping directly from the CLI</h2>
@@ -2854,17 +2971,6 @@
 <p>Both paths are supported directly by the CLI implementation.</p>
 <h3 id="option-a-run-from-explicit-cli-arguments">Option A: run from explicit CLI arguments</h3>
 <p>This is the most direct fully-CLI workflow.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>aatm<span class="w"> </span>map<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--input-file<span class="w"> </span>data/source_to_concept_map.csv<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--output-dir<span class="w"> </span>output<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>--translator-id<span class="w"> </span>empty-translator<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>--retriever-id<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span>--reranker-id<span class="w"> </span>bm25-reranker<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span>--selector-id<span class="w"> </span>first-result-selector<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span>--batch-size<span class="w"> </span><span class="m">100</span>
-</span></code></pre></div>
-<h4 id="run-a-small-test-job">Run a small test job</h4>
-<p>Use <code>--limit-to</code> when you want to test with only a few rows.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>aatm<span class="w"> </span>map<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>--input-file<span class="w"> </span>data/source_to_concept_map.csv<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>--output-dir<span class="w"> </span>output<span class="w"> </span><span class="se">\</span>
@@ -2872,26 +2978,37 @@
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span>--retriever-id<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span>--reranker-id<span class="w"> </span>bm25-reranker<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span>--selector-id<span class="w"> </span>first-result-selector<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span>--limit-to<span class="w"> </span><span class="m">20</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span>--batch-size<span class="w"> </span><span class="m">100</span>
 </span></code></pre></div>
-<h4 id="apply-rate-limiting">Apply rate limiting</h4>
-<p>If needed, you can also pass a rate limit:</p>
+<h4 id="run-a-small-test-job">Run a small test job</h4>
+<p>Use <code>--limit-to</code> when you want to test with only a few rows.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>aatm<span class="w"> </span>map<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--input-file<span class="w"> </span>data/source_to_concept_map.csv<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>--output-dir<span class="w"> </span>output<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>--translator-id<span class="w"> </span>gemini-2.5-flash<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>--translator-id<span class="w"> </span>empty-translator<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span>--retriever-id<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span>--reranker-id<span class="w"> </span>bm25-reranker<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>--selector-id<span class="w"> </span>first-result-selector<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span>--batch-size<span class="w"> </span><span class="m">50</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span>--rate-limit<span class="w"> </span><span class="m">100</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span>--limit-to<span class="w"> </span><span class="m">20</span>
+</span></code></pre></div>
+<h4 id="apply-rate-limiting">Apply rate limiting</h4>
+<p>If needed, you can also pass a rate limit:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>aatm<span class="w"> </span>map<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>--input-file<span class="w"> </span>data/source_to_concept_map.csv<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>--output-dir<span class="w"> </span>output<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span>--translator-id<span class="w"> </span>gemini-2.5-flash<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span>--retriever-id<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span>--reranker-id<span class="w"> </span>bm25-reranker<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span>--selector-id<span class="w"> </span>first-result-selector<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">  </span>--batch-size<span class="w"> </span><span class="m">50</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">  </span>--rate-limit<span class="w"> </span><span class="m">100</span>
 </span></code></pre></div>
 <p>The CLI accepts all of these options directly.</p>
 <hr>
 <h3 id="option-b-run-mapping-from-a-config-file">Option B. Run mapping from a config file</h3>
 <p>The other CLI workflow is to store the mapping task in a config file and pass it with <code>--task-config-path</code> or <code>-t</code>.</p>
 <h4 id="example-command">Example command</h4>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>aatm<span class="w"> </span>map<span class="w"> </span>--task-config-path<span class="w"> </span>task.yaml
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>aatm<span class="w"> </span>map<span class="w"> </span>--task-config-path<span class="w"> </span>task.yaml
 </span></code></pre></div>
 <p>When you do this, the CLI loads the task config file and runs the mapping task from it. </p>
 <h4 id="example-task-config">Example task config</h4>
@@ -2899,29 +3016,29 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="yaml" name="__tabbed_1" type="radio"><input id="json" name="__tabbed_1" type="radio"><div class="tabbed-labels"><label for="yaml">YAML</label><label for="json">JSON</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">input_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data/source_to_concept_map.csv</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">output_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">output</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nt">translator_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">empty-translator</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nt">retriever_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">embeddinggemma-300M</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nt">reranker_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bm25-reranker</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="nt">selector_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">first-result-selector</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="nt">rate_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="nt">limit_to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">input_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data/source_to_concept_map.csv</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nt">output_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">output</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nt">translator_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">empty-translator</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nt">retriever_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">embeddinggemma-300M</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="nt">reranker_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bm25-reranker</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="nt">selector_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">first-result-selector</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="nt">rate_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="nt">limit_to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="language-json highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">{</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">"input_file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"data/source_to_concept_map.csv"</span><span class="p">,</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">"output_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"output"</span><span class="p">,</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">"translator_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"empty-translator"</span><span class="p">,</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nt">"retriever_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"embeddinggemma-300M"</span><span class="p">,</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span><span class="nt">"reranker_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"bm25-reranker"</span><span class="p">,</span>
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">  </span><span class="nt">"selector_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"first-result-selector"</span><span class="p">,</span>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">  </span><span class="nt">"batch_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">  </span><span class="nt">"rate_limit"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">  </span><span class="nt">"limit_to"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
-</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="p">}</span>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">"input_file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"data/source_to_concept_map.csv"</span><span class="p">,</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">"output_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"output"</span><span class="p">,</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nt">"translator_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"empty-translator"</span><span class="p">,</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">  </span><span class="nt">"retriever_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"embeddinggemma-300M"</span><span class="p">,</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">  </span><span class="nt">"reranker_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"bm25-reranker"</span><span class="p">,</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">  </span><span class="nt">"selector_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"first-result-selector"</span><span class="p">,</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">  </span><span class="nt">"batch_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">  </span><span class="nt">"rate_limit"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">  </span><span class="nt">"limit_to"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="p">}</span>
 </span></code></pre></div>
 </div>
 </div>
@@ -2930,7 +3047,7 @@
 <hr>
 <h2 id="5-launch-the-search-ui-from-the-cli">5. Launch the search UI from the CLI</h2>
 <p>You can also launch the Streamlit-based search interface directly from the CLI:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>aatm<span class="w"> </span>search-ui
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>aatm<span class="w"> </span>search-ui
 </span></code></pre></div>
 <p>The CLI resolves the packaged <code>search_ui.py</code> file and launches it through Streamlit using the current Python interpreter. Streamlit's file watcher is turned off, since it is only needed while editing the UI; set <code>STREAMLIT_SERVER_FILE_WATCHER_TYPE=auto</code> to turn it back on.</p>
 <figure>
@@ -2942,55 +3059,61 @@
 <hr>
 <h2 id="6-what-gets-created-locally">6. What gets created locally</h2>
 <p>After a normal CLI setup and mapping workflow, you will typically have local artifacts such as:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>.aatm/
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>├── omop.db
-</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>├── datasets/
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>└── chroma_vector_dbs/
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>.aatm/
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>├── omop.db
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>├── datasets/
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>└── chroma_vector_dbs/
 </span></code></pre></div>
 <p>And your mapped output will typically be written to:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>output/mapped_source_concepts.csv
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>output/mapped_source_concepts.csv
 </span></code></pre></div>
 <p>The CLI <code>init</code> command is responsible for creating the local helper resources, and the <code>map</code> command runs the terminology mapping workflow. </p>
 <hr>
 <h2 id="7-end-to-end-cli-example">7. End-to-end CLI example</h2>
 <p>Here is a full CLI-only path.</p>
 <h3 id="step-1-initialize">Step 1: initialize</h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>aatm<span class="w"> </span>init<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span>--vocab-dir<span class="w"> </span>./vocabularies<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span>--embedding-model<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>LOINC<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>SNOMED<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>RxNorm
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>aatm<span class="w"> </span>init<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>--vocab-dir<span class="w"> </span>./vocabularies<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>--embedding-model<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>LOINC<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>SNOMED<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>RxNorm
 </span></code></pre></div>
 <h3 id="step-2-run-mapping">Step 2: run mapping</h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>aatm<span class="w"> </span>map<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>--input-file<span class="w"> </span>data/source_to_concept_map.csv<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span>--output-dir<span class="w"> </span>output<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">  </span>--translator-id<span class="w"> </span>empty-translator<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span>--retriever-id<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span>--reranker-id<span class="w"> </span>bm25-reranker<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">  </span>--selector-id<span class="w"> </span>first-result-selector<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span>--batch-size<span class="w"> </span><span class="m">100</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>aatm<span class="w"> </span>map<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span>--input-file<span class="w"> </span>data/source_to_concept_map.csv<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span>--output-dir<span class="w"> </span>output<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span>--translator-id<span class="w"> </span>empty-translator<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span>--retriever-id<span class="w"> </span>embeddinggemma-300M<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="w">  </span>--reranker-id<span class="w"> </span>bm25-reranker<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="w">  </span>--selector-id<span class="w"> </span>first-result-selector<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">  </span>--batch-size<span class="w"> </span><span class="m">100</span>
 </span></code></pre></div>
 <h3 id="step-3-inspect-output">Step 3: inspect output</h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>ls<span class="w"> </span>output
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>ls<span class="w"> </span>output
 </span></code></pre></div>
 <p>You should see the mapped CSV file there.</p>
 <h3 id="step-4-optionally-launch-the-search-ui">Step 4: optionally launch the search UI</h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>aatm<span class="w"> </span>search-ui
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>aatm<span class="w"> </span>search-ui
 </span></code></pre></div>
 <hr>
 <h2 id="8-troubleshooting">8. Troubleshooting</h2>
 <h3 id="aatm-init-says-the-vocabulary-directory-does-not-exist"><code>aatm init</code> says the vocabulary directory does not exist</h3>
 <p>Make sure your OMOP vocabulary files are present in <code>./vocabularies</code>, or pass the correct path with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>aatm<span class="w"> </span>init<span class="w"> </span>--vocab-dir<span class="w"> </span>/path/to/vocabularies
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>aatm<span class="w"> </span>init<span class="w"> </span>--vocab-dir<span class="w"> </span>/path/to/vocabularies
 </span></code></pre></div>
-<p>The CLI explicitly checks whether the provided directory exists. </p>
+<p>The CLI explicitly checks whether the provided directory exists. You can also skip the manual unpacking and pass the bundle with <code>--vocab-zip</code> (see <a href="#1-get-your-omop-vocabularies">step 1</a>).</p>
+<h3 id="aatm-init-vocab-zip-says-the-link-returned-a-web-page-or-has-expired"><code>aatm init --vocab-zip</code> says the link returned a web page or has expired</h3>
+<p>Athena's link needs a valid, recent bundle. Request the bundle again on <a href="https://athena.ohdsi.org/vocabulary/list">Athena</a> and use the new link, or open the link in your browser while logged in to Athena, save the zip, and pass its path to <code>--vocab-zip</code>.</p>
+<h3 id="aatm-init-vocab-zip-says-files-already-exist"><code>aatm init --vocab-zip</code> says files already exist</h3>
+<p>The target directory already has vocabulary files. Confirm the overwrite when asked, pass <code>--force</code>, or unpack into another directory with <code>--vocab-dir</code>.</p>
+<h3 id="aatm-init-vocab-zip-warns-about-cpt4"><code>aatm init --vocab-zip</code> warns about CPT4</h3>
+<p>The bundle includes CPT4, whose names must be downloaded with your own UMLS licence. Install Java and pass your UMLS API key with <code>--umls-api-key</code> or the <code>UMLS_API_KEY</code> environment variable.</p>
 <h3 id="aatm-init-says-the-embedding-model-is-unsupported"><code>aatm init</code> says the embedding model is unsupported</h3>
 <p>Use one of the supported model names listed in this page. The CLI validates the model name before continuing. </p>
 <h3 id="aatm-map-says-the-task-config-file-does-not-exist"><code>aatm map</code> says the task config file does not exist</h3>
 <p>Check the path you passed to:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>aatm<span class="w"> </span>map<span class="w"> </span>--task-config-path<span class="w"> </span>task.yaml
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>aatm<span class="w"> </span>map<span class="w"> </span>--task-config-path<span class="w"> </span>task.yaml
 </span></code></pre></div>
 <p>The CLI verifies that the config file exists before loading it. </p>
 <h3 id="retrieval-fails-at-mapping-time">Retrieval fails at mapping time</h3>
@@ -2999,7 +3122,7 @@
 <p>Check that your <code>.env</code> file contains the required API keys.</p>
 <h3 id="seeing-more-or-fewer-log-messages">Seeing more (or fewer) log messages</h3>
 <p>Every command accepts a global <code>--log-level</code> option (or <code>-l</code>), placed before the command name. Logs are written to stderr:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>aatm<span class="w"> </span>--log-level<span class="w"> </span>DEBUG<span class="w"> </span>map<span class="w"> </span>--task-config-path<span class="w"> </span>task.yaml
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>aatm<span class="w"> </span>--log-level<span class="w"> </span>DEBUG<span class="w"> </span>map<span class="w"> </span>--task-config-path<span class="w"> </span>task.yaml
 </span></code></pre></div>
 <p>The level can also be set with the <code>AATM_LOG_LEVEL</code> environment variable. It is passed on to <code>aatm serve</code> and <code>aatm search-ui</code>.</p>
 <h3 id="output-redirected-to-a-file-looks-garbled-or-fails">Output redirected to a file looks garbled or fails</h3>
