@@ -13,7 +13,7 @@ selection stages in the mapping pipeline.
 
 import os
 import json
-import google.genai as genai
+from aatm.llm.gemini import gemini_client
 from google.genai import types
 import dotenv
 from abc import ABC, abstractmethod
@@ -155,7 +155,7 @@ class GeminiTranslator(BaseTranslator):
         Returns:
             None.
         """
-        self.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+        self.client = gemini_client(os.getenv("GOOGLE_API_KEY"))
         self.model = model
         self.n_retries = n_retries
 

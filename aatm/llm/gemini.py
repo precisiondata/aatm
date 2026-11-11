@@ -42,6 +42,26 @@ _GEMINI_SCHEMA_KEYS = {
 }
 
 
+#: API version of every Gemini client. google-genai 3.x defaults to ``v1``, which
+#: lacks preview models (e.g. ``gemini-3-flash-preview``) and the Decisions API.
+GEMINI_API_VERSION = "v1beta"
+
+
+def gemini_client(
+    api_key: Optional[str] = None, *, timeout: Optional[float] = None
+) -> genai.Client:
+    """A Google GenAI client on `GEMINI_API_VERSION`.
+
+    Args:
+        api_key: API key; ``GOOGLE_API_KEY`` or ``GEMINI_API_KEY`` when omitted.
+        timeout: Request timeout in seconds.
+    """
+    http_options = types.HttpOptions(api_version=GEMINI_API_VERSION)
+    if timeout is not None:
+        http_options.timeout = int(timeout * 1000)
+    return genai.Client(api_key=api_key, http_options=http_options)
+
+
 def gemini_response_schema(schema: Any) -> Any:
     """Return a copy of a JSON schema restricted to keywords Gemini supports."""
     if isinstance(schema, list):
@@ -78,10 +98,7 @@ class GeminiLLM:
         self.model = model
         self.model_id = f"gemini/{model}"
         self.settings = settings or LLMSettings()
-        http_options = None
-        if self.settings.timeout is not None:
-            http_options = types.HttpOptions(timeout=int(self.settings.timeout * 1000))
-        self.client = genai.Client(api_key=api_key, http_options=http_options)
+        self.client = gemini_client(api_key, timeout=self.settings.timeout)
 
     def _config(self, system: str, output_type: type[T]) -> types.GenerateContentConfig:
         s = self.settings
