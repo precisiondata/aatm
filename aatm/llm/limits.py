@@ -87,6 +87,25 @@ class RateLimits(BaseModel):
     initial_backoff: float = Field(default=1.0, gt=0)
     max_backoff: float = Field(default=60.0, gt=0)
 
+    def divided(self, parts: int) -> "RateLimits":
+        """These limits split evenly among `parts` processes calling the same model.
+
+        Rates are divided by `parts`; the concurrency cap too, rounded up so each
+        process can make at least one call. Retries are unchanged.
+        """
+        if parts < 1:
+            raise ValueError("parts must be >= 1")
+        if parts == 1:
+            return self.model_copy()
+        update: dict[str, Any] = {}
+        if self.max_concurrency is not None:
+            update["max_concurrency"] = -(-self.max_concurrency // parts)
+        if self.requests_per_minute is not None:
+            update["requests_per_minute"] = self.requests_per_minute / parts
+        if self.tokens_per_minute is not None:
+            update["tokens_per_minute"] = self.tokens_per_minute / parts
+        return self.model_copy(update=update)
+
 
 def estimate_tokens(*texts: str) -> int:
     """A rough token count of prompt texts (about 4 characters per token)."""
@@ -363,6 +382,12 @@ def get_rate_limiter(model_id: str) -> RateLimiter:
                     model_id, _resolve(model_id)
                 )
     return limiter
+
+
+def configured_rate_limits() -> dict[str, RateLimits]:
+    """The limits set with `set_rate_limits`, by key (model, provider or ``"*"``)."""
+    with _CONFIG_LOCK:
+        return {key: limits.model_copy() for key, limits in _LIMITS.items()}
 
 
 def reset_rate_limits() -> None:

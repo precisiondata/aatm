@@ -1165,10 +1165,91 @@ notes and tried again by the next run, live or in a batch. Batch calls are count
 has an entry for that id. Gemini takes at most about 20 MB of prompts per job: lower
 `chunk_size` if it refuses one.
 
+**Several processes or machines.** Split the dataset into shards that run
+independently.
+
+!!! note "When sharding helps"
+    With a hosted API, a single process is not the limit: it spends its time waiting
+    for the model, and the provider's rate limit applies to all processes together.
+    Raise `max_concurrency` and the rate limits instead, with a `chunk_size` several
+    times `max_concurrency`. Shard on one machine when a single process is busy (a
+    fast or local model, local embedding retrieval), or to spread a run over several
+    machines or cluster jobs. See the
+    [sharding benchmark](https://github.com/precisiondata/aatm/tree/main/benchmarks/sharding).
+ A note's shard is a stable hash of its `note_id`, so every worker finds
+its share of the source on its own. On one machine, `run_sharded` runs the shards in
+separate processes:
+
+```python
+# my_pipeline.py: worker processes import the factory, so define it in a module
+from aatm.omop import OmopExtractionPipeline
+
+def make_pipeline():
+    return OmopExtractionPipeline(
+        "ecog_performance_status", model_id="openai/gpt-5-mini", max_concurrency=16,
+        cache=True,  # one cache file, shared by the processes
+    )
+```
+
+```python
+from aatm.llm import set_rate_limits
+from aatm.omop import OmopRun, run_sharded
+from my_pipeline import make_pipeline
+
+if __name__ == "__main__":
+    set_rate_limits("openai", requests_per_minute=5000)  # divided among the processes
+    summary = run_sharded(
+        make_pipeline, "notes.parquet", "output/ecog", num_shards=4, chunk_size=200
+    )
+    run = OmopRun("output/ecog")  # reads every shard as one run
+    run.table("measurement")
+```
+
+Each shard is an ordinary run in its own folder (`output/ecog/shard-000-of-004/`...),
+with its own ledger: it resumes, retries and rebuilds on its own, and
+`pipeline.rebuild("output/ecog")` rebuilds them all. Calling `run_sharded` again
+resumes every shard. A folder keeps the number of shards it was split into. If a shard
+stops with an error, the others finish, and `ShardedRunError` reports it with the
+combined summary.
+
+Rate limits apply per process: `run_sharded` divides the limits you set among the
+processes running at once (`processes`, all shards by default). Pass the source as a
+path, a DataFrame or a list, which every process reads, keeping its own notes, or, for
+a database, as a function that opens its own connection and returns `notes_from_sql`.
+A query is filtered in the database, so each shard fetches only its notes:
+
+```python
+import sqlite3
+from aatm.omop import notes_from_sql
+
+def note_source():  # in my_pipeline.py, next to make_pipeline
+    con = sqlite3.connect("cdm.db")
+    return notes_from_sql("SELECT note_id, note_text AS text, person_id FROM note", con)
+
+run_sharded(make_pipeline, note_source, "output/ecog", num_shards=4)
+```
+
+The filter is integer arithmetic on the note id, cast to `BIGINT`; for MySQL, pass
+`notes_from_sql(..., cast="SIGNED")`. `shard_condition(index, count)` returns it, to
+filter a query yourself.
+
+On several machines (or jobs of a scheduler), run one shard on each with
+`shard=(index, count)`, then gather the folders under one parent and read it with
+`OmopRun`:
+
+```python
+from aatm.omop import shard_dir
+
+index = int(os.environ["SHARD_INDEX"])
+await pipeline.run("notes.parquet", shard_dir("output/ecog", index, 8), shard=(index, 8))
+```
+
+Each machine keeps its own coding cache: entries are not shared across machines.
+
 **Row ids.** The primary keys of a run are derived from the note:
 `note_id * 65536 + n`, where `n` is the position of the mention in the note. The same
 note gets the same ids in any chunk, after a resume or a rebuild, and in separate runs
-over parts of a dataset; ids never repeat across tables. They need a 64-bit (`BIGINT`)
+over parts of a dataset, such as shards; ids never repeat across tables. They need a 64-bit (`BIGINT`)
 column. `OmopTableBuilder.build(..., row_ids="note")` numbers rows the same way.
 
 !!! tip "Speed and cost"

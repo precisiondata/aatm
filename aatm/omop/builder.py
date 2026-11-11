@@ -1250,6 +1250,7 @@ class OmopExtractionPipeline:
         batch: bool = False,
         poll_every: float = 60.0,
         max_batches: int = 20,
+        shard: Optional[tuple[int, int]] = None,
     ) -> "RunSummary":
         """Process a dataset of any size in chunks, writing Parquet files as it goes.
 
@@ -1281,6 +1282,11 @@ class OmopExtractionPipeline:
             poll_every: Seconds between polls of pending batch jobs.
             max_batches: Batch jobs pending at once; reading the source waits
                 while that many are pending.
+            shard: ``(index, count)``: process only the notes of shard `index` of
+                `count` (by a hash of `note_id`, see `aatm.omop.shards`), e.g. one
+                per machine. Each shard needs its own `output_dir`
+                (`aatm.omop.shards.shard_dir`); `OmopRun` reads their parent as one.
+                `run_sharded` runs the shards in processes on one machine.
 
         Returns:
             What this run did: notes built, skipped and failed, rows per table,
@@ -1300,6 +1306,7 @@ class OmopExtractionPipeline:
             batch=batch,
             poll_every=poll_every,
             max_batches=max_batches,
+            shard=shard,
         )
 
     async def rebuild(
@@ -1313,7 +1320,8 @@ class OmopExtractionPipeline:
 
         Makes no extraction calls: use it after changing the ``omop`` blocks. Row ids
         stay the same. The coder may still be called for texts it has not cached.
-        `prices` and `log_every` are as for `run`.
+        `prices` and `log_every` are as for `run`. Given the parent folder of shards
+        (`run_sharded`), it rebuilds each shard in turn.
         """
         from aatm.omop.runner import ChunkedRun
 

@@ -19,6 +19,7 @@ default; set them, per model, provider or for all, with `set_rate_limits`
 from aatm.llm.limits import (
     RateLimiter,
     RateLimits,
+    configured_rate_limits,
     get_rate_limiter,
     get_rate_limits,
     reset_rate_limits,
@@ -39,6 +40,7 @@ __all__ = [
     "ModelTokens",
     "TokenUsage",
     "available_providers",
+    "configured_rate_limits",
     "create_llm",
     "get_rate_limiter",
     "get_rate_limits",
