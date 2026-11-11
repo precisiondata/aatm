@@ -602,6 +602,9 @@ def data_fingerprint(obj: Any) -> Optional[dict[str, Any]]:
       `vocabulary_fingerprint`.
     - A ChromaDB collection: its id, which changes when the collection is
       recreated, and its number of records.
+    - Another vector database index (`aatm.retrievers.PineconeRetriever`): what
+      its ``content_fingerprint()`` returns, i.e. its name, host, dimension and
+      number of records.
 
     Returns ``None`` for components without such data, or whose data is unknown.
     """
@@ -617,6 +620,14 @@ def data_fingerprint(obj: Any) -> Optional[dict[str, Any]]:
             logger.warning(
                 f"Could not read the collection of {type(obj).__name__}: {e}"
             )
+        return None
+    # Other vector databases, e.g. a Pinecone index: name, host, dimension, count.
+    content_fingerprint = getattr(obj, "content_fingerprint", None)
+    if callable(content_fingerprint):
+        try:
+            return content_fingerprint()
+        except Exception as e:  # pragma: no cover - a broken client
+            logger.warning(f"Could not read the index of {type(obj).__name__}: {e}")
     return None
 
 

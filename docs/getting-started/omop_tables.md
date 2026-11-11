@@ -614,8 +614,8 @@ aatm cache clear --coder <hash>
 ```
 
 !!! warning "Rebuilt data the cache cannot see"
-    The data of a retriever that is not a ChromaDB collection (a retriever of your own,
-    for example) cannot be fingerprinted. When the cache opens, a warning names such
+    The data of a retriever that is neither a ChromaDB collection nor a Pinecone index
+    (a retriever of your own, for example) cannot be fingerprinted. When the cache opens, a warning names such
     components: `changes to the content of ... cannot be detected`. If you rebuild
     their index, run `aatm cache clear`, or results coded against the old data will be
     reused without any error.

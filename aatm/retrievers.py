@@ -1,43 +1,51 @@
 """
-Define retriever abstractions and ChromaDB-based retrieval implementations.
+Define retriever abstractions and vector-database-backed retrieval implementations.
 
 This module provides the base interface for retrieval components used in the
-pipeline, along with a concrete retriever backed by ChromaDB. Retrievers are
-responsible for accepting one or more queries, fetching candidate expressions,
-and returning them in a standardized ``RetrieverResults`` structure.
+pipeline, along with retrievers backed by a vector database: `ChromaDBRetriever`
+(a local or Chroma Cloud collection) and `PineconeRetriever` (a Pinecone
+index). Both share their filtering logic through `VectorStoreRetriever`.
+Retrievers are responsible for accepting one or more queries, fetching
+candidate expressions, and returning them in a standardized
+``RetrieverResults`` structure.
 
 The module is designed to support pipeline-style composition, allowing
 retrievers to be chained with other components such as rerankers and selectors.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, List, Literal, Mapping, Sequence, get_args
+from typing import Any, Callable, List, Literal, Mapping, Sequence, get_args
 import chromadb
-from chromadb import EmbeddingFunction
 
 from .data_models import RetrievedExpressionMetadata, RetrieverResults, Translation
 from .pipeline import PipelineBaseClass
+from .vector_stores import Hit as _Hit
+from .vector_stores import UnsupportedFilterError, VectorStore, chroma_hits
 
-FilterStrategy = Literal["overfetch_fallback", "overfetch", "chroma"]
-"""How `ChromaDBRetriever` applies a `where` metadata filter.
+FilterStrategy = Literal["overfetch_fallback", "overfetch", "native", "chroma"]
+"""How a `VectorStoreRetriever` applies a `where` metadata filter.
 
-- ``"overfetch_fallback"`` (default): query without the filter for more
-  results than needed, keep the ones that match the filter, and run ChromaDB's
-  filtered query for the queries where fewer than ``top_k`` matches survive.
+- ``"overfetch_fallback"`` (default for ChromaDB): query without the filter
+  for more results than needed, keep the ones that match the filter, and run
+  the database's filtered query for the queries where fewer than ``top_k``
+  matches survive.
 - ``"overfetch"``: the same over-fetch, without the fallback. A query may then
   return fewer than ``top_k`` results.
-- ``"chroma"``: pass the filter to ChromaDB, which applies it before the vector
-  search. Exact, but slow on large collections when many records match.
+- ``"native"`` (default for Pinecone): pass the filter to the vector database.
+  ChromaDB applies it before the vector search, which is exact but slow on
+  large collections when many records match; Pinecone applies it during the
+  search, so the over-fetch is not needed there.
+- ``"chroma"``: the same as ``"native"``, under its original name.
 """
 
 FILTER_STRATEGIES: tuple[str, ...] = get_args(FilterStrategy)
 
-_Hit = tuple[float, dict[str, Any]]
-"""One retrieved record: its distance and its metadata."""
+EmbeddingFunction = Callable[..., Any]
+"""Turns a list of texts into one vector each: ``embedding_function(input=texts)``.
 
-
-class UnsupportedFilterError(ValueError):
-    """Raised when a `where` filter cannot be evaluated in Python."""
+Any of `aatm.embedding_functions` works, as does any ``chromadb.EmbeddingFunction``.
+An ``embed_query`` method, when present, is used for queries.
+"""
 
 
 def _values_equal(a: Any, b: Any) -> bool:
@@ -192,65 +200,60 @@ class BaseRetriever(PipelineBaseClass, ABC):
         return self.retrieve(queries, *args, **kwargs)
 
 
-class ChromaDBRetriever(BaseRetriever):
-    """Retrieve candidate expressions from a ChromaDB collection.
+class VectorStoreRetriever(BaseRetriever):
+    """Retrieve candidate expressions from a vector database.
 
-    This retriever uses a ChromaDB client and collection to perform vector-based
-    retrieval over stored expressions. Retrieved metadata and distances are
+    Queries are embedded with ``embedding_function`` and sent to a
+    `aatm.vector_stores.VectorStore`. Retrieved metadata and distances are
     converted into ``RetrievedExpressionMetadata`` objects and returned in a
-    standardized ``RetrieverResults`` container.
+    standardized ``RetrieverResults`` container. Distances mean the same on
+    every backend (see `aatm.vector_stores`), so selectors and thresholds do
+    not depend on it.
 
     The retriever supports default filtering through a ``where`` clause and a
     configurable default number of results per query.
 
-    A ``where`` filter makes ChromaDB's own query slow on large collections:
-    ChromaDB fetches every record that matches the filter before the vector
-    search. ``filter_strategy`` chooses how the filter is applied instead (see
-    `FilterStrategy`). With the default, ``"overfetch_fallback"``, the
-    retriever first queries without the filter for
-    ``max(top_k * overfetch_factor, min_overfetch)`` results, then, for the
-    queries still short of ``top_k`` matches, for ``max_overfetch`` results,
-    and only then falls back to ChromaDB's filtered query. With an exact
-    search, the ``top_k`` matches that survive would be exactly the filtered
-    query's results. The vector index is approximate, so in practice both
-    methods miss some neighbours, in different places: the over-fetch misses
-    matches that sit deep in the unfiltered ranking (a filter that fits the
-    query poorly), while ChromaDB's filtered search can miss even close
-    matches. Raise ``min_overfetch`` / ``max_overfetch`` for deeper filters.
+    ``filter_strategy`` chooses how a ``where`` filter is applied (see
+    `FilterStrategy`). With ``"overfetch_fallback"``, the retriever first
+    queries without the filter for ``max(top_k * overfetch_factor,
+    min_overfetch)`` results, then, for the queries still short of ``top_k``
+    matches, for ``max_overfetch`` results, and only then falls back to the
+    database's filtered query. With an exact search, the ``top_k`` matches that
+    survive would be exactly the filtered query's results. Vector indexes are
+    approximate, so in practice both methods miss some neighbours, in different
+    places: the over-fetch misses matches that sit deep in the unfiltered
+    ranking (a filter that fits the query poorly), while ChromaDB's filtered
+    search can miss even close matches. Raise ``min_overfetch`` /
+    ``max_overfetch`` for deeper filters. Query sizes are capped at the
+    store's ``max_top_k``.
     """
 
     def __init__(
         self,
-        client: chromadb.ClientAPI,
-        collection_name: str,
+        store: VectorStore,
         embedding_function: EmbeddingFunction,
         top_k: int = 10,
         where: dict[str, Any] | None = None,
-        filter_strategy: FilterStrategy = "overfetch_fallback",
+        filter_strategy: FilterStrategy | None = None,
         overfetch_factor: int = 20,
         min_overfetch: int = 1000,
         max_overfetch: int = 5000,
         *args: Any,
         **kwargs: Any,
     ):
-        """Initialize the ChromaDB retriever.
-
-        This constructor stores the ChromaDB client configuration, creates or
-        retrieves the target collection, and sets default retrieval parameters
-        such as the number of results to return and any metadata filter to
-        apply.
+        """Initialize the retriever.
 
         Args:
-            client: ChromaDB client used to access the vector database.
-            collection_name: Name of the ChromaDB collection to query.
-            embedding_function: Embedding function used by the collection for
-                query encoding.
+            store: The vector database index to query.
+            embedding_function: Embeds the queries, with the model the index
+                was built with.
             top_k: Default number of candidate results to return per query.
             where: Optional metadata filter applied to all queries unless
                 overridden at retrieval time.
-            filter_strategy: How a ``where`` filter is applied. One of
-                ``"overfetch_fallback"`` (default), ``"overfetch"`` or
-                ``"chroma"``. See `FilterStrategy`.
+            filter_strategy: How a ``where`` filter is applied. See
+                `FilterStrategy`. Defaults to ``"native"`` for a store that
+                filters during the search (Pinecone), and to
+                ``"overfetch_fallback"`` otherwise (ChromaDB).
             overfetch_factor: The first unfiltered query fetches
                 ``top_k * overfetch_factor`` results (at least
                 ``min_overfetch``).
@@ -261,13 +264,30 @@ class ChromaDBRetriever(BaseRetriever):
             *args: Additional positional arguments reserved for compatibility.
             **kwargs: Additional keyword arguments reserved for compatibility.
         """
-        self.client = client
-        self.collection_name = collection_name
+        self.store = store
         self.embedding_function = embedding_function
-        self.collection = self.client.get_or_create_collection(
-            collection_name,
-            embedding_function=embedding_function,
+        if filter_strategy is None:
+            filter_strategy = (
+                "native" if store.filters_during_search else "overfetch_fallback"
+            )
+        self._configure(
+            top_k,
+            where,
+            filter_strategy,
+            overfetch_factor,
+            min_overfetch,
+            max_overfetch,
         )
+
+    def _configure(
+        self,
+        top_k: int,
+        where: dict[str, Any] | None,
+        filter_strategy: FilterStrategy,
+        overfetch_factor: int,
+        min_overfetch: int,
+        max_overfetch: int,
+    ) -> None:
         self.top_k = top_k
         self.where = where
         self.filter_strategy = _check_strategy(filter_strategy)
@@ -279,6 +299,15 @@ class ChromaDBRetriever(BaseRetriever):
         self.min_overfetch = min_overfetch
         self.max_overfetch = max_overfetch
 
+    @property
+    def max_query_size(self) -> int | None:
+        """Largest number of results one query may ask for, or ``None``."""
+        return self.store.max_top_k
+
+    def content_fingerprint(self) -> dict[str, Any] | None:
+        """Identify the index content, for the coding cache (`aatm.omop.cache`)."""
+        return self.store.fingerprint()
+
     def retrieve(
         self,
         queries: List[str],
@@ -288,16 +317,16 @@ class ChromaDBRetriever(BaseRetriever):
         *args,
         **kwargs,
     ) -> RetrieverResults:
-        """Retrieve nearest candidates for the given queries from ChromaDB.
+        """Retrieve nearest candidates for the given queries.
 
-        This method submits the provided query strings to the configured ChromaDB
-        collection, optionally overriding the default metadata filter and number
-        of returned results. It then converts the raw ChromaDB response into
+        This method submits the provided query strings to the vector database,
+        optionally overriding the default metadata filter and number of
+        returned results. It then converts the raw response into
         ``RetrievedExpressionMetadata`` objects grouped by query and wraps them
         in a ``RetrieverResults`` instance.
 
         Args:
-            queries: List of query strings to search for in the collection.
+            queries: List of query strings to search for.
             where: Optional metadata filter to apply to this retrieval call. If
                 not provided, the retriever's default filter is used.
             top_k: Optional number of results to return per query. If not
@@ -312,9 +341,9 @@ class ChromaDBRetriever(BaseRetriever):
         Raises:
             UnsupportedFilterError: With ``filter_strategy="overfetch"``, if the
                 filter has a shape `is_supported_filter` rejects. The default
-                strategy hands such filters to ChromaDB instead.
-            Exception: Propagates errors raised by the underlying ChromaDB
-                client or collection query operation.
+                strategy hands such filters to the database instead.
+            Exception: Propagates errors raised by the underlying vector
+                database client.
         """
         n_results = top_k if top_k is not None else self.top_k
         where = where if where is not None else self.where
@@ -325,7 +354,7 @@ class ChromaDBRetriever(BaseRetriever):
         hits: list[list[_Hit]]
         if not where:
             hits = self._query(query_texts=queries, n_results=n_results)
-        elif strategy == "chroma" or (
+        elif strategy in ("native", "chroma") or (
             strategy == "overfetch_fallback" and not is_supported_filter(where)
         ):
             hits = self._query(query_texts=queries, n_results=n_results, where=where)
@@ -333,7 +362,7 @@ class ChromaDBRetriever(BaseRetriever):
             if not is_supported_filter(where):
                 raise UnsupportedFilterError(
                     f"Cannot evaluate filter in Python: {where!r}. Use "
-                    "filter_strategy='chroma' or 'overfetch_fallback' for it."
+                    "filter_strategy='native' or 'overfetch_fallback' for it."
                 )
             hits = self._overfetch(
                 queries,
@@ -358,7 +387,11 @@ class ChromaDBRetriever(BaseRetriever):
     def overfetch_sizes(self, top_k: int) -> list[int]:
         """The sizes of the unfiltered queries the over-fetch runs, in order."""
         first = max(top_k * self.overfetch_factor, self.min_overfetch)
-        return [first, self.max_overfetch] if self.max_overfetch > first else [first]
+        second = self.max_overfetch
+        cap = self.max_query_size
+        if cap is not None:
+            first, second = min(first, cap), min(second, cap)
+        return [first, second] if second > first else [first]
 
     def _overfetch(
         self,
@@ -400,28 +433,155 @@ class ChromaDBRetriever(BaseRetriever):
         return hits
 
     def _embed_queries(self, queries: List[str]) -> Any:
-        """Embed query texts the way ChromaDB does for `query_texts`."""
+        """Embed query texts, with ``embed_query`` when the function has one."""
         embed_query = getattr(self.embedding_function, "embed_query", None)
         if callable(embed_query):
             return embed_query(input=queries)
         return self.embedding_function(input=queries)
 
-    def _query(self, n_results: int, **kwargs: Any) -> list[list[_Hit]]:
+    def _query(
+        self,
+        n_results: int,
+        query_texts: List[str] | None = None,
+        query_embeddings: Sequence[Any] | None = None,
+        where: dict[str, Any] | None = None,
+    ) -> list[list[_Hit]]:
+        """Run one query per text or embedding and return its (distance, metadata)."""
+        if query_embeddings is None:
+            assert query_texts is not None, "query_texts or query_embeddings needed"
+            query_embeddings = list(self._embed_queries(query_texts))
+        if self.max_query_size is not None:
+            n_results = min(n_results, self.max_query_size)
+        return self.store.query(query_embeddings, top_k=n_results, where=where)
+
+
+class ChromaDBRetriever(VectorStoreRetriever):
+    """Retrieve candidate expressions from a ChromaDB collection.
+
+    This retriever uses a ChromaDB client and collection, local or in Chroma
+    Cloud, to perform vector-based retrieval over stored expressions. See
+    `VectorStoreRetriever` for the filter strategies.
+
+    A ``where`` filter makes ChromaDB's own query slow on large collections:
+    ChromaDB fetches every record that matches the filter before the vector
+    search. That is why the default ``filter_strategy`` here is
+    ``"overfetch_fallback"``.
+    """
+
+    def __init__(
+        self,
+        client: chromadb.ClientAPI,
+        collection_name: str,
+        embedding_function: EmbeddingFunction,
+        top_k: int = 10,
+        where: dict[str, Any] | None = None,
+        filter_strategy: FilterStrategy = "overfetch_fallback",
+        overfetch_factor: int = 20,
+        min_overfetch: int = 1000,
+        max_overfetch: int = 5000,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        """Initialize the ChromaDB retriever.
+
+        This constructor stores the ChromaDB client configuration, creates or
+        retrieves the target collection, and sets default retrieval parameters
+        such as the number of results to return and any metadata filter to
+        apply.
+
+        Args:
+            client: ChromaDB client used to access the vector database.
+            collection_name: Name of the ChromaDB collection to query.
+            embedding_function: Embedding function used by the collection for
+                query encoding.
+            top_k: Default number of candidate results to return per query.
+            where: Optional metadata filter applied to all queries unless
+                overridden at retrieval time.
+            filter_strategy: How a ``where`` filter is applied. One of
+                ``"overfetch_fallback"`` (default), ``"overfetch"`` or
+                ``"native"`` (also ``"chroma"``). See `FilterStrategy`.
+            overfetch_factor: The first unfiltered query fetches
+                ``top_k * overfetch_factor`` results (at least
+                ``min_overfetch``).
+            min_overfetch: Lower bound on the first unfiltered query's size.
+            max_overfetch: Size of the second, wider unfiltered query, run for
+                the queries the first one left short of ``top_k`` matches.
+                Skipped when it is not larger than the first query.
+            *args: Additional positional arguments reserved for compatibility.
+            **kwargs: Additional keyword arguments reserved for compatibility.
+        """
+        from .vector_stores import ChromaVectorStore
+
+        self.client = client
+        self.collection_name = collection_name
+        self.embedding_function = embedding_function
+        self.collection = self.client.get_or_create_collection(
+            collection_name,
+            embedding_function=embedding_function,  # type: ignore[arg-type]
+        )
+        self.store = ChromaVectorStore(self.collection)
+        self._configure(
+            top_k,
+            where,
+            filter_strategy,
+            overfetch_factor,
+            min_overfetch,
+            max_overfetch,
+        )
+
+    def content_fingerprint(self) -> dict[str, Any] | None:
+        """Identify the collection content, for the coding cache."""
+        return {
+            "collection_id": str(self.collection.id),
+            "count": self.collection.count(),
+        }
+
+    def _query(self, n_results: int, **kwargs: Any) -> list[list[_Hit]]:  # type: ignore[override]
         """Run one ChromaDB query and return each query's (distance, metadata)."""
+        if kwargs.get("where") is None:
+            kwargs.pop("where", None)
+        for key in ("query_texts", "query_embeddings"):
+            if kwargs.get(key) is None:
+                kwargs.pop(key, None)
         results = self.collection.query(
             n_results=n_results,
             include=["metadatas", "distances"],
             **kwargs,
         )
-        assert results["distances"] is not None, "distances must not be None"
-        assert results["metadatas"] is not None, "metadatas must not be None"
-        return [
-            [
-                (distance, dict(metadata or {}))
-                for distance, metadata in zip(distances, metadatas)
-            ]
-            for distances, metadatas in zip(results["distances"], results["metadatas"])
-        ]
+        return chroma_hits(results)
+
+
+class PineconeRetriever(VectorStoreRetriever):
+    """Retrieve candidate expressions from a Pinecone index.
+
+    Pinecone applies metadata filters during the vector search, so the default
+    ``filter_strategy`` is ``"native"``: domain and vocabulary filters go
+    straight to Pinecone, without the over-fetch ChromaDB needs. The over-fetch
+    strategies still work, with query sizes capped at Pinecone's maximum
+    ``top_k`` (10,000).
+
+    Build one with `aatm.registries.retrievers.load_retriever` and
+    ``AATM_VECTOR_DB=pinecone``, or from an open index:
+
+    ```python
+    from aatm.vector_db import PineconeConnection
+    from aatm.vector_stores import PineconeVectorStore
+
+    connection = PineconeConnection.from_env()
+    store = PineconeVectorStore.open(connection.client(), "aatm-expressions-qwen3-06b")
+    retriever = PineconeRetriever(store, embedding_function)
+    ```
+    """
+
+    @property
+    def index_name(self) -> str:
+        """Name of the Pinecone index."""
+        return self.store.name
+
+    @property
+    def collection_name(self) -> str:
+        """Name of the Pinecone index, under the name `ChromaDBRetriever` uses."""
+        return self.store.name
 
 
 def _check_strategy(strategy: str) -> FilterStrategy:

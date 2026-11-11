@@ -107,7 +107,11 @@ def uses_context(coder: Any) -> bool:
 def retriever_filter(
     domain: Optional[str], vocabularies: Optional[Sequence[str]]
 ) -> Optional[dict[str, Any]]:
-    """Build the ChromaDB metadata filter that restricts retrieval to a domain and vocabularies."""
+    """Build the metadata filter that restricts retrieval to a domain and vocabularies.
+
+    The filter uses the backend-neutral (ChromaDB-style) format of
+    `aatm.vector_stores`, which every vector database accepts.
+    """
     conditions: list[dict[str, Any]] = []
     if domain is not None:
         conditions.append({"std_domain_id": domain})

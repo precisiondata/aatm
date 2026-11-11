@@ -2,7 +2,8 @@
 Provide a Streamlit-based search interface for the Any-to-Any Terminology Mapper.
 
 This module defines an interactive web application for querying a terminology
-retrieval system backed by ChromaDB. It exposes a simple search UI with
+retrieval system backed by a vector database (ChromaDB, locally or in Chroma
+Cloud, or Pinecone). It exposes a simple search UI with
 multiple tabs, supports cached retriever loading, and displays ranked candidate
 concepts with key metadata and confidence scores.
 
@@ -15,9 +16,7 @@ import dotenv
 
 from aatm.logs import configure_logging
 from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY, load_retriever
-from aatm.retrievers import (
-    ChromaDBRetriever,
-)
+from aatm.retrievers import VectorStoreRetriever
 
 dotenv.load_dotenv()
 
@@ -25,14 +24,14 @@ dotenv.load_dotenv()
 # Safe on Streamlit reruns: the handler is only added once.
 configure_logging()
 
-# Retrievers open their own client, local or Chroma Cloud depending on
-# AATM_VECTOR_DB (see `aatm.vector_db`).
+# Retrievers open their own client: local ChromaDB, Chroma Cloud or Pinecone,
+# depending on AATM_VECTOR_DB (see `aatm.vector_db`).
 
 
 @st.cache_resource
 def cached_load_retriever(
     retriever_name: str = "embeddinggemma-300M",
-) -> "ChromaDBRetriever":
+) -> VectorStoreRetriever:
     """Load and cache a retriever instance for the Streamlit application.
 
     This function wraps retriever loading with Streamlit's resource cache so
@@ -44,7 +43,7 @@ def cached_load_retriever(
             retriever registry.
 
     Returns:
-        A loaded ``ChromaDBRetriever`` instance corresponding to the requested
+        A loaded retriever instance corresponding to the requested
             retriever name.
 
     Raises:

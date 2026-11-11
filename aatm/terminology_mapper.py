@@ -39,7 +39,7 @@ from aatm.translators import BaseTranslator, EmptyTranslator
 from aatm.retrievers import BaseRetriever, ChromaDBRetriever
 from aatm.selectors import FirstResultSelector, BaseSelector
 from aatm.embedding_functions import GoogleEmbeddingFunction
-from aatm.vector_db import ChromaConnection
+from aatm.vector_db import ChromaConnection, resolve_vector_db_mode
 
 
 console = Console()
@@ -168,15 +168,19 @@ class TerminologyMapper:
         # Define retriever
         self.retriever: BaseRetriever
         if retriever is None:
-            # ChromaDB's default local path, or Chroma Cloud (see aatm.vector_db).
-            client = ChromaConnection.from_env(local_path="./chroma").client()
-            self.retriever = ChromaDBRetriever(
-                client=client,
-                collection_name="expressions",
-                embedding_function=GoogleEmbeddingFunction(
-                    model="gemini-embedding-001"
-                ),
-            )
+            if resolve_vector_db_mode() == "pinecone":
+                # Pinecone keeps one index per model (see aatm.vector_db).
+                self.retriever = load_retriever("gemini-embedding-001")
+            else:
+                # ChromaDB's default local path, or Chroma Cloud.
+                client = ChromaConnection.from_env(local_path="./chroma").client()
+                self.retriever = ChromaDBRetriever(
+                    client=client,
+                    collection_name="expressions",
+                    embedding_function=GoogleEmbeddingFunction(
+                        model="gemini-embedding-001"
+                    ),
+                )
 
         elif isinstance(retriever, str):
             self.retriever = load_retriever(retriever)

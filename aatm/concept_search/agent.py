@@ -437,7 +437,7 @@ class ConceptSearchAgent:
         vocabularies: Optional[Sequence[str]],
     ) -> list[Candidate]:
         method = getattr(self.tools, action)
-        # The tools block (SQLite, ChromaDB): run them off the event loop.
+        # The tools block (SQLite, the vector database): run them off the event loop.
         return await asyncio.to_thread(method, query, domain, vocabularies, self.top_k)
 
     async def _execute(

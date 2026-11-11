@@ -47,8 +47,21 @@ from aatm.precision import (
 )
 from aatm.data_models import ExpressionMetadata
 from aatm.timing_profiler import TimingProfiler
-from aatm.vector_db import ChromaConnection, call_with_retries
-from aatm.vector_db_writer import ChromaWriterProcess, WriteAck
+from aatm.vector_db import (
+    ChromaConnection,
+    PineconeConnection,
+    VectorDbConnection,
+    call_with_retries,
+    resolve_vector_db_mode,
+)
+from aatm.vector_db_writer import VectorStoreWriterProcess, WriteAck
+from aatm.vector_stores import (
+    PineconeVectorStore,
+    VectorStore,
+    create_pinecone_index,
+    delete_pinecone_index,
+    pinecone_index_exists,
+)
 
 logger = get_logger(__name__)
 console = Console()
@@ -558,6 +571,14 @@ provider limits on inputs per request.
 """
 
 
+PINECONE_MAX_CHUNK_SIZE = 10_000
+"""Largest chunk for a Pinecone build.
+
+Pinecone has no single batch limit like ChromaDB's: the store splits each chunk
+into upserts within Pinecone's record and request-size limits.
+"""
+
+
 def resolve_chunk_size(
     chunk_size: int | None, is_local: bool, max_chromadb_batch_size: int
 ) -> int:
@@ -600,8 +621,10 @@ def build_local_vector_database(
     """Build or repair the vector database for terminology mapping.
 
     The database is local by default. With ``vector_db="cloud"`` (or
-    ``AATM_VECTOR_DB=cloud``) it is built in Chroma Cloud instead; see
-    `aatm.vector_db`. Embeddings are still computed on this machine.
+    ``AATM_VECTOR_DB=cloud``) it is built in Chroma Cloud instead, and with
+    ``vector_db="pinecone"`` in a Pinecone index; see `aatm.vector_db`.
+    Embeddings are still computed on this machine. A new Pinecone index gets
+    its dimension from one probe embedding.
 
     Args:
         embedding_model_name: Registry key identifying the embedding model
@@ -635,8 +658,8 @@ def build_local_vector_database(
             This makes GPU timings more accurate but adds overhead.
         profile_summary_every_n_batches: Log cumulative profile summary every N
             processed batches.
-        vector_db: ``local`` or ``cloud``. If not provided, ``AATM_VECTOR_DB``
-            decides, and otherwise ``local``.
+        vector_db: ``local``, ``cloud`` or ``pinecone``. If not provided,
+            ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
 
     Returns:
         None.
@@ -672,10 +695,22 @@ def build_local_vector_database(
         synchronize_cuda=profile_sync_cuda,
     )
 
-    connection, collection_name = spec.chroma_location(vector_db)
+    connection: VectorDbConnection
     client: Any | None = None
+    # Set in Pinecone mode only; `client` is a ChromaDB client otherwise.
+    pinecone_client: Any | None = None
 
-    if connection.is_cloud:
+    if resolve_vector_db_mode(vector_db) == "pinecone":
+        if vector_db_dir is not None:
+            raise ValueError("vector_db_dir only applies to a local vector database.")
+        connection, collection_name = spec.pinecone_location()
+        console.print(f"Using {connection.describe()}, index '{collection_name}'")
+        # Opening the client does not authenticate; the first call does.
+        with profiler.time_block("pinecone_client_init"):
+            pinecone_client = connection.client()
+        already_exists = pinecone_index_exists(pinecone_client, collection_name)
+    elif (location := spec.chroma_location(vector_db))[0].is_cloud:
+        connection, collection_name = location
         if vector_db_dir is not None:
             raise ValueError("vector_db_dir only applies to a local vector database.")
         console.print(f"Using {connection.describe()}, collection '{collection_name}'")
@@ -684,6 +719,7 @@ def build_local_vector_database(
             client = connection.client()
         already_exists = get_existing_collection(client, collection_name) is not None
     else:
+        collection_name = location[1]
         if vector_db_dir is not None and not vector_db_dir.exists():
             raise ValueError("vector_db_dir does not exist")
 
@@ -711,7 +747,9 @@ def build_local_vector_database(
 
         if user_preference == "Overwrite":
             with profiler.time_block("delete_existing_vector_db"):
-                if client is not None:
+                if pinecone_client is not None:
+                    delete_pinecone_index(pinecone_client, collection_name)
+                elif client is not None:
                     client.delete_collection(collection_name)
                 else:
                     shutil.rmtree(vector_db_dir)  # type: ignore[arg-type]
@@ -729,23 +767,37 @@ def build_local_vector_database(
 
     console.print(f"Creating vector database in {connection.describe()}...")
 
-    if client is None:
-        with profiler.time_block("chromadb_client_init"):
-            client = connection.client()
-
-    existing_collection = get_existing_collection(client, collection_name)
+    # Metadata recorded on the existing collection or index, None if there is none.
+    existing_metadata: dict[str, Any] | None
+    existing_collection: Any | None = None
+    if pinecone_client is not None:
+        existing_metadata = (
+            PineconeVectorStore.open(pinecone_client, collection_name).index_metadata()
+            if pinecone_index_exists(pinecone_client, collection_name)
+            else None
+        )
+    else:
+        if client is None:
+            with profiler.time_block("chromadb_client_init"):
+                client = connection.client()
+        existing_collection = get_existing_collection(client, collection_name)
+        existing_metadata = (
+            None
+            if existing_collection is None
+            else dict(existing_collection.metadata or {})
+        )
 
     model_kwargs: dict[str, Any] = {}
     collection_metadata: dict[str, Any] | None = None
 
     if is_local:
-        if existing_collection is None:
+        if existing_metadata is None:
             build_dtype = requested_dtype or default_embedding_dtype(
                 spec.model_id, get_device()
             )
         else:
             build_dtype = dtype_for_existing_collection(
-                (existing_collection.metadata or {}).get(COLLECTION_DTYPE_KEY),
+                existing_metadata.get(COLLECTION_DTYPE_KEY),
                 requested_dtype,
             )
         model_kwargs["dtype"] = build_dtype
@@ -779,12 +831,29 @@ def build_local_vector_database(
     chunk_size = resolve_chunk_size(
         chunk_size,
         is_local=is_local,
-        max_chromadb_batch_size=client.get_max_batch_size(),
+        max_chromadb_batch_size=(
+            PINECONE_MAX_CHUNK_SIZE if client is None else client.get_max_batch_size()
+        ),
     )
 
-    if existing_collection is None:
+    if pinecone_client is not None:
+        if existing_metadata is None:
+            # A Pinecone index has a fixed dimension, so embed once to learn it.
+            with profiler.time_block("create_collection"):
+                probe = np.asarray(
+                    ensure_cpu_embeddings(embedding_function(["dimension probe"]))
+                )
+                create_pinecone_index(
+                    pinecone_client,
+                    collection_name,
+                    dimension=int(probe.shape[-1]),
+                    cloud=connection.cloud,  # type: ignore[union-attr]
+                    region=connection.region,  # type: ignore[union-attr]
+                    tags=collection_metadata,
+                )
+    elif existing_collection is None:
         with profiler.time_block("create_collection"):
-            client.create_collection(
+            client.create_collection(  # type: ignore[union-attr]
                 collection_name,
                 embedding_function=embedding_function,
                 metadata=collection_metadata,
@@ -793,14 +862,14 @@ def build_local_vector_database(
     # From here on the writer process owns the database. Two clients in different
     # processes must not share one directory, so release this one first.
     del existing_collection
-    del client
+    del client, pinecone_client
     release_chromadb_clients()
 
     dataset_paths = sorted(Path(".aatm/datasets").glob("*.csv"))
 
     with (
         GpuMemoryLimit(enabled=guard_gpu_memory) as memory_limit,
-        ChromaWriterProcess(connection, collection_name) as writer,
+        VectorStoreWriterProcess(connection, collection_name) as writer,
         BackgroundIterator(
             prepare_chunks(
                 dataset_paths,
@@ -939,38 +1008,56 @@ class UploadSummary:
     skipped: int
 
 
+UPLOAD_TARGETS = ("cloud", "pinecone")
+"""Where `upload_vector_database_to_cloud` can copy a local index to."""
+
+PINECONE_UPLOAD_BATCH_SIZE = 1000
+"""Rows checked and written per round-trip when uploading to Pinecone.
+
+The store splits each batch into upserts within Pinecone's limits.
+"""
+
+
 def upload_vector_database_to_cloud(
     embedding_model_name: str,
     vector_db_dir: Path | None = None,
     write_batch_size: int | None = None,
     read_page_size: int = UPLOAD_READ_PAGE_SIZE,
-    cloud_connection: ChromaConnection | None = None,
+    cloud_connection: VectorDbConnection | None = None,
+    to: str = "cloud",
 ) -> UploadSummary:
-    """Copy a local vector database to Chroma Cloud without re-embedding.
+    """Copy a local vector database to Chroma Cloud or Pinecone without re-embedding.
 
     Embeddings, documents and metadata are read from the local collection and
     added to the model's cloud collection (see
-    `ChromaRetrieverModelSpec.cloud_collection_name`), which is created with the
-    local collection's metadata if needed. Rows already in the cloud are
-    skipped, so an interrupted upload can simply be run again.
+    `ChromaRetrieverModelSpec.cloud_collection_name`) or Pinecone index (see
+    `ChromaRetrieverModelSpec.pinecone_index_name`). The collection or index is
+    created with the local collection's metadata if needed; a new Pinecone
+    index takes its dimension from the local embeddings. Rows already in the
+    destination are skipped, so an interrupted upload can simply be run again.
 
     Args:
         embedding_model_name: Registry key of the embedding model whose index
             to upload.
         vector_db_dir: Local database directory. Defaults to the registry path.
-        write_batch_size: Rows per cloud write. Defaults to, and is capped at,
-            the cloud's maximum batch size.
+        write_batch_size: Rows per write. For Chroma Cloud it defaults to, and
+            is capped at, the cloud's maximum batch size; for Pinecone it
+            defaults to `PINECONE_UPLOAD_BATCH_SIZE`, and each batch is split
+            into upserts within Pinecone's limits.
         read_page_size: Rows read from the local database at a time.
-        cloud_connection: Cloud connection. Defaults to the one configured by
-            ``CHROMA_API_KEY`` and related variables (see `aatm.vector_db`).
+        cloud_connection: Destination connection. Defaults to the one
+            configured for ``to`` (see `aatm.vector_db`).
+        to: ``cloud`` (Chroma Cloud, the default) or ``pinecone``. Ignored when
+            ``cloud_connection`` is given.
 
     Returns:
         How many rows were uploaded and skipped.
 
     Raises:
-        ValueError: If the local database or collection does not exist, or the
-            sizes are not positive.
-        VectorDatabaseConfigError: If the cloud configuration is missing.
+        ValueError: If the local database or collection does not exist, the
+            sizes are not positive, ``to`` is unknown, or an existing Pinecone
+            index was built with another embedding precision.
+        VectorDatabaseConfigError: If the destination configuration is missing.
     """
     from aatm.registries.retrievers import (
         CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry,
@@ -982,17 +1069,23 @@ def upload_vector_database_to_cloud(
         raise ValueError("read_page_size must be > 0")
     if write_batch_size is not None and write_batch_size <= 0:
         raise ValueError("write_batch_size must be > 0")
+    if cloud_connection is None and to not in UPLOAD_TARGETS:
+        raise ValueError(
+            f"Unknown upload destination '{to}'. Use one of: {', '.join(UPLOAD_TARGETS)}."
+        )
 
     local_dir = (vector_db_dir or Path(spec.chromadb_path)).resolve()
     if not local_dir.exists():
         raise ValueError(f"No local vector database at '{local_dir}'.")
 
     if cloud_connection is None:
-        cloud_connection = ChromaConnection.from_env(
-            local_path=str(local_dir), mode="cloud"
+        cloud_connection = (
+            PineconeConnection.from_env()
+            if to == "pinecone"
+            else ChromaConnection.from_env(local_path=str(local_dir), mode="cloud")
         )
     if not cloud_connection.is_cloud:
-        raise ValueError("cloud_connection must point at Chroma Cloud.")
+        raise ValueError("cloud_connection must point at Chroma Cloud or Pinecone.")
 
     local_client = ChromaConnection.local(str(local_dir)).client()
     local_collection = get_existing_collection(local_client, spec.collection_name)
@@ -1004,32 +1097,45 @@ def upload_vector_database_to_cloud(
 
     # Keep the build's metadata, e.g. the embedding precision for query encoding.
     collection_metadata = local_collection.metadata or None
-    cloud_client = cloud_connection.client()
-    collection_name = spec.cloud_collection_name
-    cloud_collection = call_with_retries(
-        lambda _: cloud_client.get_or_create_collection(
-            collection_name, metadata=collection_metadata
-        )
-    )
-
-    max_batch = cloud_client.get_max_batch_size()
-    batch_size = min(write_batch_size or max_batch, max_batch)
-
     total = local_collection.count()
+
+    store: VectorStore
+    retry: Callable[[Callable[[int], Any]], Any]
+    if isinstance(cloud_connection, PineconeConnection):
+        collection_name = spec.pinecone_index_name(cloud_connection)
+        store = _open_or_create_pinecone_index(
+            cloud_connection, collection_name, local_collection, collection_metadata
+        )
+        batch_size = write_batch_size or PINECONE_UPLOAD_BATCH_SIZE
+
+        # The Pinecone store retries each of its requests itself.
+        def retry(func: Callable[[int], Any]) -> Any:
+            return func(0)
+
+    else:
+        from aatm.vector_stores import ChromaVectorStore
+
+        collection_name = spec.cloud_collection_name
+        cloud_client = cloud_connection.client()
+        store = ChromaVectorStore(
+            call_with_retries(
+                lambda _: cloud_client.get_or_create_collection(
+                    collection_name, metadata=collection_metadata
+                )
+            )
+        )
+        max_batch = cloud_client.get_max_batch_size()
+        batch_size = min(write_batch_size or max_batch, max_batch)
+        retry = call_with_retries
+
     uploaded = 0
     skipped = 0
 
     console.print(
         f"Uploading {total} rows from '{local_dir}' to {cloud_connection.describe()}, "
-        f"collection '{collection_name}'..."
+        f"{'index' if isinstance(store, PineconeVectorStore) else 'collection'} "
+        f"'{collection_name}'..."
     )
-
-    def write(attempt: int, **batch: Any) -> None:
-        # A retried add may already have reached the server; upsert is idempotent.
-        if attempt == 0:
-            cloud_collection.add(**batch)
-        else:
-            cloud_collection.upsert(**batch)
 
     with Progress(*Progress.get_default_columns(), console=console) as progress:
         task = progress.add_task("Uploading embeddings", total=total)
@@ -1042,11 +1148,7 @@ def upload_vector_database_to_cloud(
             for start in range(0, len(page["ids"]), batch_size):
                 end = start + batch_size
                 ids = page["ids"][start:end]
-                present = set(
-                    call_with_retries(
-                        lambda _: cloud_collection.get(ids=ids, include=[])["ids"]
-                    )
-                )
+                present = retry(lambda _: store.existing_ids(ids))
                 keep = [
                     i for i, identifier in enumerate(ids) if identifier not in present
                 ]
@@ -1056,15 +1158,15 @@ def upload_vector_database_to_cloud(
                     embeddings = np.asarray(page["embeddings"][start:end])[keep]
                     documents = page["documents"][start:end]
                     metadatas = page["metadatas"][start:end]
-                    call_with_retries(
-                        partial(
-                            write,
-                            ids=[ids[i] for i in keep],
-                            embeddings=embeddings,
-                            documents=[documents[i] for i in keep],
-                            metadatas=[metadatas[i] for i in keep],
-                        )
-                    )
+                    batch: dict[str, Any] = {
+                        "ids": [ids[i] for i in keep],
+                        "embeddings": embeddings,
+                        "documents": [documents[i] for i in keep],
+                        "metadatas": [metadatas[i] for i in keep],
+                    }
+                    # A retried add may already have reached the server; the
+                    # store upserts on retries, which is idempotent.
+                    retry(lambda attempt: store.write(attempt=attempt, **batch))
                     uploaded += len(keep)
 
                 progress.advance(task, len(ids))
@@ -1072,10 +1174,47 @@ def upload_vector_database_to_cloud(
     del local_collection, local_client
     release_chromadb_clients()
 
-    console.print(f"Uploaded {uploaded} rows; {skipped} were already in the cloud.")
+    console.print(
+        f"Uploaded {uploaded} rows; {skipped} were already in the destination."
+    )
     return UploadSummary(
         collection_name=collection_name,
         total=total,
         uploaded=uploaded,
         skipped=skipped,
     )
+
+
+def _open_or_create_pinecone_index(
+    connection: PineconeConnection,
+    index_name: str,
+    local_collection: Any,
+    collection_metadata: dict[str, Any] | None,
+) -> PineconeVectorStore:
+    """Open the destination index of an upload, creating it like the local one."""
+    client = connection.client()
+    if not pinecone_index_exists(client, index_name):
+        first = local_collection.get(limit=1, include=["embeddings"])
+        if not first["ids"]:
+            raise ValueError(
+                "The local collection is empty; there is nothing to upload."
+            )
+        create_pinecone_index(
+            client,
+            index_name,
+            dimension=len(first["embeddings"][0]),
+            cloud=connection.cloud,
+            region=connection.region,
+            tags=collection_metadata,
+        )
+
+    store = PineconeVectorStore.open(client, index_name)
+    local_dtype = (collection_metadata or {}).get(COLLECTION_DTYPE_KEY)
+    remote_dtype = store.index_metadata().get(COLLECTION_DTYPE_KEY)
+    if local_dtype != remote_dtype:
+        raise ValueError(
+            f"The Pinecone index '{index_name}' records embedding precision "
+            f"{remote_dtype!r}, but the local database has {local_dtype!r}. "
+            "Uploading would mix precisions in one index; delete the index first."
+        )
+    return store

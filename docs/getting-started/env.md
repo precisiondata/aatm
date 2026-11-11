@@ -35,13 +35,22 @@ aatm.configure_logging(logging.DEBUG)  # everything
 logging.getLogger("aatm.data_models.extractors").setLevel(logging.DEBUG)  # one module only
 ```
 
-## Vector database location (Chroma Cloud)
+## Vector database (local, Chroma Cloud or Pinecone)
 
-By default, AATM builds one ChromaDB vector database per embedding model on this machine, under `.aatm/chroma_vector_dbs/`. To keep the index in [Chroma Cloud](https://trychroma.com/) instead, which lets a team build it once and share it, set:
+By default, AATM builds one ChromaDB vector database per embedding model on this machine, under `.aatm/chroma_vector_dbs/`. Two remote backends let a team build the index once and share it, and let machines without the disk space or GPU for a local index run retrieval:
+
+- [Chroma Cloud](https://trychroma.com/), with `AATM_VECTOR_DB=cloud`.
+- [Pinecone](https://www.pinecone.io/), with `AATM_VECTOR_DB=pinecone` (see [below](#pinecone)).
+
+Switching is configuration only: retrievers, `aatm map`, `aatm search-ui`, `aatm serve`, the concept search agent and `load_retriever()` all use the configured backend.
+
+### Chroma Cloud
+
+Set:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `AATM_VECTOR_DB` | `local` | `local` or `cloud`. `aatm init --vector-db` overrides it for the build. |
+| `AATM_VECTOR_DB` | `local` | `local`, `cloud` or `pinecone`. `aatm init --vector-db` overrides it for the build. |
 | `CHROMA_API_KEY` | unset | Chroma Cloud API key. Required in cloud mode. Never logged. |
 | `CHROMA_TENANT` | unset | Chroma Cloud tenant. Optional when the API key is scoped to one database. |
 | `CHROMA_DATABASE` | unset | Chroma Cloud database. Optional when the API key is scoped to one database. |
@@ -64,6 +73,54 @@ aatm vector-db upload -e embeddinggemma-300M  # copy an existing local index, wi
 ```
 
 `aatm vector-db upload` skips rows already in the cloud, so an interrupted upload resumes when run again. Cloud writes are retried with backoff on rate limits, server errors and network failures.
+
+### Pinecone
+
+Install the extra, then set the variables below:
+
+```bash
+pip install "aatm[pinecone]"   # or: uv sync --extra pinecone
+```
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AATM_VECTOR_DB` | `local` | Set to `pinecone`. |
+| `PINECONE_API_KEY` | unset | Pinecone API key. Required. Never logged. |
+| `PINECONE_INDEX_PREFIX` | `aatm-expressions` | Prefix of the index names. |
+| `PINECONE_CLOUD` | `aws` | Cloud of new serverless indexes. |
+| `PINECONE_REGION` | `us-east-1` | Region of new serverless indexes. |
+
+```env
+AATM_VECTOR_DB=pinecone
+PINECONE_API_KEY=your_pinecone_api_key
+```
+
+Every Pinecone index has a fixed dimension, so each embedding model gets its own serverless index, named `<prefix>-<model>` and made valid for Pinecone: lowercase `a-z`, `0-9` and `-`, at most 45 characters (e.g. `aatm-expressions-qwen3-06b`). `aatm init` creates it with the dimension of the model's embeddings.
+
+```bash
+aatm vector-db check --vector-db pinecone                     # list the models' indexes
+aatm init --vector-db pinecone                                # build the index in Pinecone
+aatm vector-db upload --to pinecone -e embeddinggemma-300M    # copy a local index, without re-embedding
+```
+
+How the index maps to Pinecone:
+
+- **Scores.** The indexes use the `euclidean` metric, whose score is the squared Euclidean distance, the same as ChromaDB's default `l2` distance. A record has the same `distance` on both backends, so the confidence score (`1 - distance`), selectors and thresholds work unchanged.
+- **Filters.** Domain and vocabulary filters (`retriever_filter`) are translated to Pinecone's syntax and applied **during** the vector search. So by default the Pinecone retriever passes them straight to Pinecone (`filter_strategy="native"`) instead of over-fetching. The over-fetch strategies still work, with query sizes capped at Pinecone's maximum `top_k` of 10,000. See [Metadata filters](concepts.md#metadata-filters).
+- **Records.** Pinecone has no document field and no null metadata. The expression text is stored in the metadata (as `expression`), and `None` values are left out. The embedding precision of local models is stored as an index tag (`aatm_embedding_dtype`), and queries are encoded in it.
+- **Writes** use `upsert`, which is idempotent, in requests within Pinecone's limits (1,000 records and 2 MB per request). Every request is retried with backoff on rate limits, server errors and network failures. A repair (`aatm init`, *Repair*) or a rerun of `aatm vector-db upload` only writes the missing records. Newly written records take a moment to become visible, so a repair right after a build may embed a few records again, which is harmless.
+
+### Choosing a backend
+
+| | Local ChromaDB | Chroma Cloud | Pinecone |
+|---|---|---|---|
+| Setup | None | API key | API key and `aatm[pinecone]` |
+| Shared across a team | No | Yes | Yes |
+| Disk and memory on this machine | Several GB per model | None | None |
+| Filtered queries (domain, vocabulary) | Over-fetch by default, because ChromaDB's own filtered query takes seconds on a full index | Same as local | Filtered during the search |
+| Cost | Free | Usage-based | Usage-based |
+
+Embeddings of local models are computed on the machine that runs the build, whichever backend stores them. To compare query time and recall on your own index, see `benchmarks/vector_db_backends`.
 
 ## Device selection
 
