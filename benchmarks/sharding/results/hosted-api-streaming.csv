@@ -1,0 +1,5 @@
+scenario,shards,extraction_concurrency,coder_concurrency,latency,sigma,coder_latency,retriever,chroma_dir,mapper_batch_size,rpm,notes,built,failed,wall_s,run_s,notes_per_min,run_notes_per_min,extraction_s,coding_s,building_s,coded_texts,cpu_s,peak_rss_mb
+instant,1,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,135.0,132.7,889.2,904.4,132.2,7.3,1.6,3502,12.4,187
+instant,4,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,138.9,136.5,863.8,879.1,526.1,8.0,1.4,3558,18.7,742
+retrieval,1,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,155.8,137.8,770.3,871.0,133.8,81.2,1.4,3503,119.4,2406
+retrieval,4,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,154.8,135.4,775.3,886.3,514.5,96.3,1.4,3558,173.5,8667

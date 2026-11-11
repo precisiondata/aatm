@@ -11,8 +11,8 @@ across shards, and the shards together hold the same rows as a single run.
 
 With a hosted API, one process spends its time waiting for the model, and the
 provider's rate limit applies to every process together: raise ``max_concurrency``
-and the rate limits rather than shard, with a ``chunk_size`` several times
-``max_concurrency``. Sharding on one machine pays off when a single process is busy (a
+and the rate limits rather than shard: one process keeps ``max_concurrency`` calls
+in flight. Sharding on one machine pays off when a single process is busy (a
 fast or local model, local embedding retrieval), at the cost of one copy of the
 models per process; and it is the way to use several machines or cluster jobs. See
 ``benchmarks/sharding`` in the repository.
