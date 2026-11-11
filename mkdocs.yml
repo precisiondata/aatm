@@ -46,6 +46,7 @@ nav:
       - Device selection: 'reference/device.md'
       - Local database utilities: 'reference/local_database_utils.md'
       - Vector database location: 'reference/vector_db.md'
+      - Vector stores: 'reference/vector_stores.md'
       - Logs: 'reference/logs.md'
       - Prompt helpers: 'reference/prompt_helpers.md'
 

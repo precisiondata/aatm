@@ -1,11 +1,11 @@
-"""Read from and write to a ChromaDB collection from a separate process.
+"""Read from and write to a vector database index from a separate process.
 
 ChromaDB's ``Collection.add`` runs in native code that keeps Python's global
 interpreter lock (GIL) for its whole duration, which is about a second per few
 thousand rows. In a thread of the same process that would also freeze the
 thread driving the GPU, so the GPU would sit idle during every write.
 
-`ChromaWriterProcess` moves all ChromaDB access into a child process, which has
+`VectorStoreWriterProcess` moves all vector database access into a child process, which has
 its own interpreter and its own GIL. The parent sends work over
 `multiprocessing` queues:
 
@@ -22,8 +22,10 @@ Duplicate IDs are harmless: ChromaDB ignores an ``add`` for an ID that already
 exists and keeps the first version.
 
 The parent must not keep its own ChromaDB client open on the same directory
-while the writer runs. For Chroma Cloud (see `aatm.vector_db`) that restriction
-does not apply, and the writer retries lookups and writes on transient errors.
+while the writer runs. For Chroma Cloud and Pinecone (see `aatm.vector_db`)
+that restriction does not apply, and lookups and writes are retried on
+transient errors. Every backend is reached through
+`aatm.vector_stores.VectorStore`, opened with the connection's ``open_store``.
 """
 
 from __future__ import annotations
@@ -39,7 +41,7 @@ from functools import partial
 from types import TracebackType
 from typing import Any
 
-from aatm.vector_db import ChromaConnection, call_with_retries
+from aatm.vector_db import ChromaConnection, VectorDbConnection, call_with_retries
 
 _STOP = None
 """Message telling a child loop to finish."""
@@ -65,7 +67,7 @@ class WriteAck:
 
 
 def _writer_main(
-    connection: ChromaConnection,
+    connection: VectorDbConnection,
     collection_name: str,
     check_requests: Any,
     check_results: Any,
@@ -74,35 +76,31 @@ def _writer_main(
 ) -> None:
     """Entry point of the writer process. Runs in the child."""
     try:
-        collection = connection.client().get_collection(collection_name)
+        store = connection.open_store(collection_name)
 
         # Network calls to Chroma Cloud can fail transiently; local calls do not.
+        # A Pinecone store retries its own calls, request by request.
         def retrying(func: Callable[[int], Any]) -> Any:
-            if connection.is_cloud:
+            if isinstance(connection, ChromaConnection) and connection.is_cloud:
                 return call_with_retries(func)
             return func(0)
 
         def write(attempt: int, **batch: Any) -> None:
             # A retried ``add`` may have reached the server before it failed, so
             # retries upsert the same rows instead, which is idempotent.
-            if attempt == 0:
-                collection.add(**batch)
-            else:
-                collection.upsert(**batch)
+            store.write(attempt=attempt, **batch)
 
         def serve_lookups() -> None:
             try:
                 while (request := check_requests.get()) is not _STOP:
                     seq, ids = request
-                    found = retrying(
-                        lambda _: collection.get(ids=ids, include=[])["ids"]
-                    )
-                    check_results.put((seq, found))
+                    found = retrying(lambda _: store.existing_ids(ids))
+                    check_results.put((seq, list(found)))
             except BaseException:
                 check_results.put(("error", traceback.format_exc()))
 
         lookup_thread = threading.Thread(
-            target=serve_lookups, name="aatm-chroma-lookups", daemon=True
+            target=serve_lookups, name="aatm-vector-db-lookups", daemon=True
         )
         lookup_thread.start()
 
@@ -129,12 +127,12 @@ def _writer_main(
         events.put(("error", traceback.format_exc()))
 
 
-class ChromaWriterProcess:
-    """Own a ChromaDB collection in a child process. See the module docstring."""
+class VectorStoreWriterProcess:
+    """Own a vector database index in a child process. See the module docstring."""
 
     def __init__(
         self,
-        target: str | ChromaConnection,
+        target: str | VectorDbConnection,
         collection_name: str,
         max_pending_writes: int = 2,
         poll_interval: float = 0.2,
@@ -144,9 +142,10 @@ class ChromaWriterProcess:
 
         Args:
             target: Directory of a local persistent ChromaDB database, or a
-                `ChromaConnection` (local or Chroma Cloud). Cloud calls are
-                retried on transient errors.
-            collection_name: Name of an existing collection in that database.
+                connection: a `ChromaConnection` (local or Chroma Cloud) or a
+                `aatm.vector_db.PineconeConnection`. Remote calls are retried
+                on transient errors.
+            collection_name: Name of an existing collection or index.
             max_pending_writes: Maximum number of batches queued for writing
                 before ``add`` blocks.
             poll_interval: How often, in seconds, blocked calls wake up to check
@@ -172,7 +171,7 @@ class ChromaWriterProcess:
                 self._add_requests,
                 self._events,
             ),
-            name="aatm-chroma-writer",
+            name="aatm-vector-db-writer",
             daemon=True,
         )
         self._poll_interval = poll_interval
@@ -180,7 +179,7 @@ class ChromaWriterProcess:
         self._check_seq = 0
         self._closed = False
 
-    def __enter__(self) -> ChromaWriterProcess:
+    def __enter__(self) -> VectorStoreWriterProcess:
         self._process.start()
         return self
 
@@ -221,7 +220,7 @@ class ChromaWriterProcess:
 
             if result[0] == "error":
                 raise VectorDatabaseWriterError(
-                    f"ChromaDB lookup failed in the writer process:\n{result[1]}"
+                    f"Vector database lookup failed in the writer process:\n{result[1]}"
                 )
 
             seq, found = result
@@ -337,7 +336,7 @@ class ChromaWriterProcess:
             return [WriteAck(seq=seq, n_added=n_added, add_seconds=add_seconds)]
         if event[0] == "error":
             raise VectorDatabaseWriterError(
-                f"ChromaDB write failed in the writer process:\n{event[1]}"
+                f"Vector database write failed in the writer process:\n{event[1]}"
             )
         return []
 
@@ -349,3 +348,7 @@ class ChromaWriterProcess:
         raise VectorDatabaseWriterError(
             f"Writer process exited unexpectedly with code {self._process.exitcode}"
         )
+
+
+ChromaWriterProcess = VectorStoreWriterProcess
+"""The writer's original name, from when it only wrote to ChromaDB."""

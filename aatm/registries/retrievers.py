@@ -1,13 +1,14 @@
 """
-Register and instantiate ChromaDB-backed retriever configurations.
+Register and instantiate vector-database-backed retriever configurations.
 
 This module defines the registry of supported embedding models used to build
-ChromaDB retrievers. Each registry entry stores the information required to
-construct a retriever, including the model identifier, embedding function
-class, collection name, and optional rate limit metadata.
+retrievers. Each registry entry stores the information required to construct a
+retriever, including the model identifier, embedding function class, collection
+name, and optional rate limit metadata.
 
-The module also provides a factory function for loading a configured
-``ChromaDBRetriever`` instance from a registered model name.
+The module also provides a factory function, `load_retriever`, which returns a
+``ChromaDBRetriever`` or a ``PineconeRetriever`` for a registered model name,
+depending on the configured vector database (see `aatm.vector_db`).
 """
 
 from dataclasses import dataclass
@@ -28,8 +29,13 @@ from ..embedding_functions import (
     Qwen3EmbeddingModels,
 )
 from ..precision import COLLECTION_DTYPE_KEY, dtype_for_queries
-from ..retrievers import ChromaDBRetriever
-from ..vector_db import ChromaConnection
+from ..retrievers import ChromaDBRetriever, PineconeRetriever, VectorStoreRetriever
+from ..vector_db import (
+    ChromaConnection,
+    PineconeConnection,
+    VectorDbConnection,
+    resolve_vector_db_mode,
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -106,6 +112,45 @@ class ChromaRetrieverModelSpec:
             return connection, self.cloud_collection_name
         return connection, self.collection_name
 
+    def pinecone_index_name(self, connection: PineconeConnection) -> str:
+        """Return the name of this model's Pinecone index.
+
+        Every Pinecone index has a fixed dimension, so each embedding model
+        gets its own, named ``<PINECONE_INDEX_PREFIX>-<name>`` and made valid
+        for Pinecone (see `aatm.vector_db.pinecone_index_name`).
+        """
+        return connection.index_name(self.name)
+
+    def pinecone_location(self) -> tuple[PineconeConnection, str]:
+        """Return the Pinecone connection and this model's index name.
+
+        Raises:
+            VectorDatabaseConfigError: If ``PINECONE_API_KEY`` is not set.
+        """
+        connection = PineconeConnection.from_env()
+        return connection, self.pinecone_index_name(connection)
+
+    def vector_db_location(
+        self, vector_db: str | None = None, local_path: str | None = None
+    ) -> tuple[VectorDbConnection, str]:
+        """Return where this retriever's index lives, for any vector database.
+
+        Args:
+            vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
+                ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
+            local_path: Directory of the local database. Defaults to
+                `chromadb_path`. Only used in local mode.
+
+        Returns:
+            The connection and the collection or index name.
+
+        Raises:
+            VectorDatabaseConfigError: If the configuration is invalid.
+        """
+        if resolve_vector_db_mode(vector_db) == "pinecone":
+            return self.pinecone_location()
+        return self.chroma_location(vector_db, local_path)
+
     @property
     def output_path(self) -> str:
         """Return the default output directory associated with this retriever.
@@ -180,25 +225,29 @@ CHROMADB_RETRIEVER_MODEL_REGISTRY: dict[str, ChromaRetrieverModelSpec] = {
 
 
 def load_retriever(
-    model_name: str, vector_db: str | None = None, **retriever_kwargs: Any
-) -> "ChromaDBRetriever":
-    """Instantiate a registered ChromaDB retriever by model name.
+    model_name: str,
+    vector_db: str | None = None,
+    local_path: str | None = None,
+    **retriever_kwargs: Any,
+) -> VectorStoreRetriever:
+    """Instantiate a registered retriever by model name.
 
     This function looks up a retriever specification in the model registry,
-    opens a ChromaDB client for the configured location (a local persistent
-    database, or Chroma Cloud, see `aatm.vector_db`), instantiates the
-    corresponding embedding function, and returns a configured
-    ``ChromaDBRetriever``.
+    opens the configured vector database (a local persistent ChromaDB
+    database, Chroma Cloud or Pinecone, see `aatm.vector_db`), instantiates the
+    corresponding embedding function, and returns a configured retriever.
 
     Args:
         model_name: Registry name of the retriever model to instantiate.
-        vector_db: ``local`` or ``cloud``. If ``None``, ``AATM_VECTOR_DB``
-            decides, and otherwise ``local``.
-        **retriever_kwargs: Passed on to ``ChromaDBRetriever``, e.g. ``top_k``,
+        vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
+            ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
+        local_path: Directory of the local database, in local mode. Defaults
+            to the model's directory under ``.aatm/chroma_vector_dbs``.
+        **retriever_kwargs: Passed on to the retriever, e.g. ``top_k``,
             ``filter_strategy`` or ``overfetch_factor``.
 
     Returns:
-        A configured ``ChromaDBRetriever`` instance for the requested model.
+        A ``ChromaDBRetriever`` (local or cloud) or a ``PineconeRetriever``.
 
     Raises:
         ValueError: If the provided model name is not present in the retriever
@@ -212,7 +261,10 @@ def load_retriever(
             f"Unknown retriever model '{model_name}'. Available models: {available}"
         ) from e
 
-    connection, collection_name = spec.chroma_location(vector_db)
+    if resolve_vector_db_mode(vector_db) == "pinecone":
+        return _load_pinecone_retriever(spec, **retriever_kwargs)
+
+    connection, collection_name = spec.chroma_location(vector_db, local_path)
     client = connection.client()
 
     # Encode queries in the precision the database was built with.
@@ -236,3 +288,43 @@ def load_retriever(
         **retriever_kwargs,
     )
     return retriever
+
+
+def _query_model_kwargs(
+    spec: ChromaRetrieverModelSpec, index_metadata: dict[str, Any]
+) -> dict[str, Any]:
+    """Embedding function arguments to encode queries like the index was built."""
+    if not getattr(spec.embedding_function_cls, "is_local", False):
+        return {}
+    dtype = dtype_for_queries(index_metadata.get(COLLECTION_DTYPE_KEY), get_device())
+    return {} if dtype is None else {"dtype": dtype}
+
+
+def _load_pinecone_retriever(
+    spec: ChromaRetrieverModelSpec, **retriever_kwargs: Any
+) -> PineconeRetriever:
+    """Open a model's Pinecone index and return a retriever for it.
+
+    Raises:
+        ValueError: If the index does not exist or Pinecone is not configured.
+    """
+    from ..vector_stores import PineconeVectorStore, pinecone_index_exists
+
+    connection, index_name = spec.pinecone_location()
+    client = connection.client()
+    if not pinecone_index_exists(client, index_name):
+        raise ValueError(
+            f"Pinecone has no index '{index_name}' for '{spec.name}'. Build it with "
+            f"`aatm init --vector-db pinecone --embedding-model {spec.name}`, or copy "
+            f"a local index with `aatm vector-db upload --to pinecone -e {spec.name}`."
+        )
+    store = PineconeVectorStore.open(client, index_name)
+    model_kwargs = _query_model_kwargs(spec, store.index_metadata())
+    return PineconeRetriever(
+        store=store,
+        embedding_function=spec.embedding_function_cls(
+            model=spec.model_id,
+            **model_kwargs,  # type: ignore[call-arg]
+        ),
+        **retriever_kwargs,
+    )

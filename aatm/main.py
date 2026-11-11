@@ -245,8 +245,9 @@ def init(
         typer.Option(
             "--vector-db",
             help=(
-                "Where to build the vector database: 'local' (on this machine) "
-                "or 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY). "
+                "Where to build the vector database: 'local' (ChromaDB on this "
+                "machine), 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY) "
+                "or 'pinecone' (configured with PINECONE_API_KEY). "
                 "Overrides AATM_VECTOR_DB. Defaults to 'local'."
             ),
             show_default=False,
@@ -279,9 +280,9 @@ def init(
         standard_vocabs: List of standard vocabularies to include in the
             mapping datasets. If not provided, the user is prompted to
             select one or more interactively.
-        vector_db: Where to build the vector database, ``local`` or
-            ``cloud``. If not provided, `AATM_VECTOR_DB` is used, and
-            otherwise ``local``.
+        vector_db: Where to build the vector database, ``local``,
+            ``cloud`` or ``pinecone``. If not provided, `AATM_VECTOR_DB` is
+            used, and otherwise ``local``.
 
     Raises:
         typer.Exit: If the vocabulary directory does not exist, if the
@@ -313,6 +314,11 @@ def init(
         Build the vector database in Chroma Cloud (needs CHROMA_API_KEY):
 
             $ aatm init --vector-db cloud
+
+        Build the vector database in Pinecone (needs PINECONE_API_KEY and
+        the `aatm[pinecone]` extra):
+
+            $ aatm init --vector-db pinecone
     """
     # Setup local directories
     LOCAL_HELPER_PATH.mkdir(exist_ok=True, parents=True)
@@ -360,12 +366,18 @@ def init(
             raise typer.Exit()
 
     # Validate the vector database settings before the long build steps.
-    from aatm.vector_db import ChromaConnection, VectorDatabaseConfigError
+    from aatm.vector_db import (
+        VectorDatabaseConfigError,
+        connection_from_env,
+        import_pinecone,
+    )
 
     try:
-        vector_db_connection = ChromaConnection.from_env(
+        vector_db_connection = connection_from_env(
             local_path=".aatm/chroma_vector_dbs", mode=vector_db
         )
+        if vector_db_connection.mode == "pinecone":
+            import_pinecone()
     except VectorDatabaseConfigError as e:
         console.print(f"[yellow]OOPS![/yellow] {e}\n")
         raise typer.Exit()
@@ -392,7 +404,7 @@ def init(
 
     console.print(
         "[blue]2) Building vector database[/blue]"
-        + (" in Chroma Cloud" if vector_db == "cloud" else "")
+        + {"cloud": " in Chroma Cloud", "pinecone": " in Pinecone"}.get(vector_db, "")
     )
 
     if embedding_model is None:
@@ -889,7 +901,10 @@ def doctor() -> None:
 
 
 vector_db_app = typer.Typer(
-    help="Check the vector database settings or upload a local index to Chroma Cloud"
+    help=(
+        "Check the vector database settings or upload a local index to Chroma "
+        "Cloud or Pinecone"
+    )
 )
 app.add_typer(vector_db_app, name="vector-db")
 
@@ -901,11 +916,12 @@ def vector_db_check(
     vector_db: Annotated[
         Optional[str],
         typer.Option(
-            "--vector-db", help="'local' or 'cloud'. Overrides AATM_VECTOR_DB."
+            "--vector-db",
+            help="'local', 'cloud' or 'pinecone'. Overrides AATM_VECTOR_DB.",
         ),
     ] = None,
 ) -> None:
-    """Print the configured vector database and, in cloud mode, its collections.
+    """Print the configured vector database and, remotely, its collections or indexes.
 
     Raises:
         typer.Exit: With code 1 if the configuration is invalid or the
@@ -917,7 +933,7 @@ def vector_db_check(
     try:
         mode = resolve_vector_db_mode(vector_db)
         locations = {
-            name: spec.chroma_location(mode)
+            name: spec.vector_db_location(mode)
             for name, spec in CHROMADB_RETRIEVER_MODEL_REGISTRY.items()
         }
     except VectorDatabaseConfigError as e:
@@ -927,32 +943,39 @@ def vector_db_check(
     if mode == "local":
         console.print("Vector database: [bold]local[/bold]")
         for name, (connection, collection_name) in locations.items():
+            path = getattr(connection, "path", None)
             status = (
-                "[green]built[/green]"
-                if connection.path and Path(connection.path).exists()
-                else "not built"
+                "[green]built[/green]" if path and Path(path).exists() else "not built"
             )
-            console.print(f"  {name}: {connection.path} ({status})")
+            console.print(f"  {name}: {path} ({status})")
         return
 
     connection = next(iter(locations.values()))[0]
     console.print(f"Vector database: [bold]{connection.describe()}[/bold]")
+    service = "Pinecone" if mode == "pinecone" else "Chroma Cloud"
+    kind = "index" if mode == "pinecone" else "collection"
     try:
         client = connection.client()
-        existing = {collection.name for collection in client.list_collections()}
+        if mode == "pinecone":
+            existing = set(client.list_indexes().names())
+        else:
+            existing = {collection.name for collection in client.list_collections()}
+    except VectorDatabaseConfigError as e:
+        console.print(f"[yellow]OOPS![/yellow] {e}")
+        raise typer.Exit(code=1)
     except Exception as e:
-        console.print(f"[red]Could not connect to Chroma Cloud:[/red] {e}")
+        console.print(f"[red]Could not connect to {service}:[/red] {e}")
         raise typer.Exit(code=1)
 
     console.print("[green]Connected.[/green]")
     for name, (_, collection_name) in locations.items():
         status = "[green]built[/green]" if collection_name in existing else "not built"
-        console.print(f"  {name}: collection '{collection_name}' ({status})")
+        console.print(f"  {name}: {kind} '{collection_name}' ({status})")
 
 
 @vector_db_app.command(
     "upload",
-    help="Copy a local vector database to Chroma Cloud without re-embedding",
+    help="Copy a local vector database to Chroma Cloud or Pinecone without re-embedding",
 )
 def vector_db_upload(
     embedding_model: Annotated[
@@ -976,12 +999,33 @@ def vector_db_upload(
         Optional[int],
         typer.Option(
             "--batch-size",
-            help="Rows per cloud write. Capped at the cloud's maximum batch size.",
+            help=(
+                "Rows per write. Capped at Chroma Cloud's maximum batch size; "
+                "split into requests within Pinecone's limits."
+            ),
+            show_default=False,
+        ),
+    ] = None,
+    to: Annotated[
+        str,
+        typer.Option(
+            "--to",
+            help="Destination: 'cloud' (Chroma Cloud) or 'pinecone'.",
+        ),
+    ] = "cloud",
+    ids_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--ids-file",
+            help=(
+                "Only upload the rows whose IDs this file lists, one per line, "
+                "e.g. a subset that fits a free plan."
+            ),
             show_default=False,
         ),
     ] = None,
 ) -> None:
-    """Upload a local index to Chroma Cloud. Re-running resumes where it stopped.
+    """Upload a local index to Chroma Cloud or Pinecone. Re-running resumes where it stopped.
 
     Raises:
         typer.Exit: With code 1 if the model is unknown, the local database is
@@ -996,9 +1040,22 @@ def vector_db_upload(
 
     from aatm.local_database_utils import upload_vector_database_to_cloud
 
+    ids = None
+    if ids_file is not None:
+        if not ids_file.exists():
+            console.print(f"[yellow]OOPS![/yellow] No IDs file at '{ids_file}'.")
+            raise typer.Exit(code=1)
+        ids = [
+            line.strip() for line in ids_file.read_text().splitlines() if line.strip()
+        ]
+
     try:
         upload_vector_database_to_cloud(
-            embedding_model, vector_db_dir=local_dir, write_batch_size=batch_size
+            embedding_model,
+            vector_db_dir=local_dir,
+            write_batch_size=batch_size,
+            to=to.strip().lower(),
+            ids=ids,
         )
     except ValueError as e:
         console.print(f"[yellow]OOPS![/yellow] {e}")

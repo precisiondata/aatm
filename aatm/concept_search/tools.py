@@ -1,6 +1,6 @@
 """The tools the concept search agent calls to explore the vocabularies.
 
-- **Semantic search** over the ChromaDB index of a retriever, filtered by domain and
+- **Semantic search** over the vector index (ChromaDB or Pinecone) of a retriever, filtered by domain and
   vocabulary.
 - **Lexical search**: concept names and synonyms containing every word of a query, in
   the local vocabulary database (``.aatm/omop.db``).
@@ -243,7 +243,8 @@ class ConceptSearchTools:
 
     Args:
         retriever: A retriever with a ``retrieve(queries, where=..., top_k=...)``
-            method, such as `aatm.retrievers.ChromaDBRetriever`, for semantic search.
+            method, such as `aatm.retrievers.ChromaDBRetriever` or
+            `aatm.retrievers.PineconeRetriever`, for semantic search.
         vocabulary: The vocabulary database, as a path or a `VocabularySearch`, for
             lexical search, code lookup, concept details and hierarchy. ``None``
             leaves only semantic search.

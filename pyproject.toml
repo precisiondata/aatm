@@ -58,6 +58,9 @@ dev = [
 anthropic = [
     "anthropic>=1.0.0",
 ]
+pinecone = [
+    "pinecone>=10.0.0",
+]
 
 [project.scripts]
 aatm = "aatm.main:app"

@@ -223,7 +223,7 @@ translator = load_translator("empty-translator")
 
 ### Retrievers
 
-Retriever models are loaded with `load_retriever(model_name)`, which constructs a `ChromaDBRetriever` backed by the configured embedding function and ChromaDB path. 
+Retriever models are loaded with `load_retriever(model_name)`, which constructs a `ChromaDBRetriever` backed by the configured embedding function and ChromaDB path, or a `PineconeRetriever` when `AATM_VECTOR_DB=pinecone` (see [Environment variables](env.md#pinecone)). 
 
 Common registered retriever IDs include:
 

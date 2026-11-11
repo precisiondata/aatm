@@ -16,7 +16,9 @@ uv run python benchmarks/concept_search/run_benchmark.py --retriever text-embedd
 ```
 
 Writes one row per text and method to ``results/<retriever>__<model>.csv`` and prints a
-summary table (accuracy, LLM calls, tokens and seconds per text).
+summary table (accuracy, LLM calls, tokens and seconds per text). ``--vector-db`` picks
+the vector database (``local``, ``cloud`` or ``pinecone``, default ``AATM_VECTOR_DB``);
+results from Chroma Cloud or Pinecone go to ``results/<retriever>__<model>__<vector-db>.csv``.
 """
 
 import argparse
@@ -32,6 +34,7 @@ from aatm.concept_search import CodingContext, ConceptSearchAgent, ConceptSearch
 from aatm.omop.coding import retriever_filter
 from aatm.registries.retrievers import load_retriever
 from aatm.selectors import FirstResultSelector, OpenAILLMSelector
+from aatm.vector_db import resolve_vector_db_mode
 
 HERE = Path(__file__).parent
 DOMAIN, VOCABULARIES = "Measurement", ["LOINC"]
@@ -125,10 +128,16 @@ def main() -> None:
     parser.add_argument("--model", default="openai/gpt-5-mini")
     parser.add_argument("--methods", nargs="+", default=METHODS, choices=METHODS)
     parser.add_argument("--max-tool-calls", type=int, default=8)
+    parser.add_argument(
+        "--vector-db",
+        default=None,
+        help="'local', 'cloud' or 'pinecone'. Defaults to AATM_VECTOR_DB, else local.",
+    )
     args = parser.parse_args()
 
     cases = load_cases()
-    retriever = load_retriever(args.retriever)
+    vector_db = resolve_vector_db_mode(args.vector_db)
+    retriever = load_retriever(args.retriever, vector_db=vector_db)
     rows = []
     for method in args.methods:
         print(f"Running {method} on {len(cases)} texts...")
@@ -160,7 +169,12 @@ def main() -> None:
             )
 
     df = pd.DataFrame(rows)
-    out = HERE / "results" / f"{args.retriever}__{args.model.replace('/', '_')}.csv"
+    suffix = "" if vector_db == "local" else f"__{vector_db}"
+    out = (
+        HERE
+        / "results"
+        / f"{args.retriever}__{args.model.replace('/', '_')}{suffix}.csv"
+    )
     out.parent.mkdir(exist_ok=True)
     if out.exists():
         # Keep the results of the methods not rerun.
