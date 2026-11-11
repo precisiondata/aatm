@@ -167,6 +167,126 @@ def print_logo() -> None:
     )
 
 
+def prepare_vocab_bundle(
+    source: str,
+    vocab_dir: Path,
+    *,
+    force: bool = False,
+    umls_api_key: Optional[str] = None,
+    standard_vocabs: Optional[List[str]] = None,
+) -> Path:
+    """Download (if needed), unpack and check an Athena vocabulary bundle.
+
+    Args:
+        source: The bundle's download link, or the path of the zip.
+        vocab_dir: Directory to unpack the bundle into.
+        force: Overwrite existing files in `vocab_dir` without asking.
+        umls_api_key: UMLS API key for the CPT4 step; skipped when missing.
+        standard_vocabs: Standard vocabularies the user asked for, to warn
+            when the bundle does not include them.
+
+    Returns:
+        The directory holding the vocabulary CSVs.
+
+    Raises:
+        typer.Exit: With a message when any step fails.
+    """
+    from rich.progress import (
+        BarColumn,
+        DownloadColumn,
+        Progress,
+        TimeRemainingColumn,
+        TransferSpeedColumn,
+    )
+
+    from aatm import vocab_bundle as vb
+
+    console.print("[blue]0) Preparing the Athena vocabulary bundle[/blue]")
+    try:
+        if vb.is_url(source):
+            console.print("Downloading the bundle...")
+            with Progress(
+                "[progress.description]{task.description}",
+                BarColumn(),
+                DownloadColumn(),
+                TransferSpeedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+                transient=True,
+            ) as bar:
+                task = bar.add_task("Downloading", total=None)
+                zip_path = vb.download_bundle(
+                    source,
+                    LOCAL_HELPER_PATH / "downloads",
+                    progress=lambda done, total: bar.update(
+                        task, completed=done, total=total
+                    ),
+                )
+            console.print(f"Saved the bundle to '{zip_path}'.")
+        else:
+            zip_path = Path(source).expanduser()
+
+        console.print(f"Unpacking '{zip_path}' into '{vocab_dir}'...")
+        try:
+            vb.unpack_bundle(zip_path, vocab_dir, overwrite=force)
+        except vb.VocabFilesExistError as e:
+            if not sys.stdin.isatty():
+                console.print(
+                    f"[yellow]OOPS![/yellow] {e}. Pass --force to overwrite them, "
+                    "or choose another directory with --vocab-dir.\n"
+                )
+                raise typer.Exit(1)
+            if not questionary.confirm(f"{e}. Overwrite them?", default=False).ask():
+                console.print(
+                    "Nothing was overwritten. Choose another directory with "
+                    "--vocab-dir, or pass --force.\n"
+                )
+                raise typer.Exit(1)
+            vb.unpack_bundle(zip_path, vocab_dir, overwrite=True)
+    except vb.VocabBundleError as e:
+        console.print(f"[yellow]OOPS![/yellow] {e}\n")
+        raise typer.Exit(1)
+
+    missing = vb.missing_required_files(vocab_dir)
+    if missing:
+        console.print(
+            f"[yellow]OOPS![/yellow] The bundle is missing required files: "
+            f"{', '.join(missing)}. Request a new bundle at {vb.ATHENA_URL}.\n"
+        )
+        raise typer.Exit(1)
+
+    if vb.has_cpt4_tooling(vocab_dir):
+        if not umls_api_key:
+            console.print(
+                "[yellow]Warning:[/yellow] the bundle includes CPT4, but no UMLS "
+                "API key was given, so CPT4 concepts will have no names. Pass "
+                f"--umls-api-key or set {vb.UMLS_API_KEY_ENV_VAR} to add them "
+                "(get a key at https://uts.nlm.nih.gov/uts/profile)."
+            )
+        else:
+            console.print("Adding CPT4 concept names (this can take a while)...")
+            try:
+                vb.run_cpt4(vocab_dir, umls_api_key)
+            except vb.Cpt4Error as e:
+                console.print(f"[yellow]OOPS![/yellow] {e}\n")
+                raise typer.Exit(1)
+
+    vocabularies = vb.read_bundle_vocabularies(vocab_dir)
+    if vocabularies:
+        console.print(f"The bundle contains {len(vocabularies)} vocabularies:")
+        for v in vocabularies:
+            console.print(f"  - {v.vocabulary_id}: {v.version or 'no version'}")
+    present = {v.vocabulary_id for v in vocabularies}
+    for vocab in standard_vocabs or []:
+        if vocab not in present:
+            console.print(
+                f"[yellow]Warning:[/yellow] {vocab} was requested with "
+                "--standard-vocabs but is not in the bundle."
+            )
+    console.print("[green]Done![/green]\n")
+    return vocab_dir
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
@@ -253,6 +373,38 @@ def init(
             show_default=False,
         ),
     ] = None,
+    vocab_zip: Annotated[
+        Optional[str],
+        typer.Option(
+            "--vocab-zip",
+            help=(
+                "Athena vocabulary bundle to set up from: the download link "
+                "Athena emailed, or the path of the downloaded zip. It is "
+                "unpacked into --vocab-dir (default ./vocabularies)."
+            ),
+            show_default=False,
+        ),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="With --vocab-zip, overwrite existing vocabulary files without asking.",
+        ),
+    ] = False,
+    umls_api_key: Annotated[
+        Optional[str],
+        typer.Option(
+            "--umls-api-key",
+            envvar="UMLS_API_KEY",
+            help=(
+                "UMLS API key used to add the CPT4 names when the bundle "
+                "includes CPT4. Read from UMLS_API_KEY when not given."
+            ),
+            show_default=False,
+            show_envvar=True,
+        ),
+    ] = None,
 ) -> None:
     """Initialize the local AATM environment.
 
@@ -283,6 +435,13 @@ def init(
         vector_db: Where to build the vector database, ``local``,
             ``cloud`` or ``pinecone``. If not provided, `AATM_VECTOR_DB` is
             used, and otherwise ``local``.
+        vocab_zip: An Athena vocabulary bundle, as its download link or the
+            path of the zip. It is downloaded if needed, unpacked into
+            `vocab_dir`, and its CPT4 names are added when it includes CPT4.
+        force: Overwrite existing vocabulary files when unpacking
+            `vocab_zip` without asking.
+        umls_api_key: UMLS API key for the CPT4 step. If not provided,
+            `UMLS_API_KEY` is used; without a key the CPT4 step is skipped.
 
     Raises:
         typer.Exit: If the vocabulary directory does not exist, if the
@@ -298,6 +457,11 @@ def init(
         Initialize with a custom vocabulary directory:
 
             $ aatm init --vocab-dir ./vocabularies
+
+        Set up from the bundle link Athena emailed, or from the downloaded zip:
+
+            $ aatm init --vocab-zip "https://athena.ohdsi.org/api/v1/vocabularies/zip/<id>"
+            $ aatm init --vocab-zip ~/Downloads/vocabulary_download_v5_<id>.zip
 
         Initialize with an explicit embedding model:
 
@@ -340,8 +504,24 @@ def init(
     print_logo()
     console.print("Let's set up your environment!\n")
 
+    # Validate provided standard vocabs
+    if standard_vocabs is not None:
+        if not set(standard_vocabs).issubset(STANDARD_VOCABULARIES):
+            console.print(
+                f"[yellow]OOPS![/yellow] You specified standard vocabularies that are not available. Available options: {STANDARD_VOCABULARIES}. You provided: {standard_vocabs}\n"
+            )
+            raise typer.Exit()
+
     # Validate vocab directory
-    if vocab_dir is None:
+    if vocab_zip is not None:
+        vocab_dir = prepare_vocab_bundle(
+            vocab_zip,
+            Path(vocab_dir) if vocab_dir is not None else DEFAULT_VOCAB_DIR,
+            force=force,
+            umls_api_key=umls_api_key,
+            standard_vocabs=standard_vocabs,
+        )
+    elif vocab_dir is None:
         vocab_dir = DEFAULT_VOCAB_DIR
     else:
         vocab_dir = Path(vocab_dir)
@@ -382,14 +562,6 @@ def init(
         console.print(f"[yellow]OOPS![/yellow] {e}\n")
         raise typer.Exit()
     vector_db = vector_db_connection.mode
-
-    # Validate provided standard vocabs
-    if standard_vocabs is not None:
-        if not set(standard_vocabs).issubset(STANDARD_VOCABULARIES):
-            console.print(
-                f"[yellow]OOPS![/yellow] You specified standard vocabularies that are not available. Available options: {STANDARD_VOCABULARIES}. You provided: {standard_vocabs}\n"
-            )
-            raise typer.Exit()
 
     console.print("[blue]1) Building local OMOP vocabulary database[/blue]")
     console.print(f"Using vocabulary files from: '{vocab_dir}'")
