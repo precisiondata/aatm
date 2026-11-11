@@ -1032,6 +1032,8 @@
       
         
       
+        
+      
     
     
     
@@ -1290,6 +1292,34 @@
     
   
     Concept search agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/decision_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision models
   
 
     
@@ -2191,6 +2221,7 @@
 </span></code></pre></div>
 <p>AATM loads environment variables automatically with <code>python-dotenv</code>.</p>
 <p>The <a href="../quick_start_extraction/">information extraction</a> pipeline needs the key of the provider you use: <code>OPENAI_API_KEY</code>, <code>GOOGLE_API_KEY</code>, <code>ANTHROPIC_API_KEY</code> or <code>OPENROUTER_API_KEY</code>. Local OpenAI-compatible servers such as Ollama usually need none. <code>OPENAI_API_KEY</code> and <code>GOOGLE_API_KEY</code> are also used by the OpenAI- and Gemini-based mapping components.</p>
+<p><a href="../../reference/decision_models/">Decision models</a> use <code>OPENAI_API_KEY</code> (<code>openai/gpt-6-luna</code>), <code>GOOGLE_API_KEY</code> (<code>gemini/gemini-decision-1</code>) or <code>OPENROUTER_API_KEY</code> (<code>openrouter/typesafe/jev-1.13</code>). They send the state they decide on, e.g. a sentence of a note, to that provider. Check its data processing terms before sending protected health information.</p>
 <h2 id="optional-settings">Optional settings</h2>
 <table>
 <thead>
