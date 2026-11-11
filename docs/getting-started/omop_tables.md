@@ -20,10 +20,12 @@ on its *entity definitions*.
 ## Before you start
 
 1. **Install AATM** ([Installation](installation.md)).
-2. **Download the OMOP vocabularies** from [Athena](https://athena.ohdsi.org/vocabulary/list).
+2. **Request the OMOP vocabularies** on [Athena](https://athena.ohdsi.org/vocabulary/list).
    The predefined definitions on this page use **SNOMED**, **LOINC** and **UCUM**
-   (units), so include at least those three.
-3. **Run `aatm init`** ([CLI quick start](quick_start_cli.md)). It builds the local
+   (units), so include at least those three. Athena emails you a link to the bundle.
+3. **Run `aatm init --vocab-zip "<link from Athena>"`**
+   ([CLI quick start](quick_start_cli.md#1-get-your-omop-vocabularies)). It downloads
+   and unpacks the bundle, then builds the local
    vocabulary database (`.aatm/omop.db`), which every example on this page reads, and
    the search index the terminology mapper uses. Note the embedding model you choose
    (for example `text-embedding-3-small`): you pass the same name to the mapper later.
