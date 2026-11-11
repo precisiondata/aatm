@@ -24,6 +24,7 @@ probability-weighted position with ``legend`` and ``probabilities``. ``usage`` h
 the tokens and the ``cost`` in USD, which `aatm.llm.track_usage` records.
 """
 
+import logging
 from typing import Any, Mapping, Optional, Sequence
 
 import httpx
@@ -45,9 +46,27 @@ from aatm.llm.decisions import (
 from aatm.llm.limits import estimate_tokens, get_rate_limiter
 from aatm.llm.usage import record_usage
 
+logger = logging.getLogger(__name__)
+
 OPENROUTER_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
 
 _KINDS = {"choice": "choice", "score": "score", "predicate": "noul"}
+
+_WARNED_ALPHA: set[str] = set()
+
+
+def warn_if_alpha(url: str) -> None:
+    """Warn, once per URL, that an alpha endpoint may change without notice."""
+    if "/alpha/" not in url or url in _WARNED_ALPHA:
+        return
+    _WARNED_ALPHA.add(url)
+    logger.warning(
+        "%s is an alpha endpoint: its request and response shapes, model ids and "
+        "pricing may change without notice or deprecation period, and aatm may fail "
+        "to parse its answers. Pin the aatm version and the model version for "
+        "production runs.",
+        url,
+    )
 
 
 class DecisionHTTPError(RuntimeError):
@@ -112,6 +131,7 @@ class JevDecisionModel:
         self.settings = settings or DecisionSettings()
         self.http_client = http_client
         warn_if_unpinned(self.model_id)
+        warn_if_alpha(url)
 
     def request_body(
         self, state: State, questions: Sequence[Question]
