@@ -595,10 +595,18 @@ def test_live_decision(model_id, key_env):
     if not os.getenv(key_env):
         pytest.skip(f"{key_env} is not set")
     model = create_decision_model(model_id)
-    decision = asyncio.run(
-        model.decide({"text": "serum creatinine 1.4 mg/dl"}, QUESTIONS)
+    # A name with a result is not "the name of a lab test": ask about the result.
+    reports_result = Question.predicate(
+        "reports_result", "Does the text report a laboratory test result?"
     )
-    assert decision["is_lab"].value is True
+    decision = asyncio.run(
+        model.decide(
+            {"text": "serum creatinine 1.4 mg/dl"},
+            [SPECIMEN, CERTAINTY, reports_result],
+        )
+    )
+    assert decision["reports_result"].value is True
+    assert decision["reports_result"].probability > 0.5
     assert decision["specimen"].value == "serum"
     assert decision["specimen"].probabilities
     assert decision["certainty"].label in CERTAINTY.values
