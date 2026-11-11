@@ -124,3 +124,9 @@ source = ["aatm"]
 # Floor that CI enforces. Raise it as coverage improves; the target is 80%.
 fail_under = 35
 show_missing = true
+
+[[tool.mypy.overrides]]
+# pyarrow shipped type information (py.typed) up to 24.0.0 but not in 25+, which
+# we require (see the pyarrow pin above). Treat it as untyped until it returns.
+module = ["pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
