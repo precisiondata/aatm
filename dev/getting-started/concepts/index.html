@@ -1633,6 +1633,8 @@
       
         
       
+        
+      
     
     
     
@@ -1863,6 +1865,34 @@
     
   
     Vector database location
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/vector_stores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vector stores
   
 
     
@@ -2171,12 +2201,17 @@
 <p>Use <code>EmptyTranslator</code> when your inputs are already in the desired language.</p>
 <h2 id="retriever">Retriever</h2>
 <p>Retrievers fetch candidate concepts from a vector database.</p>
-<p>Main implementation:</p>
+<p>Implementations, both returned by <code>load_retriever()</code> depending on <code>AATM_VECTOR_DB</code>
+(see <a href="../env/#vector-database-local-chroma-cloud-or-pinecone">Environment variables</a>):</p>
 <ul>
-<li><code>ChromaDBRetriever</code></li>
+<li><code>ChromaDBRetriever</code>: a local or Chroma Cloud collection.</li>
+<li><code>PineconeRetriever</code>: a Pinecone index.</li>
 </ul>
+<p>Both share their filtering logic (<code>VectorStoreRetriever</code>), and distances mean the same
+on both, so selectors and thresholds do not depend on the backend.</p>
 <h3 id="metadata-filters">Metadata filters</h3>
-<p>A retriever can restrict its candidates with a ChromaDB <code>where</code> filter, for example to
+<p>A retriever can restrict its candidates with a <code>where</code> filter, written in ChromaDB's
+syntax, which AATM translates for Pinecone. For example, to restrict them to
 one domain and some vocabularies. The OMOP builder does this for every <code>map</code> source:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop.coding</span><span class="w"> </span><span class="kn">import</span> <span class="n">retriever_filter</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
@@ -2208,9 +2243,9 @@ only when too few match. <code>filter_strategy</code> chooses the method:</p>
 <td>Fast, but may return fewer than <code>top_k</code> results for rare filters</td>
 </tr>
 <tr>
-<td><code>"chroma"</code></td>
-<td>Passes the filter to ChromaDB</td>
-<td>Exact, slow on large indexes</td>
+<td><code>"native"</code> (or <code>"chroma"</code>)</td>
+<td>Passes the filter to the vector database</td>
+<td>ChromaDB: exact, slow on large indexes. Pinecone: the default, filtered during the search</td>
 </tr>
 </tbody>
 </table>
@@ -2233,6 +2268,10 @@ Measurement records for a lab test.</p>
 <p>The over-fetch evaluates equality, <code>$eq</code>, <code>$in</code>, <code>$and</code> and <code>$or</code>, which covers every
 filter <code>retriever_filter</code> builds. The default strategy hands any other filter to
 ChromaDB; <code>"overfetch"</code> raises <code>UnsupportedFilterError</code> for it.</p>
+<p>Pinecone applies filters during the vector search, so <code>PineconeRetriever</code> defaults to
+<code>filter_strategy="native"</code> and needs no over-fetch. Filters are translated to
+Pinecone's syntax: <code>{"field": value}</code> becomes <code>{"field": {"$eq": value}}</code>, and <code>$ne</code>,
+<code>$gt</code>, <code>$gte</code>, <code>$lt</code>, <code>$lte</code>, <code>$in</code> and <code>$nin</code> keep their names.</p>
 <h2 id="reranker">Reranker</h2>
 <p>Rerankers reorder retrieved candidates.</p>
 <p>Examples:</p>

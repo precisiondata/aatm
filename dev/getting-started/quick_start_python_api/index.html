@@ -1876,6 +1876,8 @@
       
         
       
+        
+      
     
     
     
@@ -2106,6 +2108,34 @@
     
   
     Vector database location
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/vector_stores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vector stores
   
 
     
@@ -2797,7 +2827,7 @@
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">translator</span> <span class="o">=</span> <span class="n">load_translator</span><span class="p">(</span><span class="s2">"empty-translator"</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="retrievers">Retrievers</h3>
-<p>Retriever models are loaded with <code>load_retriever(model_name)</code>, which constructs a <code>ChromaDBRetriever</code> backed by the configured embedding function and ChromaDB path. </p>
+<p>Retriever models are loaded with <code>load_retriever(model_name)</code>, which constructs a <code>ChromaDBRetriever</code> backed by the configured embedding function and ChromaDB path, or a <code>PineconeRetriever</code> when <code>AATM_VECTOR_DB=pinecone</code> (see <a href="../env/#pinecone">Environment variables</a>). </p>
 <p>Common registered retriever IDs include:</p>
 <ul>
 <li><code>qwen3-06B</code></li>

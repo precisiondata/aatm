@@ -555,13 +555,52 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#vector-database-location-chroma-cloud" class="md-nav__link">
+  <a href="#vector-database-local-chroma-cloud-or-pinecone" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vector database location (Chroma Cloud)
+        Vector database (local, Chroma Cloud or Pinecone)
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Vector database (local, Chroma Cloud or Pinecone)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chroma-cloud" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chroma Cloud
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pinecone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinecone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choosing-a-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1605,6 +1644,8 @@
       
         
       
+        
+      
     
     
     
@@ -1855,6 +1896,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/vector_stores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vector stores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/logs/" class="md-nav__link">
         
   
@@ -1968,13 +2037,52 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#vector-database-location-chroma-cloud" class="md-nav__link">
+  <a href="#vector-database-local-chroma-cloud-or-pinecone" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vector database location (Chroma Cloud)
+        Vector database (local, Chroma Cloud or Pinecone)
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Vector database (local, Chroma Cloud or Pinecone)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chroma-cloud" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chroma Cloud
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pinecone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinecone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choosing-a-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2114,8 +2222,15 @@
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">aatm</span><span class="o">.</span><span class="n">configure_logging</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>  <span class="c1"># everything</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"aatm.data_models.extractors"</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>  <span class="c1"># one module only</span>
 </span></code></pre></div>
-<h2 id="vector-database-location-chroma-cloud">Vector database location (Chroma Cloud)</h2>
-<p>By default, AATM builds one ChromaDB vector database per embedding model on this machine, under <code>.aatm/chroma_vector_dbs/</code>. To keep the index in <a href="https://trychroma.com/">Chroma Cloud</a> instead, which lets a team build it once and share it, set:</p>
+<h2 id="vector-database-local-chroma-cloud-or-pinecone">Vector database (local, Chroma Cloud or Pinecone)</h2>
+<p>By default, AATM builds one ChromaDB vector database per embedding model on this machine, under <code>.aatm/chroma_vector_dbs/</code>. Two remote backends let a team build the index once and share it, and let machines without the disk space or GPU for a local index run retrieval:</p>
+<ul>
+<li><a href="https://trychroma.com/">Chroma Cloud</a>, with <code>AATM_VECTOR_DB=cloud</code>.</li>
+<li><a href="https://www.pinecone.io/">Pinecone</a>, with <code>AATM_VECTOR_DB=pinecone</code> (see <a href="#pinecone">below</a>).</li>
+</ul>
+<p>Switching is configuration only: retrievers, <code>aatm map</code>, <code>aatm search-ui</code>, <code>aatm serve</code>, the concept search agent and <code>load_retriever()</code> all use the configured backend.</p>
+<h3 id="chroma-cloud">Chroma Cloud</h3>
+<p>Set:</p>
 <table>
 <thead>
 <tr>
@@ -2128,7 +2243,7 @@
 <tr>
 <td><code>AATM_VECTOR_DB</code></td>
 <td><code>local</code></td>
-<td><code>local</code> or <code>cloud</code>. <code>aatm init --vector-db</code> overrides it for the build.</td>
+<td><code>local</code>, <code>cloud</code> or <code>pinecone</code>. <code>aatm init --vector-db</code> overrides it for the build.</td>
 </tr>
 <tr>
 <td><code>CHROMA_API_KEY</code></td>
@@ -2163,6 +2278,106 @@
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>aatm<span class="w"> </span>vector-db<span class="w"> </span>upload<span class="w"> </span>-e<span class="w"> </span>embeddinggemma-300M<span class="w">  </span><span class="c1"># copy an existing local index, without re-embedding</span>
 </span></code></pre></div>
 <p><code>aatm vector-db upload</code> skips rows already in the cloud, so an interrupted upload resumes when run again. Cloud writes are retried with backoff on rate limits, server errors and network failures.</p>
+<h3 id="pinecone">Pinecone</h3>
+<p>Install the extra, then set the variables below:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"aatm[pinecone]"</span><span class="w">   </span><span class="c1"># or: uv sync --extra pinecone</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AATM_VECTOR_DB</code></td>
+<td><code>local</code></td>
+<td>Set to <code>pinecone</code>.</td>
+</tr>
+<tr>
+<td><code>PINECONE_API_KEY</code></td>
+<td>unset</td>
+<td>Pinecone API key. Required. Never logged.</td>
+</tr>
+<tr>
+<td><code>PINECONE_INDEX_PREFIX</code></td>
+<td><code>aatm-expressions</code></td>
+<td>Prefix of the index names.</td>
+</tr>
+<tr>
+<td><code>PINECONE_CLOUD</code></td>
+<td><code>aws</code></td>
+<td>Cloud of new serverless indexes.</td>
+</tr>
+<tr>
+<td><code>PINECONE_REGION</code></td>
+<td><code>us-east-1</code></td>
+<td>Region of new serverless indexes.</td>
+</tr>
+</tbody>
+</table>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>AATM_VECTOR_DB=pinecone
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>PINECONE_API_KEY=your_pinecone_api_key
+</span></code></pre></div>
+<p>Every Pinecone index has a fixed dimension, so each embedding model gets its own serverless index, named <code>&lt;prefix&gt;-&lt;model&gt;</code> and made valid for Pinecone: lowercase <code>a-z</code>, <code>0-9</code> and <code>-</code>, at most 45 characters (e.g. <code>aatm-expressions-qwen3-06b</code>). <code>aatm init</code> creates it with the dimension of the model's embeddings.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>aatm<span class="w"> </span>vector-db<span class="w"> </span>check<span class="w"> </span>--vector-db<span class="w"> </span>pinecone<span class="w">                     </span><span class="c1"># list the models' indexes</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>aatm<span class="w"> </span>init<span class="w"> </span>--vector-db<span class="w"> </span>pinecone<span class="w">                                </span><span class="c1"># build the index in Pinecone</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>aatm<span class="w"> </span>vector-db<span class="w"> </span>upload<span class="w"> </span>--to<span class="w"> </span>pinecone<span class="w"> </span>-e<span class="w"> </span>embeddinggemma-300M<span class="w">    </span><span class="c1"># copy a local index, without re-embedding</span>
+</span></code></pre></div>
+<p>On Pinecone's free plan the full index does not fit: writes cost one write unit per KB of request, and a 768-dimension record is about 16.6 KB, so the 2 million monthly write units cover roughly 120,000 records. <code>--ids-file</code> uploads only the rows a file lists, one ID per line; <code>benchmarks/vector_db_backends/make_subset.py</code> makes such a subset. Set <code>PINECONE_INDEX_PREFIX</code> (e.g. <code>aatm-subset</code>) so the subset does not take the full index's name.</p>
+<p>How the index maps to Pinecone:</p>
+<ul>
+<li><strong>Scores.</strong> The indexes use the <code>euclidean</code> metric, whose score is the squared Euclidean distance, the same as ChromaDB's default <code>l2</code> distance. A record has the same <code>distance</code> on both backends, so the confidence score (<code>1 - distance</code>), selectors and thresholds work unchanged.</li>
+<li><strong>Filters.</strong> Domain and vocabulary filters (<code>retriever_filter</code>) are translated to Pinecone's syntax and applied <strong>during</strong> the vector search. So by default the Pinecone retriever passes them straight to Pinecone (<code>filter_strategy="native"</code>) instead of over-fetching. The over-fetch strategies still work, with query sizes capped at Pinecone's maximum <code>top_k</code> of 10,000. See <a href="../concepts/#metadata-filters">Metadata filters</a>.</li>
+<li><strong>Records.</strong> Pinecone has no document field and no null metadata. The expression text is stored in the metadata (as <code>expression</code>), and <code>None</code> values are left out. The embedding precision of local models is stored as an index tag (<code>aatm_embedding_dtype</code>), and queries are encoded in it.</li>
+<li><strong>Writes</strong> use <code>upsert</code>, which is idempotent, in requests within Pinecone's limits (1,000 records and 2 MB per request). Every request is retried with backoff on rate limits, server errors and network failures. A repair (<code>aatm init</code>, <em>Repair</em>) or a rerun of <code>aatm vector-db upload</code> only writes the missing records. Newly written records take a moment to become visible, so a repair right after a build may embed a few records again, which is harmless.</li>
+</ul>
+<h3 id="choosing-a-backend">Choosing a backend</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Local ChromaDB</th>
+<th>Chroma Cloud</th>
+<th>Pinecone</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Setup</td>
+<td>None</td>
+<td>API key</td>
+<td>API key and <code>aatm[pinecone]</code></td>
+</tr>
+<tr>
+<td>Shared across a team</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Disk and memory on this machine</td>
+<td>Several GB per model</td>
+<td>None</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Filtered queries (domain, vocabulary)</td>
+<td>Over-fetch by default, because ChromaDB's own filtered query takes seconds on a full index</td>
+<td>Same as local</td>
+<td>Filtered during the search</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>Free</td>
+<td>Usage-based</td>
+<td>Usage-based</td>
+</tr>
+</tbody>
+</table>
+<p>Embeddings of local models are computed on the machine that runs the build, whichever backend stores them. To compare query time and recall on your own index, see <code>benchmarks/vector_db_backends</code>.</p>
 <h2 id="device-selection">Device selection</h2>
 <table>
 <thead>

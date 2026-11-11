@@ -1905,6 +1905,8 @@
       
         
       
+        
+      
     
     
     
@@ -2135,6 +2137,34 @@
     
   
     Vector database location
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/vector_stores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vector stores
   
 
     
@@ -3604,8 +3634,8 @@ goes over a limit, the entries used least recently are deleted first:</p>
 </span></code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">Rebuilt data the cache cannot see</p>
-<p>The data of a retriever that is not a ChromaDB collection (a retriever of your own,
-for example) cannot be fingerprinted. When the cache opens, a warning names such
+<p>The data of a retriever that is neither a ChromaDB collection nor a Pinecone index
+(a retriever of your own, for example) cannot be fingerprinted. When the cache opens, a warning names such
 components: <code>changes to the content of ... cannot be detected</code>. If you rebuild
 their index, run <code>aatm cache clear</code>, or results coded against the old data will be
 reused without any error.</p>
