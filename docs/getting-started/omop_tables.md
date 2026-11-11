@@ -1090,7 +1090,8 @@ DuckDB, Polars and Spark read the folders directly, e.g.
 
 **Resuming.** Run the same call again. Notes already built are skipped; notes extracted
 but not yet written are built from their stored extraction result, without another
-model call. A note that fails (an API error once retries are spent, a result that
+model call. Each extraction result is stored as soon as it comes back, so a run that
+stops loses none of the calls it paid for. A note that fails (an API error once retries are spent, a result that
 cannot be built) is recorded with its error and the run goes on; the next run tries it
 again, up to `max_attempts` times in all (3 by default).
 
@@ -1171,8 +1172,8 @@ independently.
 !!! note "When sharding helps"
     With a hosted API, a single process is not the limit: it spends its time waiting
     for the model, and the provider's rate limit applies to all processes together.
-    Raise `max_concurrency` and the rate limits instead, with a `chunk_size` several
-    times `max_concurrency`. Shard on one machine when a single process is busy (a
+    Raise `max_concurrency` and the rate limits instead: one process keeps that many
+    calls in flight all the time, whatever the `chunk_size`. Shard on one machine when a single process is busy (a
     fast or local model, local embedding retrieval), or to spread a run over several
     machines or cluster jobs. See the
     [sharding benchmark](https://github.com/precisiondata/aatm/tree/main/benchmarks/sharding).
@@ -1257,14 +1258,17 @@ column. `OmopTableBuilder.build(..., row_ids="note")` numbers rows the same way.
     [rate limits](#rate-limits-for-long-runs) to stay under your provider's quota.
     With `cache=True`, a text seen in an earlier chunk or run is not coded again.
     `chunk_size` bounds memory; larger chunks let the builder group more repeated
-    texts per coding call.
+    texts per coding call. It does not limit extraction: a new call starts as soon as
+    one ends, so `max_concurrency` calls stay in flight and a slow note holds up no
+    other.
 
-    While a chunk is built (coded and written), the next one is extracted, so the
-    slower of the two stages sets the pace. This pays off when coding takes about as
-    long as extraction, e.g. with the [agent](#searching-with-an-agent); without a
-    mapper, building takes milliseconds and extraction is all the time. At most two
-    chunks are in memory. The two stages share the per-minute rate limits, but each
-    gets its own `max_concurrency`, so up to twice as many calls may be in flight.
+    While a chunk is built (coded and written), extraction goes on, so the slower of
+    the two stages sets the pace. This pays off when coding takes about as long as
+    extraction, e.g. with the [agent](#searching-with-an-agent); without a mapper,
+    building takes milliseconds and extraction is all the time. A few chunks are in
+    memory at most: the one being built, up to two waiting, and the notes being
+    extracted. The two stages share the per-minute rate limits, but each gets its own
+    `max_concurrency`, so up to twice as many calls may be in flight.
 
 ---
 

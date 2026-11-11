@@ -43,6 +43,17 @@ uv run python benchmarks/sharding/run_benchmark.py --notes 5000 --latency 0.3 --
 uv run python benchmarks/sharding/run_benchmark.py --notes 1000 --latency 4 --concurrency 64 --shards 1 4 --rpm 300 --scenarios rate-limited --label hosted-api-rpm300
 ```
 
+The tables below were measured with a runner that extracted a chunk at a time and
+waited for its slowest call; the runner now streams notes through extraction (see
+[Streaming extraction](#streaming-extraction)). Those runs are saved with
+`-streaming` labels:
+
+```bash
+uv run python benchmarks/sharding/run_benchmark.py --notes 2000 --latency 4 --concurrency 64 --shards 1 4 --scenarios instant retrieval --label hosted-api-streaming
+uv run python benchmarks/sharding/run_benchmark.py --notes 5000 --latency 0.3 --concurrency 256 --shards 1 8 --scenarios instant retrieval --label fast-model-streaming
+uv run python benchmarks/sharding/run_benchmark.py --notes 5000 --latency 0.3 --concurrency 256 --shards 1 --chunk-size 1000 --scenarios instant retrieval --label fast-model-streaming-chunk1000
+```
+
 ## Results (2026-11-11)
 
 Notes per minute, wall time (process start-up and model loading included). Full rows,
@@ -73,15 +84,43 @@ The ceiling is 64 calls / 4 s = 960 notes/min.
 Memory: about 0.2 GB per process with the instant coder, 2.2 GB with the embedding
 model (17 GB for 8 retrieval shards).
 
+### Streaming extraction
+
+The runner used to extract a chunk with all its calls at once and wait for the
+slowest before starting the next chunk, so the calls in flight drained at the end of
+every chunk. It now keeps `max_concurrency` calls in flight all the time, starting a
+new one as soon as one ends, stores each result as it comes back, and builds chunks
+as they fill up. Notes per minute, before and after:
+
+| Setting | Scenario | Chunk size | Shards | Before | After |
+|---|---|---|---|---|---|
+| Hosted API | instant | 100 | 1 | 421 | **889** |
+| Hosted API | instant | 100 | 4 | 754 | 864 |
+| Hosted API | retrieval | 100 | 1 | 383 | **770** |
+| Hosted API | retrieval | 100 | 4 | 661 | 775 |
+| Fast model | instant | 100 | 1 | 5,900 | 11,900 |
+| Fast model | instant | 1000 | 1 | 20,000 | **24,200** |
+| Fast model | instant | 100 | 8 | 22,900 | 28,400 |
+| Fast model | retrieval | 100 | 1 | 1,310 | 1,220 |
+| Fast model | retrieval | 1000 | 1 | 4,770 | 4,440 |
+| Fast model | retrieval | 100 | 8 | 5,070 | 3,770, 4,450 |
+
+With a hosted API, one process with 100-note chunks now runs at 93% of the 960
+notes/min ceiling (run time; the rest is the latency tail of the last calls), and
+shards add nothing. With retrieval on a fast model, coding a chunk at a time is the
+limit either way, and the differences are within the noise of single runs (the
+8-shard run, repeated, gave 3,770 and 4,450).
+
 ## What it shows
 
 1. **With a hosted API, sharding on one machine does not help.** The CPU is nearly
    idle: one process used 11 CPU seconds in a 285 s run. The apparent gains with
-   100-note chunks come from the runner, not from more processes: a chunk's
-   extraction waits for its slowest call before the next chunk starts, so the slots
-   in flight drain at the end of every chunk. More shards keep more chunks going and
-   hide the gaps. One process with chunks well above the concurrency (1,000 for 64
-   calls) is as fast as 8 shards, with an eighth of the memory.
+   100-note chunks came from the runner, not from more processes: a chunk's
+   extraction waited for its slowest call before the next chunk started, so the
+   slots in flight drained at the end of every chunk, and more shards hid the gaps.
+   The runner now streams notes through extraction: one process reaches 889
+   notes/min with 100-note chunks, more than 8 shards did, with an eighth of the
+   memory.
 2. **Under a rate limit, sharding cannot help**: the limit is the provider's, and
    `run_sharded` divides it among the processes (306 vs 298 notes/min).
 3. **The agentic coder is bound by its concurrency and latency**, not by processes:
@@ -96,8 +135,10 @@ model (17 GB for 8 retrieval shards).
 
 ### Recommendations
 
-- Hosted API: one process. Raise `max_concurrency` and the rate limits to your quota,
-  and use a `chunk_size` several times `max_concurrency`.
+- Hosted API: one process. Raise `max_concurrency` and the rate limits to your quota;
+  `chunk_size` no longer limits extraction.
+- Fast or local models: larger chunks (1,000) still help, since each chunk's build
+  has a fixed cost.
 - Agentic coder: raise its `max_concurrency`.
 - Fast or local models, local retrieval: shard on one machine, within its memory.
 - Several machines or a cluster: shard, one shard per job.

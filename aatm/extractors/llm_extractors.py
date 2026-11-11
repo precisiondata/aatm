@@ -141,6 +141,7 @@ class SimpleLLMExtractor:
 
         self.llm = llm
         self.model_id = llm.model_id
+        self.max_concurrency = max_concurrency
         self.semaphore: Optional[asyncio.Semaphore] = (
             asyncio.Semaphore(max_concurrency) if max_concurrency is not None else None
         )

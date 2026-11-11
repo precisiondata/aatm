@@ -247,6 +247,88 @@ def test_build_failures_keep_the_extraction(tmp_path):
     assert extractor.calls == 3
 
 
+class HangingExtractor(FakeExtractor):
+    """Note 1's call waits until `release()` returns true (or forever)."""
+
+    max_concurrency = 4
+
+    def __init__(self, definitions, release=lambda: False, timeout=None):
+        super().__init__(definitions)
+        self.release = release
+        self.timeout = timeout
+
+    async def __call__(self, texts):
+        if texts[0].startswith("Visit 1."):
+            waited = 0.0
+            while not self.release():
+                if self.timeout is not None and waited > self.timeout:
+                    raise TimeoutError("note 1 was held up")
+                await asyncio.sleep(0.01)
+                waited += 0.01
+        return await super().__call__(texts)
+
+
+def test_a_slow_note_does_not_hold_up_the_next_chunks(tmp_path):
+    pipeline, _ = make_pipeline()
+    built: set[int] = set()
+    original = pipeline.builder.build
+
+    def build(notes, results, **kwargs):
+        tables = original(notes, results, **kwargs)
+        built.update(n.note_id for n in notes)
+        return tables
+
+    pipeline.builder.build = build
+    # Note 1 answers only once notes of later chunks are built.
+    pipeline.extractor = HangingExtractor(
+        pipeline.extractor.definitions, release=lambda: {3, 4} <= built, timeout=5
+    )
+
+    summary = run(pipeline, notes(6), tmp_path, chunk_size=2)
+
+    assert (summary.built, summary.failed) == (6, 0)
+    assert OmopRun(tmp_path).status() == {"built": 6}
+
+
+def test_results_are_stored_as_they_come(tmp_path):
+    """A run stopped while a call hangs keeps the results that came back."""
+    pipeline, _ = make_pipeline()
+    pipeline.extractor = HangingExtractor(pipeline.extractor.definitions)
+
+    async def stopped():
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(pipeline.run(notes(4), tmp_path), timeout=1)
+
+    asyncio.run(stopped())
+    assert OmopRun(tmp_path).status() == {"extracted": 3}
+
+    extractor = HangingExtractor(pipeline.extractor.definitions, lambda: True)
+    pipeline.extractor = extractor
+    summary = run(pipeline, notes(4), tmp_path)
+    assert (summary.extracted, summary.reused, summary.built) == (1, 3, 4)
+    assert extractor.calls == 1
+
+
+def test_extraction_calls_in_flight_are_capped(tmp_path):
+    pipeline, _ = make_pipeline()
+    active, peak = 0, 0
+
+    class Counting(FakeExtractor):
+        max_concurrency = 3
+
+        async def __call__(self, texts):
+            nonlocal active, peak
+            active += 1
+            peak = max(peak, active)
+            await asyncio.sleep(0.01)
+            active -= 1
+            return await super().__call__(texts)
+
+    pipeline.extractor = Counting(pipeline.extractor.definitions)
+    assert run(pipeline, notes(20), tmp_path, chunk_size=5).built == 20
+    assert peak == 3
+
+
 def test_notes_need_ids(tmp_path):
     pipeline, _ = make_pipeline()
     with pytest.raises(ValueError, match="note_id"):
