@@ -4358,10 +4358,78 @@ notes and tried again by the next run, live or in a batch. Batch calls are count
 <code>&lt;model&gt;@batch</code> in the usage, and priced at half the model's price unless <code>prices</code>
 has an entry for that id. Gemini takes at most about 20 MB of prompts per job: lower
 <code>chunk_size</code> if it refuses one.</p>
+<p><strong>Several processes or machines.</strong> Split the dataset into shards that run
+independently.</p>
+<div class="admonition note">
+<p class="admonition-title">When sharding helps</p>
+<p>With a hosted API, a single process is not the limit: it spends its time waiting
+for the model, and the provider's rate limit applies to all processes together.
+Raise <code>max_concurrency</code> and the rate limits instead, with a <code>chunk_size</code> several
+times <code>max_concurrency</code>. Shard on one machine when a single process is busy (a
+fast or local model, local embedding retrieval), or to spread a run over several
+machines or cluster jobs. See the
+<a href="https://github.com/precisiondata/aatm/tree/main/benchmarks/sharding">sharding benchmark</a>.</p>
+</div>
+<p>A note's shard is a stable hash of its <code>note_id</code>, so every worker finds
+its share of the source on its own. On one machine, <code>run_sharded</code> runs the shards in
+separate processes:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="c1"># my_pipeline.py: worker processes import the factory, so define it in a module</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">OmopExtractionPipeline</span>
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">make_pipeline</span><span class="p">():</span>
+</span><span id="__span-29-5"><a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a>    <span class="k">return</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span>
+</span><span id="__span-29-6"><a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a>        <span class="s2">"ecog_performance_status"</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span> <span class="n">max_concurrency</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+</span><span id="__span-29-7"><a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a>        <span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># one cache file, shared by the processes</span>
+</span><span id="__span-29-8"><a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a>    <span class="p">)</span>
+</span></code></pre></div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">set_rate_limits</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">OmopRun</span><span class="p">,</span> <span class="n">run_sharded</span>
+</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">my_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_pipeline</span>
+</span><span id="__span-30-4"><a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>
+</span><span id="__span-30-5"><a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+</span><span id="__span-30-6"><a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>    <span class="n">set_rate_limits</span><span class="p">(</span><span class="s2">"openai"</span><span class="p">,</span> <span class="n">requests_per_minute</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span>  <span class="c1"># divided among the processes</span>
+</span><span id="__span-30-7"><a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a>    <span class="n">summary</span> <span class="o">=</span> <span class="n">run_sharded</span><span class="p">(</span>
+</span><span id="__span-30-8"><a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a>        <span class="n">make_pipeline</span><span class="p">,</span> <span class="s2">"notes.parquet"</span><span class="p">,</span> <span class="s2">"output/ecog"</span><span class="p">,</span> <span class="n">num_shards</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">200</span>
+</span><span id="__span-30-9"><a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a>    <span class="p">)</span>
+</span><span id="__span-30-10"><a id="__codelineno-30-10" name="__codelineno-30-10" href="#__codelineno-30-10"></a>    <span class="n">run</span> <span class="o">=</span> <span class="n">OmopRun</span><span class="p">(</span><span class="s2">"output/ecog"</span><span class="p">)</span>  <span class="c1"># reads every shard as one run</span>
+</span><span id="__span-30-11"><a id="__codelineno-30-11" name="__codelineno-30-11" href="#__codelineno-30-11"></a>    <span class="n">run</span><span class="o">.</span><span class="n">table</span><span class="p">(</span><span class="s2">"measurement"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Each shard is an ordinary run in its own folder (<code>output/ecog/shard-000-of-004/</code>...),
+with its own ledger: it resumes, retries and rebuilds on its own, and
+<code>pipeline.rebuild("output/ecog")</code> rebuilds them all. Calling <code>run_sharded</code> again
+resumes every shard. A folder keeps the number of shards it was split into. If a shard
+stops with an error, the others finish, and <code>ShardedRunError</code> reports it with the
+combined summary.</p>
+<p>Rate limits apply per process: <code>run_sharded</code> divides the limits you set among the
+processes running at once (<code>processes</code>, all shards by default). Pass the source as a
+path, a DataFrame or a list, which every process reads, keeping its own notes, or, for
+a database, as a function that opens its own connection and returns <code>notes_from_sql</code>.
+A query is filtered in the database, so each shard fetches only its notes:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sqlite3</span>
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">notes_from_sql</span>
+</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>
+</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">note_source</span><span class="p">():</span>  <span class="c1"># in my_pipeline.py, next to make_pipeline</span>
+</span><span id="__span-31-5"><a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a>    <span class="n">con</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"cdm.db"</span><span class="p">)</span>
+</span><span id="__span-31-6"><a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a>    <span class="k">return</span> <span class="n">notes_from_sql</span><span class="p">(</span><span class="s2">"SELECT note_id, note_text AS text, person_id FROM note"</span><span class="p">,</span> <span class="n">con</span><span class="p">)</span>
+</span><span id="__span-31-7"><a id="__codelineno-31-7" name="__codelineno-31-7" href="#__codelineno-31-7"></a>
+</span><span id="__span-31-8"><a id="__codelineno-31-8" name="__codelineno-31-8" href="#__codelineno-31-8"></a><span class="n">run_sharded</span><span class="p">(</span><span class="n">make_pipeline</span><span class="p">,</span> <span class="n">note_source</span><span class="p">,</span> <span class="s2">"output/ecog"</span><span class="p">,</span> <span class="n">num_shards</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The filter is integer arithmetic on the note id, cast to <code>BIGINT</code>; for MySQL, pass
+<code>notes_from_sql(..., cast="SIGNED")</code>. <code>shard_condition(index, count)</code> returns it, to
+filter a query yourself.</p>
+<p>On several machines (or jobs of a scheduler), run one shard on each with
+<code>shard=(index, count)</code>, then gather the folders under one parent and read it with
+<code>OmopRun</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">shard_dir</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="n">index</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"SHARD_INDEX"</span><span class="p">])</span>
+</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"notes.parquet"</span><span class="p">,</span> <span class="n">shard_dir</span><span class="p">(</span><span class="s2">"output/ecog"</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span> <span class="n">shard</span><span class="o">=</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+</span></code></pre></div>
+<p>Each machine keeps its own coding cache: entries are not shared across machines.</p>
 <p><strong>Row ids.</strong> The primary keys of a run are derived from the note:
 <code>note_id * 65536 + n</code>, where <code>n</code> is the position of the mention in the note. The same
 note gets the same ids in any chunk, after a resume or a rebuild, and in separate runs
-over parts of a dataset; ids never repeat across tables. They need a 64-bit (<code>BIGINT</code>)
+over parts of a dataset, such as shards; ids never repeat across tables. They need a 64-bit (<code>BIGINT</code>)
 column. <code>OmopTableBuilder.build(..., row_ids="note")</code> numbers rows the same way.</p>
 <div class="admonition tip">
 <p class="admonition-title">Speed and cost</p>
