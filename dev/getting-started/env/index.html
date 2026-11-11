@@ -555,6 +555,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#vector-database-location-chroma-cloud" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vector database location (Chroma Cloud)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#device-selection" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1592,6 +1603,8 @@
       
         
       
+        
+      
     
     
     
@@ -1814,6 +1827,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/vector_db/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vector database location
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/logs/" class="md-nav__link">
         
   
@@ -1920,6 +1961,17 @@
     <span class="md-ellipsis">
       
         Logging in Python code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vector-database-location-chroma-cloud" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vector database location (Chroma Cloud)
       
     </span>
   </a>
@@ -2062,6 +2114,55 @@
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">aatm</span><span class="o">.</span><span class="n">configure_logging</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>  <span class="c1"># everything</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"aatm.data_models.extractors"</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>  <span class="c1"># one module only</span>
 </span></code></pre></div>
+<h2 id="vector-database-location-chroma-cloud">Vector database location (Chroma Cloud)</h2>
+<p>By default, AATM builds one ChromaDB vector database per embedding model on this machine, under <code>.aatm/chroma_vector_dbs/</code>. To keep the index in <a href="https://trychroma.com/">Chroma Cloud</a> instead, which lets a team build it once and share it, set:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AATM_VECTOR_DB</code></td>
+<td><code>local</code></td>
+<td><code>local</code> or <code>cloud</code>. <code>aatm init --vector-db</code> overrides it for the build.</td>
+</tr>
+<tr>
+<td><code>CHROMA_API_KEY</code></td>
+<td>unset</td>
+<td>Chroma Cloud API key. Required in cloud mode. Never logged.</td>
+</tr>
+<tr>
+<td><code>CHROMA_TENANT</code></td>
+<td>unset</td>
+<td>Chroma Cloud tenant. Optional when the API key is scoped to one database.</td>
+</tr>
+<tr>
+<td><code>CHROMA_DATABASE</code></td>
+<td>unset</td>
+<td>Chroma Cloud database. Optional when the API key is scoped to one database.</td>
+</tr>
+<tr>
+<td><code>CHROMA_CLOUD_HOST</code></td>
+<td><code>api.trychroma.com</code></td>
+<td>Chroma Cloud host.</td>
+</tr>
+</tbody>
+</table>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>AATM_VECTOR_DB=cloud
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>CHROMA_API_KEY=your_chroma_api_key
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>CHROMA_DATABASE=aatm
+</span></code></pre></div>
+<p>In cloud mode, one database holds every model's index, so each embedding model gets its own collection, named <code>expressions-&lt;model&gt;</code> (e.g. <code>expressions-qwen3-06B</code>). Retrievers, <code>aatm map</code>, the search UI and the API then query Chroma Cloud with the same filters as locally. Embeddings for local models are still computed on the machine that runs the build.</p>
+<p>Useful commands:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>aatm<span class="w"> </span>vector-db<span class="w"> </span>check<span class="w">                       </span><span class="c1"># show the configured location and test the connection</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>aatm<span class="w"> </span>init<span class="w"> </span>--vector-db<span class="w"> </span>cloud<span class="w">                </span><span class="c1"># build the index directly in Chroma Cloud</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>aatm<span class="w"> </span>vector-db<span class="w"> </span>upload<span class="w"> </span>-e<span class="w"> </span>embeddinggemma-300M<span class="w">  </span><span class="c1"># copy an existing local index, without re-embedding</span>
+</span></code></pre></div>
+<p><code>aatm vector-db upload</code> skips rows already in the cloud, so an interrupted upload resumes when run again. Cloud writes are retried with backoff on rate limits, server errors and network failures.</p>
 <h2 id="device-selection">Device selection</h2>
 <table>
 <thead>
