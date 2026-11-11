@@ -1164,7 +1164,17 @@ has an entry for that id. Gemini takes at most about 20 MB of prompts per job: l
 `chunk_size` if it refuses one.
 
 **Several processes or machines.** Split the dataset into shards that run
-independently. A note's shard is a stable hash of its `note_id`, so every worker finds
+independently.
+
+!!! note "When sharding helps"
+    With a hosted API, a single process is not the limit: it spends its time waiting
+    for the model, and the provider's rate limit applies to all processes together.
+    Raise `max_concurrency` and the rate limits instead, with a `chunk_size` several
+    times `max_concurrency`. Shard on one machine when a single process is busy (a
+    fast or local model, local embedding retrieval), or to spread a run over several
+    machines or cluster jobs. See the
+    [sharding benchmark](https://github.com/precisiondata/aatm/tree/main/benchmarks/sharding).
+ A note's shard is a stable hash of its `note_id`, so every worker finds
 its share of the source on its own. On one machine, `run_sharded` runs the shards in
 separate processes:
 

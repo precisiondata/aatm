@@ -1,0 +1,17 @@
+scenario,shards,extraction_concurrency,coder_concurrency,latency,sigma,coder_latency,retriever,chroma_dir,mapper_batch_size,rpm,notes,built,failed,wall_s,run_s,notes_per_min,run_notes_per_min,extraction_s,coding_s,building_s,coded_texts,cpu_s,peak_rss_mb
+instant,1,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,284.8,282.6,421.4,424.6,282.1,6.9,1.5,3507,11.3,187
+instant,2,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,195.4,193.1,614.3,621.6,378.8,7.2,1.6,3533,13.8,375
+instant,4,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,159.1,156.7,754.2,765.9,597.1,8.0,1.6,3565,19.2,747
+instant,8,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,147.9,145.0,811.1,827.5,1097.4,8.8,1.5,3810,30.2,1484
+retrieval,1,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,313.1,295.4,383.3,406.3,291.3,80.1,1.6,3507,115.2,2359
+retrieval,2,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,203.2,185.0,590.6,648.7,359.1,84.0,1.5,3533,136.3,4531
+retrieval,4,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,181.6,162.1,660.9,740.1,615.1,100.8,1.5,3565,177.9,8612
+retrieval,8,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,164.1,140.1,731.3,856.6,1053.4,126.1,1.8,3810,295.9,17074
+agent,1,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,494.0,491.9,242.9,243.9,269.3,475.0,1.6,3507,11.9,189
+agent,2,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,468.3,466.0,256.2,257.5,387.2,875.1,1.5,3533,14.2,377
+agent,4,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,476.1,471.9,252.1,254.3,610.6,1710.0,1.5,3565,18.8,753
+agent,8,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,,2000,2000,0,524.2,521.4,228.9,230.1,1098.5,3572.1,1.7,3810,29.1,1498
+rate-limited,1,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,1200.0,2000,2000,0,274.0,272.0,438.0,441.2,271.4,7.0,1.6,3507,11.6,189
+rate-limited,2,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,1200.0,2000,2000,0,211.9,209.6,566.3,572.6,388.0,7.6,1.9,3533,14.1,375
+rate-limited,4,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,1200.0,2000,2000,0,164.3,161.8,730.3,741.4,618.1,8.1,1.6,3565,18.9,749
+rate-limited,8,64,16,4.0,0.5,2.0,embeddinggemma-300M,.aatm/chroma_vector_dbs_subset/embeddinggemma-300M,16,1200.0,2000,2000,0,147.8,144.9,811.9,828.4,1083.0,8.7,1.4,3810,29.9,1489

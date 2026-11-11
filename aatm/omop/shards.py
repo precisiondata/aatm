@@ -7,6 +7,16 @@ folder, ledger and part files; it resumes, retries and rebuilds like any run. Ro
 are derived from the note (`aatm.omop.builder.note_row_id`), so they never collide
 across shards, and the shards together hold the same rows as a single run.
 
+## When it helps
+
+With a hosted API, one process spends its time waiting for the model, and the
+provider's rate limit applies to every process together: raise ``max_concurrency``
+and the rate limits rather than shard, with a ``chunk_size`` several times
+``max_concurrency``. Sharding on one machine pays off when a single process is busy (a
+fast or local model, local embedding retrieval), at the cost of one copy of the
+models per process; and it is the way to use several machines or cluster jobs. See
+``benchmarks/sharding`` in the repository.
+
 ## On one machine
 
 `run_sharded` runs the shards in separate processes and returns their combined
