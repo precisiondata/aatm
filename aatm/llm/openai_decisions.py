@@ -8,6 +8,7 @@ from typing import Any, Optional, Sequence
 
 from openai import AsyncOpenAI
 
+from aatm.llm.base import PerEventLoop
 from aatm.llm.decisions import (
     Answer,
     Decision,
@@ -45,11 +46,19 @@ class OpenAIDecisionModel:
         self.model = model
         self.model_id = f"openai/{model}"
         self.settings = settings or DecisionSettings()
-        # Retries are handled by the shared limiter (`aatm.llm.limits`).
-        self.client = client or AsyncOpenAI(
-            api_key=api_key, base_url=base_url, max_retries=0
+        # Retries are handled by the shared limiter (`aatm.llm.limits`). One client
+        # per event loop: openai 3.x binds its connection pool to the first loop.
+        self._clients = PerEventLoop(
+            lambda: AsyncOpenAI(api_key=api_key, base_url=base_url, max_retries=0)
         )
+        if client is not None:
+            self._clients.set(client)
         warn_if_unpinned(self.model_id)
+
+    @property
+    def client(self) -> AsyncOpenAI:
+        """The client of the running event loop (or the one given)."""
+        return self._clients.get()
 
     def request_body(
         self, state: State, questions: Sequence[Question]

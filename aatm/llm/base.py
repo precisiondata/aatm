@@ -1,6 +1,17 @@
 """Provider-neutral interface for structured-output LLM calls."""
 
-from typing import Any, Literal, Optional, Protocol, TypeVar, runtime_checkable
+import asyncio
+import weakref
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Literal,
+    Optional,
+    Protocol,
+    TypeVar,
+    runtime_checkable,
+)
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,6 +46,50 @@ class LLMSettings(BaseModel):
     reasoning_effort: Optional[ReasoningEffort] = None
     timeout: Optional[float] = Field(default=None, gt=0)
     provider_kwargs: dict[str, Any] = Field(default_factory=dict)
+
+
+C = TypeVar("C")
+
+
+class PerEventLoop(Generic[C]):
+    """One object per asyncio event loop, e.g. an async SDK client.
+
+    Async SDK clients (``openai`` 3.x, ``google-genai``'s Decisions API) keep a
+    connection pool bound to the event loop they first ran on, and fail with
+    "Event loop is closed" on the next one. aatm calls models from successive
+    ``asyncio.run`` calls (synchronous APIs, notebooks), so adapters build one
+    client per loop.
+
+    Args:
+        factory: Builds a new object.
+    """
+
+    def __init__(self, factory: Callable[[], C]):
+        self._factory = factory
+        self._by_loop: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, C] = (
+            weakref.WeakKeyDictionary()
+        )
+        self._outside_loop: Optional[C] = None
+        self._fixed: Optional[C] = None
+
+    def get(self) -> C:
+        """The object of the running loop; a shared one outside any loop."""
+        if self._fixed is not None:
+            return self._fixed
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            if self._outside_loop is None:
+                self._outside_loop = self._factory()
+            return self._outside_loop
+        value = self._by_loop.get(loop)
+        if value is None:
+            value = self._by_loop[loop] = self._factory()
+        return value
+
+    def set(self, value: C) -> None:
+        """Use `value` on every loop from now on (e.g. a fake client in tests)."""
+        self._fixed = value
 
 
 class LLMResponseError(RuntimeError):
