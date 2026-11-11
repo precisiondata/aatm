@@ -85,6 +85,12 @@ The summary is printed (logged) and saved as JSON in ``runs/``, one file per cal
 `OmopRun.summaries` reads them back. The file is also saved at every progress log,
 so a long run can be watched from elsewhere, and kept when a run crashes.
 
+## Shards
+
+To run on several processes or machines, split the dataset into shards with
+``shard=(index, count)``, or `aatm.omop.run_sharded` on one machine; `OmopRun` reads
+the parent folder of the shards as one run. See `aatm.omop.shards`.
+
 ## Rebuilding
 
 Extraction, the costly step, is stored apart from the tables. After changing the

@@ -60,6 +60,8 @@ Run one shard per machine (or job) with ``shard=(index, count)``, into folders u
 one parent, then read the parent:
 
 ```python
+from aatm.omop import shard_dir
+
 summary = await pipeline.run(
     "notes.parquet", shard_dir("output/ecog", index, 8), shard=(index, 8)
 )
