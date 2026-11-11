@@ -1137,6 +1137,12 @@ class _BatchQueue:
         return done
 
 
+def _describe_shard(value: str) -> str:
+    """``"1/4"`` as ``"shard 1 of 4"``; ``"0/1"`` is the whole dataset."""
+    index, count = value.split("/")
+    return "the whole dataset" if count == "1" else f"shard {index} of {count}"
+
+
 class ChunkedRun:
     """Runs a pipeline over a dataset in chunks; see `OmopExtractionPipeline.run`."""
 
@@ -1179,16 +1185,10 @@ class ChunkedRun:
         stored = ledger.get_meta("shard")
         if stored is None and ledger.has_notes():
             stored = "0/1"  # made before shards were recorded: a whole dataset
-        if stored not in (None, wanted):
-            def describe(value: str) -> str:
-                index, count = value.split("/")
-                if count == "1":
-                    return "the whole dataset"
-                return f"shard {index} of {count}"
-
+        if stored is not None and stored != wanted:
             raise ValueError(
-                f"{self.output_dir} holds {describe(stored)}, not "
-                f"{describe(wanted)}: use another output folder"
+                f"{self.output_dir} holds {_describe_shard(stored)}, not "
+                f"{_describe_shard(wanted)}: use another output folder"
             )
         ledger.set_meta("shard", wanted)
 
@@ -1668,7 +1668,9 @@ class OmopRun:
         return self.folders != [self.output_dir]
 
     def _parts(self, name: str) -> list[Path]:
-        return [p for f in self.folders for p in sorted((f / name).glob("part-*.parquet"))]
+        return [
+            p for f in self.folders for p in sorted((f / name).glob("part-*.parquet"))
+        ]
 
     @property
     def tables(self) -> list[str]:
@@ -1735,7 +1737,9 @@ class OmopRun:
 
     def failures(self) -> pd.DataFrame:
         """Notes that could not be extracted or built: their stage, error and tries."""
-        return self._concat([ledger.failures() for ledger in self._ledgers()], "note_id")
+        return self._concat(
+            [ledger.failures() for ledger in self._ledgers()], "note_id"
+        )
 
     def summaries(self) -> list[RunSummary]:
         """The summaries of the runs and rebuilds made in this folder, oldest first.

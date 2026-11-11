@@ -258,7 +258,9 @@ def _failed_summary(output_dir: Path, error: BaseException) -> "RunSummary":
 
     message = f"{type(error).__name__}: {error}" if str(error) else type(error).__name__
     return RunSummary(
-        output_dir=str(output_dir), error=message, finished_at=datetime.now(timezone.utc)
+        output_dir=str(output_dir),
+        error=message,
+        finished_at=datetime.now(timezone.utc),
     )
 
 
