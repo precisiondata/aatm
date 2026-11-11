@@ -30,8 +30,12 @@ recorded with its error and the run goes on; a later run tries it again, up to
 ``max_attempts`` times in all. `note_id` is the key that tells notes apart, so every
 note needs a unique one.
 
-While a chunk is built (coded and written, in a thread), the next one is extracted;
-at most two chunks are in memory.
+Extraction does not wait for chunks: up to the extractor's ``max_concurrency`` calls
+(or its model's, see `aatm.llm.set_rate_limits`) are in flight at once, a new one
+starting as soon as one ends, and each result is stored as soon as it comes back, so a
+run that stops loses none of the calls it paid for. Extracted notes are built
+``chunk_size`` at a time, one chunk at a time in a thread, while extraction goes on;
+a few chunks are in memory at most.
 
 ## Batch extraction
 
@@ -1648,8 +1652,10 @@ class _Stream:
     async def extract(self, note: ClinicalNote) -> None:
         """Start extracting `note`, once a slot is free."""
         await self._wait(
-            lambda: len(self.extracting) < self.max_extracting
-            and len(self.buffer) < self.max_waiting
+            lambda: (
+                len(self.extracting) < self.max_extracting
+                and len(self.buffer) < self.max_waiting
+            )
         )
         if not self.extracting:
             self.busy_since = time.perf_counter()
