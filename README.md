@@ -68,17 +68,37 @@ cd aatm
 uv sync
 ```
 
-## 1. Prepare your OMOP vocabularies directory
+## 1. Get your OMOP vocabularies
 
-Before running `aatm init`, download the OMOP vocabularies you want to use and place them in a directory. You can find them at https://athena.ohdsi.org/vocabulary/list
+AATM cannot ship the OMOP vocabularies because several of them have their own licences. You request them from [Athena](https://athena.ohdsi.org/vocabulary/list), which has no API for this, so this step is done in the browser:
 
-By default, the CLI expects it at the root directory:
+1. Log in to [Athena](https://athena.ohdsi.org/vocabulary/list) and open **Download**.
+2. Select the vocabularies you need (for example SNOMED, LOINC, RxNorm and UCUM) and accept the licences of the restricted ones.
+3. Click **Download vocabularies** and name the bundle. Athena emails you a link to a zip file when it is ready, which can take a while.
+
+Then let `aatm init` do the rest by passing it the link, or the zip if you already downloaded it:
+
+```bash
+aatm init --vocab-zip "https://athena.ohdsi.org/api/v1/vocabularies/zip/<bundle-id>"
+aatm init --vocab-zip ~/Downloads/vocabulary_download_v5_<bundle-id>.zip
+```
+
+With `--vocab-zip`, `aatm init`:
+
+- downloads the bundle into `.aatm/downloads` (resuming if the connection drops). If Athena returns a login page or the link has expired, it says so: request the bundle again, or download it in your browser and pass the zip's path instead;
+- unpacks it into `./vocabularies`, or into `--vocab-dir`. It asks before overwriting existing files; pass `--force` to overwrite without asking;
+- checks that the required files (`CONCEPT.csv`, `CONCEPT_RELATIONSHIP.csv`, `CONCEPT_SYNONYM.csv`, `VOCABULARY.csv`, `DOMAIN.csv`) are present, and lists the vocabularies and versions in the bundle;
+- adds the CPT4 concept names when the bundle includes CPT4. This needs [Java](https://adoptium.net) and a [UMLS API key](https://uts.nlm.nih.gov/uts/profile), passed with `--umls-api-key` or the `UMLS_API_KEY` environment variable. Without a key, CPT4 concepts are kept without names.
+
+### Using an unpacked directory
+
+If you unpacked the zip yourself, put the CSVs in `./vocabularies`, where the CLI looks by default:
 
 ```text
 ./vocabularies
 ```
 
-If you do not use that location, you can point the CLI to a different directory with the option `--vocab-dir` or `-vd`. The CLI validates this path during initialization.
+To use another location, pass `--vocab-dir` or `-vd`. The CLI validates this path during initialization. In that case, add the CPT4 names yourself by following the `readme.txt` in the bundle.
 
 ---
 
