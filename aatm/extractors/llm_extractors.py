@@ -25,18 +25,22 @@ key is read from the provider's usual environment variable unless passed explici
 import asyncio
 import contextlib
 import logging
-from typing import Any, List, Literal, Optional, Sequence
+from typing import TYPE_CHECKING, Any, List, Literal, Optional, Sequence
 
 from aatm.data_models.extractors import (
     EntityDefinitions,
     EntityValidationResult,
     ExtractedEntityCandidates,
+    TextSegment,
     format_segments_for_prompt,
     segment_text,
     validate_extracted_entity,
 )
 from aatm.llm import LLMSettings, StructuredLLM, create_llm
 from aatm.llm.batch import BatchLLM, BatchRequest, supports_batch
+
+if TYPE_CHECKING:
+    from aatm.extractors.attribute_labeller import DecisionAttributeLabeller
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +114,10 @@ class SimpleLLMExtractor:
             ``"raise"`` (default) raises the error; ``"record"`` returns an empty
             result for that text with the error in its ``error`` field, so one note
             does not stop a batch.
+        attribute_labeller: Opt in to labelling attributes with a decision model,
+            with probabilities, instead of (or as a check on) this extractor's own
+            labels; see `aatm.extractors.DecisionAttributeLabeller`. A labeller
+            error counts as an extraction error (see ``on_error``).
     """
 
     def __init__(
@@ -125,6 +133,7 @@ class SimpleLLMExtractor:
         max_segment_chars: Optional[int] = None,
         llm: Optional[StructuredLLM] = None,
         on_error: Literal["raise", "record"] = "raise",
+        attribute_labeller: Optional["DecisionAttributeLabeller"] = None,
     ):
         if entity_definitions is None:
             raise ValueError("entity_definitions is required")
@@ -148,12 +157,20 @@ class SimpleLLMExtractor:
         self.on_error = on_error
         self.entity_definitions = entity_definitions
         self.max_segment_chars = max_segment_chars
+        self.attribute_labeller = attribute_labeller
+        # The definitions the model sees and its output is validated against: in
+        # the labeller's replace mode, without the attributes it labels.
+        self._prompt_definitions = (
+            attribute_labeller.prompt_definitions(entity_definitions)
+            if attribute_labeller is not None
+            else entity_definitions
+        )
 
         # Plain replacement instead of str.format so that literal braces in custom
         # instructions do not break prompt construction.
         self.instructions = instructions.replace(
             "{output_format}", str(output_type.model_json_schema())
-        ).replace("{entity_definitions}", entity_definitions.to_prompt_str())
+        ).replace("{entity_definitions}", self._prompt_definitions.to_prompt_str())
         self.output_type = output_type
 
     async def extract(self, text: str) -> EntityValidationResult:
@@ -172,11 +189,40 @@ class SimpleLLMExtractor:
             logger.warning("Extraction failed with %s: %s", self.model_id, e)
             return EntityValidationResult(error=f"{type(e).__name__}: {e}")
 
+        result = self._validate(text, candidates, segments)
+        if self.attribute_labeller is None:
+            return result
+        try:
+            return await self._label(result, segments)
+        except Exception as e:
+            if self.on_error == "raise":
+                raise
+            logger.warning("Attribute labelling failed: %s", e)
+            return EntityValidationResult(error=f"{type(e).__name__}: {e}")
+
+    def _validate(
+        self,
+        text: str,
+        candidates: ExtractedEntityCandidates,
+        segments: List[TextSegment],
+    ) -> EntityValidationResult:
+        if self.attribute_labeller is not None:
+            candidates = self.attribute_labeller.strip_candidates(
+                candidates, self.entity_definitions
+            )
         return validate_extracted_entity(
             text=text,
             extracted_entities=candidates,
-            entity_definitions=self.entity_definitions,
+            entity_definitions=self._prompt_definitions,
             segments=segments,
+        )
+
+    async def _label(
+        self, result: EntityValidationResult, segments: List[TextSegment]
+    ) -> EntityValidationResult:
+        assert self.attribute_labeller is not None
+        return await self.attribute_labeller.label(
+            result, segments, self.entity_definitions
         )
 
     # --- provider batch jobs ------------------------------------------------------
@@ -220,27 +266,39 @@ class SimpleLLMExtractor:
 
         `items` are the ``(key, text)`` pairs submitted. A request that failed gets
         a result with its ``error`` set, whatever ``on_error`` is.
+
+        With an ``attribute_labeller``, the attributes are labelled here, with live
+        decision calls, before the results are returned. A run that stops while
+        they are labelled has not stored the results, so it polls the finished job
+        again and labels them then.
         """
         keys = [key for key, _ in items]
         batch = await self._batch_llm().poll_batch(batch_id, keys, self.output_type)
         if batch is None:
             return None
         results: dict[str, EntityValidationResult] = {}
+        segments_of: dict[str, List[TextSegment]] = {}
         for (key, text), item in zip(items, batch):
             if item.error is not None or item.output is None:
                 results[key] = EntityValidationResult(error=item.error or "no output")
                 continue
             try:
-                results[key] = validate_extracted_entity(
-                    text=text,
-                    extracted_entities=item.output,
-                    entity_definitions=self.entity_definitions,
-                    segments=segment_text(
-                        text, max_segment_chars=self.max_segment_chars
-                    ),
-                )
+                segments = segment_text(text, max_segment_chars=self.max_segment_chars)
+                results[key] = self._validate(text, item.output, segments)
+                segments_of[key] = segments
             except Exception as e:  # noqa: BLE001 - one bad output must not stop a batch
                 results[key] = EntityValidationResult(error=f"{type(e).__name__}: {e}")
+        if self.attribute_labeller is not None:
+            labelled = await asyncio.gather(
+                *(self._label(results[k], s) for k, s in segments_of.items()),
+                return_exceptions=True,
+            )
+            for key, outcome in zip(segments_of, labelled):
+                if isinstance(outcome, BaseException):
+                    error = f"{type(outcome).__name__}: {outcome}"
+                    results[key] = EntityValidationResult(error=error)
+                else:
+                    results[key] = outcome
         return results
 
     async def __call__(self, texts: List[str]) -> List[EntityValidationResult]:
