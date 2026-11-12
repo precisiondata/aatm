@@ -1,0 +1,58 @@
+id,group,text,value,unit,operator,sentence,gold,also_accept,language
+1,Hb,Hb,11.2,g/dL,,"Labs 03/15/2025: Hb 11.2 g/dL, creatinine 1.4 mg/dl.",718-7,,en
+2,Hb,Hb,9.8,g/dL,,"Post-op day 2: Hb 9.8 g/dL, transfused 1 unit.",718-7,,en
+3,Hb,Hb,112,g/L,,"CBC: Hb 112 g/L, WBC 6.1, PLT 210.",718-7,,en
+4,Hb,Hb,"10,5",g/dL,,"Hemograma: Hb 10,5 g/dL, leucócitos 8.000.",718-7,,pt
+5,Hb,Hb,7.8,%,,"DM2 follow-up: Hb 7.8 % (8.4 % in March), adjust metformin.",4548-4,,en
+6,glucose,glucose,110,mg/dL,,Glucose 110 mg/dL (random).,2345-7,,en
+7,glucose,glucose,6.1,mmol/L,,"Chem panel: glucose 6.1 mmol/L, urea 5.2 mmol/L.",14749-6,,en
+8,glucose,glucose,126,mg/dL,,Fasting labs this morning: glucose 126 mg/dL.,1558-6,,en
+9,glucose,glucose,45,mg/dL,,"CSF analysis: glucose 45 mg/dL, protein 60 mg/dL, WBC 250 /uL.",2342-4,,en
+10,glucose,glucose,100,mg/dL,,"Urinalysis: pH 6.0, protein negative, glucose 100 mg/dL.",2350-7,5792-7,en
+11,creatinine,creatinine,1.4,mg/dl,,"Labs 03/15/2025: Hb 11.2 g/dL, creatinine 1.4 mg/dl.",2160-0,,en
+12,creatinine,creatinine,0.9,mg/dL,,"Creatinine 0.9 mg/dL, stable.",2160-0,,en
+13,creatinine,creatinine,124,umol/L,,"U&E: creatinine 124 umol/L, eGFR 48.",14682-9,,en
+14,creatinine,creatinine,1.2,g/24 h,,"24-hour urine collection: volume 1800 mL, creatinine 1.2 g/24 h.",2162-6,,en
+15,creatinine,creatinine,80,mg/dL,,"Spot urine: albumin 30 mg/L, creatinine 80 mg/dL.",2161-8,,en
+16,protein,protein,450,mg/24 h,,24h urine: protein 450 mg/24 h.,2889-4,,en
+17,protein,protein,7.0,g/dL,,"LFTs: albumin 4.0 g/dL, protein 7.0 g/dL, bilirubin 0.8 mg/dL.",2885-2,,en
+18,protein,protein,60,mg/dL,,"CSF analysis: glucose 45 mg/dL, protein 60 mg/dL, WBC 250 /uL.",2880-3,,en
+19,albumin,albumin,4.0,g/dL,,"LFTs: albumin 4.0 g/dL, protein 7.0 g/dL, bilirubin 0.8 mg/dL.",1751-7,,en
+20,albumin,albumin,3.1,g/dL,,"Albumin 3.1 g/dL, poor oral intake.",1751-7,,en
+21,albumin,albumin,30,mg/L,,"Spot urine: albumin 30 mg/L, creatinine 80 mg/dL.",14957-5,1754-1,en
+22,K,K,4.1,mmol/L,,"BMP: Na 138, K 4.1 mmol/L, Cl 101.",2823-3,,en
+23,K,K,5.6,mEq/L,,"K 5.6 mEq/L, repeat sample not hemolyzed.",2823-3,,en
+24,K,K,30,mmol/L,,"Urine electrolytes: Na 40 mmol/L, K 30 mmol/L.",2828-2,,en
+25,Na,Na,138,mmol/L,,"BMP: Na 138 mmol/L, K 4.1, Cl 101.",2951-2,,en
+26,Na,Na,128,mEq/L,,Hyponatremia: Na 128 mEq/L on admission.,2951-2,,en
+27,Na,Na,40,mmol/L,,"Urine electrolytes: Na 40 mmol/L, K 30 mmol/L.",2955-3,,en
+28,WBC,WBC,7.2,x10^3/uL,,"CBC: WBC 7.2 x10^3/uL, Hgb 13.5, PLT 250.",6690-2,26464-8,en
+29,WBC,WBC,15.3,x10^9/L,,"Leukocytosis, WBC 15.3 x10^9/L.",6690-2,26464-8,en
+30,WBC,WBC,250,/uL,,"CSF analysis: glucose 45 mg/dL, protein 60 mg/dL, WBC 250 /uL.",26465-5,806-0,en
+31,WBC,WBC,15,/hpf,,"Urinalysis: WBC 15 /hpf, RBC 2 /hpf, nitrite positive.",5821-4,,en
+32,troponin,troponin,0.03,ng/mL,,Chest pain workup: troponin (cTnI) 0.03 ng/mL.,10839-9,,en
+33,troponin,troponin,0.01,ng/mL,<,Serial cTnI: troponin <0.01 ng/mL at 0 and 3 h.,10839-9,,en
+34,troponin,troponin,14,ng/L,,High-sensitivity cTnT: troponin 14 ng/L at 0 h.,67151-1,,en
+35,HbA1c,HbA1c,8.1,%,,HbA1c 8.1% today.,4548-4,,en
+36,HbA1c,HbA1c,7.0,%,,"Last HbA1c 7.0 %, well controlled.",4548-4,,en
+37,HbA1c,HbA1c,"6,5",%,,"Hemoglobina glicada: HbA1c 6,5%.",4548-4,,pt
+38,HbA1c,HbA1c,64,mmol/mol,,HbA1c 64 mmol/mol (IFCC).,59261-8,,en
+39,CRP,CRP,12,mg/L,,CRP 12 mg/L on admission.,1988-5,,en
+40,CRP,CRP,1.2,mg/dL,,"CRP 1.2 mg/dL, trending down.",1988-5,,en
+41,CRP,CRP,2.1,mg/L,,Cardiac risk: CRP (high-sensitivity) 2.1 mg/L.,30522-7,,en
+42,TSH,TSH,2.3,mIU/L,,TSH 2.3 mIU/L (normal).,3016-3,,en
+43,TSH,TSH,0.05,uIU/mL,,"Hyperthyroid: TSH 0.05 uIU/mL, free T4 2.8 ng/dL.",3016-3,,en
+44,TSH,TSH,0.01,mIU/L,<,TSH <0.01 mIU/L on levothyroxine.,3016-3,,en
+45,TSH,TSH,"4,8",µUI/mL,,"TSH 4,8 µUI/mL, T4 livre normal.",3016-3,,pt
+46,ALT,ALT,45,U/L,,"LFTs: ALT 45 U/L, AST 30 U/L.",1742-6,,en
+47,ALT,ALT,312,U/L,,"Acute hepatitis: ALT 312 U/L, bilirubin 3.2 mg/dL.",1742-6,,en
+48,ALT,ALT,0.75,ukat/L,,ALT 0.75 ukat/L.,1742-6,,en
+49,PLT,PLT,250,x10^3/uL,,"CBC: WBC 7.2, Hgb 13.5, PLT 250 x10^3/uL.",777-3,26515-7,en
+50,PLT,PLT,45,x10^9/L,,"Thrombocytopenia, PLT 45 x10^9/L, hold heparin.",777-3,26515-7,en
+51,PLT,PLT,180.000,/mm3,,Plaquetas: PLT 180.000/mm3.,777-3,26515-7,pt
+52,ferritin,ferritin,25,ng/mL,,Ferritin 25 ng/mL; iron studies pending.,2276-4,,en
+53,ferritin,ferritin,850,ug/L,,"Ferritin 850 ug/L, likely inflammatory.",2276-4,,en
+54,ferritin,ferritin,8,ng/mL,,"Iron deficiency: ferritin 8 ng/mL, TSAT 9%.",2276-4,,en
+55,INR,INR,1.1,,,INR 1.1 on warfarin.,6301-6,34714-6,en
+56,INR,INR,2.8,,,"Coags: PT 28 s, INR 2.8.",6301-6,34714-6,en
+57,INR,INR,3.5,,,"Supratherapeutic INR 3.5, hold warfarin.",6301-6,34714-6,en
