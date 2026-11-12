@@ -633,10 +633,12 @@ Otherwise wrap it yourself and say what it is:
 
 ### Rate limits for long runs
 
-No rate limits are set by default: the pipeline sends model calls as fast as it can,
-and retries rate-limit and transient errors on its own. For large datasets, or a
-provider quota you must stay under, set limits once before the run; they cover
-extraction and coding together:
+No rate limits are set by default, and rate-limit and transient errors are retried on
+their own. A chunked run (`pipeline.run`) keeps 16 extraction calls in flight with a
+hosted API and 4 with a local server, unless you set `max_concurrency`. For large
+datasets, or a provider quota you must stay under, set limits once before the run;
+they cover extraction and coding together, and a run derives its extraction
+concurrency from them:
 
 ```python
 from aatm.llm import set_rate_limits
@@ -1038,7 +1040,7 @@ from aatm.omop import OmopExtractionPipeline, OmopRun
 pipeline = OmopExtractionPipeline(
     "ecog_performance_status",
     model_id="openai/gpt-5-mini",
-    max_concurrency=16,  # notes extracted at once
+    max_concurrency=16,  # notes extracted at once (16 is the default for a hosted API)
     cache=True,          # code each distinct text once, across chunks and runs
 )
 summary = asyncio.run(
@@ -1051,6 +1053,13 @@ summary = asyncio.run(
 )
 print(summary)  # notes built, skipped and failed, rows per table, cache hit rate
 ```
+
+**Check the plan first.** `pipeline.plan("notes.parquet", "output/ecog")` is a dry
+run: no model call. It prints the settings the run would use and where each came from,
+the notes left to do, the calls, tokens, cost and time a pilot run predicts, and
+warnings with a fix, such as a low `max_concurrency` with a hosted API. Which settings
+matter for your case, and which you can leave alone, is in
+[Tuning large OMOP runs](tuning_omop_runs.md).
 
 **Sources.** A CSV or Parquet file, a folder of Parquet files, a DataFrame, an iterable
 of `ClinicalNote` objects or dicts, or a database query:
@@ -1255,21 +1264,18 @@ over parts of a dataset, such as shards; ids never repeat across tables. They ne
 column. `OmopTableBuilder.build(..., row_ids="note")` numbers rows the same way.
 
 !!! tip "Speed and cost"
-    `max_concurrency` (default 1) sets how many notes are extracted at once; set
-    [rate limits](#rate-limits-for-long-runs) to stay under your provider's quota.
-    With `cache=True`, a text seen in an earlier chunk or run is not coded again.
-    `chunk_size` bounds memory; larger chunks let the builder group more repeated
-    texts per coding call. It does not limit extraction: a new call starts as soon as
-    one ends, so `max_concurrency` calls stay in flight and a slow note holds up no
-    other.
+    Most runs need no throughput setting: a run keeps 16 extraction calls in flight
+    with a hosted API (4 with a local server), whatever the `chunk_size`. Check what a
+    run would do, and what it would cost from a pilot, with `pipeline.plan(...)`; see
+    [Tuning large OMOP runs](tuning_omop_runs.md) for which settings matter in your
+    case.
 
     While a chunk is built (coded and written), extraction goes on, so the slower of
     the two stages sets the pace. This pays off when coding takes about as long as
     extraction, e.g. with the [agent](#searching-with-an-agent); without a mapper,
     building takes milliseconds and extraction is all the time. A few chunks are in
     memory at most: the one being built, up to two waiting, and the notes being
-    extracted. The two stages share the per-minute rate limits, but each gets its own
-    `max_concurrency`, so up to twice as many calls may be in flight.
+    extracted.
 
 ---
 
