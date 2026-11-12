@@ -543,6 +543,7 @@ def describe_component(obj: Any, _depth: int = 0) -> Any:
 
     The class, the settings that change its results (models, index, filters, top k,
     generation settings) and its nested components (retriever, selector, agent...).
+    A nested component with a ``cache_identity()`` method is described by it.
     The concept search agent's prompts are included as a fingerprint.
     """
     plain = _plain(obj)
@@ -550,6 +551,11 @@ def describe_component(obj: Any, _depth: int = 0) -> Any:
         return plain
     cls = type(obj)
     described: dict[str, Any] = {"class": f"{cls.__module__}.{cls.__qualname__}"}
+    identity = getattr(obj, "cache_identity", None)
+    if _depth > 0 and callable(identity):
+        # A nested component that describes itself (e.g. `DecisionSelector`).
+        described["identity"] = identity()
+        return described
     for name in _SETTING_ATTRS:
         value = _plain(getattr(obj, name, None))
         if name == "settings" and isinstance(value, dict):

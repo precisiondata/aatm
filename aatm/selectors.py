@@ -5,14 +5,14 @@ This module provides selector components used in the terminology-mapping
 pipeline to choose the best candidate from a set of retrieved expressions. It
 includes a simple rule-based selector that picks the first result under a
 distance threshold, as well as LLM-based selectors backed by OpenAI and Gemini
-models.
+models, and a selector backed by decision models (`DecisionSelector`).
 
 Selectors are designed to operate as pipeline stages that consume
 ``RetrieverResults`` and return structured ``SelectorResults`` objects.
 """
 
 from enum import Enum
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict, List, Tuple
 import dotenv
 from abc import ABC, abstractmethod
 from aatm.llm.gemini import gemini_client
@@ -456,3 +456,228 @@ class GeminiLLMSelector(BaseSelector):
                     break
 
         return selector_results
+
+
+# --- Decision models ------------------------------------------------------------------
+
+NONE_OPTION = "none"
+"""The option of `DecisionSelector`'s question meaning that no candidate fits."""
+
+DECISION_SELECTOR_INSTRUCTIONS = (
+    "The state is a clinical term from a source record. Which candidate standard "
+    "concept means the same as the term? Answer 'none' if no candidate means the "
+    "same thing: a broader, narrower or related concept is not the same."
+)
+
+
+def _candidate_description(expressions: List[Any]) -> str:
+    """How a candidate concept is shown to the model: name, code, domain, matches."""
+    first = expressions[0]
+    vocabulary = getattr(first.std_vocabulary_id, "value", first.std_vocabulary_id)
+    details = [
+        f"{vocabulary} {first.std_vocabulary_code or ''}".strip() if vocabulary else "",
+        first.std_domain_id or "",
+    ]
+    text = first.std_concept_name or first.expression or ""
+    if any(details):
+        text += " (" + ", ".join(d for d in details if d) + ")"
+    matched = [
+        e.expression
+        for e in expressions
+        if e.expression and e.expression != first.std_concept_name
+    ]
+    if matched:
+        text += "; matched: " + "; ".join(repr(m) for m in dict.fromkeys(matched))
+    return text
+
+
+class DecisionSelector(BaseSelector):
+    """Select candidates with a decision model (`aatm.llm.DecisionModel`).
+
+    For each query, the selector asks the model one choice question about the
+    query text, whose options are the top-k retrieved candidate concepts and
+    ``none``. Retrieved expressions of the same standard concept (synonyms) make one
+    option, so their probability is not split between them.
+
+    The probability of the chosen concept is the result's score: the mapper's
+    ``confidence_score`` and the OMOP builder's ``score``, so ``min_score: 0.8`` keeps
+    the mappings the model gives at least 80 %. ``llm/`` decision models give no
+    probabilities: their selections have **no score** (``confidence_score`` is
+    ``None``), and a ``min_score`` rejects all of them.
+
+    ```python
+    from aatm.terminology_mapper import TerminologyMapper
+
+    mapper = TerminologyMapper(selector="decision-openrouter/typesafe/jev-1.13")
+    ```
+
+    **Data governance:** the query texts and candidate names are sent to the
+    decision provider.
+
+    Args:
+        model: A decision model id for `aatm.llm.create_decision_model`, e.g.
+            ``"openrouter/typesafe/jev-1.13"``, or a `DecisionModel`. Pin a version.
+        top_k: Candidates (distinct concepts) offered to the model, at most 254.
+        instructions: The question asked about each query.
+        max_concurrency: Queries decided at the same time.
+        model_kwargs: Passed to `create_decision_model` (``api_key``, ``base_url``,
+            ``settings``) when `model` is an id.
+    """
+
+    def __init__(
+        self,
+        model: Any,
+        top_k: int = 10,
+        instructions: str = DECISION_SELECTOR_INSTRUCTIONS,
+        max_concurrency: int = 8,
+        model_kwargs: Optional[Dict[str, Any]] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        from aatm.llm.decisions import MAX_CHOICES, DecisionModel
+
+        if not 1 <= top_k <= MAX_CHOICES - 1:
+            raise ValueError(f"top_k must be between 1 and {MAX_CHOICES - 1}")
+        if max_concurrency < 1:
+            raise ValueError("max_concurrency must be >= 1")
+        if isinstance(model, str):
+            from aatm.llm import create_decision_model
+
+            model = create_decision_model(model, **(model_kwargs or {}))
+        elif model_kwargs:
+            raise ValueError("model_kwargs only applies when model is a model id")
+        if not isinstance(model, DecisionModel):
+            raise TypeError(
+                "model must be a decision model id or a DecisionModel, got "
+                f"{type(model).__name__}"
+            )
+        self.decision_model = model
+        self.model_id: str = model.model_id
+        self.top_k = top_k
+        self.instructions = instructions
+        self.max_concurrency = max_concurrency
+        if not self.has_probabilities:
+            logger.warning(
+                "%s gives no probabilities: DecisionSelector's selections have no "
+                "confidence score, and a min_score rejects all of them.",
+                self.model_id,
+            )
+
+    @property
+    def has_probabilities(self) -> bool:
+        """Whether the model's answers have probabilities (not ``llm/`` models)."""
+        return not self.model_id.startswith("llm/")
+
+    def cache_identity(self) -> Dict[str, Any]:
+        """The model and the question, for `aatm.omop.CachedCoder`.
+
+        ``max_concurrency`` is left out: it does not change the results.
+        """
+        identity: Dict[str, Any] = {
+            "selector": "DecisionSelector",
+            "model_id": self.model_id,
+            "top_k": self.top_k,
+            "instructions": self.instructions,
+        }
+        # The server of jev-compatible and OpenAI-compatible endpoints.
+        for name in ("url", "base_url"):
+            value = getattr(self.decision_model, name, None)
+            if value is not None:
+                identity[name] = str(value)
+        client_url = getattr(
+            getattr(self.decision_model, "client", None), "base_url", None
+        )
+        if client_url is not None and "base_url" not in identity:
+            identity["base_url"] = str(client_url)
+        # Extra request fields can change the answers; the timeout cannot.
+        settings = getattr(self.decision_model, "settings", None)
+        extra = getattr(settings, "provider_kwargs", None)
+        if extra:
+            identity["provider_kwargs"] = {
+                k: v if isinstance(v, (str, int, float, bool)) or v is None else repr(v)
+                for k, v in sorted(extra.items())
+            }
+        return identity
+
+    def question(self, candidates: List[List[Any]]) -> Any:
+        """The choice question for a query's candidates, grouped by concept."""
+        from aatm.llm.decisions import Option, Question
+
+        options = [
+            Option(value=f"c{i + 1}", description=_candidate_description(group))
+            for i, group in enumerate(candidates)
+        ]
+        options.append(Option(value=NONE_OPTION, description="None of the candidates"))
+        return Question.choice("concept", self.instructions, options)
+
+    def candidates(self, expressions: List[Any]) -> List[List[Tuple[int, Any]]]:
+        """The top-k distinct concepts, each with its ``(index, expression)`` pairs."""
+        groups: Dict[str, List[Tuple[int, Any]]] = {}
+        for index, expression in enumerate(expressions):
+            key = expression.std_concept_id or f"expression:{index}"
+            if key not in groups:
+                if len(groups) == self.top_k:
+                    continue
+                groups[key] = []
+            groups[key].append((index, expression))
+        return list(groups.values())
+
+    async def _select_one(
+        self, query: str, expressions: List[Any], semaphore: Any
+    ) -> SelectedExpressionMetadata | EmptySelectionMetadata:
+        import json
+
+        from aatm.llm.decisions import DecisionError
+
+        candidates = self.candidates(expressions)
+        if not candidates:
+            return EmptySelectionMetadata()
+        question = self.question([[e for _, e in group] for group in candidates])
+        try:
+            async with semaphore:
+                decision = await self.decision_model.decide({"text": query}, [question])
+            answer = decision[question.name]
+        except (DecisionError, KeyError) as e:
+            logger.warning("No decision for %r: %s", query, e)
+            return EmptySelectionMetadata(rationale=f"No decision: {e}")
+        trace = json.dumps(
+            [
+                {
+                    "model": decision.model,
+                    "answer": answer.value,
+                    "probabilities": answer.probabilities,
+                    "refused": answer.refused,
+                }
+            ],
+            ensure_ascii=False,
+        )
+        if answer.refused or answer.value not in question.values[:-1]:
+            return EmptySelectionMetadata(trace=trace)
+        position = question.values.index(str(answer.value))
+        index, expression = candidates[position][0]
+        probability = answer.probability
+        data = expression.model_dump(exclude={"distance", "expression_id"})
+        return SelectedExpressionMetadata(
+            **data,
+            # The mapper's confidence_score is 1 - distance: the probability.
+            distance=1 - probability if probability is not None else None,
+            result_list_index=index,
+            trace=trace,
+        )
+
+    def select(self, results: RetrieverResults) -> SelectorResults:
+        """Select a candidate for each query, or none."""
+        import asyncio
+
+        from aatm.concept_search.agent import run_sync
+
+        async def select_all() -> List[Any]:
+            semaphore = asyncio.Semaphore(self.max_concurrency)
+            return await asyncio.gather(
+                *(
+                    self._select_one(query, list(expressions), semaphore)
+                    for query, expressions in zip(results.queries, results.results)
+                )
+            )
+
+        return SelectorResults(results=run_sync(select_all()), queries=results.queries)
