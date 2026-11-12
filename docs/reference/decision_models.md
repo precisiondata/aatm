@@ -7,8 +7,9 @@ a generative LLM call, and write no text.
 
 Many steps of a mapping or extraction pipeline are decisions of this kind: choosing a
 candidate concept, labelling an attribute, checking that a mention is not negated.
-See [issue #77](https://github.com/precisiondata/aatm/issues/77) for the pipeline
-steps planned on top of this interface.
+The first such step is [`DecisionSelector`](#selecting-concepts-decisionselector);
+see [issue #77](https://github.com/precisiondata/aatm/issues/77) for the others
+planned on top of this interface.
 
 ```python
 import asyncio
@@ -71,6 +72,60 @@ Calls share the rate limits and retries of `aatm.llm.limits`, and are counted by
 !!! note "Probabilities are not accuracy"
     A confident answer can be wrong, and some models' probabilities shift with the
     order of the options. Calibrate thresholds on your own labelled data.
+
+## Selecting concepts: `DecisionSelector`
+
+`DecisionSelector` is a selector of the terminology mapper. For each text, it asks
+the decision model one choice question: which of the top-k retrieved candidate
+concepts means the same as the text, or `none`. Expressions of the same standard
+concept (synonyms) are one option, so their probability is not split.
+
+```python
+from aatm.omop import OmopTableBuilder
+from aatm.terminology_mapper import TerminologyMapper
+
+mapper = TerminologyMapper(
+    retriever="text-embedding-3-small",
+    selector="decision-openrouter/typesafe/jev-1.13",
+)
+builder = OmopTableBuilder(definitions, mapper=mapper)
+```
+
+Registered names are `decision-openai/gpt-6-luna`, `decision-gemini/gemini-decision-1`
+and `decision-openrouter/typesafe/jev-1.13`; any other `decision-<model id>` works
+too, e.g. `decision-llm/ollama/llama3.1:8b`. To set `top_k`, the question, or the
+model's `api_key`, `base_url` and `settings`, build the selector:
+
+```python
+from aatm.selectors import DecisionSelector
+
+selector = DecisionSelector(
+    "jev-compatible/jev-1.13",
+    top_k=5,
+    model_kwargs={"base_url": "https://jev.example.org/v1/decisions"},
+)
+```
+
+**The probability of the chosen concept is the mapping's score**: the mapper's
+`confidence_score` and the builder's `score`. A `min_score` in a definition is
+therefore a threshold on the model's probability: `map: {min_score: 0.8}` keeps the
+concepts chosen with at least 80 %, and stores `0` with a `low_confidence` issue
+for the others. Each mapping's trace has the provider's model version and the
+probability of every option.
+
+!!! warning "`llm/` models give no score"
+    With an `llm/` model the selector still chooses, but the mappings have no score
+    (`confidence_score` is empty): a `min_score` rejects all of them. aatm warns
+    when you create such a selector.
+
+The coding cache (`aatm.omop.CachedCoder`) keys results on the selector's
+`cache_identity()`: the model id, `top_k`, the question and the endpoint. Changing
+any of them, e.g. moving from `jev-1.13` to `jev-1.14`, codes the texts again. A
+moving alias (`jev-latest`) would not: pin versions.
+
+The texts to map and the candidate names are sent to the provider; see the data
+governance warning above. The API reference of `DecisionSelector` is on the
+[Selectors](selectors.md) page.
 
 ::: aatm.llm.decisions
 
