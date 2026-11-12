@@ -1,19 +1,19 @@
 {
  "model": "openai/gpt-5-nano",
- "key": "f745f73684bd06d9a37e6e071f016d59c4a9b9f760aeecfa154f52ff131caf5a",
+ "key": "d265c5c7e2aba4d579017393ac8044146239925b3b7198c1db274857676d2acf",
  "stats": {
-  "calls": 81,
-  "input_tokens": 395475,
-  "output_tokens": 166427,
-  "cost": 0.08634455,
-  "seconds": 178.79398899999796
+  "calls": 83,
+  "input_tokens": 405415,
+  "output_tokens": 185164,
+  "cost": 0.09433635,
+  "seconds": 198.95685049999156
  },
  "results": {
   "1": {
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Former smoker",
+     "text": "Social history: Former smoker, quit 2015. Drinks socially.",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
@@ -24,8 +24,8 @@
        "value": "former"
       }
      ],
-     "start": 16,
-     "end": 29,
+     "start": 0,
+     "end": 58,
      "attribute_probabilities": {}
     }
    ],
@@ -51,7 +51,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "smokes 1 ppd x 20 years",
+     "text": "SH: smokes 1 ppd x 20 years.",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
@@ -62,34 +62,8 @@
        "value": "current_every_day"
       }
      ],
-     "start": 4,
-     "end": 27,
-     "attribute_probabilities": {}
-    },
-    {
-     "id": "e3",
-     "text": "20",
-     "key": "pack_years_value",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [
-      "e2"
-     ],
-     "attributes": [],
-     "start": 19,
-     "end": 21,
-     "attribute_probabilities": {}
-    },
-    {
-     "id": "e2",
-     "text": "20 years",
-     "key": "pack_years",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [],
-     "attributes": [],
-     "start": 19,
-     "end": 27,
+     "start": 0,
+     "end": 28,
      "attribute_probabilities": {}
     }
    ],
@@ -100,6 +74,8 @@
     "drug_name",
     "ecog_performance_status",
     "family_history",
+    "pack_years",
+    "pack_years_value",
     "sig",
     "verbatim_end_date",
     "verbatim_start_date"
@@ -116,7 +92,7 @@
      "text": "Never smoker.",
      "key": "smoking_status",
      "line": "L1",
-     "occurrence": null,
+     "occurrence": 1,
      "parents": [],
      "attributes": [
       {
@@ -341,7 +317,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ex-tabagista h\u00e1 10 anos.",
+     "text": "H\u00e1bitos: ex-tabagista h\u00e1 10 anos.",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
@@ -352,7 +328,7 @@
        "value": "former"
       }
      ],
-     "start": 9,
+     "start": 0,
      "end": 33,
      "attribute_probabilities": {}
     }
@@ -645,7 +621,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Smokes half a pack daily, trying to cut down.",
+     "text": "Smokes half a pack daily",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
@@ -657,7 +633,7 @@
       }
      ],
      "start": 0,
-     "end": 45,
+     "end": 24,
      "attribute_probabilities": {}
     }
    ],
@@ -683,7 +659,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Former heavy smoker (quit 2001), now vapes daily.",
+     "text": "Former heavy smoker (quit 2001)",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
@@ -695,7 +671,7 @@
       }
      ],
      "start": 0,
-     "end": 49,
+     "end": 31,
      "attribute_probabilities": {}
     }
    ],
@@ -721,7 +697,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Mother smoked for 30 years; the patient never smoked.",
+     "text": "the patient never smoked.",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
@@ -732,7 +708,7 @@
        "value": "never"
       }
      ],
-     "start": 0,
+     "start": 28,
      "end": 53,
      "attribute_probabilities": {}
     }
@@ -1025,7 +1001,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG 1.",
+     "text": "ECOG 1",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
@@ -1037,7 +1013,7 @@
       }
      ],
      "start": 12,
-     "end": 19,
+     "end": 18,
      "attribute_probabilities": {}
     }
    ],
@@ -1139,7 +1115,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "PS ECOG 3",
+     "text": "ECOG 3",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
@@ -1150,7 +1126,7 @@
        "value": "3"
       }
      ],
-     "start": 0,
+     "start": 3,
      "end": 9,
      "attribute_probabilities": {}
     }
@@ -1295,10 +1271,10 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG 0 at diagnosis",
+     "text": "ECOG 0",
      "key": "ecog_performance_status",
      "line": "L1",
-     "occurrence": null,
+     "occurrence": 1,
      "parents": [],
      "attributes": [
       {
@@ -1307,7 +1283,7 @@
       }
      ],
      "start": 0,
-     "end": 19,
+     "end": 6,
      "attribute_probabilities": {}
     },
     {
@@ -1315,7 +1291,7 @@
      "text": "at diagnosis",
      "key": "assessment_date",
      "line": "L1",
-     "occurrence": null,
+     "occurrence": 1,
      "parents": [
       "e1"
      ],
@@ -1329,7 +1305,7 @@
      "text": "ECOG 2",
      "key": "ecog_performance_status",
      "line": "L1",
-     "occurrence": null,
+     "occurrence": 1,
      "parents": [],
      "attributes": [
       {
@@ -1474,10 +1450,11 @@
    "error": null
   },
   "38": {
-   "validated_entities": [
+   "validated_entities": [],
+   "unmatched_entities": [
     {
      "id": "e1",
-     "text": "ECOG PS 0-1.",
+     "text": " ECOG PS 0-1.",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
@@ -1492,16 +1469,18 @@
        "value": "1"
       }
      ],
-     "start": 0,
-     "end": 12,
-     "attribute_probabilities": {}
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
     }
    ],
-   "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
     "drug_duration",
     "drug_name",
+    "ecog_performance_status",
     "family_history",
     "pack_years",
     "pack_years_value",
@@ -1519,7 +1498,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG remains 1 despite fatigue.",
+     "text": "ECOG remains 1",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
@@ -1531,7 +1510,7 @@
       }
      ],
      "start": 0,
-     "end": 31,
+     "end": 14,
      "attribute_probabilities": {}
     }
    ],
@@ -1633,7 +1612,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG 4",
+     "text": "ECOG 4, bedbound.",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
@@ -1645,7 +1624,7 @@
       }
      ],
      "start": 0,
-     "end": 6,
+     "end": 17,
      "attribute_probabilities": {}
     }
    ],
@@ -1714,7 +1693,16 @@
      "line": "L1",
      "occurrence": null,
      "parents": [],
-     "attributes": [],
+     "attributes": [
+      {
+       "key": "score_range_min",
+       "value": "2"
+      },
+      {
+       "key": "score_range_max",
+       "value": "3"
+      }
+     ],
      "start": 0,
      "end": 31,
      "attribute_probabilities": {}
@@ -1739,8 +1727,7 @@
    "error": null
   },
   "45": {
-   "validated_entities": [],
-   "unmatched_entities": [
+   "validated_entities": [
     {
      "id": "e1",
      "text": "lisinopril 10 mg",
@@ -1750,15 +1737,13 @@
      "parents": [],
      "attributes": [
       {
-       "key": "sig",
-       "value": "PO daily"
+       "key": "kind",
+       "value": "taking"
       }
      ],
      "start": 20,
      "end": 36,
-     "reasons": [
-      "required_attribute_missing"
-     ]
+     "attribute_probabilities": {}
     },
     {
      "id": "e2",
@@ -1769,15 +1754,13 @@
      "parents": [],
      "attributes": [
       {
-       "key": "sig",
-       "value": "nightly"
+       "key": "kind",
+       "value": "taking"
       }
      ],
      "start": 48,
      "end": 66,
-     "reasons": [
-      "required_attribute_missing"
-     ]
+     "attribute_probabilities": {}
     },
     {
      "id": "e3",
@@ -1788,12 +1771,201 @@
      "parents": [],
      "attributes": [
       {
-       "key": "sig",
-       "value": "twice daily with meals"
+       "key": "kind",
+       "value": "prescribed"
       }
      ],
      "start": 89,
      "end": 105,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "46": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "ceftriaxone 1 g",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "administered"
+      }
+     ],
+     "start": 11,
+     "end": 26,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "azithromycin 250 mg",
+     "key": "drug_name",
+     "line": "L2",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "prescribed"
+      }
+     ],
+     "start": 51,
+     "end": 70,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [
+    {
+     "entity_id": "e2",
+     "entity_key": "drug_name",
+     "attribute_key": "sig",
+     "value": "by mouth daily for 4 days",
+     "reason": "unknown_attribute",
+     "required": false,
+     "kept_entity_id": null,
+     "kept_value": null
+    }
+   ],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "47": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Em uso domiciliar: Insulina NPH 10 UI SC \u00e0 noite.",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "taking"
+      }
+     ],
+     "start": 0,
+     "end": 49,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "48": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Albuterol MDI",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "taking"
+      }
+     ],
+     "start": 0,
+     "end": 13,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "2 puffs q4h PRN wheeze",
+     "key": "sig",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 14,
+     "end": 36,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "49": {
+   "validated_entities": [],
+   "unmatched_entities": [
+    {
+     "id": "e1",
+     "text": "Timolol 0.5% eye drops OU BID - continue.",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 41,
      "reasons": [
       "required_attribute_missing"
      ]
@@ -1822,137 +1994,18 @@
      "required": true,
      "kept_entity_id": null,
      "kept_value": null
-    },
-    {
-     "entity_id": "e2",
-     "entity_key": "drug_name",
-     "attribute_key": "kind",
-     "value": null,
-     "reason": "missing_required",
-     "required": true,
-     "kept_entity_id": null,
-     "kept_value": null
-    },
-    {
-     "entity_id": "e3",
-     "entity_key": "drug_name",
-     "attribute_key": "kind",
-     "value": null,
-     "reason": "missing_required",
-     "required": true,
-     "kept_entity_id": null,
-     "kept_value": null
     }
    ],
-   "optional_attribute_issues": [
-    {
-     "entity_id": "e1",
-     "entity_key": "drug_name",
-     "attribute_key": "sig",
-     "value": "PO daily",
-     "reason": "unknown_attribute",
-     "required": false,
-     "kept_entity_id": null,
-     "kept_value": null
-    },
-    {
-     "entity_id": "e2",
-     "entity_key": "drug_name",
-     "attribute_key": "sig",
-     "value": "nightly",
-     "reason": "unknown_attribute",
-     "required": false,
-     "kept_entity_id": null,
-     "kept_value": null
-    },
-    {
-     "entity_id": "e3",
-     "entity_key": "drug_name",
-     "attribute_key": "sig",
-     "value": "twice daily with meals",
-     "reason": "unknown_attribute",
-     "required": false,
-     "kept_entity_id": null,
-     "kept_value": null
-    }
-   ],
-   "attribute_reviews": [],
-   "error": null
-  },
-  "46": {
-   "validated_entities": [
-    {
-     "id": "e1",
-     "text": "ceftriaxone 1 g IV",
-     "key": "drug_name",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [],
-     "attributes": [
-      {
-       "key": "kind",
-       "value": "administered"
-      }
-     ],
-     "start": 11,
-     "end": 29,
-     "attribute_probabilities": {}
-    },
-    {
-     "id": "e2",
-     "text": "azithromycin 250 mg",
-     "key": "drug_name",
-     "line": "L2",
-     "occurrence": null,
-     "parents": [],
-     "attributes": [
-      {
-       "key": "kind",
-       "value": "prescribed"
-      }
-     ],
-     "start": 51,
-     "end": 70,
-     "attribute_probabilities": {}
-    },
-    {
-     "id": "e3",
-     "text": "by mouth daily for 4 days.",
-     "key": "sig",
-     "line": "L2",
-     "occurrence": null,
-     "parents": [
-      "e2"
-     ],
-     "attributes": [],
-     "start": 71,
-     "end": 97,
-     "attribute_probabilities": {}
-    }
-   ],
-   "unmatched_entities": [],
-   "unmatched_keys": [
-    "assessment_date",
-    "drug_duration",
-    "ecog_performance_status",
-    "family_history",
-    "pack_years",
-    "pack_years_value",
-    "smoking_status",
-    "verbatim_end_date",
-    "verbatim_start_date"
-   ],
-   "required_attribute_issues": [],
    "optional_attribute_issues": [],
    "attribute_reviews": [],
    "error": null
   },
-  "47": {
+  "50": {
    "validated_entities": [],
    "unmatched_entities": [
     {
      "id": "e1",
-     "text": "Em uso domiciliar: Insulina NPH 10 UI SC \u00e0 noite.",
+     "text": "Fentanyl 25 mcg/h patch changed today by nursing.",
      "key": "drug_name",
      "line": "L1",
      "occurrence": null,
@@ -1994,35 +2047,77 @@
    "attribute_reviews": [],
    "error": null
   },
-  "48": {
+  "51": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Ondansetron 4 mg SL",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "administered"
+      },
+      {
+       "key": "route",
+       "value": "sublingual"
+      }
+     ],
+     "start": 0,
+     "end": 19,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "52": {
    "validated_entities": [],
    "unmatched_entities": [
     {
      "id": "e1",
-     "text": "Albuterol MDI",
+     "text": "hydrocortisone 1% cream",
      "key": "drug_name",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
-     "start": 0,
-     "end": 13,
+     "start": 5,
+     "end": 28,
      "reasons": [
       "required_attribute_missing"
      ]
     },
     {
      "id": "e2",
-     "text": "2 puffs q4h PRN wheeze",
-     "key": "sig",
+     "text": "7 days",
+     "key": "drug_duration",
      "line": "L1",
      "occurrence": null,
      "parents": [
       "e1"
      ],
      "attributes": [],
-     "start": 14,
-     "end": 36,
+     "start": 47,
+     "end": 53,
      "reasons": [
       "parent_rejected"
      ]
@@ -2057,204 +2152,8 @@
    "attribute_reviews": [],
    "error": null
   },
-  "49": {
-   "validated_entities": [
-    {
-     "id": "e1",
-     "text": "Timolol 0.5% eye drops OU BID - continue.",
-     "key": "drug_name",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [],
-     "attributes": [
-      {
-       "key": "kind",
-       "value": "taking"
-      }
-     ],
-     "start": 0,
-     "end": 41,
-     "attribute_probabilities": {}
-    }
-   ],
-   "unmatched_entities": [],
-   "unmatched_keys": [
-    "assessment_date",
-    "drug_duration",
-    "ecog_performance_status",
-    "family_history",
-    "pack_years",
-    "pack_years_value",
-    "sig",
-    "smoking_status",
-    "verbatim_end_date",
-    "verbatim_start_date"
-   ],
-   "required_attribute_issues": [],
-   "optional_attribute_issues": [],
-   "attribute_reviews": [],
-   "error": null
-  },
-  "50": {
-   "validated_entities": [
-    {
-     "id": "e1",
-     "text": "Fentanyl 25 mcg/h patch",
-     "key": "drug_name",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [],
-     "attributes": [
-      {
-       "key": "kind",
-       "value": "administered"
-      }
-     ],
-     "start": 0,
-     "end": 23,
-     "attribute_probabilities": {}
-    }
-   ],
-   "unmatched_entities": [],
-   "unmatched_keys": [
-    "assessment_date",
-    "drug_duration",
-    "ecog_performance_status",
-    "family_history",
-    "pack_years",
-    "pack_years_value",
-    "sig",
-    "smoking_status",
-    "verbatim_end_date",
-    "verbatim_start_date"
-   ],
-   "required_attribute_issues": [],
-   "optional_attribute_issues": [],
-   "attribute_reviews": [],
-   "error": null
-  },
-  "51": {
-   "validated_entities": [
-    {
-     "id": "e1",
-     "text": "Ondansetron 4 mg SL",
-     "key": "drug_name",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [],
-     "attributes": [
-      {
-       "key": "kind",
-       "value": "administered"
-      },
-      {
-       "key": "route",
-       "value": "sublingual"
-      }
-     ],
-     "start": 0,
-     "end": 19,
-     "attribute_probabilities": {}
-    },
-    {
-     "id": "e2",
-     "text": "4 mg SL given for nausea, may repeat once.",
-     "key": "sig",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [
-      "e1"
-     ],
-     "attributes": [],
-     "start": 12,
-     "end": 54,
-     "attribute_probabilities": {}
-    }
-   ],
-   "unmatched_entities": [],
-   "unmatched_keys": [
-    "assessment_date",
-    "drug_duration",
-    "ecog_performance_status",
-    "family_history",
-    "pack_years",
-    "pack_years_value",
-    "smoking_status",
-    "verbatim_end_date",
-    "verbatim_start_date"
-   ],
-   "required_attribute_issues": [],
-   "optional_attribute_issues": [],
-   "attribute_reviews": [],
-   "error": null
-  },
-  "52": {
-   "validated_entities": [
-    {
-     "id": "e1",
-     "text": "hydrocortisone 1% cream",
-     "key": "drug_name",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [],
-     "attributes": [
-      {
-       "key": "kind",
-       "value": "prescribed"
-      }
-     ],
-     "start": 5,
-     "end": 28,
-     "attribute_probabilities": {}
-    },
-    {
-     "id": "e3",
-     "text": "BID x 7 days.",
-     "key": "sig",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [
-      "e1"
-     ],
-     "attributes": [],
-     "start": 41,
-     "end": 54,
-     "attribute_probabilities": {}
-    },
-    {
-     "id": "e2",
-     "text": "7 days.",
-     "key": "drug_duration",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [
-      "e1"
-     ],
-     "attributes": [],
-     "start": 47,
-     "end": 54,
-     "attribute_probabilities": {}
-    }
-   ],
-   "unmatched_entities": [],
-   "unmatched_keys": [
-    "assessment_date",
-    "ecog_performance_status",
-    "family_history",
-    "pack_years",
-    "pack_years_value",
-    "smoking_status",
-    "verbatim_end_date",
-    "verbatim_start_date"
-   ],
-   "required_attribute_issues": [],
-   "optional_attribute_issues": [],
-   "attribute_reviews": [],
-   "error": null
-  },
   "53": {
-   "validated_entities": [],
-   "unmatched_entities": [
+   "validated_entities": [
     {
      "id": "e1",
      "text": "aspirin 81 mg",
@@ -2262,107 +2161,14 @@
      "line": "L1",
      "occurrence": null,
      "parents": [],
-     "attributes": [],
-     "start": 23,
-     "end": 36,
-     "reasons": [
-      "required_attribute_missing"
-     ]
-    }
-   ],
-   "unmatched_keys": [
-    "assessment_date",
-    "drug_duration",
-    "drug_name",
-    "ecog_performance_status",
-    "family_history",
-    "pack_years",
-    "pack_years_value",
-    "sig",
-    "smoking_status",
-    "verbatim_end_date",
-    "verbatim_start_date"
-   ],
-   "required_attribute_issues": [
-    {
-     "entity_id": "e1",
-     "entity_key": "drug_name",
-     "attribute_key": "kind",
-     "value": null,
-     "reason": "missing_required",
-     "required": true,
-     "kept_entity_id": null,
-     "kept_value": null
-    }
-   ],
-   "optional_attribute_issues": [],
-   "attribute_reviews": [],
-   "error": null
-  },
-  "54": {
-   "validated_entities": [],
-   "unmatched_entities": [
-    {
-     "id": "e1",
-     "text": "paclitaxel 175 mg/m2",
-     "key": "drug_name",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [],
-     "attributes": [],
-     "start": 9,
-     "end": 29,
-     "reasons": [
-      "required_attribute_missing"
-     ]
-    }
-   ],
-   "unmatched_keys": [
-    "assessment_date",
-    "drug_duration",
-    "drug_name",
-    "ecog_performance_status",
-    "family_history",
-    "pack_years",
-    "pack_years_value",
-    "sig",
-    "smoking_status",
-    "verbatim_end_date",
-    "verbatim_start_date"
-   ],
-   "required_attribute_issues": [
-    {
-     "entity_id": "e1",
-     "entity_key": "drug_name",
-     "attribute_key": "kind",
-     "value": null,
-     "reason": "missing_required",
-     "required": true,
-     "kept_entity_id": null,
-     "kept_value": null
-    }
-   ],
-   "optional_attribute_issues": [],
-   "attribute_reviews": [],
-   "error": null
-  },
-  "55": {
-   "validated_entities": [
-    {
-     "id": "e1",
-     "text": "Fluticasone nasal spray",
-     "key": "drug_name",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [],
      "attributes": [
       {
        "key": "kind",
        "value": "taking"
       }
      ],
-     "start": 0,
-     "end": 23,
+     "start": 23,
+     "end": 36,
      "attribute_probabilities": {}
     }
    ],
@@ -2380,17 +2186,97 @@
     "verbatim_start_date"
    ],
    "required_attribute_issues": [],
-   "optional_attribute_issues": [
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "54": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Received paclitaxel 175 mg/m2, cycle 3, today; tolerated well.",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "administered"
+      }
+     ],
+     "start": 0,
+     "end": 62,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "55": {
+   "validated_entities": [],
+   "unmatched_entities": [
+    {
+     "id": "e1",
+     "text": "Fluticasone nasal spray, 2 sprays each nostril daily (home).",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "sig",
+       "value": "2 sprays each nostril daily"
+      }
+     ],
+     "start": 0,
+     "end": 60,
+     "reasons": [
+      "required_attribute_missing"
+     ]
+    }
+   ],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [
     {
      "entity_id": "e1",
      "entity_key": "drug_name",
-     "attribute_key": "route",
-     "value": "intranasal",
-     "reason": "invalid_label",
-     "required": false,
+     "attribute_key": "kind",
+     "value": null,
+     "reason": "missing_required",
+     "required": true,
      "kept_entity_id": null,
      "kept_value": null
-    },
+    }
+   ],
+   "optional_attribute_issues": [
     {
      "entity_id": "e1",
      "entity_key": "drug_name",
@@ -2406,32 +2292,33 @@
    "error": null
   },
   "56": {
-   "validated_entities": [],
-   "unmatched_entities": [
+   "validated_entities": [
     {
      "id": "e1",
-     "text": "Vitamin B12 1000 mcg IM was given in clinic today.",
+     "text": "Vitamin B12 1000 mcg",
      "key": "drug_name",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [
       {
+       "key": "kind",
+       "value": "administered"
+      },
+      {
        "key": "route",
        "value": "intramuscular"
       }
      ],
      "start": 0,
-     "end": 50,
-     "reasons": [
-      "required_attribute_missing"
-     ]
+     "end": 20,
+     "attribute_probabilities": {}
     }
    ],
+   "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
     "drug_duration",
-    "drug_name",
     "ecog_performance_status",
     "family_history",
     "pack_years",
@@ -2441,18 +2328,7 @@
     "verbatim_end_date",
     "verbatim_start_date"
    ],
-   "required_attribute_issues": [
-    {
-     "entity_id": "e1",
-     "entity_key": "drug_name",
-     "attribute_key": "kind",
-     "value": null,
-     "reason": "missing_required",
-     "required": true,
-     "kept_entity_id": null,
-     "kept_value": null
-    }
-   ],
+   "required_attribute_issues": [],
    "optional_attribute_issues": [],
    "attribute_reviews": [],
    "error": null
@@ -2583,14 +2459,19 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Alzheimer disease",
+     "text": "Alzheimer disease.",
      "key": "family_history",
      "line": "L1",
      "occurrence": null,
      "parents": [],
-     "attributes": [],
+     "attributes": [
+      {
+       "key": "relative",
+       "value": "grandmother"
+      }
+     ],
      "start": 25,
-     "end": 42,
+     "end": 43,
      "attribute_probabilities": {}
     }
    ],
@@ -2621,12 +2502,7 @@
      "line": "L1",
      "occurrence": null,
      "parents": [],
-     "attributes": [
-      {
-       "key": "relative",
-       "value": "son"
-      }
-     ],
+     "attributes": [],
      "start": 27,
      "end": 42,
      "attribute_probabilities": {}
@@ -2654,7 +2530,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "l\u00fapus",
+     "text": "Hist\u00f3ria familiar: irm\u00e3 com l\u00fapus.",
      "key": "family_history",
      "line": "L1",
      "occurrence": null,
@@ -2665,8 +2541,8 @@
        "value": "sister"
       }
      ],
-     "start": 28,
-     "end": 33,
+     "start": 0,
+     "end": 34,
      "attribute_probabilities": {}
     }
    ],
@@ -2806,7 +2682,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Twin brother with schizophrenia.",
+     "text": "schizophrenia",
      "key": "family_history",
      "line": "L1",
      "occurrence": null,
@@ -2817,8 +2693,8 @@
        "value": "brother"
       }
      ],
-     "start": 0,
-     "end": 32,
+     "start": 18,
+     "end": 31,
      "attribute_probabilities": {}
     }
    ],
@@ -3151,7 +3027,7 @@
      "text": "never smoked cigarettes.",
      "key": "smoking_status",
      "line": "L1",
-     "occurrence": 1,
+     "occurrence": null,
      "parents": [],
      "attributes": [
       {
@@ -3186,7 +3062,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "PS 1 per ECOG.",
+     "text": "PS 1",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
@@ -3198,7 +3074,7 @@
       }
      ],
      "start": 0,
-     "end": 14,
+     "end": 4,
      "attribute_probabilities": {}
     }
    ],
@@ -3224,7 +3100,7 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG 1",
+     "text": "Performance status: ECOG 1 (KPS 80).",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
@@ -3235,8 +3111,8 @@
        "value": "1"
       }
      ],
-     "start": 20,
-     "end": 26,
+     "start": 0,
+     "end": 36,
      "attribute_probabilities": {}
     }
    ],
@@ -3385,7 +3261,16 @@
      "line": "L1",
      "occurrence": null,
      "parents": [],
-     "attributes": [],
+     "attributes": [
+      {
+       "key": "score_range_min",
+       "value": "2"
+      },
+      {
+       "key": "score_range_max",
+       "value": "3"
+      }
+     ],
      "start": 0,
      "end": 13,
      "attribute_probabilities": {}
@@ -3434,6 +3319,323 @@
     "assessment_date",
     "drug_duration",
     "drug_name",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "82": {
+   "validated_entities": [],
+   "unmatched_entities": [
+    {
+     "id": "e1",
+     "text": " - tiotropium 18 mcg inhaled daily",
+     "key": "drug_name",
+     "line": "L5",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "taking"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e2",
+     "text": " - amlodipine 5 mg daily",
+     "key": "drug_name",
+     "line": "L6",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "taking"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e3",
+     "text": " - omeprazole 20 mg daily",
+     "key": "drug_name",
+     "line": "L7",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "taking"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e4",
+     "text": " - methylprednisolone 125 mg IV",
+     "key": "drug_name",
+     "line": "L9",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "administered"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e5",
+     "text": " - ipratropium-albuterol nebulizer",
+     "key": "drug_name",
+     "line": "L10",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "administered"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e6",
+     "text": " - prednisone 40 mg daily for 5 days",
+     "key": "drug_name",
+     "line": "L12",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "prescribed"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e7",
+     "text": "5 days",
+     "key": "drug_duration",
+     "line": "L12",
+     "occurrence": null,
+     "parents": [
+      "e6"
+     ],
+     "attributes": [],
+     "start": 320,
+     "end": 326,
+     "reasons": [
+      "parent_rejected"
+     ]
+    },
+    {
+     "id": "e8",
+     "text": "40 mg daily for 5 days",
+     "key": "sig",
+     "line": "L12",
+     "occurrence": null,
+     "parents": [
+      "e6"
+     ],
+     "attributes": [],
+     "start": 304,
+     "end": 326,
+     "reasons": [
+      "parent_rejected"
+     ]
+    },
+    {
+     "id": "e9",
+     "text": " - doxycycline 100 mg BID for 5 days",
+     "key": "drug_name",
+     "line": "L13",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "kind",
+       "value": "prescribed"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e10",
+     "text": "5 days",
+     "key": "drug_duration",
+     "line": "L13",
+     "occurrence": null,
+     "parents": [
+      "e9"
+     ],
+     "attributes": [],
+     "start": 356,
+     "end": 362,
+     "reasons": [
+      "parent_rejected"
+     ]
+    },
+    {
+     "id": "e11",
+     "text": "100 mg BID for 5 days",
+     "key": "sig",
+     "line": "L13",
+     "occurrence": null,
+     "parents": [
+      "e9"
+     ],
+     "attributes": [],
+     "start": 341,
+     "end": 362,
+     "reasons": [
+      "parent_rejected"
+     ]
+    }
+   ],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "83": {
+   "validated_entities": [],
+   "unmatched_entities": [
+    {
+     "id": "e1",
+     "text": " - hypertension",
+     "key": "family_history",
+     "line": "L3",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "relative",
+       "value": "mother"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e2",
+     "text": " - breast cancer at 52",
+     "key": "family_history",
+     "line": "L4",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "relative",
+       "value": "mother"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e3",
+     "text": " - type 1 diabetes",
+     "key": "family_history",
+     "line": "L6",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "relative",
+       "value": "brother"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    },
+    {
+     "id": "e4",
+     "text": " - colon cancer",
+     "key": "family_history",
+     "line": "L8",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [
+      {
+       "key": "relative",
+       "value": "grandfather"
+      }
+     ],
+     "start": null,
+     "end": null,
+     "reasons": [
+      "invalid_text"
+     ]
+    }
+   ],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
     "family_history",
     "pack_years",
     "pack_years_value",

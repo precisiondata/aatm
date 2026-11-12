@@ -1,12 +1,12 @@
 {
  "model": "openai/gpt-5-mini",
- "key": "faede61111404cb8abc82c7310da72673af2774f36313131c5c051bfbd27a420",
+ "key": "f2efc4aec8969c3c926daae3166921f40cfe0f3abdb20be6b7c17fda5a8bff67",
  "stats": {
-  "calls": 81,
-  "input_tokens": 286125,
-  "output_tokens": 54801,
-  "cost": 0.18113325,
-  "seconds": 70.83345759999065
+  "calls": 83,
+  "input_tokens": 293365,
+  "output_tokens": 66896,
+  "cost": 0.20713325,
+  "seconds": 140.78265739999188
  },
  "results": {
   "1": {
@@ -541,14 +541,14 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Smokes half a pack daily",
+     "text": "Smokes half a pack daily, trying to cut down.",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
      "start": 0,
-     "end": 24,
+     "end": 45,
      "attribute_probabilities": {}
     }
    ],
@@ -1069,14 +1069,14 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG 1-2.",
+     "text": "ECOG 1-2",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
      "start": 22,
-     "end": 31,
+     "end": 30,
      "attribute_probabilities": {}
     }
    ],
@@ -1113,7 +1113,7 @@
      "attribute_probabilities": {}
     },
     {
-     "id": "e2",
+     "id": "e3",
      "text": "at diagnosis",
      "key": "assessment_date",
      "line": "L1",
@@ -1127,7 +1127,7 @@
      "attribute_probabilities": {}
     },
     {
-     "id": "e3",
+     "id": "e2",
      "text": "ECOG 2",
      "key": "ecog_performance_status",
      "line": "L1",
@@ -1325,14 +1325,14 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG is 2",
+     "text": "ECOG is 2.",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
      "start": 46,
-     "end": 55,
+     "end": 56,
      "attribute_probabilities": {}
     }
    ],
@@ -1502,6 +1502,20 @@
     },
     {
      "id": "e2",
+     "text": "10 mg PO daily",
+     "key": "sig",
+     "line": "L2",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 31,
+     "end": 45,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e3",
      "text": "atorvastatin 40 mg",
      "key": "drug_name",
      "line": "L3",
@@ -1513,7 +1527,21 @@
      "attribute_probabilities": {}
     },
     {
-     "id": "e3",
+     "id": "e4",
+     "text": "40 mg nightly",
+     "key": "sig",
+     "line": "L3",
+     "occurrence": null,
+     "parents": [
+      "e3"
+     ],
+     "attributes": [],
+     "start": 61,
+     "end": 74,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e5",
      "text": "metformin 500 mg",
      "key": "drug_name",
      "line": "L5",
@@ -1522,6 +1550,20 @@
      "attributes": [],
      "start": 89,
      "end": 105,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e6",
+     "text": "500 mg twice daily with meals",
+     "key": "sig",
+     "line": "L5",
+     "occurrence": null,
+     "parents": [
+      "e5"
+     ],
+     "attributes": [],
+     "start": 99,
+     "end": 128,
      "attribute_probabilities": {}
     }
    ],
@@ -1533,7 +1575,6 @@
     "family_history",
     "pack_years",
     "pack_years_value",
-    "sig",
     "smoking_status",
     "verbatim_end_date",
     "verbatim_start_date"
@@ -1733,20 +1774,6 @@
      "start": 0,
      "end": 22,
      "attribute_probabilities": {}
-    },
-    {
-     "id": "e2",
-     "text": "OU BID - continue",
-     "key": "sig",
-     "line": "L1",
-     "occurrence": null,
-     "parents": [
-      "e1"
-     ],
-     "attributes": [],
-     "start": 23,
-     "end": 40,
-     "attribute_probabilities": {}
     }
    ],
    "unmatched_entities": [],
@@ -1757,6 +1784,7 @@
     "family_history",
     "pack_years",
     "pack_years_value",
+    "sig",
     "smoking_status",
     "verbatim_end_date",
     "verbatim_start_date"
@@ -1815,7 +1843,7 @@
     },
     {
      "id": "e2",
-     "text": "SL given for nausea, may repeat once",
+     "text": "4 mg SL given for nausea, may repeat once",
      "key": "sig",
      "line": "L1",
      "occurrence": null,
@@ -1823,7 +1851,7 @@
       "e1"
      ],
      "attributes": [],
-     "start": 17,
+     "start": 12,
      "end": 53,
      "attribute_probabilities": {}
     }
@@ -1860,7 +1888,7 @@
      "attribute_probabilities": {}
     },
     {
-     "id": "e3",
+     "id": "e2",
      "text": "to the rash BID x 7 days",
      "key": "sig",
      "line": "L1",
@@ -1874,7 +1902,7 @@
      "attribute_probabilities": {}
     },
     {
-     "id": "e2",
+     "id": "e3",
      "text": "7 days",
      "key": "drug_duration",
      "line": "L1",
@@ -2452,13 +2480,13 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Tobacco: Former",
+     "text": "Former",
      "key": "smoking_status",
      "line": "L2",
      "occurrence": null,
      "parents": [],
      "attributes": [],
-     "start": 15,
+     "start": 24,
      "end": 30,
      "attribute_probabilities": {}
     }
@@ -2551,13 +2579,25 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Currently smoking again after quitting in 2018.",
+     "text": "Currently smoking again",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
      "start": 0,
+     "end": 23,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "quitting in 2018.",
+     "key": "smoking_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 30,
      "end": 47,
      "attribute_probabilities": {}
     }
@@ -2716,14 +2756,14 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG 1",
+     "text": "Performance status: ECOG 1 (KPS 80).",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
-     "start": 20,
-     "end": 26,
+     "start": 0,
+     "end": 36,
      "attribute_probabilities": {}
     }
    ],
@@ -2898,6 +2938,290 @@
     "drug_duration",
     "drug_name",
     "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "82": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "tiotropium 18 mcg",
+     "key": "drug_name",
+     "line": "L5",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 122,
+     "end": 139,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "18 mcg inhaled daily",
+     "key": "sig",
+     "line": "L5",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 133,
+     "end": 153,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e3",
+     "text": "amlodipine 5 mg",
+     "key": "drug_name",
+     "line": "L6",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 156,
+     "end": 171,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e4",
+     "text": "5 mg daily",
+     "key": "sig",
+     "line": "L6",
+     "occurrence": null,
+     "parents": [
+      "e3"
+     ],
+     "attributes": [],
+     "start": 167,
+     "end": 177,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e5",
+     "text": "omeprazole 20 mg",
+     "key": "drug_name",
+     "line": "L7",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 180,
+     "end": 196,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e6",
+     "text": "20 mg daily",
+     "key": "sig",
+     "line": "L7",
+     "occurrence": null,
+     "parents": [
+      "e5"
+     ],
+     "attributes": [],
+     "start": 191,
+     "end": 202,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e7",
+     "text": "methylprednisolone 125 mg",
+     "key": "drug_name",
+     "line": "L9",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 222,
+     "end": 247,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e8",
+     "text": "125 mg IV",
+     "key": "sig",
+     "line": "L9",
+     "occurrence": null,
+     "parents": [
+      "e7"
+     ],
+     "attributes": [],
+     "start": 241,
+     "end": 250,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e9",
+     "text": "ipratropium-albuterol nebulizer",
+     "key": "drug_name",
+     "line": "L10",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 253,
+     "end": 284,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e10",
+     "text": "prednisone 40 mg",
+     "key": "drug_name",
+     "line": "L12",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 293,
+     "end": 309,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e11",
+     "text": "40 mg daily for 5 days",
+     "key": "sig",
+     "line": "L12",
+     "occurrence": null,
+     "parents": [
+      "e10"
+     ],
+     "attributes": [],
+     "start": 304,
+     "end": 326,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e12",
+     "text": "5 days",
+     "key": "drug_duration",
+     "line": "L12",
+     "occurrence": null,
+     "parents": [
+      "e10"
+     ],
+     "attributes": [],
+     "start": 320,
+     "end": 326,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e13",
+     "text": "doxycycline 100 mg",
+     "key": "drug_name",
+     "line": "L13",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 329,
+     "end": 347,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e14",
+     "text": "100 mg BID for 5 days",
+     "key": "sig",
+     "line": "L13",
+     "occurrence": null,
+     "parents": [
+      "e13"
+     ],
+     "attributes": [],
+     "start": 341,
+     "end": 362,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e15",
+     "text": "5 days",
+     "key": "drug_duration",
+     "line": "L13",
+     "occurrence": null,
+     "parents": [
+      "e13"
+     ],
+     "attributes": [],
+     "start": 356,
+     "end": 362,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "83": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "hypertension",
+     "key": "family_history",
+     "line": "L3",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 25,
+     "end": 37,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "breast cancer",
+     "key": "family_history",
+     "line": "L4",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 40,
+     "end": 53,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e3",
+     "text": "type 1 diabetes",
+     "key": "family_history",
+     "line": "L6",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 71,
+     "end": 86,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e4",
+     "text": "colon cancer",
+     "key": "family_history",
+     "line": "L8",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 111,
+     "end": 123,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
     "pack_years",
     "pack_years_value",
     "sig",
