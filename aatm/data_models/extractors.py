@@ -101,12 +101,18 @@ class AttributeDefinition(BaseModel):
         description (str): What the attribute describes. The model reads it.
         required (bool): If True, a mention without a valid label for this attribute is
             rejected. If False (default), the mention is kept without the attribute.
+        ordered (bool): Whether the labels form a scale, listed lowest first, e.g. the
+            ECOG grades 0 to 5. A decision model then answers a score question, which
+            knows that 2 lies between 1 and 3, instead of a choice question (see
+            `aatm.extractors.DecisionAttributeLabeller`). The extractor's prompt does
+            not use it.
         labels (List[AttributeLabel]): The allowed labels.
     """
 
     key: str = Field(pattern=_KEY_PATTERN)
     description: _PromptText
     required: bool = False
+    ordered: bool = False
     labels: List[AttributeLabel] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -544,6 +550,7 @@ RejectionReason = Literal[
     "parent_rejected",
     "required_attribute_missing",
     "invalid_required_attribute",
+    "required_attribute_under_review",
 ]
 
 
@@ -592,6 +599,52 @@ class AttributeIssue(BaseModel):
     kept_value: Optional[str] = None
 
 
+AttributeReviewReason = Literal["low_probability", "disagreement", "refused"]
+
+
+class AttributeReview(BaseModel):
+    """An attribute label a decision model could not confirm, for a person to check.
+
+    The label was not written to the entity. When the attribute is required, the
+    entity was rejected with ``required_attribute_under_review``.
+
+    Attributes:
+        entity_id (str): The id of the mention.
+        entity_key (str): The key of the mention's entity.
+        text (str): The mention's text.
+        attribute_key (str): The attribute.
+        extractor_value (Optional[str]): The extractor's label (``verify`` mode), or
+            ``None`` when it left the attribute out or did not label it
+            (``replace`` mode).
+        decision_value (Optional[str]): The decision model's label, or ``None`` when
+            it found the attribute not stated.
+        probability (Optional[float]): The decision model's probability that its
+            answer (`decision_value`) is right. ``None`` when the model gives no
+            probabilities.
+        probabilities (dict[str, float]): The decision model's probability of each
+            label, with ``"not_stated"`` for leaving the attribute out.
+        reason (AttributeReviewReason): Why the label needs checking:
+
+            - ``low_probability``: the decision model's probability is below the
+              labeller's ``min_probability``.
+            - ``disagreement``: the decision model and the extractor gave different
+              labels (``verify`` mode).
+            - ``refused``: the decision model declined to answer.
+        model (str): The decision model that answered.
+    """
+
+    entity_id: str
+    entity_key: str
+    text: str
+    attribute_key: str
+    extractor_value: Optional[str] = None
+    decision_value: Optional[str] = None
+    probability: Optional[float] = None
+    probabilities: dict[str, float] = Field(default_factory=dict)
+    reason: AttributeReviewReason
+    model: str
+
+
 class RejectedEntityCandidate(ExtractedEntityCandidate):
     start: Optional[int] = Field(default=None, ge=0)
     end: Optional[int] = Field(default=None, ge=0)
@@ -630,10 +683,15 @@ class ExtractedEntity(ExtractedEntityCandidate):
             label spelled as defined. Invalid ones are reported as `AttributeIssue`.
         start (int): The start index of the entity in the text.
         end (int): The end index of the entity in the text.
+        attribute_probabilities (dict[str, float]): For attributes labelled by a
+            decision model, the model's probability that the label is right, by
+            attribute key. Empty without a decision model, or when it gives no
+            probabilities.
     """
 
     start: int = Field(ge=0)
     end: int = Field(ge=0)
+    attribute_probabilities: dict[str, float] = Field(default_factory=dict)
 
     def get_attribute(self, key: str) -> Optional[str]:
         """Return the label of attribute `key`, or ``None`` if it was not given."""
@@ -664,6 +722,7 @@ class EntityRecord(BaseModel):
     start: int
     end: int
     attributes: dict[str, str] = Field(default_factory=dict)
+    attribute_probabilities: dict[str, float] = Field(default_factory=dict)
     children: dict[str, List["EntityRecord"]] = Field(default_factory=dict)
 
 
@@ -680,6 +739,9 @@ class EntityValidationResult(BaseModel):
             rejected.
         optional_attribute_issues: Problems with optional or unknown attributes. The
             candidate is kept, without the faulty attribute.
+        attribute_reviews: Attribute labels a decision model could not confirm (see
+            `aatm.extractors.DecisionAttributeLabeller`). They were not written to
+            the entity, so a person should check them.
         error: The error that stopped the extraction, if any (see ``on_error`` in
             `aatm.extractors.SimpleLLMExtractor`). Such a result has no entities.
     """
@@ -689,6 +751,7 @@ class EntityValidationResult(BaseModel):
     unmatched_keys: list[str] = Field(default_factory=list)
     required_attribute_issues: list[AttributeIssue] = Field(default_factory=list)
     optional_attribute_issues: list[AttributeIssue] = Field(default_factory=list)
+    attribute_reviews: list[AttributeReview] = Field(default_factory=list)
     error: Optional[str] = None
 
     def get_entity(self, entity_id: str) -> Optional[ExtractedEntity]:
@@ -718,6 +781,7 @@ class EntityValidationResult(BaseModel):
                 attributes={
                     a.key: a.value for a in entity.attributes if a.value is not None
                 },
+                attribute_probabilities=dict(entity.attribute_probabilities),
             )
             for child in children_of.get(entity.id, []):
                 if child.id in ancestors:

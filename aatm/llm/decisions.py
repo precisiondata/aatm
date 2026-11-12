@@ -347,6 +347,35 @@ def refusal(question: Question) -> Answer:
     return Answer(name=question.name, kind=question.kind, value=None, refused=True)
 
 
+def has_probabilities(model: DecisionModel) -> bool:
+    """Whether the model's answers have probabilities (all but ``llm/`` models)."""
+    return not model.model_id.startswith("llm/")
+
+
+def model_identity(model: DecisionModel) -> dict[str, Any]:
+    """What makes a decision model's answers differ, besides the questions.
+
+    The model id, the server of jev-compatible and OpenAI-compatible endpoints, and
+    extra request fields. The timeout is left out: it does not change the answers.
+    """
+    identity: dict[str, Any] = {"model_id": model.model_id}
+    for name in ("url", "base_url"):
+        value = getattr(model, name, None)
+        if value is not None:
+            identity[name] = str(value)
+    client_url = getattr(getattr(model, "client", None), "base_url", None)
+    if client_url is not None and "base_url" not in identity:
+        identity["base_url"] = str(client_url)
+    settings = getattr(model, "settings", None)
+    extra = getattr(settings, "provider_kwargs", None)
+    if extra:
+        identity["provider_kwargs"] = {
+            k: v if isinstance(v, (str, int, float, bool)) or v is None else repr(v)
+            for k, v in sorted(extra.items())
+        }
+    return identity
+
+
 def warn_if_unpinned(model_id: str) -> None:
     """Warn about moving aliases such as ``jev-latest``."""
     if re.search(r"(latest|preview)$", model_id):

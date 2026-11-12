@@ -566,38 +566,23 @@ class DecisionSelector(BaseSelector):
     @property
     def has_probabilities(self) -> bool:
         """Whether the model's answers have probabilities (not ``llm/`` models)."""
-        return not self.model_id.startswith("llm/")
+        from aatm.llm.decisions import has_probabilities
+
+        return has_probabilities(self.decision_model)
 
     def cache_identity(self) -> Dict[str, Any]:
         """The model and the question, for `aatm.omop.CachedCoder`.
 
         ``max_concurrency`` is left out: it does not change the results.
         """
-        identity: Dict[str, Any] = {
+        from aatm.llm.decisions import model_identity
+
+        return {
             "selector": "DecisionSelector",
-            "model_id": self.model_id,
             "top_k": self.top_k,
             "instructions": self.instructions,
+            **model_identity(self.decision_model),
         }
-        # The server of jev-compatible and OpenAI-compatible endpoints.
-        for name in ("url", "base_url"):
-            value = getattr(self.decision_model, name, None)
-            if value is not None:
-                identity[name] = str(value)
-        client_url = getattr(
-            getattr(self.decision_model, "client", None), "base_url", None
-        )
-        if client_url is not None and "base_url" not in identity:
-            identity["base_url"] = str(client_url)
-        # Extra request fields can change the answers; the timeout cannot.
-        settings = getattr(self.decision_model, "settings", None)
-        extra = getattr(settings, "provider_kwargs", None)
-        if extra:
-            identity["provider_kwargs"] = {
-                k: v if isinstance(v, (str, int, float, bool)) or v is None else repr(v)
-                for k, v in sorted(extra.items())
-            }
-        return identity
 
     def question(self, candidates: List[List[Any]]) -> Any:
         """The choice question for a query's candidates, grouped by concept."""
