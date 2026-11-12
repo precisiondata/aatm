@@ -156,8 +156,8 @@ async def label(
     decisions: dict[tuple[str, str, str], dict[str, AttributeDecision]] = {}
     decide = labeller.decide
 
-    async def recording(entity, attributes, mention, line):  # type: ignore[no-untyped-def]
-        answers = await decide(entity, attributes, mention, line)
+    async def recording(entity, attributes, mention, line, context=None):  # type: ignore[no-untyped-def]
+        answers = await decide(entity, attributes, mention, line, context)
         decisions[(entity.key, mention, line)] = answers
         return answers
 

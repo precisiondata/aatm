@@ -46,7 +46,7 @@ check. When such an attribute is required, the mention is rejected
 (``required_attribute_under_review``), with its children.
 
 **Data governance:** each mention and its line of the note are sent to the decision
-provider.
+provider, and with ``section`` or ``lines_before``, the heading and lines above it.
 """
 
 import asyncio
@@ -81,9 +81,61 @@ NOT_STATED = "not_stated"
 
 DEFAULT_INSTRUCTIONS = (
     "The state is one mention of {entity} in a clinical note: `mention` is its "
-    "text, and `line` the line of the note it appears on. Answer about this mention "
-    "only, from what the note states, without guessing. {attribute}"
+    "text, and `line` the line of the note it appears on. When given, `section` is "
+    "the heading of the part of the note that line is in, and `before` the lines "
+    "just before it. Answer about this mention only, from what the note states, "
+    "without guessing. {attribute}"
 )
+
+#: Headings are short: a longer line is never taken for one.
+MAX_HEADING_CHARS = 80
+
+
+def is_heading(text: str) -> bool:
+    """Whether a line looks like a section heading of a note.
+
+    A heading is a short line that ends with ``:`` ("HOME MEDICATIONS:",
+    "Mother:"), starts with ``#``, or is written in capitals without digits
+    ("FAMILY HISTORY"). "Tobacco: former" or "ECOG 1" are not headings.
+    """
+    text = text.strip()
+    if not text or len(text) > MAX_HEADING_CHARS:
+        return False
+    if text.startswith("#") or text.endswith(":"):
+        return True
+    letters = [c for c in text if c.isalpha()]
+    return (
+        len(letters) >= 3
+        and not any(c.islower() for c in letters)
+        and not any(c.isdigit() for c in text)
+    )
+
+
+def mention_context(
+    segments: Sequence[TextSegment],
+    line_id: str,
+    section: bool = False,
+    lines_before: int = 0,
+) -> dict[str, str]:
+    """The parts of the note around a mention's line that the labeller adds to the
+    state: ``before`` (the `lines_before` lines before it) and ``section`` (the
+    nearest heading above it, unless ``before`` already holds it).
+    """
+    index = next((i for i, s in enumerate(segments) if s.id == line_id), None)
+    if index is None:
+        return {}
+    context: dict[str, str] = {}
+    first = max(index - lines_before, 0)
+    if lines_before and first < index:
+        context["before"] = "\n".join(s.text for s in segments[first:index])
+    if section:
+        heading = next(
+            (j for j in range(index - 1, -1, -1) if is_heading(segments[j].text)),
+            None,
+        )
+        if heading is not None and heading < first:
+            context["section"] = segments[heading].text.strip()
+    return context
 
 
 class AttributeDecision(BaseModel):
@@ -227,7 +279,10 @@ class DecisionAttributeLabeller:
 
     For each mention, the model reads the entity's name, the mention's text and its
     line of the note, and answers one question per labelled attribute of the entity,
-    in one call.
+    in one call. A label can depend on more than the line: a drug listed under
+    "HOME MEDICATIONS:" is taken at home, though its line does not say so. With
+    `section` and `lines_before`, the model also reads the section heading above
+    the line, and the lines just before it.
 
     Args:
         model: A decision model id for `aatm.llm.create_decision_model`, e.g.
@@ -243,6 +298,10 @@ class DecisionAttributeLabeller:
             instead of the entity. ``None`` (default): keep every label, recording
             its probability. Models without probabilities (``llm/``) then send
             every label to review.
+        section: Add the nearest section heading above the mention's line (see
+            `is_heading`), e.g. "HOME MEDICATIONS:". Adds a few tokens per call.
+        lines_before: Add this many lines before the mention's line. Each line adds
+            its tokens to every call, and more of the note goes to the provider.
         instructions: The text that starts every question. ``{entity}`` is replaced
             by the entity's name and ``{attribute}`` by the attribute's description.
         max_concurrency: Mentions labelled at the same time.
@@ -257,6 +316,8 @@ class DecisionAttributeLabeller:
         mode: LabellerMode,
         attributes: Optional[Sequence[str]] = None,
         min_probability: Optional[float] = None,
+        section: bool = False,
+        lines_before: int = 0,
         instructions: str = DEFAULT_INSTRUCTIONS,
         max_concurrency: int = 8,
         model_kwargs: Optional[Mapping[str, Any]] = None,
@@ -269,6 +330,8 @@ class DecisionAttributeLabeller:
             raise ValueError("min_probability must be between 0 and 1, or None")
         if max_concurrency < 1:
             raise ValueError("max_concurrency must be >= 1")
+        if lines_before < 0:
+            raise ValueError("lines_before must be >= 0")
         if isinstance(attributes, str):
             raise TypeError("attributes must be a list of names, not a string")
         if isinstance(model, str):
@@ -287,6 +350,8 @@ class DecisionAttributeLabeller:
         self.mode: LabellerMode = mode
         self.attributes = list(attributes) if attributes is not None else None
         self.min_probability = min_probability
+        self.section = section
+        self.lines_before = lines_before
         self.instructions = instructions
         self.max_concurrency = max_concurrency
         self._semaphore: Optional[asyncio.Semaphore] = None
@@ -343,6 +408,8 @@ class DecisionAttributeLabeller:
             "labeller": type(self).__qualname__,
             "mode": self.mode,
             "min_probability": self.min_probability,
+            "section": self.section,
+            "lines_before": self.lines_before,
             "instructions": self.instructions,
             "attributes": {
                 key: [{"key": a.key, "ordered": a.ordered} for a in attributes]
@@ -407,8 +474,13 @@ class DecisionAttributeLabeller:
         attributes: Sequence[AttributeDefinition],
         mention: str,
         line: str,
+        context: Optional[Mapping[str, str]] = None,
     ) -> dict[str, AttributeDecision]:
-        """Ask the attributes of one mention; return the answer of each, by key."""
+        """Ask the attributes of one mention; return the answer of each, by key.
+
+        `context` holds ``section`` and ``before``, when asked for
+        (`mention_context`).
+        """
         asked = [
             _AttributeQuestions(i, entity, a, self.instructions)
             for i, a in enumerate(attributes)
@@ -418,7 +490,13 @@ class DecisionAttributeLabeller:
             self._semaphore = asyncio.Semaphore(self.max_concurrency)
         async with self._semaphore:
             decision = await self.decision_model.decide(
-                {"entity": entity.name, "mention": mention, "line": line}, questions
+                {
+                    "entity": entity.name,
+                    **(context or {}),
+                    "mention": mention,
+                    "line": line,
+                },
+                questions,
             )
         return {a.attribute.key: a.read(decision) for a in asked}
 
@@ -448,7 +526,13 @@ class DecisionAttributeLabeller:
         decisions = await asyncio.gather(
             *(
                 self.decide(
-                    definition, attributes, entity.text, lines.get(entity.line, "")
+                    definition,
+                    attributes,
+                    entity.text,
+                    lines.get(entity.line, ""),
+                    mention_context(
+                        segments, entity.line, self.section, self.lines_before
+                    ),
                 )
                 for entity, definition, attributes in jobs
             )

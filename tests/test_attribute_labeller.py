@@ -13,8 +13,10 @@ from aatm.data_models.extractors import (
     ExtractedAttribute,
     ExtractedEntityCandidate,
     ExtractedEntityCandidates,
+    segment_text,
 )
 from aatm.extractors import DecisionAttributeLabeller, SimpleLLMExtractor
+from aatm.extractors.attribute_labeller import is_heading, mention_context
 from aatm.llm.batch import BatchResult
 from aatm.llm.decisions import Answer, Decision, DecisionError, LLMDecisionModel
 
@@ -217,6 +219,89 @@ def test_state_is_the_mention_and_its_line():
     assert question.values == ["never", "former", "current", "not_stated"]
     assert "Smoking status" in question.instructions
     assert "Whether the patient smokes." in question.instructions
+
+
+@pytest.mark.parametrize(
+    "line, heading",
+    [
+        ("HOME MEDICATIONS:", True),
+        ("Mother:", True),
+        ("FAMILY HISTORY", True),
+        ("# Plan", True),
+        ("- lisinopril 10 mg PO daily", False),
+        ("Tobacco: former", False),
+        ("ECOG 1", False),  # capitals, but with a digit
+        ("MI", False),  # too short
+        ("", False),
+        ("A" * 81 + ":", False),  # too long
+    ],
+)
+def test_is_heading(line, heading):
+    assert is_heading(line) is heading
+
+
+def test_mention_context():
+    segments = segment_text("HOME MEDICATIONS:\n- a\n- b\n- c")
+    assert mention_context(segments, "L4") == {}
+    assert mention_context(segments, "L4", section=True) == {
+        "section": "HOME MEDICATIONS:"
+    }
+    assert mention_context(segments, "L4", lines_before=2) == {"before": "- a\n- b"}
+    # The heading is among the lines before: not repeated.
+    assert mention_context(segments, "L2", section=True, lines_before=1) == {
+        "before": "HOME MEDICATIONS:"
+    }
+    assert mention_context(segments, "L4", section=True, lines_before=1) == {
+        "before": "- b",
+        "section": "HOME MEDICATIONS:",
+    }
+    # No heading above the first line, and no lines before it.
+    assert mention_context(segments, "L1", section=True, lines_before=3) == {}
+    assert mention_context(segments, "L9", section=True) == {}
+
+
+SECTIONED_NOTE = "SOCIAL HISTORY:\nAlcohol: none.\nformer smoker, quit 2010."
+
+
+def sectioned_candidates():
+    return ExtractedEntityCandidates(
+        entities=[
+            ExtractedEntityCandidate(
+                id="e1",
+                text="former smoker",
+                key="smoking_status",
+                line="L3",
+                attributes=[ExtractedAttribute(key="status", value="former")],
+            )
+        ]
+    )
+
+
+def test_state_can_hold_the_section_and_lines_before():
+    model = FakeDecisionModel({"status": ("former", {})})
+    labeller = DecisionAttributeLabeller(
+        model,
+        mode="verify",
+        attributes=["smoking_status.status"],
+        section=True,
+        lines_before=1,
+    )
+    result, _, _ = extract(labeller, sectioned_candidates(), text=SECTIONED_NOTE)
+    assert result.get_entity("e1").get_attribute("status") == "former"
+    ((state, (question,)),) = model.calls
+    assert state == {
+        "entity": "Smoking status",
+        "section": "SOCIAL HISTORY:",
+        "before": "Alcohol: none.",
+        "mention": "former smoker",
+        "line": "former smoker, quit 2010.",
+    }
+    assert "`section`" in question.instructions
+
+
+def test_lines_before_must_not_be_negative():
+    with pytest.raises(ValueError, match="lines_before"):
+        DecisionAttributeLabeller(FakeDecisionModel(), mode="verify", lines_before=-1)
 
 
 def test_one_call_per_mention_asks_all_its_attributes():
@@ -635,6 +720,8 @@ def test_resuming_needs_the_same_labeller(tmp_path):
     for other in (
         None,
         DecisionAttributeLabeller(model, mode="verify", min_probability=0.9),
+        DecisionAttributeLabeller(model, mode="verify", section=True),
+        DecisionAttributeLabeller(model, mode="verify", lines_before=2),
         DecisionAttributeLabeller(model, mode="replace"),
         DecisionAttributeLabeller(
             FakeDecisionModel(model_id="fake/decider-2"), mode="verify"
