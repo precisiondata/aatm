@@ -158,8 +158,13 @@ class RunPlan(BaseModel):
 
         lines.append("settings:")
         width = max((len(s.name) for s in self.settings), default=0)
+        values = max((len(_show(s.value)) for s in self.settings), default=0)
+        sources = max((len(s.source) for s in self.settings), default=0) + 2
         for s in self.settings:
-            line = f"  {s.name.ljust(width)}  {_show(s.value)}  [{s.source}]"
+            line = (
+                f"  {s.name.ljust(width)}  {_show(s.value).ljust(values)}  "
+                f"{f'[{s.source}]'.ljust(sources)}"
+            )
             if s.note:
                 line += f"  {s.note}"
             lines.append(line)
@@ -537,7 +542,7 @@ def plan_run(
             pilots,
             plan.to_extract,
             plan.to_build,
-            None if batch else concurrency.value * shards,
+            None if batch else concurrency.value,
             bool(batch),
             rpm,
             prices,
@@ -566,7 +571,7 @@ def plan_run(
             PlanWarning(
                 message=(
                     f"max_concurrency={concurrency.value} with a hosted API: about "
-                    f"{rate:,.0f} notes/min ({basis}), the API waiting on you"
+                    f"{rate:,.0f} notes/min ({basis}), far below what the API serves"
                 ),
                 fix=(
                     f"set max_concurrency={hosted_default} or more, with "
