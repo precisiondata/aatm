@@ -902,6 +902,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ordered-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ordered labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#how-the-models-labels-are-checked" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2306,6 +2317,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ordered-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ordered labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#how-the-models-labels-are-checked" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2652,6 +2674,12 @@ what the result was:</p>
 <td>Reject mentions that have no valid label for this attribute</td>
 </tr>
 <tr>
+<td><code>ordered</code></td>
+<td>no</td>
+<td><code>false</code></td>
+<td>The labels form a scale, listed lowest first (see <a href="#ordered-labels">Ordered labels</a>)</td>
+</tr>
+<tr>
 <td><code>labels</code></td>
 <td>yes</td>
 <td></td>
@@ -2794,6 +2822,13 @@ known result.</p>
 <li>Keep values short and stable (<code>positive</code>, not <code>Positive result reported</code>). You will
   filter and count by them.</li>
 </ul>
+<h3 id="ordered-labels">Ordered labels</h3>
+<p>Mark an attribute <code>ordered: true</code> when its labels are a scale, listed from lowest to
+highest, like the ECOG grades 0 to 5. The extractor does not use it. A
+<a href="../../reference/decision_models/#labelling-attributes-decisionattributelabeller">decision model labeller</a>,
+if you add one, then asks a score question, which knows that grade 2 lies between 1
+and 3, instead of a choice between unrelated options. Leave it out for labels with no
+order, such as <code>never</code> / <code>former</code> / <code>current</code>.</p>
 <h3 id="how-the-models-labels-are-checked">How the model's labels are checked</h3>
 <p>Labels are checked after the model answers, against the file:</p>
 <ul>
