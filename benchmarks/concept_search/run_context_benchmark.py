@@ -128,7 +128,7 @@ async def run_variant(
 
 def agreement(codes: pd.Series) -> float:
     """Share of pairs of answers that are the same concept."""
-    pairs = list(itertools.combinations(codes.fillna("none"), 2))
+    pairs = list(itertools.combinations(codes, 2))
     return sum(a == b for a, b in pairs) / len(pairs) if pairs else float("nan")
 
 
@@ -158,7 +158,7 @@ def summarize(df: pd.DataFrame, cases: pd.DataFrame) -> None:
     # Consistency: agreement between contexts of the same text, within a repeat.
     cons = (
         df.groupby(["variant", "repeat", "group", "context_matters"])
-        .concept_code.apply(agreement)
+        .answer.apply(agreement)
         .groupby(["variant", "context_matters"])
         .mean()
         .unstack()
@@ -175,8 +175,8 @@ def summarize(df: pd.DataFrame, cases: pd.DataFrame) -> None:
         runs = (
             df.groupby(["variant", "id"])
             .agg(
-                agreement=("concept_code", agreement),
-                stable=("concept_code", lambda s: s.fillna("none").nunique() == 1),
+                agreement=("answer", agreement),
+                stable=("answer", lambda s: s.nunique() == 1),
             )
             .groupby("variant")
             .mean()
@@ -187,18 +187,13 @@ def summarize(df: pd.DataFrame, cases: pd.DataFrame) -> None:
         print(runs.round(3).to_markdown())
 
     # Disagreements: same case and repeat, two variants, different answers.
-    wide = df.pivot_table(
-        index=["id", "repeat"], columns="variant", values="correct", aggfunc="first"
-    )
-    codes = df.pivot_table(
-        index=["id", "repeat"],
-        columns="variant",
-        values="concept_code",
-        aggfunc="first",
-    ).fillna("none")
+    wide = df.pivot(index=["id", "repeat"], columns="variant", values="correct")
+    wide = wide.fillna(False).astype(bool)
+    codes = df.pivot(index=["id", "repeat"], columns="variant", values="answer")
     rows = []
     for a, b in itertools.combinations(variants, 2):
-        differ = codes[a] != codes[b]
+        both = codes[[a, b]].notna().all(axis=1)  # runs of both variants
+        differ = both & (codes[a] != codes[b])
         rows.append(
             {
                 "pair": f"{a} vs {b}",
@@ -334,9 +329,17 @@ def main() -> None:
             out.parent.mkdir(exist_ok=True)
             done.to_csv(out, index=False)
     df = pd.read_csv(out, dtype={"id": str, "concept_code": str})
+    # A failed search (rate limit, timeout) says nothing about context: leave it out.
+    failed = df.error.notna()
+    if failed.any():
+        print(f"\nLeft out {failed.sum()} failed searches:")
+        print(df[failed].groupby(["repeat", "variant"]).size().to_string())
+        df = df[~failed]
 
     df = df.merge(cases[["id", "accepted", "context_matters"]], on="id")
     df["correct"] = [c in a for c, a in zip(df.concept_code, df.accepted)]
+    # Accepted codes count as one answer, e.g. platelets with or without the method.
+    df["answer"] = df.gold.where(df.correct, df.concept_code.fillna("none"))
     summarize(df, cases)
     print(f"\nPer-case results: {out}")
 
