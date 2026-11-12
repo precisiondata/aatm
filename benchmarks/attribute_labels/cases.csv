@@ -1,0 +1,51 @@
+note_id,note,entity,mention,attribute,gold,tag
+1,"Social history: Former smoker, quit 2015. Drinks socially.",smoking_status,Former smoker,status,former,plain
+2,SH: smokes 1 ppd x 20 years.,smoking_status,smokes 1 ppd,status,current_every_day,abbreviation
+3,Never smoker. No alcohol.,smoking_status,Never smoker,status,never,plain
+4,Patient denies tobacco use.,smoking_status,denies tobacco use,status,not_current,plain
+5,Occasional cigar on weekends.,smoking_status,Occasional cigar on weekends,status,current_some_day,plain
+6,Tobacco: current smoker.,smoking_status,current smoker,status,current_unknown_frequency,plain
+7,Quit smoking 3 months ago after his MI.,smoking_status,Quit smoking 3 months ago,status,former,plain
+8,Non-smoker.,smoking_status,Non-smoker,status,not_current,plain
+9,Hábitos: ex-tabagista há 10 anos.,smoking_status,ex-tabagista,status,former,portuguese
+10,"Tabagista ativo, 20 cigarros/dia.",smoking_status,"Tabagista ativo, 20 cigarros/dia",status,current_every_day,portuguese
+11,Nega etilismo. Nunca fumou.,smoking_status,Nunca fumou,status,never,portuguese
+12,"Fuma ocasionalmente, em festas.",smoking_status,Fuma ocasionalmente,status,current_some_day,portuguese
+13,Smoker.,smoking_status,Smoker,status,current_unknown_frequency,plain
+14,Lifelong non-smoker.,smoking_status,Lifelong non-smoker,status,never,hard
+15,He smoked in college but has not smoked since.,smoking_status,smoked in college but has not smoked since,status,former,hard
+16,"Social smoker, a few cigarettes at parties.",smoking_status,Social smoker,status,current_some_day,plain
+17,"Smokes half a pack daily, trying to cut down.",smoking_status,Smokes half a pack daily,status,current_every_day,plain
+18,"Former heavy smoker (quit 2001), now vapes daily.",smoking_status,Former heavy smoker,status,former,distractor
+19,Mother smoked for 30 years; the patient never smoked.,smoking_status,never smoked,status,never,distractor
+20,"Relapsed to smoking last month, about 5 cigarettes a day.",smoking_status,Relapsed to smoking last month,status,current_every_day,hard
+21,"Smokes cigarettes on some days, not daily.",smoking_status,Smokes cigarettes on some days,status,current_some_day,plain
+22,Tobacco use: yes.,smoking_status,Tobacco use: yes,status,current_unknown_frequency,form
+23,Tobacco use: never.,smoking_status,Tobacco use: never,status,never,form
+24,Stopped smoking 2 weeks ago.,smoking_status,Stopped smoking 2 weeks ago,status,former,plain
+25,No tobacco.,smoking_status,No tobacco,status,not_current,plain
+26,Pipe smoker.,smoking_status,Pipe smoker,status,current_unknown_frequency,plain
+27,Assessment: ECOG 1.,ecog_performance_status,ECOG 1,score,1,plain
+28,ECOG PS: 0,ecog_performance_status,ECOG PS: 0,score,0,plain
+29,ECOG performance status is 2.,ecog_performance_status,ECOG performance status is 2,score,2,plain
+30,"PS ECOG 3, mostly in bed.",ecog_performance_status,PS ECOG 3,score,3,plain
+31,Zubrod score of one.,ecog_performance_status,Zubrod score of one,score,1,words
+32,WHO performance status 0.,ecog_performance_status,WHO performance status 0,score,0,plain
+33,"Fit for chemotherapy, ECOG 1-2.",ecog_performance_status,ECOG 1-2,score,,range
+33,"Fit for chemotherapy, ECOG 1-2.",ecog_performance_status,ECOG 1-2,score_range_min,1,range
+33,"Fit for chemotherapy, ECOG 1-2.",ecog_performance_status,ECOG 1-2,score_range_max,2,range
+34,"ECOG 0 at diagnosis, now ECOG 2.",ecog_performance_status,ECOG 0,score,0,time points
+34,"ECOG 0 at diagnosis, now ECOG 2.",ecog_performance_status,ECOG 2,score,2,time points
+35,Performance status (ECOG): 4,ecog_performance_status,Performance status (ECOG): 4,score,4,plain
+36,ECOG grade II.,ecog_performance_status,ECOG grade II,score,2,words
+37,"ECOG zero, works full time.",ecog_performance_status,ECOG zero,score,0,words
+38,ECOG PS 0-1.,ecog_performance_status,ECOG PS 0-1,score,,range
+38,ECOG PS 0-1.,ecog_performance_status,ECOG PS 0-1,score_range_min,0,range
+38,ECOG PS 0-1.,ecog_performance_status,ECOG PS 0-1,score_range_max,1,range
+39,ECOG remains 1 despite fatigue.,ecog_performance_status,ECOG remains 1,score,1,plain
+40,Eligibility requires ECOG <= 1; the patient's ECOG is 2.,ecog_performance_status,ECOG is 2,score,2,distractor
+41,Estado funcional ECOG 2.,ecog_performance_status,ECOG 2,score,2,portuguese
+42,"ECOG 4, bedbound.",ecog_performance_status,ECOG 4,score,4,plain
+43,ECOG PS = 1.,ecog_performance_status,ECOG PS = 1,score,1,plain
+44,ECOG performance status of 2-3.,ecog_performance_status,ECOG performance status of 2-3,score,,range
+44,ECOG performance status of 2-3.,ecog_performance_status,ECOG performance status of 2-3,score_range_max,3,range

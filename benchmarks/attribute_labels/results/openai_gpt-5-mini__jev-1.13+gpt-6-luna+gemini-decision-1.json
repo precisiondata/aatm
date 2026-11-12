@@ -1,0 +1,382 @@
+{
+ "model": "openai/gpt-5-mini",
+ "decision_models": {
+  "openrouter/typesafe/jev-1.13": {
+   "calibration": {
+    "answers": 50,
+    "accuracy": 1.0,
+    "brier": 0.0063772080000000005,
+    "mean_probability_right": 0.950528,
+    "mean_probability_wrong": null
+   },
+   "usage": {
+    "calls": 45,
+    "input_tokens": 40775,
+    "output_tokens": 3972,
+    "cost": 0.0017125500000000002,
+    "seconds": 8.787073900006362
+   }
+  },
+  "openai/gpt-6-luna": {
+   "calibration": {
+    "answers": 50,
+    "accuracy": 0.96,
+    "brier": 0.028690812399999998,
+    "mean_probability_right": 0.9551083333333333,
+    "mean_probability_wrong": 0.6676
+   },
+   "usage": {
+    "calls": 45,
+    "input_tokens": 39662,
+    "output_tokens": 0,
+    "cost": 0.0039662000000000005,
+    "seconds": 2.431352900006459
+   }
+  },
+  "gemini/gemini-decision-1": {
+   "calibration": {
+    "answers": 50,
+    "accuracy": 0.98,
+    "brier": 0.026713958738189773,
+    "mean_probability_right": 0.9051226449394019,
+    "mean_probability_wrong": 0.47105338856642237
+   },
+   "usage": {
+    "calls": 45,
+    "input_tokens": 33001,
+    "output_tokens": 0,
+    "cost": 0.0,
+    "seconds": 3.5821856999973534
+   }
+  }
+ },
+ "summary": {
+  "extractor": {
+   "correct": 50,
+   "wrong": 0,
+   "review": 0,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "calls": 44,
+    "input_tokens": 137258,
+    "output_tokens": 29770,
+    "cost": 0.0938545,
+    "seconds": 39.418004799998016
+   }
+  },
+  "verify jev-1.13": {
+   "correct": 50,
+   "wrong": 0,
+   "review": 0,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.095567218,
+    "seconds": 47.7016403000016,
+    "decision_calls": 45
+   }
+  },
+  "verify jev-1.13 @0.5": {
+   "correct": 50,
+   "wrong": 0,
+   "review": 0,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.095567218,
+    "seconds": 47.7016403000016,
+    "decision_calls": 45
+   }
+  },
+  "verify jev-1.13 @0.8": {
+   "correct": 48,
+   "wrong": 0,
+   "review": 2,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.095567218,
+    "seconds": 47.7016403000016,
+    "decision_calls": 45
+   }
+  },
+  "verify jev-1.13 @0.9": {
+   "correct": 41,
+   "wrong": 0,
+   "review": 9,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.095567218,
+    "seconds": 47.7016403000016,
+    "decision_calls": 45
+   }
+  },
+  "replace jev-1.13": {
+   "correct": 50,
+   "wrong": 0,
+   "review": 0,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.08194504999999999,
+    "seconds": 47.28855040000053,
+    "decision_calls": 45
+   }
+  },
+  "replace jev-1.13 @0.5": {
+   "correct": 50,
+   "wrong": 0,
+   "review": 0,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.08194504999999999,
+    "seconds": 47.28855040000053,
+    "decision_calls": 45
+   }
+  },
+  "replace jev-1.13 @0.8": {
+   "correct": 49,
+   "wrong": 0,
+   "review": 1,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.08194504999999999,
+    "seconds": 47.28855040000053,
+    "decision_calls": 45
+   }
+  },
+  "replace jev-1.13 @0.9": {
+   "correct": 41,
+   "wrong": 0,
+   "review": 9,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.08194504999999999,
+    "seconds": 47.28855040000053,
+    "decision_calls": 45
+   }
+  },
+  "verify gpt-6-luna": {
+   "correct": 48,
+   "wrong": 0,
+   "review": 2,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.09782099999999999,
+    "seconds": 42.822738200004096,
+    "decision_calls": 45
+   }
+  },
+  "verify gpt-6-luna @0.5": {
+   "correct": 48,
+   "wrong": 0,
+   "review": 2,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.09782099999999999,
+    "seconds": 42.822738200004096,
+    "decision_calls": 45
+   }
+  },
+  "verify gpt-6-luna @0.8": {
+   "correct": 46,
+   "wrong": 0,
+   "review": 4,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.09782099999999999,
+    "seconds": 42.822738200004096,
+    "decision_calls": 45
+   }
+  },
+  "verify gpt-6-luna @0.9": {
+   "correct": 40,
+   "wrong": 0,
+   "review": 10,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.09782099999999999,
+    "seconds": 42.822738200004096,
+    "decision_calls": 45
+   }
+  },
+  "replace gpt-6-luna": {
+   "correct": 48,
+   "wrong": 2,
+   "review": 0,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 0.96,
+   "stats": {
+    "cost": 0.0841987,
+    "seconds": 40.93282940000063,
+    "decision_calls": 45
+   }
+  },
+  "replace gpt-6-luna @0.5": {
+   "correct": 48,
+   "wrong": 1,
+   "review": 1,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 0.9795918367346939,
+   "stats": {
+    "cost": 0.0841987,
+    "seconds": 40.93282940000063,
+    "decision_calls": 45
+   }
+  },
+  "replace gpt-6-luna @0.8": {
+   "correct": 46,
+   "wrong": 1,
+   "review": 3,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 0.9787234042553191,
+   "stats": {
+    "cost": 0.0841987,
+    "seconds": 40.93282940000063,
+    "decision_calls": 45
+   }
+  },
+  "replace gpt-6-luna @0.9": {
+   "correct": 40,
+   "wrong": 1,
+   "review": 9,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 0.975609756097561,
+   "stats": {
+    "cost": 0.0841987,
+    "seconds": 40.93282940000063,
+    "decision_calls": 45
+   }
+  },
+  "verify gemini-decision-1": {
+   "correct": 49,
+   "wrong": 0,
+   "review": 1,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.0938545,
+    "seconds": 44.39488829999755,
+    "decision_calls": 45
+   }
+  },
+  "verify gemini-decision-1 @0.5": {
+   "correct": 49,
+   "wrong": 0,
+   "review": 1,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.0938545,
+    "seconds": 44.39488829999755,
+    "decision_calls": 45
+   }
+  },
+  "verify gemini-decision-1 @0.8": {
+   "correct": 39,
+   "wrong": 0,
+   "review": 11,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.0938545,
+    "seconds": 44.39488829999755,
+    "decision_calls": 45
+   }
+  },
+  "verify gemini-decision-1 @0.9": {
+   "correct": 37,
+   "wrong": 0,
+   "review": 13,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.0938545,
+    "seconds": 44.39488829999755,
+    "decision_calls": 45
+   }
+  },
+  "replace gemini-decision-1": {
+   "correct": 49,
+   "wrong": 1,
+   "review": 0,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 0.98,
+   "stats": {
+    "cost": 0.0802325,
+    "seconds": 42.08366219999152,
+    "decision_calls": 45
+   }
+  },
+  "replace gemini-decision-1 @0.5": {
+   "correct": 49,
+   "wrong": 0,
+   "review": 1,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.0802325,
+    "seconds": 42.08366219999152,
+    "decision_calls": 45
+   }
+  },
+  "replace gemini-decision-1 @0.8": {
+   "correct": 39,
+   "wrong": 0,
+   "review": 11,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.0802325,
+    "seconds": 42.08366219999152,
+    "decision_calls": 45
+   }
+  },
+  "replace gemini-decision-1 @0.9": {
+   "correct": 37,
+   "wrong": 0,
+   "review": 13,
+   "missed": 0,
+   "mentions": 50,
+   "precision": 1.0,
+   "stats": {
+    "cost": 0.0802325,
+    "seconds": 42.08366219999152,
+    "decision_calls": 45
+   }
+  }
+ }
+}
