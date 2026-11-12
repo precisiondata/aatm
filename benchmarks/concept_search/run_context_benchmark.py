@@ -125,10 +125,7 @@ def summarize(df: pd.DataFrame, cases: pd.DataFrame) -> None:
             "accuracy": per_repeat.groupby("variant").mean(),
             "min": per_repeat.groupby("variant").min(),
             "max": per_repeat.groupby("variant").max(),
-            **{
-                f"accuracy ({kinds[k]})": by_kind[k]
-                for k in by_kind.columns
-            },
+            **{f"accuracy ({kinds[k]})": by_kind[k] for k in by_kind.columns},
             "high confidence": df.groupby("variant").confidence.apply(
                 lambda s: (s == "high").mean()
             ),
@@ -227,7 +224,13 @@ def summarize(df: pd.DataFrame, cases: pd.DataFrame) -> None:
     print("\n## Errors (case, variant: wrong answers / repeats)\n")
     errors = (
         wrong.groupby(["id", "text", "gold", "variant"])
-        .agg(times=("correct", "size"), answers=("concept_code", lambda s: ", ".join(sorted(set(s.fillna("none"))))))
+        .agg(
+            times=("correct", "size"),
+            answers=(
+                "concept_code",
+                lambda s: ", ".join(sorted(set(s.fillna("none")))),
+            ),
+        )
         .reset_index()
     )
     errors["sentence"] = errors.id.map(cases.set_index("id").sentence)
