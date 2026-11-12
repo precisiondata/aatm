@@ -2,150 +2,150 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/artifacts/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/concepts/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/entity_definitions/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/env/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/installation/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/omop_tables/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/quick_start_cli/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/quick_start_extraction/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/quick_start_python_api/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/cli/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/concept_search/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/data_models/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/debug/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/decision_models/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/device/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/embedding_functions/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/extraction_data_models/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/extractors/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/local_database_utils/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/logs/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/omop/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/pipeline/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/prompt_helpers/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/rerankers/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/retrievers/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/search_ui/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/selectors/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/terminology_mapper/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/translators/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/vector_db/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/vector_stores/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/registries/rerankers/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/registries/retrievers/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/registries/selectors/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/reference/registries/translators/</loc>
-         <lastmod>2026-11-11</lastmod>
+         <lastmod>2026-11-12</lastmod>
     </url>
 </urlset>

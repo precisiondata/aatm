@@ -1242,6 +1242,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#selecting-concepts-decisionselector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selecting concepts: DecisionSelector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#aatm.llm.decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2425,6 +2436,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#selecting-concepts-decisionselector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selecting concepts: DecisionSelector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#aatm.llm.decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2965,8 +2987,9 @@ no. They return the answer <strong>with a probability per option</strong>, faste
 a generative LLM call, and write no text.</p>
 <p>Many steps of a mapping or extraction pipeline are decisions of this kind: choosing a
 candidate concept, labelling an attribute, checking that a mention is not negated.
-See <a href="https://github.com/precisiondata/aatm/issues/77">issue #77</a> for the pipeline
-steps planned on top of this interface.</p>
+The first such step is <a href="#selecting-concepts-decisionselector"><code>DecisionSelector</code></a>;
+see <a href="https://github.com/precisiondata/aatm/issues/77">issue #77</a> for the others
+planned on top of this interface.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">Question</span><span class="p">,</span> <span class="n">create_decision_model</span>
@@ -3061,6 +3084,51 @@ data on your machine.</p>
 <p>A confident answer can be wrong, and some models' probabilities shift with the
 order of the options. Calibrate thresholds on your own labelled data.</p>
 </div>
+<h2 id="selecting-concepts-decisionselector">Selecting concepts: <code>DecisionSelector</code></h2>
+<p><code>DecisionSelector</code> is a selector of the terminology mapper. For each text, it asks
+the decision model one choice question: which of the top-k retrieved candidate
+concepts means the same as the text, or <code>none</code>. Expressions of the same standard
+concept (synonyms) are one option, so their probability is not split.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop</span><span class="w"> </span><span class="kn">import</span> <span class="n">OmopTableBuilder</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.terminology_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminologyMapper</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">selector</span><span class="o">=</span><span class="s2">"decision-openrouter/typesafe/jev-1.13"</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">)</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">builder</span> <span class="o">=</span> <span class="n">OmopTableBuilder</span><span class="p">(</span><span class="n">definitions</span><span class="p">,</span> <span class="n">mapper</span><span class="o">=</span><span class="n">mapper</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Registered names are <code>decision-openai/gpt-6-luna</code>, <code>decision-gemini/gemini-decision-1</code>
+and <code>decision-openrouter/typesafe/jev-1.13</code>; any other <code>decision-&lt;model id&gt;</code> works
+too, e.g. <code>decision-llm/ollama/llama3.1:8b</code>. To set <code>top_k</code>, the question, or the
+model's <code>api_key</code>, <code>base_url</code> and <code>settings</code>, build the selector:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.selectors</span><span class="w"> </span><span class="kn">import</span> <span class="n">DecisionSelector</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">selector</span> <span class="o">=</span> <span class="n">DecisionSelector</span><span class="p">(</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="s2">"jev-compatible/jev-1.13"</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">top_k</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">model_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">"base_url"</span><span class="p">:</span> <span class="s2">"https://jev.example.org/v1/decisions"</span><span class="p">},</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>The probability of the chosen concept is the mapping's score</strong>: the mapper's
+<code>confidence_score</code> and the builder's <code>score</code>. A <code>min_score</code> in a definition is
+therefore a threshold on the model's probability: <code>map: {min_score: 0.8}</code> keeps the
+concepts chosen with at least 80 %, and stores <code>0</code> with a <code>low_confidence</code> issue
+for the others. Each mapping's trace has the provider's model version and the
+probability of every option.</p>
+<div class="admonition warning">
+<p class="admonition-title"><code>llm/</code> models give no score</p>
+<p>With an <code>llm/</code> model the selector still chooses, but the mappings have no score
+(<code>confidence_score</code> is empty): a <code>min_score</code> rejects all of them. aatm warns
+when you create such a selector.</p>
+</div>
+<p>The coding cache (<code>aatm.omop.CachedCoder</code>) keys results on the selector's
+<code>cache_identity()</code>: the model id, <code>top_k</code>, the question and the endpoint. Changing
+any of them, e.g. moving from <code>jev-1.13</code> to <code>jev-1.14</code>, codes the texts again. A
+moving alias (<code>jev-latest</code>) would not: pin versions.</p>
+<p>The texts to map and the candidate names are sent to the provider; see the data
+governance warning above. The API reference of <code>DecisionSelector</code> is on the
+<a href="../selectors/">Selectors</a> page.</p>
 
 
 <div class="doc doc-object doc-module">
