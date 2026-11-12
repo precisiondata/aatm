@@ -524,6 +524,54 @@ HARD = [
         "ECOG performance status: 1.\nKarnofsky 70.",
         [(ECOG, "ECOG performance status: 1", "score", "1", "distractor")],
     ),
+    # --- long notes whose labels depend on a section heading ---------------------------
+    (
+        "ADMISSION NOTE\n"
+        "HISTORY OF PRESENT ILLNESS:\n"
+        "67-year-old man with COPD admitted with worsening dyspnea.\n"
+        "HOME MEDICATIONS:\n"
+        "- tiotropium 18 mcg inhaled daily\n"
+        "- amlodipine 5 mg daily\n"
+        "- omeprazole 20 mg daily\n"
+        "GIVEN IN THE ED:\n"
+        "- methylprednisolone 125 mg IV\n"
+        "- ipratropium-albuterol nebulizer\n"
+        "PLAN:\n"
+        "- prednisone 40 mg daily for 5 days\n"
+        "- doxycycline 100 mg BID for 5 days",
+        [
+            (DRUG, "tiotropium 18 mcg", "kind", "taking", "section"),
+            (DRUG, "tiotropium 18 mcg", "route", "inhaled", "plain"),
+            (DRUG, "amlodipine 5 mg", "kind", "taking", "section"),
+            (DRUG, "amlodipine 5 mg", "route", "", "not stated"),
+            (DRUG, "omeprazole 20 mg", "kind", "taking", "section"),
+            (DRUG, "omeprazole 20 mg", "route", "", "not stated"),
+            (DRUG, "methylprednisolone 125 mg", "kind", "administered", "section"),
+            (DRUG, "methylprednisolone 125 mg", "route", "intravenous", "abbreviation"),
+            (DRUG, "ipratropium-albuterol", "kind", "administered", "section"),
+            (DRUG, "ipratropium-albuterol", "route", "inhaled", "plain"),
+            (DRUG, "prednisone 40 mg", "kind", "prescribed", "section"),
+            (DRUG, "prednisone 40 mg", "route", "", "not stated"),
+            (DRUG, "doxycycline 100 mg", "kind", "prescribed", "section"),
+            (DRUG, "doxycycline 100 mg", "route", "", "not stated"),
+        ],
+    ),
+    (
+        "FAMILY HISTORY\n"
+        "Mother:\n"
+        "- hypertension\n"
+        "- breast cancer at 52\n"
+        "Brother:\n"
+        "- type 1 diabetes\n"
+        "Maternal grandfather:\n"
+        "- colon cancer",
+        [
+            (FAMILY, "hypertension", "relative", "mother", "section"),
+            (FAMILY, "breast cancer", "relative", "mother", "section"),
+            (FAMILY, "type 1 diabetes", "relative", "brother", "section"),
+            (FAMILY, "colon cancer", "relative", "grandfather", "section"),
+        ],
+    ),
 ]
 
 

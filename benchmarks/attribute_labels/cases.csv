@@ -155,3 +155,217 @@ Packs/day: 1",smoking_status,Former,status,former,form
 80,hard,ECOG: II-III.,ecog_performance_status,ECOG: II-III,score_range_max,3,range
 81,hard,"ECOG performance status: 1.
 Karnofsky 70.",ecog_performance_status,ECOG performance status: 1,score,1,distractor
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,tiotropium 18 mcg,kind,taking,section
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,tiotropium 18 mcg,route,inhaled,plain
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,amlodipine 5 mg,kind,taking,section
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,amlodipine 5 mg,route,,not stated
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,omeprazole 20 mg,kind,taking,section
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,omeprazole 20 mg,route,,not stated
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,methylprednisolone 125 mg,kind,administered,section
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,methylprednisolone 125 mg,route,intravenous,abbreviation
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,ipratropium-albuterol,kind,administered,section
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,ipratropium-albuterol,route,inhaled,plain
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,prednisone 40 mg,kind,prescribed,section
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,prednisone 40 mg,route,,not stated
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,doxycycline 100 mg,kind,prescribed,section
+82,hard,"ADMISSION NOTE
+HISTORY OF PRESENT ILLNESS:
+67-year-old man with COPD admitted with worsening dyspnea.
+HOME MEDICATIONS:
+- tiotropium 18 mcg inhaled daily
+- amlodipine 5 mg daily
+- omeprazole 20 mg daily
+GIVEN IN THE ED:
+- methylprednisolone 125 mg IV
+- ipratropium-albuterol nebulizer
+PLAN:
+- prednisone 40 mg daily for 5 days
+- doxycycline 100 mg BID for 5 days",drug_name,doxycycline 100 mg,route,,not stated
+83,hard,"FAMILY HISTORY
+Mother:
+- hypertension
+- breast cancer at 52
+Brother:
+- type 1 diabetes
+Maternal grandfather:
+- colon cancer",family_history,hypertension,relative,mother,section
+83,hard,"FAMILY HISTORY
+Mother:
+- hypertension
+- breast cancer at 52
+Brother:
+- type 1 diabetes
+Maternal grandfather:
+- colon cancer",family_history,breast cancer,relative,mother,section
+83,hard,"FAMILY HISTORY
+Mother:
+- hypertension
+- breast cancer at 52
+Brother:
+- type 1 diabetes
+Maternal grandfather:
+- colon cancer",family_history,type 1 diabetes,relative,brother,section
+83,hard,"FAMILY HISTORY
+Mother:
+- hypertension
+- breast cancer at 52
+Brother:
+- type 1 diabetes
+Maternal grandfather:
+- colon cancer",family_history,colon cancer,relative,grandfather,section

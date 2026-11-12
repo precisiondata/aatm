@@ -63,6 +63,20 @@ PRICES = {
 OUTCOMES = ["correct", "wrong", "review", "dropped", "missed"]
 
 
+def parse_context(context: str) -> tuple[bool, int]:
+    """``line``, ``section``, ``before<n>`` or ``section+before<n>`` as the
+    labeller's ``(section, lines_before)``."""
+    section, lines_before = False, 0
+    for part in context.split("+"):
+        if part == "section":
+            section = True
+        elif part.startswith("before") and part[6:].isdigit():
+            lines_before = int(part[6:])
+        elif part != "line":
+            raise ValueError(f"Unknown context {context!r}")
+    return section, lines_before
+
+
 def slug(model_id: str) -> str:
     return model_id.replace("/", "_").replace(":", "_")
 
@@ -334,13 +348,15 @@ def table(summary: dict[str, Any]) -> str:
 
 def cost_table(stats: dict[str, Any], mentions: int) -> str:
     lines = [
-        "| Setup | USD / 1,000 mentions | Seconds | Decision calls |",
-        "|---|---|---|---|",
+        "| Setup | USD / 1,000 mentions | Decision USD | Tokens / decision call "
+        "| Seconds | Decision calls |",
+        "|---|---|---|---|---|---|",
     ]
     for name, s in stats.items():
         cost = s.get("cost")
         lines.append(
             f"| {name} | {fmt(None if cost is None else cost / mentions * 1000, 3)} "
+            f"| {fmt(s.get('decision_cost'), 4)} | {fmt(s.get('tokens_per_call'), 0)} "
             f"| {fmt(s.get('seconds'), 1)} | {s.get('decision_calls', 0)} |"
         )
     return "\n".join(lines)
@@ -377,40 +393,54 @@ async def run_model(
     stats: dict[str, Any] = {"extractor": full_stats}
     report: dict[str, Any] = {"model": model, "decision_models": {}}
 
-    for decision_model in args.decision_models:
-        name = decision_model.split("/")[-1]
-        for mode, extracted, extraction_stats in (
+    for decision_model, (mode, extracted, extraction_stats), context in (
+        (d, m, c)
+        for d in args.decision_models
+        for m in (
             ("verify", full, full_stats),
             ("replace", stripped, stripped_stats),
-        ):
-            labeller = DecisionAttributeLabeller(
-                decision_model, mode=mode, max_concurrency=args.concurrency
-            )
-            labelled, decisions, label_stats = await label(
-                labeller, extracted, notes, definitions
-            )
-            stats[f"{mode} {name}"] = {
-                **{
-                    k: (extraction_stats.get(k) or 0) + (label_stats.get(k) or 0)
-                    for k in ("cost", "seconds")
+        )
+        for c in args.contexts
+    ):
+        name = decision_model.split("/")[-1]
+        section, lines_before = parse_context(context)
+        labeller = DecisionAttributeLabeller(
+            decision_model,
+            mode=mode,
+            section=section,
+            lines_before=lines_before,
+            max_concurrency=args.concurrency,
+        )
+        labelled, decisions, label_stats = await label(
+            labeller, extracted, notes, definitions
+        )
+        base = f"{mode} {name}" + ("" if context == "line" else f" [{context}]")
+        stats[base] = {
+            **{
+                k: (extraction_stats.get(k) or 0) + (label_stats.get(k) or 0)
+                for k in ("cost", "seconds")
+            },
+            "decision_calls": label_stats["calls"],
+            "decision_cost": label_stats.get("cost"),
+            "tokens_per_call": label_stats["input_tokens"] / label_stats["calls"]
+            if label_stats["calls"]
+            else None,
+        }
+        for threshold in [None, *args.thresholds]:
+            setup = base + (f" @{threshold}" if threshold else "")
+            per_case[setup] = score(cases, labelled, decisions, threshold)
+        if mode == "replace":
+            report["decision_models"][f"{decision_model} [{context}]"] = {
+                "calibration": {
+                    case_set: calibration(
+                        [c for c in cases if c["set"] == case_set],
+                        labelled,
+                        decisions,
+                    )
+                    for case_set in SETS
                 },
-                "decision_calls": label_stats["calls"],
+                "usage": label_stats,
             }
-            for threshold in [None, *args.thresholds]:
-                setup = f"{mode} {name}" + (f" @{threshold}" if threshold else "")
-                per_case[setup] = score(cases, labelled, decisions, threshold)
-            if mode == "replace":
-                report["decision_models"][decision_model] = {
-                    "calibration": {
-                        case_set: calibration(
-                            [c for c in cases if c["set"] == case_set],
-                            labelled,
-                            decisions,
-                        )
-                        for case_set in SETS
-                    },
-                    "usage": label_stats,
-                }
 
     summary = {
         case_set: {
@@ -476,6 +506,13 @@ def main() -> None:
         "--decision-models", nargs="+", default=["openrouter/typesafe/jev-1.13"]
     )
     parser.add_argument("--thresholds", nargs="*", type=float, default=[0.5, 0.8, 0.9])
+    parser.add_argument(
+        "--contexts",
+        nargs="+",
+        default=["line"],
+        help="what the decision model reads besides the mention: line, section, "
+        "before<n> or section+before<n>",
+    )
     parser.add_argument("--concurrency", type=int, default=8)
     parser.add_argument("--sets", nargs="*", choices=SETS, help="default: all")
     parser.add_argument("--fresh", action="store_true", help="extract the notes again")
