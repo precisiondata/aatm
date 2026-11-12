@@ -96,6 +96,9 @@ The errors:
   correct labels to review. The probabilities are not comparable across models
   (Gemini's are lower overall), so a threshold has to be set per model.
 
-**Decision: keep `verify` as the default.** `replace` with Jev matched the extractor
-here at a lower cost, but 50 easy mentions are not enough to trust one decision
-model's labels without the extractor's check. Revisit with a harder set.
+**Decision: no default mode.** `DecisionAttributeLabeller` requires `mode="verify"`
+or `mode="replace"`, so the code always says what runs. `replace` with Jev matched the
+extractor here at a lower cost, but 50 easy mentions are not enough to trust one
+decision model's labels without the extractor's check: the docs point to `verify`
+for trying a decision model, and to `replace` once it has been checked on your
+notes. Revisit with a harder set.

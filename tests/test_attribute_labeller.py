@@ -185,7 +185,9 @@ def entity(result, entity_id):
 
 def test_verify_keeps_agreed_labels_with_their_probability():
     model = FakeDecisionModel({"status": ("former", {"former": 0.93})})
-    labeller = DecisionAttributeLabeller(model, attributes=["smoking_status.status"])
+    labeller = DecisionAttributeLabeller(
+        model, mode="verify", attributes=["smoking_status.status"]
+    )
     result, llm, _ = extract(labeller, candidates())
 
     smoking = entity(result, "e1")
@@ -200,7 +202,9 @@ def test_verify_keeps_agreed_labels_with_their_probability():
 
 def test_state_is_the_mention_and_its_line():
     model = FakeDecisionModel({"status": ("former", {})})
-    labeller = DecisionAttributeLabeller(model, attributes=["smoking_status.status"])
+    labeller = DecisionAttributeLabeller(
+        model, mode="verify", attributes=["smoking_status.status"]
+    )
     extract(labeller, candidates())
     ((state, questions),) = model.calls
     assert state == {
@@ -217,7 +221,9 @@ def test_state_is_the_mention_and_its_line():
 
 def test_one_call_per_mention_asks_all_its_attributes():
     model = FakeDecisionModel({"status": ("former", {}), "product": ("not_stated", {})})
-    labeller = DecisionAttributeLabeller(model, attributes=["smoking_status"])
+    labeller = DecisionAttributeLabeller(
+        model, mode="verify", attributes=["smoking_status"]
+    )
     extract(labeller, candidates())
     ((_, questions),) = model.calls
     assert [q.name for q in questions] == ["status", "product"]
@@ -225,7 +231,9 @@ def test_one_call_per_mention_asks_all_its_attributes():
 
 def test_disagreement_goes_to_review_and_rejects_required_attribute_with_children():
     model = FakeDecisionModel({"status": ("current", {"current": 0.7})})
-    labeller = DecisionAttributeLabeller(model, attributes=["smoking_status.status"])
+    labeller = DecisionAttributeLabeller(
+        model, mode="verify", attributes=["smoking_status.status"]
+    )
     result, _, _ = extract(labeller, candidates())
 
     (review,) = result.attribute_reviews
@@ -249,7 +257,9 @@ def test_disagreement_on_optional_attribute_keeps_the_mention():
     model = FakeDecisionModel(
         {"status": ("former", {}), "product": ("cigars", {"cigars": 0.6})}
     )
-    labeller = DecisionAttributeLabeller(model, attributes=["smoking_status"])
+    labeller = DecisionAttributeLabeller(
+        model, mode="verify", attributes=["smoking_status"]
+    )
     result, _, _ = extract(labeller, candidates(product="cigarettes"))
 
     smoking = entity(result, "e1")
@@ -263,7 +273,9 @@ def test_both_not_stated_agree():
     model = FakeDecisionModel(
         {"status": ("former", {}), "product": ("not_stated", {"not_stated": 0.95})}
     )
-    labeller = DecisionAttributeLabeller(model, attributes=["smoking_status"])
+    labeller = DecisionAttributeLabeller(
+        model, mode="verify", attributes=["smoking_status"]
+    )
     result, _, _ = extract(labeller, candidates())
     assert entity(result, "e1").get_attribute("product") is None
     assert result.attribute_reviews == []
@@ -272,7 +284,7 @@ def test_both_not_stated_agree():
 def test_low_probability_goes_to_review():
     model = FakeDecisionModel({"status": ("former", {"former": 0.55})})
     labeller = DecisionAttributeLabeller(
-        model, attributes=["smoking_status.status"], min_probability=0.8
+        model, mode="verify", attributes=["smoking_status.status"], min_probability=0.8
     )
     result, _, _ = extract(labeller, candidates())
     (review,) = result.attribute_reviews
@@ -283,7 +295,9 @@ def test_low_probability_goes_to_review():
 
 def test_refusal_goes_to_review():
     model = FakeDecisionModel({"status": ("refuse", {})})
-    labeller = DecisionAttributeLabeller(model, attributes=["smoking_status.status"])
+    labeller = DecisionAttributeLabeller(
+        model, mode="verify", attributes=["smoking_status.status"]
+    )
     result, _, _ = extract(labeller, candidates())
     (review,) = result.attribute_reviews
     assert review.reason == "refused"
@@ -291,7 +305,9 @@ def test_refusal_goes_to_review():
 
 def test_mentions_rejected_by_validation_are_not_labelled():
     model = FakeDecisionModel()
-    labeller = DecisionAttributeLabeller(model, attributes=["smoking_status.status"])
+    labeller = DecisionAttributeLabeller(
+        model, mode="verify", attributes=["smoking_status.status"]
+    )
     result, _, _ = extract(labeller, candidates(status=None))
     assert model.calls == []
     assert "e1" in {e.id for e in result.unmatched_entities}
@@ -423,7 +439,7 @@ def test_not_stated_option_avoids_a_label_of_the_same_name():
 
 
 def test_attributes_default_to_all_and_are_checked():
-    labeller = DecisionAttributeLabeller(FakeDecisionModel())
+    labeller = DecisionAttributeLabeller(FakeDecisionModel(), mode="verify")
     assert {
         k: [a.key for a in v] for k, v in labeller.targets(DEFINITIONS).items()
     } == {
@@ -451,13 +467,20 @@ def test_argument_errors():
     with pytest.raises(ValueError, match="mode"):
         DecisionAttributeLabeller(FakeDecisionModel(), mode="check")
     with pytest.raises(ValueError, match="min_probability"):
-        DecisionAttributeLabeller(FakeDecisionModel(), min_probability=2)
+        DecisionAttributeLabeller(FakeDecisionModel(), mode="verify", min_probability=2)
     with pytest.raises(TypeError, match="list of names"):
-        DecisionAttributeLabeller(FakeDecisionModel(), attributes="ecog")
+        DecisionAttributeLabeller(FakeDecisionModel(), mode="verify", attributes="ecog")
     with pytest.raises(TypeError, match="DecisionModel"):
-        DecisionAttributeLabeller(object())
+        DecisionAttributeLabeller(object(), mode="verify")
+    # The mode is never implied: the developer chooses it.
+    with pytest.raises(TypeError, match="mode"):
+        DecisionAttributeLabeller(FakeDecisionModel())  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        DecisionAttributeLabeller(FakeDecisionModel(), "verify")  # type: ignore[misc]
     with pytest.raises(ValueError, match="model_kwargs"):
-        DecisionAttributeLabeller(FakeDecisionModel(), model_kwargs={"api_key": "x"})
+        DecisionAttributeLabeller(
+            FakeDecisionModel(), mode="verify", model_kwargs={"api_key": "x"}
+        )
 
 
 def test_model_without_probabilities(caplog):
@@ -470,6 +493,7 @@ def test_model_without_probabilities(caplog):
     with caplog.at_level(logging.WARNING):
         strict = DecisionAttributeLabeller(
             LLMDecisionModel(FixedLLM()),
+            mode="verify",
             attributes=["smoking_status.status"],
             min_probability=0.5,
         )
@@ -478,7 +502,9 @@ def test_model_without_probabilities(caplog):
     assert [r.reason for r in result.attribute_reviews] == ["low_probability"]
 
     lenient = DecisionAttributeLabeller(
-        LLMDecisionModel(FixedLLM()), attributes=["smoking_status.status"]
+        LLMDecisionModel(FixedLLM()),
+        mode="verify",
+        attributes=["smoking_status.status"],
     )
     result, _, _ = extract(lenient, candidates())
     smoking = entity(result, "e1")
@@ -490,7 +516,7 @@ def test_model_without_probabilities(caplog):
 
 
 def test_labeller_errors_follow_on_error():
-    labeller = DecisionAttributeLabeller(FakeDecisionModel(error=True))
+    labeller = DecisionAttributeLabeller(FakeDecisionModel(error=True), mode="verify")
     with pytest.raises(DecisionError):
         extract(labeller, candidates())
     result, _, _ = extract(labeller, candidates(), on_error="record")
@@ -526,7 +552,7 @@ def test_poll_batch_labels_the_results():
 
 
 def test_poll_batch_records_labeller_errors_per_note():
-    labeller = DecisionAttributeLabeller(FakeDecisionModel(error=True))
+    labeller = DecisionAttributeLabeller(FakeDecisionModel(error=True), mode="verify")
     extractor = SimpleLLMExtractor(
         entity_definitions=DEFINITIONS,
         llm=FakeBatchLLM(candidates()),
@@ -569,7 +595,7 @@ def test_run_writes_attribute_reviews(tmp_path):
     from aatm.omop import OmopRun
 
     model = FakeDecisionModel({"score": ("2", {"2": 0.6})})
-    pipeline = ecog_pipeline(DecisionAttributeLabeller(model))
+    pipeline = ecog_pipeline(DecisionAttributeLabeller(model, mode="verify"))
     summary = asyncio.run(pipeline.run(ecog_notes(), tmp_path))
 
     assert summary.rows == {"measurement": 2}
@@ -596,17 +622,23 @@ def test_run_writes_attribute_reviews(tmp_path):
 def test_resuming_needs_the_same_labeller(tmp_path):
     model = FakeDecisionModel({"score": ("1", {})})
     asyncio.run(
-        ecog_pipeline(DecisionAttributeLabeller(model)).run(ecog_notes(), tmp_path)
+        ecog_pipeline(DecisionAttributeLabeller(model, mode="verify")).run(
+            ecog_notes(), tmp_path
+        )
     )
     # The same labeller resumes.
     asyncio.run(
-        ecog_pipeline(DecisionAttributeLabeller(model)).run(ecog_notes(), tmp_path)
+        ecog_pipeline(DecisionAttributeLabeller(model, mode="verify")).run(
+            ecog_notes(), tmp_path
+        )
     )
     for other in (
         None,
-        DecisionAttributeLabeller(model, min_probability=0.9),
+        DecisionAttributeLabeller(model, mode="verify", min_probability=0.9),
         DecisionAttributeLabeller(model, mode="replace"),
-        DecisionAttributeLabeller(FakeDecisionModel(model_id="fake/decider-2")),
+        DecisionAttributeLabeller(
+            FakeDecisionModel(model_id="fake/decider-2"), mode="verify"
+        ),
     ):
         with pytest.raises(ValueError, match="another extractor"):
             asyncio.run(ecog_pipeline(other).run(ecog_notes(), tmp_path))

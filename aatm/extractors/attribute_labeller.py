@@ -28,17 +28,22 @@ scale, lowest first, like the ECOG grades) is asked as a score question; any oth
 as a choice question. Every question can also be answered "not stated", since a
 mention need not state every attribute.
 
-Modes:
+``mode`` is required, with no default, so the code always says which one runs:
 
-- ``verify`` (default): the extractor labels as before, and the decision model
-  checks each label. A label is kept only when both agree.
-- ``replace``: the extractor's prompt leaves out the labelled attributes, so it only
-  finds the mentions, and the decision model's labels are used.
+- ``"verify"``: the extractor's prompt is unchanged and it labels as before. The
+  decision model labels each mention too, and a label is written **only when both
+  give the same answer** (both "not stated" counts as agreeing). Costs the extraction
+  plus one decision call per mention.
+- ``"replace"``: the labelled attributes are **left out of the extractor's prompt**,
+  so it only finds the mentions, and the **decision model's label is written**. The
+  extraction prompt and output are smaller, so it costs less, but no second model
+  checks the label.
 
-Labels the decision model is not sure of (below ``min_probability``), or that the
-two models disagree on, are not written to the entity: they go to the result's
-``attribute_reviews`` for a person to check. When such an attribute is required, the
-mention is rejected (``required_attribute_under_review``), with its children.
+In both modes, a label the decision model is not sure of (below ``min_probability``),
+that it refused to give, or (``verify``) that the two models disagree on, is not
+written to the entity: it goes to the result's ``attribute_reviews`` for a person to
+check. When such an attribute is required, the mention is rejected
+(``required_attribute_under_review``), with its children.
 
 **Data governance:** each mention and its line of the note are sent to the decision
 provider.
@@ -227,7 +232,10 @@ class DecisionAttributeLabeller:
     Args:
         model: A decision model id for `aatm.llm.create_decision_model`, e.g.
             ``"openrouter/typesafe/jev-1.13"``, or a `DecisionModel`. Pin a version.
-        mode: ``"verify"`` (default) or ``"replace"``, see the module docs.
+        mode: Required, keyword only. ``"verify"``: the extractor labels as before
+            and a label is written only when the decision model gives the same
+            one. ``"replace"``: the extractor's prompt leaves the attributes out
+            and the decision model's label is written. See the module docs.
         attributes: Which attributes to label: entity keys (all of the entity's
             attributes) or ``"<entity key>.<attribute key>"``. ``None`` (default):
             every attribute of every entity.
@@ -245,7 +253,8 @@ class DecisionAttributeLabeller:
     def __init__(
         self,
         model: Any,
-        mode: LabellerMode = "verify",
+        *,
+        mode: LabellerMode,
         attributes: Optional[Sequence[str]] = None,
         min_probability: Optional[float] = None,
         instructions: str = DEFAULT_INSTRUCTIONS,

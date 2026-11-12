@@ -170,10 +170,22 @@ question can be answered "not stated" (a `not_stated` option, or a yes/no
 "is it stated?" question next to a score), since a mention need not state every
 attribute: the attribute is then left out, as the extractor would.
 
-| Mode | The extractor | The decision model | A label is written when |
-|---|---|---|---|
-| `verify` (default) | labels as before | labels each mention too | both give the same answer |
-| `replace` | only finds mentions: the labelled attributes are left out of its prompt | labels each mention | the decision model gives it |
+### Choosing a mode
+
+`mode` is **required**: there is no default, so the code always says what runs.
+
+| | `mode="verify"` | `mode="replace"` |
+|---|---|---|
+| Extractor prompt | unchanged: it finds the mentions **and labels them**, as without a labeller | the labelled attributes are **left out**: it only finds the mentions |
+| Decision model | labels each mention too | labels each mention |
+| Label written | only when **both give the same answer** (both "not stated" counts as agreeing) | the **decision model's** answer |
+| A disagreement | goes to review, nothing is written | cannot happen: only one model labels |
+| Cost | the extraction, plus one decision call per mention | a smaller extraction, plus one decision call per mention |
+| Use it when | a wrong label costs more than a withheld one; you are trying a decision model on your notes | you have checked, on your notes, that the decision model labels as well as the extractor |
+
+In the [benchmark](#which-mode-the-benchmark) below, `verify` wrote no wrong label
+with any of the three decision models, and `replace` cost about 13 % less but wrote
+whatever the decision model answered.
 
 **`min_probability`** is a threshold on the decision model's probability. With
 `min_probability=0.8`, only labels the model gives at least 80 % are written. The
@@ -196,8 +208,27 @@ extractor. With `batch=True`, the labels are asked with live calls when a batch 
 results come back, before they are stored; a run that stops meanwhile collects the job
 again and labels it then.
 
-Which mode to use is a matter of accuracy and cost on your notes: see the
-[attribute labelling benchmark](https://github.com/precisiondata/aatm/tree/main/benchmarks/attribute_labels).
+### Which mode: the benchmark
+
+`benchmarks/attribute_labels` labels 50 hand-written mentions (26 smoking statuses,
+24 ECOG grades and ranges) with `openai/gpt-5-mini` as the extractor (2026-11-12):
+
+| Setup | Correct | Wrong | Review | USD / 1,000 mentions |
+|---|---|---|---|---|
+| extractor alone | 50 | 0 | 0 | 1.88 |
+| `verify`, jev-1.13 | 50 | 0 | 0 | 1.91 |
+| `verify`, gpt-6-luna | 48 | 0 | 2 | 1.96 |
+| `verify`, gemini-decision-1 | 49 | 0 | 1 | 1.88 |
+| `replace`, jev-1.13 | 50 | 0 | 0 | 1.64 |
+| `replace`, gpt-6-luna | 48 | 2 | 0 | 1.68 |
+| `replace`, gemini-decision-1 | 49 | 1 | 0 | 1.61 |
+
+The extractor alone got every label right on this set, so it cannot show `verify`
+catching the extractor's mistakes; it does show that `replace` is only as good as the
+decision model. A `min_probability` of 0.5 caught the low-probability errors, while
+0.8 and 0.9 mostly sent correct labels to review. Measure on your own notes before
+choosing `replace` or a threshold. Details, errors and calibration are in the
+[benchmark's README](https://github.com/precisiondata/aatm/tree/main/benchmarks/attribute_labels).
 
 Each mention and its line are sent to the decision provider; see the data governance
 warning above.
