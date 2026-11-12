@@ -1,51 +1,157 @@
-note_id,note,entity,mention,attribute,gold,tag
-1,"Social history: Former smoker, quit 2015. Drinks socially.",smoking_status,Former smoker,status,former,plain
-2,SH: smokes 1 ppd x 20 years.,smoking_status,smokes 1 ppd,status,current_every_day,abbreviation
-3,Never smoker. No alcohol.,smoking_status,Never smoker,status,never,plain
-4,Patient denies tobacco use.,smoking_status,denies tobacco use,status,not_current,plain
-5,Occasional cigar on weekends.,smoking_status,Occasional cigar on weekends,status,current_some_day,plain
-6,Tobacco: current smoker.,smoking_status,current smoker,status,current_unknown_frequency,plain
-7,Quit smoking 3 months ago after his MI.,smoking_status,Quit smoking 3 months ago,status,former,plain
-8,Non-smoker.,smoking_status,Non-smoker,status,not_current,plain
-9,Hábitos: ex-tabagista há 10 anos.,smoking_status,ex-tabagista,status,former,portuguese
-10,"Tabagista ativo, 20 cigarros/dia.",smoking_status,"Tabagista ativo, 20 cigarros/dia",status,current_every_day,portuguese
-11,Nega etilismo. Nunca fumou.,smoking_status,Nunca fumou,status,never,portuguese
-12,"Fuma ocasionalmente, em festas.",smoking_status,Fuma ocasionalmente,status,current_some_day,portuguese
-13,Smoker.,smoking_status,Smoker,status,current_unknown_frequency,plain
-14,Lifelong non-smoker.,smoking_status,Lifelong non-smoker,status,never,hard
-15,He smoked in college but has not smoked since.,smoking_status,smoked in college but has not smoked since,status,former,hard
-16,"Social smoker, a few cigarettes at parties.",smoking_status,Social smoker,status,current_some_day,plain
-17,"Smokes half a pack daily, trying to cut down.",smoking_status,Smokes half a pack daily,status,current_every_day,plain
-18,"Former heavy smoker (quit 2001), now vapes daily.",smoking_status,Former heavy smoker,status,former,distractor
-19,Mother smoked for 30 years; the patient never smoked.,smoking_status,never smoked,status,never,distractor
-20,"Relapsed to smoking last month, about 5 cigarettes a day.",smoking_status,Relapsed to smoking last month,status,current_every_day,hard
-21,"Smokes cigarettes on some days, not daily.",smoking_status,Smokes cigarettes on some days,status,current_some_day,plain
-22,Tobacco use: yes.,smoking_status,Tobacco use: yes,status,current_unknown_frequency,form
-23,Tobacco use: never.,smoking_status,Tobacco use: never,status,never,form
-24,Stopped smoking 2 weeks ago.,smoking_status,Stopped smoking 2 weeks ago,status,former,plain
-25,No tobacco.,smoking_status,No tobacco,status,not_current,plain
-26,Pipe smoker.,smoking_status,Pipe smoker,status,current_unknown_frequency,plain
-27,Assessment: ECOG 1.,ecog_performance_status,ECOG 1,score,1,plain
-28,ECOG PS: 0,ecog_performance_status,ECOG PS: 0,score,0,plain
-29,ECOG performance status is 2.,ecog_performance_status,ECOG performance status is 2,score,2,plain
-30,"PS ECOG 3, mostly in bed.",ecog_performance_status,PS ECOG 3,score,3,plain
-31,Zubrod score of one.,ecog_performance_status,Zubrod score of one,score,1,words
-32,WHO performance status 0.,ecog_performance_status,WHO performance status 0,score,0,plain
-33,"Fit for chemotherapy, ECOG 1-2.",ecog_performance_status,ECOG 1-2,score,,range
-33,"Fit for chemotherapy, ECOG 1-2.",ecog_performance_status,ECOG 1-2,score_range_min,1,range
-33,"Fit for chemotherapy, ECOG 1-2.",ecog_performance_status,ECOG 1-2,score_range_max,2,range
-34,"ECOG 0 at diagnosis, now ECOG 2.",ecog_performance_status,ECOG 0,score,0,time points
-34,"ECOG 0 at diagnosis, now ECOG 2.",ecog_performance_status,ECOG 2,score,2,time points
-35,Performance status (ECOG): 4,ecog_performance_status,Performance status (ECOG): 4,score,4,plain
-36,ECOG grade II.,ecog_performance_status,ECOG grade II,score,2,words
-37,"ECOG zero, works full time.",ecog_performance_status,ECOG zero,score,0,words
-38,ECOG PS 0-1.,ecog_performance_status,ECOG PS 0-1,score,,range
-38,ECOG PS 0-1.,ecog_performance_status,ECOG PS 0-1,score_range_min,0,range
-38,ECOG PS 0-1.,ecog_performance_status,ECOG PS 0-1,score_range_max,1,range
-39,ECOG remains 1 despite fatigue.,ecog_performance_status,ECOG remains 1,score,1,plain
-40,Eligibility requires ECOG <= 1; the patient's ECOG is 2.,ecog_performance_status,ECOG is 2,score,2,distractor
-41,Estado funcional ECOG 2.,ecog_performance_status,ECOG 2,score,2,portuguese
-42,"ECOG 4, bedbound.",ecog_performance_status,ECOG 4,score,4,plain
-43,ECOG PS = 1.,ecog_performance_status,ECOG PS = 1,score,1,plain
-44,ECOG performance status of 2-3.,ecog_performance_status,ECOG performance status of 2-3,score,,range
-44,ECOG performance status of 2-3.,ecog_performance_status,ECOG performance status of 2-3,score_range_max,3,range
+note_id,set,note,entity,mention,attribute,gold,tag
+1,basic,"Social history: Former smoker, quit 2015. Drinks socially.",smoking_status,Former smoker,status,former,plain
+2,basic,SH: smokes 1 ppd x 20 years.,smoking_status,smokes 1 ppd,status,current_every_day,abbreviation
+3,basic,Never smoker. No alcohol.,smoking_status,Never smoker,status,never,plain
+4,basic,Patient denies tobacco use.,smoking_status,denies tobacco use,status,not_current,plain
+5,basic,Occasional cigar on weekends.,smoking_status,Occasional cigar on weekends,status,current_some_day,plain
+6,basic,Tobacco: current smoker.,smoking_status,current smoker,status,current_unknown_frequency,plain
+7,basic,Quit smoking 3 months ago after his MI.,smoking_status,Quit smoking 3 months ago,status,former,plain
+8,basic,Non-smoker.,smoking_status,Non-smoker,status,not_current,plain
+9,basic,Hábitos: ex-tabagista há 10 anos.,smoking_status,ex-tabagista,status,former,portuguese
+10,basic,"Tabagista ativo, 20 cigarros/dia.",smoking_status,"Tabagista ativo, 20 cigarros/dia",status,current_every_day,portuguese
+11,basic,Nega etilismo. Nunca fumou.,smoking_status,Nunca fumou,status,never,portuguese
+12,basic,"Fuma ocasionalmente, em festas.",smoking_status,Fuma ocasionalmente,status,current_some_day,portuguese
+13,basic,Smoker.,smoking_status,Smoker,status,current_unknown_frequency,plain
+14,basic,Lifelong non-smoker.,smoking_status,Lifelong non-smoker,status,never,hard
+15,basic,He smoked in college but has not smoked since.,smoking_status,smoked in college but has not smoked since,status,former,hard
+16,basic,"Social smoker, a few cigarettes at parties.",smoking_status,Social smoker,status,current_some_day,plain
+17,basic,"Smokes half a pack daily, trying to cut down.",smoking_status,Smokes half a pack daily,status,current_every_day,plain
+18,basic,"Former heavy smoker (quit 2001), now vapes daily.",smoking_status,Former heavy smoker,status,former,distractor
+19,basic,Mother smoked for 30 years; the patient never smoked.,smoking_status,never smoked,status,never,distractor
+20,basic,"Relapsed to smoking last month, about 5 cigarettes a day.",smoking_status,Relapsed to smoking last month,status,current_every_day,hard
+21,basic,"Smokes cigarettes on some days, not daily.",smoking_status,Smokes cigarettes on some days,status,current_some_day,plain
+22,basic,Tobacco use: yes.,smoking_status,Tobacco use: yes,status,current_unknown_frequency,form
+23,basic,Tobacco use: never.,smoking_status,Tobacco use: never,status,never,form
+24,basic,Stopped smoking 2 weeks ago.,smoking_status,Stopped smoking 2 weeks ago,status,former,plain
+25,basic,No tobacco.,smoking_status,No tobacco,status,not_current,plain
+26,basic,Pipe smoker.,smoking_status,Pipe smoker,status,current_unknown_frequency,plain
+27,basic,Assessment: ECOG 1.,ecog_performance_status,ECOG 1,score,1,plain
+28,basic,ECOG PS: 0,ecog_performance_status,ECOG PS: 0,score,0,plain
+29,basic,ECOG performance status is 2.,ecog_performance_status,ECOG performance status is 2,score,2,plain
+30,basic,"PS ECOG 3, mostly in bed.",ecog_performance_status,PS ECOG 3,score,3,plain
+31,basic,Zubrod score of one.,ecog_performance_status,Zubrod score of one,score,1,words
+32,basic,WHO performance status 0.,ecog_performance_status,WHO performance status 0,score,0,plain
+33,basic,"Fit for chemotherapy, ECOG 1-2.",ecog_performance_status,ECOG 1-2,score,,range
+33,basic,"Fit for chemotherapy, ECOG 1-2.",ecog_performance_status,ECOG 1-2,score_range_min,1,range
+33,basic,"Fit for chemotherapy, ECOG 1-2.",ecog_performance_status,ECOG 1-2,score_range_max,2,range
+34,basic,"ECOG 0 at diagnosis, now ECOG 2.",ecog_performance_status,ECOG 0,score,0,time points
+34,basic,"ECOG 0 at diagnosis, now ECOG 2.",ecog_performance_status,ECOG 2,score,2,time points
+35,basic,Performance status (ECOG): 4,ecog_performance_status,Performance status (ECOG): 4,score,4,plain
+36,basic,ECOG grade II.,ecog_performance_status,ECOG grade II,score,2,words
+37,basic,"ECOG zero, works full time.",ecog_performance_status,ECOG zero,score,0,words
+38,basic,ECOG PS 0-1.,ecog_performance_status,ECOG PS 0-1,score,,range
+38,basic,ECOG PS 0-1.,ecog_performance_status,ECOG PS 0-1,score_range_min,0,range
+38,basic,ECOG PS 0-1.,ecog_performance_status,ECOG PS 0-1,score_range_max,1,range
+39,basic,ECOG remains 1 despite fatigue.,ecog_performance_status,ECOG remains 1,score,1,plain
+40,basic,Eligibility requires ECOG <= 1; the patient's ECOG is 2.,ecog_performance_status,ECOG is 2,score,2,distractor
+41,basic,Estado funcional ECOG 2.,ecog_performance_status,ECOG 2,score,2,portuguese
+42,basic,"ECOG 4, bedbound.",ecog_performance_status,ECOG 4,score,4,plain
+43,basic,ECOG PS = 1.,ecog_performance_status,ECOG PS = 1,score,1,plain
+44,basic,ECOG performance status of 2-3.,ecog_performance_status,ECOG performance status of 2-3,score,,range
+44,basic,ECOG performance status of 2-3.,ecog_performance_status,ECOG performance status of 2-3,score_range_max,3,range
+45,hard,"HOME MEDICATIONS:
+- lisinopril 10 mg PO daily
+- atorvastatin 40 mg nightly
+PLAN:
+- start metformin 500 mg twice daily with meals",drug_name,lisinopril 10 mg,kind,taking,section
+45,hard,"HOME MEDICATIONS:
+- lisinopril 10 mg PO daily
+- atorvastatin 40 mg nightly
+PLAN:
+- start metformin 500 mg twice daily with meals",drug_name,lisinopril 10 mg,route,oral,abbreviation
+45,hard,"HOME MEDICATIONS:
+- lisinopril 10 mg PO daily
+- atorvastatin 40 mg nightly
+PLAN:
+- start metformin 500 mg twice daily with meals",drug_name,atorvastatin 40 mg,kind,taking,section
+45,hard,"HOME MEDICATIONS:
+- lisinopril 10 mg PO daily
+- atorvastatin 40 mg nightly
+PLAN:
+- start metformin 500 mg twice daily with meals",drug_name,atorvastatin 40 mg,route,,not stated
+45,hard,"HOME MEDICATIONS:
+- lisinopril 10 mg PO daily
+- atorvastatin 40 mg nightly
+PLAN:
+- start metformin 500 mg twice daily with meals",drug_name,metformin 500 mg,kind,prescribed,section
+45,hard,"HOME MEDICATIONS:
+- lisinopril 10 mg PO daily
+- atorvastatin 40 mg nightly
+PLAN:
+- start metformin 500 mg twice daily with meals",drug_name,metformin 500 mg,route,,not stated
+46,hard,"ED course: ceftriaxone 1 g IV given.
+Discharge Rx: azithromycin 250 mg by mouth daily for 4 days.",drug_name,ceftriaxone 1 g,kind,administered,plain
+46,hard,"ED course: ceftriaxone 1 g IV given.
+Discharge Rx: azithromycin 250 mg by mouth daily for 4 days.",drug_name,ceftriaxone 1 g,route,intravenous,abbreviation
+46,hard,"ED course: ceftriaxone 1 g IV given.
+Discharge Rx: azithromycin 250 mg by mouth daily for 4 days.",drug_name,azithromycin 250 mg,kind,prescribed,section
+46,hard,"ED course: ceftriaxone 1 g IV given.
+Discharge Rx: azithromycin 250 mg by mouth daily for 4 days.",drug_name,azithromycin 250 mg,route,oral,plain
+47,hard,Em uso domiciliar: Insulina NPH 10 UI SC à noite.,drug_name,Insulina NPH,kind,taking,portuguese
+47,hard,Em uso domiciliar: Insulina NPH 10 UI SC à noite.,drug_name,Insulina NPH,route,subcutaneous,portuguese
+48,hard,Albuterol MDI 2 puffs q4h PRN wheeze (home med).,drug_name,Albuterol,kind,taking,abbreviation
+48,hard,Albuterol MDI 2 puffs q4h PRN wheeze (home med).,drug_name,Albuterol,route,inhaled,abbreviation
+49,hard,Timolol 0.5% eye drops OU BID - continue.,drug_name,Timolol 0.5%,kind,taking,plain
+49,hard,Timolol 0.5% eye drops OU BID - continue.,drug_name,Timolol 0.5%,route,ophthalmic,plain
+50,hard,Fentanyl 25 mcg/h patch changed today by nursing.,drug_name,Fentanyl 25 mcg/h,kind,administered,hard
+50,hard,Fentanyl 25 mcg/h patch changed today by nursing.,drug_name,Fentanyl 25 mcg/h,route,transdermal,plain
+51,hard,"Ondansetron 4 mg SL given for nausea, may repeat once.",drug_name,Ondansetron 4 mg,kind,administered,plain
+51,hard,"Ondansetron 4 mg SL given for nausea, may repeat once.",drug_name,Ondansetron 4 mg,route,sublingual,abbreviation
+52,hard,New: hydrocortisone 1% cream to the rash BID x 7 days.,drug_name,hydrocortisone 1% cream,kind,prescribed,plain
+52,hard,New: hydrocortisone 1% cream to the rash BID x 7 days.,drug_name,hydrocortisone 1% cream,route,topical,hard
+53,hard,Patient stopped taking aspirin 81 mg last month due to bruising.,drug_name,aspirin 81 mg,kind,taking,hard
+53,hard,Patient stopped taking aspirin 81 mg last month due to bruising.,drug_name,aspirin 81 mg,route,,not stated
+54,hard,"Received paclitaxel 175 mg/m2, cycle 3, today; tolerated well.",drug_name,paclitaxel,kind,administered,plain
+54,hard,"Received paclitaxel 175 mg/m2, cycle 3, today; tolerated well.",drug_name,paclitaxel,route,,not stated
+55,hard,"Fluticasone nasal spray, 2 sprays each nostril daily (home).",drug_name,Fluticasone,kind,taking,plain
+55,hard,"Fluticasone nasal spray, 2 sprays each nostril daily (home).",drug_name,Fluticasone,route,nasal,plain
+56,hard,Vitamin B12 1000 mcg IM was given in clinic today.,drug_name,Vitamin B12 1000 mcg,kind,administered,plain
+56,hard,Vitamin B12 1000 mcg IM was given in clinic today.,drug_name,Vitamin B12 1000 mcg,route,intramuscular,abbreviation
+57,hard,"FAMILY HISTORY:
+Mother: breast cancer at 45.
+Father: MI at 60, type 2 diabetes.
+Maternal aunt with ovarian cancer.",family_history,breast cancer,relative,mother,section
+57,hard,"FAMILY HISTORY:
+Mother: breast cancer at 45.
+Father: MI at 60, type 2 diabetes.
+Maternal aunt with ovarian cancer.",family_history,MI at 60,relative,father,section
+57,hard,"FAMILY HISTORY:
+Mother: breast cancer at 45.
+Father: MI at 60, type 2 diabetes.
+Maternal aunt with ovarian cancer.",family_history,type 2 diabetes,relative,father,section
+57,hard,"FAMILY HISTORY:
+Mother: breast cancer at 45.
+Father: MI at 60, type 2 diabetes.
+Maternal aunt with ovarian cancer.",family_history,ovarian cancer,relative,aunt,plain
+58,hard,Family history of colon cancer.,family_history,colon cancer,relative,,not stated
+59,hard,Paternal grandmother had Alzheimer disease.,family_history,Alzheimer disease,relative,grandmother,plain
+60,hard,His son was diagnosed with type 1 diabetes at age 8.,family_history,type 1 diabetes,relative,son,plain
+61,hard,História familiar: irmã com lúpus.,family_history,lúpus,relative,sister,portuguese
+62,hard,A cousin on the father's side has epilepsy.,family_history,epilepsy,relative,cousin,distractor
+63,hard,Niece with cystic fibrosis.,family_history,cystic fibrosis,relative,other_relative,hard
+64,hard,One of her parents had glaucoma; she is not sure which.,family_history,glaucoma,relative,parent,hard
+65,hard,Twin brother with schizophrenia.,family_history,schizophrenia,relative,brother,plain
+66,hard,Uncle (mother's brother) died of a stroke.,family_history,stroke,relative,uncle,distractor
+67,hard,Children are healthy except one daughter with migraine.,family_history,migraine,relative,daughter,plain
+68,hard,"SOCIAL HISTORY
+Tobacco: Former
+Quit date: 2012
+Packs/day: 1",smoking_status,Former,status,former,form
+69,hard,"Tobacco: yes, 1/2 ppd",smoking_status,"Tobacco: yes, 1/2 ppd",status,current_every_day,form
+70,hard,Smoked 2 packs/day for 30 years until his CABG in 2019.,smoking_status,Smoked 2 packs/day for 30 years until his CABG in 2019,status,former,hard
+71,hard,Currently smoking again after quitting in 2018.,smoking_status,Currently smoking again,status,current_unknown_frequency,hard
+72,hard,Has cut down to a cigarette now and then.,smoking_status,cut down to a cigarette now and then,status,current_some_day,hard
+73,hard,Fumante de 1 maço por dia.,smoking_status,Fumante de 1 maço por dia,status,current_every_day,portuguese
+74,hard,Uses smokeless tobacco; never smoked cigarettes.,smoking_status,never smoked cigarettes,status,never,distractor
+75,hard,PS 1 per ECOG.,ecog_performance_status,PS 1 per ECOG,score,1,words
+76,hard,Performance status: ECOG 1 (KPS 80).,ecog_performance_status,ECOG 1,score,1,distractor
+77,hard,ECOG <= 1 required for the trial; currently ECOG 0.,ecog_performance_status,ECOG 0,score,0,distractor
+78,hard,Zubrod 3.,ecog_performance_status,Zubrod 3,score,3,words
+79,hard,ECOG PS 2 to 3.,ecog_performance_status,ECOG PS 2 to 3,score,,range
+79,hard,ECOG PS 2 to 3.,ecog_performance_status,ECOG PS 2 to 3,score_range_min,2,range
+79,hard,ECOG PS 2 to 3.,ecog_performance_status,ECOG PS 2 to 3,score_range_max,3,range
+80,hard,ECOG: II-III.,ecog_performance_status,ECOG: II-III,score,,range
+80,hard,ECOG: II-III.,ecog_performance_status,ECOG: II-III,score_range_min,2,range
+80,hard,ECOG: II-III.,ecog_performance_status,ECOG: II-III,score_range_max,3,range
+81,hard,"ECOG performance status: 1.
+Karnofsky 70.",ecog_performance_status,ECOG performance status: 1,score,1,distractor

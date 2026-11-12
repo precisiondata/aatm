@@ -5,6 +5,10 @@ occurrence in the note), the attribute and the gold label. An empty gold label m
 the note does not state the attribute for that mention (e.g. the single ECOG grade of
 a range). Notes with several rows are extracted once.
 
+Two sets: `basic` (short one-line notes, smoking status and ECOG) and `hard` (longer
+notes, labels that depend on another line or section, drug `kind` and `route`,
+family history `relative`, and harder smoking and ECOG phrasing).
+
 The snippets are written by hand, not taken from patient records. Run this script
 after editing the list, from the repository root:
 
@@ -269,21 +273,285 @@ CASES = [
     ),
 ]
 
+DRUG = "drug_name"
+FAMILY = "family_history"
+
+# The hard set: longer notes where the label depends on another line or section,
+# attributes with many labels (drug route: 13, family relative: 16), the drug `kind`
+# (administered / prescribed / taking), and harder smoking and ECOG phrasing.
+# (note, [(entity, mention, attribute, gold, tag), ...])
+HARD = [
+    # --- drugs: kind and route ---------------------------------------------------------
+    (
+        "HOME MEDICATIONS:\n- lisinopril 10 mg PO daily\n- atorvastatin 40 mg nightly\n"
+        "PLAN:\n- start metformin 500 mg twice daily with meals",
+        [
+            (DRUG, "lisinopril 10 mg", "kind", "taking", "section"),
+            (DRUG, "lisinopril 10 mg", "route", "oral", "abbreviation"),
+            (DRUG, "atorvastatin 40 mg", "kind", "taking", "section"),
+            (DRUG, "atorvastatin 40 mg", "route", "", "not stated"),
+            (DRUG, "metformin 500 mg", "kind", "prescribed", "section"),
+            (DRUG, "metformin 500 mg", "route", "", "not stated"),
+        ],
+    ),
+    (
+        "ED course: ceftriaxone 1 g IV given.\n"
+        "Discharge Rx: azithromycin 250 mg by mouth daily for 4 days.",
+        [
+            (DRUG, "ceftriaxone 1 g", "kind", "administered", "plain"),
+            (DRUG, "ceftriaxone 1 g", "route", "intravenous", "abbreviation"),
+            (DRUG, "azithromycin 250 mg", "kind", "prescribed", "section"),
+            (DRUG, "azithromycin 250 mg", "route", "oral", "plain"),
+        ],
+    ),
+    (
+        "Em uso domiciliar: Insulina NPH 10 UI SC à noite.",
+        [
+            (DRUG, "Insulina NPH", "kind", "taking", "portuguese"),
+            (DRUG, "Insulina NPH", "route", "subcutaneous", "portuguese"),
+        ],
+    ),
+    (
+        "Albuterol MDI 2 puffs q4h PRN wheeze (home med).",
+        [
+            (DRUG, "Albuterol", "kind", "taking", "abbreviation"),
+            (DRUG, "Albuterol", "route", "inhaled", "abbreviation"),
+        ],
+    ),
+    (
+        "Timolol 0.5% eye drops OU BID - continue.",
+        [
+            (DRUG, "Timolol 0.5%", "kind", "taking", "plain"),
+            (DRUG, "Timolol 0.5%", "route", "ophthalmic", "plain"),
+        ],
+    ),
+    (
+        "Fentanyl 25 mcg/h patch changed today by nursing.",
+        [
+            (DRUG, "Fentanyl 25 mcg/h", "kind", "administered", "hard"),
+            (DRUG, "Fentanyl 25 mcg/h", "route", "transdermal", "plain"),
+        ],
+    ),
+    (
+        "Ondansetron 4 mg SL given for nausea, may repeat once.",
+        [
+            (DRUG, "Ondansetron 4 mg", "kind", "administered", "plain"),
+            (DRUG, "Ondansetron 4 mg", "route", "sublingual", "abbreviation"),
+        ],
+    ),
+    (
+        "New: hydrocortisone 1% cream to the rash BID x 7 days.",
+        [
+            (DRUG, "hydrocortisone 1% cream", "kind", "prescribed", "plain"),
+            (DRUG, "hydrocortisone 1% cream", "route", "topical", "hard"),
+        ],
+    ),
+    (
+        "Patient stopped taking aspirin 81 mg last month due to bruising.",
+        [
+            (DRUG, "aspirin 81 mg", "kind", "taking", "hard"),
+            (DRUG, "aspirin 81 mg", "route", "", "not stated"),
+        ],
+    ),
+    (
+        "Received paclitaxel 175 mg/m2, cycle 3, today; tolerated well.",
+        [
+            (DRUG, "paclitaxel", "kind", "administered", "plain"),
+            (DRUG, "paclitaxel", "route", "", "not stated"),
+        ],
+    ),
+    (
+        "Fluticasone nasal spray, 2 sprays each nostril daily (home).",
+        [
+            (DRUG, "Fluticasone", "kind", "taking", "plain"),
+            (DRUG, "Fluticasone", "route", "nasal", "plain"),
+        ],
+    ),
+    (
+        "Vitamin B12 1000 mcg IM was given in clinic today.",
+        [
+            (DRUG, "Vitamin B12 1000 mcg", "kind", "administered", "plain"),
+            (DRUG, "Vitamin B12 1000 mcg", "route", "intramuscular", "abbreviation"),
+        ],
+    ),
+    # --- family history: relative ----------------------------------------------------
+    (
+        "FAMILY HISTORY:\nMother: breast cancer at 45.\nFather: MI at 60, type 2 "
+        "diabetes.\nMaternal aunt with ovarian cancer.",
+        [
+            (FAMILY, "breast cancer", "relative", "mother", "section"),
+            # "MI" alone would match inside "FAMILY": anchor it on its line.
+            (FAMILY, "MI at 60", "relative", "father", "section"),
+            (FAMILY, "type 2 diabetes", "relative", "father", "section"),
+            (FAMILY, "ovarian cancer", "relative", "aunt", "plain"),
+        ],
+    ),
+    (
+        "Family history of colon cancer.",
+        [(FAMILY, "colon cancer", "relative", "", "not stated")],
+    ),
+    (
+        "Paternal grandmother had Alzheimer disease.",
+        [(FAMILY, "Alzheimer disease", "relative", "grandmother", "plain")],
+    ),
+    (
+        "His son was diagnosed with type 1 diabetes at age 8.",
+        [(FAMILY, "type 1 diabetes", "relative", "son", "plain")],
+    ),
+    (
+        "História familiar: irmã com lúpus.",
+        [(FAMILY, "lúpus", "relative", "sister", "portuguese")],
+    ),
+    (
+        "A cousin on the father's side has epilepsy.",
+        [(FAMILY, "epilepsy", "relative", "cousin", "distractor")],
+    ),
+    (
+        "Niece with cystic fibrosis.",
+        [(FAMILY, "cystic fibrosis", "relative", "other_relative", "hard")],
+    ),
+    (
+        "One of her parents had glaucoma; she is not sure which.",
+        [(FAMILY, "glaucoma", "relative", "parent", "hard")],
+    ),
+    (
+        "Twin brother with schizophrenia.",
+        [(FAMILY, "schizophrenia", "relative", "brother", "plain")],
+    ),
+    (
+        "Uncle (mother's brother) died of a stroke.",
+        [(FAMILY, "stroke", "relative", "uncle", "distractor")],
+    ),
+    (
+        "Children are healthy except one daughter with migraine.",
+        [(FAMILY, "migraine", "relative", "daughter", "plain")],
+    ),
+    # --- smoking status --------------------------------------------------------------
+    (
+        "SOCIAL HISTORY\nTobacco: Former\nQuit date: 2012\nPacks/day: 1",
+        [(SMOKING, "Former", "status", "former", "form")],
+    ),
+    (
+        "Tobacco: yes, 1/2 ppd",
+        [(SMOKING, "Tobacco: yes, 1/2 ppd", "status", "current_every_day", "form")],
+    ),
+    (
+        "Smoked 2 packs/day for 30 years until his CABG in 2019.",
+        [
+            (
+                SMOKING,
+                "Smoked 2 packs/day for 30 years until his CABG in 2019",
+                "status",
+                "former",
+                "hard",
+            )
+        ],
+    ),
+    (
+        "Currently smoking again after quitting in 2018.",
+        [
+            (
+                SMOKING,
+                "Currently smoking again",
+                "status",
+                "current_unknown_frequency",
+                "hard",
+            )
+        ],
+    ),
+    (
+        "Has cut down to a cigarette now and then.",
+        [
+            (
+                SMOKING,
+                "cut down to a cigarette now and then",
+                "status",
+                "current_some_day",
+                "hard",
+            )
+        ],
+    ),
+    (
+        "Fumante de 1 maço por dia.",
+        [
+            (
+                SMOKING,
+                "Fumante de 1 maço por dia",
+                "status",
+                "current_every_day",
+                "portuguese",
+            )
+        ],
+    ),
+    (
+        "Uses smokeless tobacco; never smoked cigarettes.",
+        [(SMOKING, "never smoked cigarettes", "status", "never", "distractor")],
+    ),
+    # --- ECOG --------------------------------------------------------------------------
+    (
+        "PS 1 per ECOG.",
+        [(ECOG, "PS 1 per ECOG", "score", "1", "words")],
+    ),
+    (
+        "Performance status: ECOG 1 (KPS 80).",
+        [(ECOG, "ECOG 1", "score", "1", "distractor")],
+    ),
+    (
+        "ECOG <= 1 required for the trial; currently ECOG 0.",
+        [(ECOG, "ECOG 0", "score", "0", "distractor")],
+    ),
+    (
+        "Zubrod 3.",
+        [(ECOG, "Zubrod 3", "score", "3", "words")],
+    ),
+    (
+        "ECOG PS 2 to 3.",
+        [
+            (ECOG, "ECOG PS 2 to 3", "score", "", "range"),
+            (ECOG, "ECOG PS 2 to 3", "score_range_min", "2", "range"),
+            (ECOG, "ECOG PS 2 to 3", "score_range_max", "3", "range"),
+        ],
+    ),
+    (
+        "ECOG: II-III.",
+        [
+            (ECOG, "ECOG: II-III", "score", "", "range"),
+            (ECOG, "ECOG: II-III", "score_range_min", "2", "range"),
+            (ECOG, "ECOG: II-III", "score_range_max", "3", "range"),
+        ],
+    ),
+    (
+        "ECOG performance status: 1.\nKarnofsky 70.",
+        [(ECOG, "ECOG performance status: 1", "score", "1", "distractor")],
+    ),
+]
+
+
+def rows() -> list[tuple[str, str, str, str, str, str, str]]:
+    """Every case as (set, note, entity, mention, attribute, gold, tag)."""
+    basic = [("basic", *case) for case in CASES]
+    hard = [("hard", note, *mention) for note, mentions in HARD for mention in mentions]
+    return basic + hard
+
 
 def main() -> None:
     notes: dict[str, int] = {}
+    cases = rows()
     path = Path(__file__).with_name("cases.csv")
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["note_id", "note", "entity", "mention", "attribute", "gold", "tag"]
+            ["note_id", "set", "note", "entity", "mention", "attribute", "gold", "tag"]
         )
-        for note, entity, mention, attribute, gold, tag in CASES:
+        for case_set, note, entity, mention, attribute, gold, tag in cases:
             if mention not in note:
                 raise ValueError(f"{mention!r} is not in {note!r}")
             note_id = notes.setdefault(note, len(notes) + 1)
-            writer.writerow([note_id, note, entity, mention, attribute, gold, tag])
-    print(f"Wrote {len(CASES)} mentions in {len(notes)} notes to {path}")
+            writer.writerow(
+                [note_id, case_set, note, entity, mention, attribute, gold, tag]
+            )
+    sets = {s: sum(1 for c in cases if c[0] == s) for s in ("basic", "hard")}
+    print(f"Wrote {len(cases)} mentions ({sets}) in {len(notes)} notes to {path}")
 
 
 if __name__ == "__main__":

@@ -10,13 +10,14 @@ ECOG grade), and in which mode? Every mention of `cases.csv` is labelled by:
   decision model (`mode="replace"`).
 
 Each mention ends as `correct`, `wrong`, `review` (the label was withheld for a
-person to check) or `missed` (the extractor did not find it). `verify` and `replace`
+person to check), `dropped` (found, but rejected because a required attribute got
+no label) or `missed` (the extractor did not find it). `verify` and `replace`
 are also scored at several `min_probability` thresholds, from the same calls.
 
 Run from the repository root (keys in `.env`):
 
     uv run python benchmarks/attribute_labels/run_benchmark.py \\
-        --model openai/gpt-5-mini --decision-models openrouter/typesafe/jev-1.13
+        --models openai/gpt-5-mini --decision-models openrouter/typesafe/jev-1.13
 
 Extractions are stored in `results/` and reused by later runs (`--fresh` redoes
 them), so trying another decision model costs only its own calls.
@@ -25,6 +26,7 @@ them), so trying another decision model costs only its own calls.
 import argparse
 import asyncio
 import csv
+import hashlib
 import json
 import time
 from collections import Counter, defaultdict
@@ -44,14 +46,21 @@ from aatm.llm.usage import TokenUsage, track_usage
 from aatm.omop.builder import _load_definitions
 
 HERE = Path(__file__).parent
-DEFINITIONS = ["smoking_status", "ecog_performance_status"]
+DEFINITIONS = [
+    "smoking_status",
+    "ecog_performance_status",
+    "drug_exposure",
+    "family_history",
+]
+SETS = ["basic", "hard"]
 #: USD per million input / output tokens, for models whose provider reports no cost.
 PRICES = {
     "openai/gpt-5-mini": (0.25, 2.0),
+    "openai/gpt-5-nano": (0.05, 0.40),
     "openai/gpt-6-luna": (0.10, 0.0),
     "openrouter/typesafe/jev-1.13": (0.042, 0.0),
 }
-OUTCOMES = ["correct", "wrong", "review", "missed"]
+OUTCOMES = ["correct", "wrong", "review", "dropped", "missed"]
 
 
 def slug(model_id: str) -> str:
@@ -77,14 +86,22 @@ async def extract(
     path: Path,
     fresh: bool,
 ) -> tuple[dict[str, EntityValidationResult], dict[str, Any]]:
-    """Extract every note, or load the extraction stored at `path`."""
+    """Extract every note, or load the extraction stored at `path` when it was made
+    with the same model, definitions and notes."""
+    key = hashlib.sha256(
+        json.dumps(
+            [model, definitions.model_dump(mode="json", exclude={"omop"}), notes],
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
     if path.exists() and not fresh:
         stored = json.loads(path.read_text(encoding="utf-8"))
-        results = {
-            k: EntityValidationResult.model_validate(v)
-            for k, v in stored["results"].items()
-        }
-        return results, stored["stats"]
+        if stored.get("key") == key:
+            results = {
+                k: EntityValidationResult.model_validate(v)
+                for k, v in stored["results"].items()
+            }
+            return results, stored["stats"]
     extractor = SimpleLLMExtractor(
         model_id=model,
         entity_definitions=definitions,
@@ -101,6 +118,7 @@ async def extract(
         json.dumps(
             {
                 "model": model,
+                "key": key,
                 "stats": stats,
                 "results": {k: r.model_dump(mode="json") for k, r in results.items()},
             },
@@ -188,9 +206,15 @@ def outcome(
             and rejected.start is not None
             and rejected.end is not None
             and overlaps(start, end, rejected.start, rejected.end)
-            and "required_attribute_under_review" in rejected.reasons
         ):
-            return "review", None, rejected
+            if "required_attribute_under_review" in rejected.reasons:
+                return "review", None, rejected
+            if {
+                "required_attribute_missing",
+                "invalid_required_attribute",
+            } & set(rejected.reasons):
+                # Found, but rejected for want of a required label.
+                return "dropped", None, rejected
     return "missed", None, None
 
 
@@ -229,6 +253,7 @@ def score(
                 "note_id": case["note_id"],
                 "mention": case["mention"],
                 "attribute": case["attribute"],
+                "set": case["set"],
                 "tag": case["tag"],
                 "gold": case["gold"],
                 "outcome": kind,
@@ -293,35 +318,47 @@ def fmt(value: Any, digits: int = 2) -> str:
     return str(value)
 
 
-def table(summary: dict[str, Any], mentions: int) -> str:
+def table(summary: dict[str, Any]) -> str:
     lines = [
-        "| Setup | Correct | Wrong | Review | Missed | Precision of written labels "
-        "| Cost (USD) / 1,000 mentions | Seconds |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Setup | Correct | Wrong | Review | Dropped | Missed "
+        "| Precision of written labels |",
+        "|---|---|---|---|---|---|---|",
     ]
     for name, s in summary.items():
-        cost = s["stats"].get("cost")
         lines.append(
-            f"| {name} | {s['correct']} | {s['wrong']} | {s['review']} | {s['missed']} "
-            f"| {fmt(s['precision'])} "
-            f"| {fmt(None if cost is None else cost / mentions * 1000, 3)} "
-            f"| {fmt(s['stats'].get('seconds'), 1)} |"
+            f"| {name} | {s['correct']} | {s['wrong']} | {s['review']} "
+            f"| {s['dropped']} | {s['missed']} | {fmt(s['precision'])} |"
         )
     return "\n".join(lines)
 
 
-async def run(args: argparse.Namespace) -> None:
-    cases = load_cases()
-    notes = notes_of(cases)
-    definitions = _load_definitions(DEFINITIONS)
-    out = HERE / "results"
-    print(f"{len(cases)} mentions in {len(notes)} notes")
+def cost_table(stats: dict[str, Any], mentions: int) -> str:
+    lines = [
+        "| Setup | USD / 1,000 mentions | Seconds | Decision calls |",
+        "|---|---|---|---|",
+    ]
+    for name, s in stats.items():
+        cost = s.get("cost")
+        lines.append(
+            f"| {name} | {fmt(None if cost is None else cost / mentions * 1000, 3)} "
+            f"| {fmt(s.get('seconds'), 1)} | {s.get('decision_calls', 0)} |"
+        )
+    return "\n".join(lines)
 
+
+async def run_model(
+    args: argparse.Namespace,
+    model: str,
+    cases: list[dict[str, str]],
+    notes: dict[str, str],
+    definitions: EntityDefinitions,
+) -> None:
+    out = HERE / "results"
     full, full_stats = await extract(
-        args.model,
+        model,
         definitions,
         notes,
-        out / f"extraction__{slug(args.model)}.json",
+        out / f"extraction__{slug(model)}.json",
         args.fresh,
     )
     # The extraction of replace mode: the labelled attributes left out of the prompt.
@@ -329,18 +366,16 @@ async def run(args: argparse.Namespace) -> None:
         args.decision_models[0], mode="replace", max_concurrency=args.concurrency
     )
     stripped, stripped_stats = await extract(
-        args.model,
+        model,
         any_labeller.prompt_definitions(definitions),
         notes,
-        out / f"extraction_without_attributes__{slug(args.model)}.json",
+        out / f"extraction_without_attributes__{slug(model)}.json",
         args.fresh,
     )
 
-    summary: dict[str, Any] = {}
-    rows = score(cases, full, None, None)
-    summary["extractor"] = {**summarize(rows), "stats": full_stats}
-    per_case = {"extractor": rows}
-    report: dict[str, Any] = {"model": args.model, "decision_models": {}}
+    per_case = {"extractor": score(cases, full, None, None)}
+    stats: dict[str, Any] = {"extractor": full_stats}
+    report: dict[str, Any] = {"model": model, "decision_models": {}}
 
     for decision_model in args.decision_models:
         name = decision_model.split("/")[-1]
@@ -351,69 +386,98 @@ async def run(args: argparse.Namespace) -> None:
             labeller = DecisionAttributeLabeller(
                 decision_model, mode=mode, max_concurrency=args.concurrency
             )
-            labelled, decisions, stats = await label(
+            labelled, decisions, label_stats = await label(
                 labeller, extracted, notes, definitions
             )
-            total = {
-                k: (extraction_stats.get(k) or 0) + (stats.get(k) or 0)
-                for k in ("cost", "seconds")
+            stats[f"{mode} {name}"] = {
+                **{
+                    k: (extraction_stats.get(k) or 0) + (label_stats.get(k) or 0)
+                    for k in ("cost", "seconds")
+                },
+                "decision_calls": label_stats["calls"],
             }
             for threshold in [None, *args.thresholds]:
                 setup = f"{mode} {name}" + (f" @{threshold}" if threshold else "")
-                rows = score(cases, labelled, decisions, threshold)
-                per_case[setup] = rows
-                summary[setup] = {
-                    **summarize(rows),
-                    "stats": {**total, "decision_calls": stats["calls"]},
-                }
+                per_case[setup] = score(cases, labelled, decisions, threshold)
             if mode == "replace":
                 report["decision_models"][decision_model] = {
-                    "calibration": calibration(cases, labelled, decisions),
-                    "usage": stats,
+                    "calibration": {
+                        case_set: calibration(
+                            [c for c in cases if c["set"] == case_set],
+                            labelled,
+                            decisions,
+                        )
+                        for case_set in SETS
+                    },
+                    "usage": label_stats,
                 }
 
-    slug_all = (
-        slug(args.model)
+    summary = {
+        case_set: {
+            setup: summarize([r for r in rows if r["set"] == case_set])
+            for setup, rows in per_case.items()
+        }
+        for case_set in SETS
+    }
+    report["summary"] = summary
+    report["stats"] = stats
+
+    name = (
+        slug(model)
         + "__"
         + "+".join(slug(m.split("/")[-1]) for m in args.decision_models)
     )
-    with (out / f"{slug_all}.csv").open("w", newline="", encoding="utf-8") as f:
+    with (out / f"{name}.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["setup", *per_case["extractor"][0]])
         writer.writeheader()
         for setup, rows in per_case.items():
             for row in rows:
                 writer.writerow({"setup": setup, **row})
-    report["summary"] = summary
-    (out / f"{slug_all}.json").write_text(
-        json.dumps(report, indent=1), encoding="utf-8"
-    )
+    (out / f"{name}.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
 
+    print(f"\n## {model}")
+    for case_set in SETS:
+        count = sum(1 for c in cases if c["set"] == case_set)
+        print(f"\n### {case_set} ({count} mentions)\n")
+        print(table(summary[case_set]))
+    print(f"\n### Cost, both sets ({len(cases)} mentions)\n")
+    print(cost_table(stats, len(cases)))
     print()
-    print(table(summary, len(cases)))
-    print()
-    for model, data in report["decision_models"].items():
-        print(model, json.dumps(data["calibration"]))
+    for decision_model, data in report["decision_models"].items():
+        print(decision_model, json.dumps(data["calibration"]))
     by_tag: dict[str, Counter[str]] = defaultdict(Counter)
     for setup, rows in per_case.items():
         if "@" in setup:
             continue
         for row in rows:
             if row["outcome"] != "correct":
-                by_tag[setup][f"{row['tag']}:{row['outcome']}"] += 1
+                by_tag[setup][f"{row['set']}/{row['tag']}:{row['outcome']}"] += 1
     print()
     for setup, counter in by_tag.items():
         print(setup, dict(counter))
 
 
+async def run(args: argparse.Namespace) -> None:
+    cases = load_cases()
+    if args.sets:
+        cases = [c for c in cases if c["set"] in args.sets]
+    notes = notes_of(cases)
+    definitions = _load_definitions(DEFINITIONS)
+    print(f"{len(cases)} mentions in {len(notes)} notes")
+    for model in args.models:
+        await run_model(args, model, cases, notes, definitions)
+
+
 def main() -> None:
     dotenv.load_dotenv()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--model", default="openai/gpt-5-mini")
+    parser.add_argument("--models", nargs="+", default=["openai/gpt-5-mini"])
     parser.add_argument(
         "--decision-models", nargs="+", default=["openrouter/typesafe/jev-1.13"]
     )
     parser.add_argument("--thresholds", nargs="*", type=float, default=[0.5, 0.8, 0.9])
     parser.add_argument("--concurrency", type=int, default=8)
+    parser.add_argument("--sets", nargs="*", choices=SETS, help="default: all")
     parser.add_argument("--fresh", action="store_true", help="extract the notes again")
     asyncio.run(run(parser.parse_args()))
 
