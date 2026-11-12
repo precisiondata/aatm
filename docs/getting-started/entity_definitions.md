@@ -105,6 +105,7 @@ A definition file is a YAML **list**. Each item is one entity.
 | `key` | yes | | Identifier, unique within the entity. Lowercase letters, digits and `_` only |
 | `description` | yes | | What the attribute describes. The model reads it |
 | `required` | no | `false` | Reject mentions that have no valid label for this attribute |
+| `ordered` | no | `false` | The labels form a scale, listed lowest first (see [Ordered labels](#ordered-labels)) |
 | `labels` | yes | | The allowed values, at least one |
 
 ### Label fields
@@ -222,6 +223,15 @@ known result.
   an unclear description.
 - Keep values short and stable (`positive`, not `Positive result reported`). You will
   filter and count by them.
+
+### Ordered labels
+
+Mark an attribute `ordered: true` when its labels are a scale, listed from lowest to
+highest, like the ECOG grades 0 to 5. The extractor does not use it. A
+[decision model labeller](../reference/decision_models.md#labelling-attributes-decisionattributelabeller),
+if you add one, then asks a score question, which knows that grade 2 lies between 1
+and 3, instead of a choice between unrelated options. Leave it out for labels with no
+order, such as `never` / `former` / `current`.
 
 ### How the model's labels are checked
 

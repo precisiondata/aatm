@@ -1080,6 +1080,7 @@ run.table("measurement")    # a DataFrame
 run.provenance()            # note_id, entity_id and span of each row (table, row_id)
 run.issues()
 run.mappings()
+run.attribute_reviews()     # labels a decision model could not confirm, if you use one
 run.failures()              # notes that could not be extracted or built, and why
 run.status()                # {"built": 9850, "failed": 3}
 run.dataset("measurement")  # a pyarrow Dataset, to filter without loading it all

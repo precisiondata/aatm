@@ -7,8 +7,10 @@ a generative LLM call, and write no text.
 
 Many steps of a mapping or extraction pipeline are decisions of this kind: choosing a
 candidate concept, labelling an attribute, checking that a mention is not negated.
-The first such step is [`DecisionSelector`](#selecting-concepts-decisionselector);
-see [issue #77](https://github.com/precisiondata/aatm/issues/77) for the others
+Two steps use them so far:
+[`DecisionSelector`](#selecting-concepts-decisionselector) and
+[`DecisionAttributeLabeller`](#labelling-attributes-decisionattributelabeller); see
+[issue #77](https://github.com/precisiondata/aatm/issues/77) for the others
 planned on top of this interface.
 
 ```python
@@ -126,6 +128,81 @@ moving alias (`jev-latest`) would not: pin versions.
 The texts to map and the candidate names are sent to the provider; see the data
 governance warning above. The API reference of `DecisionSelector` is on the
 [Selectors](selectors.md) page.
+
+## Labelling attributes: `DecisionAttributeLabeller`
+
+An entity [attribute](../getting-started/entity_definitions.md#attributes-what-the-note-says-about-a-mention)
+with a closed list of labels, such as `smoking_status.status` or the ECOG grade, is a
+closed-set question. By default the extractor's own LLM call chooses the labels. To
+have a decision model label them instead, or check them, give the extractor a
+labeller:
+
+```python
+from aatm.extractors import DecisionAttributeLabeller
+from aatm.omop import OmopExtractionPipeline
+
+pipeline = OmopExtractionPipeline(
+    ["smoking_status", "ecog_performance_status"],
+    model_id="openai/gpt-5-mini",
+    attribute_labeller=DecisionAttributeLabeller(
+        "openrouter/typesafe/jev-1.13",
+        mode="verify",
+        min_probability=0.8,
+    ),
+)
+```
+
+`SimpleLLMExtractor(..., attribute_labeller=...)` takes the same argument. Without
+it, nothing changes.
+
+**Who labels is set in code; what kind of question each attribute is, in the
+definitions.** The labeller sets the model, the mode, the attributes (`attributes=
+["smoking_status", "ecog_performance_status.score"]`; all of them by default) and the
+threshold. The definition file says whether an attribute's labels form a scale:
+with `ordered: true` (the ECOG grades) the model answers a **score** question, which
+knows that grade 2 lies between 1 and 3; otherwise a **choice** question. The
+extractor ignores `ordered`, so the definition files work the same with or without a
+labeller.
+
+For each mention, the model reads the entity's name, the mention's text and its line
+of the note, and answers every labelled attribute of the mention in one call. Every
+question can be answered "not stated" (a `not_stated` option, or a yes/no
+"is it stated?" question next to a score), since a mention need not state every
+attribute: the attribute is then left out, as the extractor would.
+
+| Mode | The extractor | The decision model | A label is written when |
+|---|---|---|---|
+| `verify` (default) | labels as before | labels each mention too | both give the same answer |
+| `replace` | only finds mentions: the labelled attributes are left out of its prompt | labels each mention | the decision model gives it |
+
+**`min_probability`** is a threshold on the decision model's probability. With
+`min_probability=0.8`, only labels the model gives at least 80 % are written. The
+default, `None`, keeps every label. Either way, the probability of each label written
+is in `ExtractedEntity.attribute_probabilities` (and `EntityRecord.attribute_probabilities`).
+`llm/` models give no probabilities: with a threshold, all their labels go to review.
+
+**Review.** A label below the threshold, a disagreement (`verify`), or a refusal is
+**not written**: the mention keeps its other attributes, and the label goes to the
+result's `attribute_reviews` for a person to check, with the extractor's label, the
+decision model's label and its probability of each option. When the attribute is
+`required`, the mention is rejected (`required_attribute_under_review`), with its
+children, rather than written without it. The OMOP builder collects the reviews in
+`OmopTables.attribute_reviews_dataframe()`, and a run writes them to the
+`attribute_reviews` folder (`OmopRun.attribute_reviews()`).
+
+**Runs.** A run's stored results depend on the labeller as much as on the extractor:
+resuming with another labeller, mode, threshold or model is refused, as with another
+extractor. With `batch=True`, the labels are asked with live calls when a batch job's
+results come back, before they are stored; a run that stops meanwhile collects the job
+again and labels it then.
+
+Which mode to use is a matter of accuracy and cost on your notes: see the
+[attribute labelling benchmark](https://github.com/precisiondata/aatm/tree/main/benchmarks/attribute_labels).
+
+Each mention and its line are sent to the decision provider; see the data governance
+warning above.
+
+::: aatm.extractors.attribute_labeller
 
 ::: aatm.llm.decisions
 
