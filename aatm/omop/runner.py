@@ -30,9 +30,10 @@ recorded with its error and the run goes on; a later run tries it again, up to
 ``max_attempts`` times in all. `note_id` is the key that tells notes apart, so every
 note needs a unique one.
 
-Extraction does not wait for chunks: up to the extractor's ``max_concurrency`` calls
-(or its model's, see `aatm.llm.set_rate_limits`) are in flight at once, a new one
-starting as soon as one ends, and each result is stored as soon as it comes back, so a
+Extraction does not wait for chunks: up to `extraction_concurrency` calls are in
+flight at once (the extractor's ``max_concurrency``, its model's limits from
+`aatm.llm.set_rate_limits`, or by default 16 for a hosted API and 4 for a local
+server, whatever the ``chunk_size``), a new one starting as soon as one ends, and each result is stored as soon as it comes back, so a
 run that stops loses none of the calls it paid for. Extracted notes are built
 ``chunk_size`` at a time, one chunk at a time in a thread, while extraction goes on;
 a few chunks are in memory at most.
@@ -865,6 +866,23 @@ def _duration(seconds: float) -> str:
     return f"{minutes}m{secs:02d}s"
 
 
+class RunSettings(BaseModel):
+    """The throughput settings a run used, so a later `plan` can scale its numbers.
+
+    Attributes:
+        max_concurrency: Extraction calls in flight at most (live runs), see
+            `extraction_concurrency`.
+        chunk_size: Notes built together.
+        batch: Whether extraction went through provider batch jobs.
+        shard: ``"index/count"``; ``"0/1"`` is the whole dataset.
+    """
+
+    max_concurrency: Optional[int] = None
+    chunk_size: Optional[int] = None
+    batch: bool = False
+    shard: str = "0/1"
+
+
 class RunSummary(BaseModel):
     """What one call of `run` or `rebuild` did.
 
@@ -900,6 +918,8 @@ class RunSummary(BaseModel):
             and ``building``.
         cost: Estimated cost of all stages, when the run was given ``prices``.
         seconds: Wall time.
+        settings: The throughput settings of a run (not of a rebuild), when it
+            recorded them.
     """
 
     output_dir: str
@@ -927,6 +947,7 @@ class RunSummary(BaseModel):
     )
     cost: Optional[float] = None
     seconds: float = 0.0
+    settings: Optional[RunSettings] = None
 
     @property
     def usage(self) -> TokenUsage:
@@ -1371,7 +1392,24 @@ class ChunkedRun:
                 f"{self.output_dir} holds the folders of a sharded run: run the "
                 "shards again with run_sharded (or shard= and each shard's folder)"
             )
-        summary = RunSummary(output_dir=str(self.output_dir), kind="run", total=total)
+        concurrency = extraction_concurrency(self.pipeline.extractor)
+        if not batch:
+            logger.info(
+                "Extracting up to %d notes at once (%s); see pipeline.plan()",
+                concurrency.value,
+                concurrency.detail,
+            )
+        summary = RunSummary(
+            output_dir=str(self.output_dir),
+            kind="run",
+            total=total,
+            settings=RunSettings(
+                max_concurrency=None if batch else concurrency.value,
+                chunk_size=chunk_size,
+                batch=batch,
+                shard=f"{shard[0]}/{shard[1]}",
+            ),
+        )
         with (
             self._ledger() as ledger,
             self._report(summary, prices, log_every) as report,
@@ -1388,7 +1426,7 @@ class ChunkedRun:
                 summary,
                 report,
                 chunk_size,
-                _concurrency(self.pipeline.extractor) or chunk_size,
+                concurrency.value,
             )
             try:
                 for chunk in read_chunks(source, chunk_size, columns, shard):
@@ -1604,18 +1642,107 @@ class ChunkedRun:
         )
 
 
-def _concurrency(extractor: Any) -> Optional[int]:
-    """The cap on the extractor's calls in flight, if any: its own or its model's."""
-    caps: list[int] = []
+#: Extraction calls in flight by default, when neither the extractor nor the model's
+#: rate limits cap them: a hosted API serves many calls at once, a local server few.
+DEFAULT_CONCURRENCY = {"hosted": 16, "local": 4}
+#: With only a requests-per-minute limit, enough calls in flight to use it when a call
+#: takes up to this many seconds; the limiter paces them.
+_ASSUMED_CALL_SECONDS = 30.0
+_MAX_DERIVED_CONCURRENCY = 256
+_LOCAL_PROVIDERS = {"ollama"}
+_HOSTED_PROVIDERS = {"openai", "anthropic", "gemini", "openrouter"}
+_LOCAL_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "[::1]", "host.docker.internal")
+
+
+def model_location(extractor: Any) -> Optional[Literal["hosted", "local"]]:
+    """Whether the extractor's model is a hosted API or a local server, if known.
+
+    From the provider of its model id (``ollama`` is local; ``openai``,
+    ``anthropic``, ``gemini`` and ``openrouter`` are hosted) or, for
+    ``openai-compatible``, the host of its ``base_url``.
+    """
+    model_id = getattr(extractor, "model_id", None)
+    if not isinstance(model_id, str) or "/" not in model_id:
+        return None
+    provider = model_id.split("/", 1)[0].split("@", 1)[0]
+    if provider in _LOCAL_PROVIDERS:
+        return "local"
+    if provider in _HOSTED_PROVIDERS:
+        return "hosted"
+    base_url = getattr(getattr(extractor, "llm", None), "base_url", None)
+    if isinstance(base_url, str):
+        from urllib.parse import urlparse
+
+        host = (urlparse(base_url).hostname or "").lower()
+        local = host in {h.strip("[]") for h in _LOCAL_HOSTS} or host.endswith(".local")
+        return "local" if local else "hosted"
+    return None
+
+
+class Concurrency(BaseModel):
+    """The extraction calls a run keeps in flight, and where the number came from.
+
+    Attributes:
+        value: Calls in flight at most.
+        source: ``argument`` (the extractor's ``max_concurrency``),
+            ``set_rate_limits`` (the model's ``max_concurrency`` or
+            ``requests_per_minute``) or ``default``.
+        detail: How it was found, in words.
+    """
+
+    value: int
+    source: Literal["argument", "set_rate_limits", "default"]
+    detail: str
+
+
+def extraction_concurrency(extractor: Any) -> Concurrency:
+    """The extraction calls a run keeps in flight with this extractor.
+
+    The lowest of the extractor's own ``max_concurrency`` and its model's
+    ``max_concurrency`` (`aatm.llm.set_rate_limits`). With neither, it is derived from
+    the model's ``requests_per_minute`` when one is set (enough calls to use it when
+    a call takes up to 30 s, at most 256), else `DEFAULT_CONCURRENCY`: 16 for a hosted
+    API, 4 for a local server. It does not depend on ``chunk_size``.
+    """
+    caps: list[tuple[int, str, str]] = []
     own = getattr(extractor, "max_concurrency", None)
     if isinstance(own, int):
-        caps.append(own)
+        caps.append((own, "argument", f"max_concurrency={own}"))
     model_id = getattr(extractor, "model_id", None)
-    if isinstance(model_id, str):
-        limit = get_rate_limits(model_id).max_concurrency
-        if limit is not None:
-            caps.append(limit)
-    return min(caps) if caps else None
+    limits = get_rate_limits(model_id) if isinstance(model_id, str) else None
+    if limits is not None and limits.max_concurrency is not None:
+        caps.append(
+            (
+                limits.max_concurrency,
+                "set_rate_limits",
+                f"the rate limits of {model_id}: "
+                f"max_concurrency={limits.max_concurrency}",
+            )
+        )
+    if caps:
+        value, source, detail = min(caps, key=lambda c: c[0])
+        return Concurrency(value=value, source=source, detail=detail)  # type: ignore[arg-type]
+    if limits is not None and limits.requests_per_minute is not None:
+        rpm = limits.requests_per_minute
+        value = int(
+            min(_MAX_DERIVED_CONCURRENCY, max(1, -(-rpm * _ASSUMED_CALL_SECONDS // 60)))
+        )
+        value = max(value, DEFAULT_CONCURRENCY["local"])
+        return Concurrency(
+            value=value,
+            source="set_rate_limits",
+            detail=(
+                f"derived from requests_per_minute={rpm:g} of {model_id}: enough "
+                f"calls to use it when a call takes {_ASSUMED_CALL_SECONDS:.0f} s"
+            ),
+        )
+    location = model_location(extractor) or "hosted"
+    value = DEFAULT_CONCURRENCY[location]
+    return Concurrency(
+        value=value,
+        source="default",
+        detail=f"the default for a {location} model",
+    )
 
 
 _Pair = tuple[ClinicalNote, EntityValidationResult]
