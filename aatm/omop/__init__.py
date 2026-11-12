@@ -26,6 +26,7 @@ _LAZY = {
     "OmopExtractionPipeline": "aatm.omop.builder",
     "OmopTables": "aatm.omop.builder",
     "OmopIssue": "aatm.omop.builder",
+    "AttributeReviewRow": "aatm.omop.builder",
     "SqliteConceptLookup": "aatm.omop.vocabulary",
     "Concept": "aatm.omop.vocabulary",
     "ConceptMapping": "aatm.omop.builder",

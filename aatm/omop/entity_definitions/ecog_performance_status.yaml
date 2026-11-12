@@ -17,6 +17,8 @@
 #   Converting KPS to ECOG is lossy and should be done downstream if needed.
 # - Eligibility criteria and thresholds ("ECOG <= 1 required") are not the patient's
 #   status and are excluded.
+# - The grades are `ordered`, so a decision model labels them as a scale (see
+#   aatm.extractors.DecisionAttributeLabeller).
 # - `score` holds a single grade. When the note gives a range ("ECOG 1-2"), `score` is
 #   left out and `score_range_min` / `score_range_max` hold the bounds, so the two cases
 #   stay distinct.
@@ -62,6 +64,7 @@
     (4) descriptions of function that do not state an ECOG grade, e.g. "bedbound".
   attributes:
     - key: score
+      ordered: true
       description: >
         The single ECOG grade stated in this mention. Leave it out when the mention
         gives a range instead of one grade.
@@ -87,6 +90,7 @@
         - value: "5"
           description: Dead.
     - key: score_range_min
+      ordered: true
       description: >
         The lower grade when this mention gives a range, e.g. "0" for "ECOG 0-1". Leave
         it out when the mention gives a single grade.
@@ -104,6 +108,7 @@
         - value: "5"
           description: Grade 5.
     - key: score_range_max
+      ordered: true
       description: >
         The higher grade when this mention gives a range, e.g. "1" for "ECOG 0-1". Leave
         it out when the mention gives a single grade.

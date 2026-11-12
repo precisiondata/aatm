@@ -164,6 +164,7 @@ from aatm.llm.usage import Prices, TokenUsage, model_prices, track_usage
 from aatm.logs import get_logger
 from aatm.omop.builder import (
     MAX_NOTE_ID,
+    AttributeReviewRow,
     ConceptMapping,
     OmopIssue,
     OmopTables,
@@ -183,6 +184,7 @@ logger = get_logger(__name__)
 
 LEDGER_FILE = "ledger.db"
 PROVENANCE, ISSUES, MAPPINGS = "provenance", "issues", "mappings"
+ATTRIBUTE_REVIEWS = "attribute_reviews"
 _NOTE_FIELDS = set(ClinicalNote.model_fields)
 # SQLite limits the number of parameters of a statement.
 _SQL_BATCH = 500
@@ -486,6 +488,12 @@ def _write_part(output_dir: Path, part: int, tables: OmopTables) -> dict[str, in
         part,
         _schema(ConceptMapping),
         [m.model_dump() for m in tables.mappings],
+    )
+    _write(
+        output_dir / ATTRIBUTE_REVIEWS,
+        part,
+        _schema(AttributeReviewRow, exclude=["note_index"]),
+        [r.model_dump(exclude={"note_index"}) for r in tables.attribute_reviews],
     )
     return counts
 
@@ -1041,6 +1049,7 @@ def _merge(parts: Sequence[OmopTables]) -> OmopTables:
             merged.provenance.setdefault(table, []).extend(tables.provenance[table])
         merged.issues.extend(tables.issues)
         merged.mappings.extend(tables.mappings)
+        merged.attribute_reviews.extend(tables.attribute_reviews)
         if tables.cache_stats is not None:
             merged.cache_stats = _add_stats(merged.cache_stats, tables.cache_stats)
         merged.coded_texts += tables.coded_texts
@@ -1236,17 +1245,25 @@ class ChunkedRun:
 
     def _extraction_fingerprint(self) -> str:
         extractor = self.pipeline.extractor
-        return _fingerprint(
-            {
-                "entities": [
-                    e.model_dump(mode="json", exclude={"omop"})
-                    for e in self.pipeline.entity_definitions.entities
-                ],
-                "extractor": type(extractor).__qualname__,
-                "model_id": getattr(extractor, "model_id", None),
-                "instructions": getattr(extractor, "instructions", None),
-            }
-        )
+        definitions = self.pipeline.entity_definitions
+        value: dict[str, Any] = {
+            # `ordered` only changes a labeller's questions, which the labeller's
+            # own fingerprint covers; leaving it out keeps earlier runs resumable.
+            "entities": [
+                e.model_dump(
+                    mode="json",
+                    exclude={"omop": True, "attributes": {"__all__": {"ordered"}}},
+                )
+                for e in definitions.entities
+            ],
+            "extractor": type(extractor).__qualname__,
+            "model_id": getattr(extractor, "model_id", None),
+            "instructions": getattr(extractor, "instructions", None),
+        }
+        labeller = getattr(extractor, "attribute_labeller", None)
+        if labeller is not None:
+            value["attribute_labeller"] = labeller.fingerprint(definitions)
+        return _fingerprint(value)
 
     def _mapping_fingerprint(self) -> str:
         return _fingerprint(
@@ -1949,6 +1966,13 @@ class OmopRun:
     def mappings(self) -> pd.DataFrame:
         """The coded texts; ``trace`` and ``usage`` are JSON strings."""
         return self._read(MAPPINGS, _schema(ConceptMapping))
+
+    def attribute_reviews(self) -> pd.DataFrame:
+        """The attribute labels to check (see `aatm.omop.AttributeReviewRow`);
+        ``probabilities`` is a JSON string."""
+        return self._read(
+            ATTRIBUTE_REVIEWS, _schema(AttributeReviewRow, exclude=["note_index"])
+        )
 
     def _ledgers(self) -> Iterator[RunLedger]:
         for folder in self.folders:

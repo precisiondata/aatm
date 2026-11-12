@@ -34,6 +34,7 @@ from dateutil import parser as date_parser
 from pydantic import BaseModel, ValidationError
 
 from aatm.data_models.extractors import (
+    AttributeReview,
     EntityDefinitions,
     EntityRecord,
     EntityValidationResult,
@@ -162,6 +163,18 @@ class ConceptMapping(BaseModel):
     cached: bool = False
 
 
+class AttributeReviewRow(AttributeReview):
+    """An attribute label to check (`AttributeReview`), with the note it is from.
+
+    The label was not written to the mention's row: the row was built without it,
+    or not at all when the attribute is required. See
+    `aatm.extractors.DecisionAttributeLabeller`.
+    """
+
+    note_index: int
+    note_id: Optional[int]
+
+
 @dataclass
 class OmopTables:
     """The rows built from a batch of notes, with their provenance and issues.
@@ -173,12 +186,16 @@ class OmopTables:
     builder has a cache. ``coded_texts`` counts the distinct texts coded (per coding
     key and context), ``coding_errors`` those whose coder failed, and
     ``coding_seconds`` the time spent coding.
+
+    ``attribute_reviews`` lists the attribute labels a decision model could not
+    confirm, for a person to check (`attribute_reviews_dataframe`).
     """
 
     rows: dict[str, list[OmopTableRow]] = field(default_factory=dict)
     provenance: dict[str, list[RowProvenance]] = field(default_factory=dict)
     issues: list[OmopIssue] = field(default_factory=list)
     mappings: list[ConceptMapping] = field(default_factory=list)
+    attribute_reviews: list[AttributeReviewRow] = field(default_factory=list)
     extraction_results: list[EntityValidationResult] = field(default_factory=list)
     cache_stats: Optional[CacheStats] = None
     coded_texts: int = 0
@@ -222,6 +239,13 @@ class OmopTables:
     def issues_dataframe(self) -> pd.DataFrame:
         return pd.DataFrame(
             [i.model_dump() for i in self.issues], columns=list(OmopIssue.model_fields)
+        )
+
+    def attribute_reviews_dataframe(self) -> pd.DataFrame:
+        """The attribute labels to check, one row per mention and attribute."""
+        return pd.DataFrame(
+            [r.model_dump() for r in self.attribute_reviews],
+            columns=list(AttributeReviewRow.model_fields),
         )
 
     def mappings_dataframe(self) -> pd.DataFrame:
@@ -639,6 +663,12 @@ class OmopTableBuilder:
         for note_index, (note, note_records) in enumerate(zip(notes, records)):
             if isinstance(note, str):
                 note = ClinicalNote(text=note)
+            tables.attribute_reviews.extend(
+                AttributeReviewRow(
+                    **review.model_dump(), note_index=note_index, note_id=note.note_id
+                )
+                for review in results[note_index].attribute_reviews
+            )
             for ordinal, record in enumerate(note_records, start=1):
                 mapping = self.mappings.get(record.key)
                 if mapping is None:
