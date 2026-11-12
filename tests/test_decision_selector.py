@@ -4,17 +4,20 @@ import asyncio
 import json
 import logging
 
+import pandas as pd
 import pytest
 
 from aatm.data_models.data_models import (
     EmptySelectionMetadata,
     RetrieverResults,
+    SelectedExpressionMetadata,
+    SelectorResults,
 )
 from aatm.llm import Answer, Decision, DecisionError, DecisionModel, LLMDecisionModel
 from aatm.omop import OmopTableBuilder, TerminologyMapperCoder
 from aatm.omop.cache import describe_component
 from aatm.registries.selectors import SELECTORS_REGISTRY, load_selector
-from aatm.selectors import NONE_OPTION, DecisionSelector
+from aatm.selectors import NONE_OPTION, BaseSelector, DecisionSelector
 from aatm.terminology_mapper import TerminologyMapper
 from test_concept_search import FakeRetriever, expression
 from test_omop_coding import UnitLookup, lab, lab_definitions, run
@@ -321,3 +324,47 @@ def test_min_score_thresholds_the_probability(tmp_path):
     rejected = build(0.6, 0.8)
     assert rejected.rows["measurement"][0].measurement_concept_id == 0
     assert "low_confidence" in set(rejected.issues_dataframe().reason)
+
+
+# --- TerminologyMapper.amap ----------------------------------------------------------
+
+
+AMAP_CSV = (
+    "source_code,source_concept_id,source_vocabulary_id,source_code_description,"
+    "valid_start_date,valid_end_date,invalid_reason\n"
+    "X1,0,LOCAL,scored,,,\n"
+    "X2,0,LOCAL,unscored,,,\n"
+    "X3,0,LOCAL,unmapped,,,\n"
+)
+
+
+class AsyncFixedSelector(BaseSelector):
+    """An async selector (as `amap` needs): scored, unscored, and no selection."""
+
+    async def select(self, results):  # type: ignore[override]
+        def chosen(distance):
+            data = results.results[0][0].model_dump(exclude={"expression_id"})
+            data["distance"] = distance
+            return SelectedExpressionMetadata(**data, result_list_index=0)
+
+        return SelectorResults(
+            results=[chosen(0.25), chosen(None), EmptySelectionMetadata()],
+            queries=results.queries,
+        )
+
+
+def test_amap_gives_no_confidence_without_a_distance(tmp_path):
+    from aatm.aio.translators import EmptyTranslator
+
+    (tmp_path / "in.csv").write_text(AMAP_CSV)
+    mapper = TerminologyMapper(
+        translator=EmptyTranslator(),
+        retriever=FakeRetriever(default=(SERUM,)),
+        selector=AsyncFixedSelector(),
+        output_dir=tmp_path,
+    )
+    df = asyncio.run(mapper.amap(file_path=tmp_path / "in.csv"))
+    scores = list(df.confidence_score)
+    # A selection without a distance, or no selection, is not full confidence.
+    assert scores[0] == pytest.approx(0.75)
+    assert pd.isna(scores[1]) and pd.isna(scores[2])

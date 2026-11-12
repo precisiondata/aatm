@@ -536,15 +536,15 @@ class TerminologyMapper:
             )
             mapped_source_concepts.extend(
                 MappedSourceConcept.from_selector_results(
-                    batch, selected_source_concepts
+                    batch, selected_source_concepts, translated_batch
                 )
             )
+            # As in map(): no distance (no selection, or a selector without
+            # scores) is no confidence, not full confidence.
             confidence_scores.extend(
                 [
-                    1 - (selected_source_concepts.results[i].distance or 0)
-                    if selected_source_concepts.results[i] is not None
-                    else None
-                    for i in range(len(selected_source_concepts.results))
+                    1 - r.distance if r is not None and r.distance is not None else None
+                    for r in selected_source_concepts.results
                 ]
             )
 
