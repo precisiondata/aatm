@@ -40,7 +40,12 @@ from pathlib import Path
 # torch crashes the interpreter.
 import pandas as pd
 
-from aatm.concept_search import CodingContext, ConceptSearchAgent, ConceptSearchTools
+from aatm.concept_search import (
+    CodingContext,
+    ConceptSearchAgent,
+    ConceptSearchResult,
+    ConceptSearchTools,
+)
 
 HERE = Path(__file__).parent
 DOMAIN, VOCABULARIES = "Measurement", ["LOINC"]
@@ -83,13 +88,27 @@ def cache_key(case: pd.Series, variant: str) -> str:
 
 
 async def run_variant(
-    agent: ConceptSearchAgent, cases: pd.DataFrame, variant: str, concurrency: int
+    agent: ConceptSearchAgent,
+    cases: pd.DataFrame,
+    variant: str,
+    concurrency: int,
+    timeout: float,
 ) -> list[dict]:
     semaphore = asyncio.Semaphore(concurrency)
 
     async def one(case: pd.Series) -> dict:
+        # A request that never returns would stall the whole round: retry it once.
         async with semaphore:
-            r = await agent.search(context(case, variant), DOMAIN, VOCABULARIES)
+            for attempt in range(2):
+                try:
+                    r = await asyncio.wait_for(
+                        agent.search(context(case, variant), DOMAIN, VOCABULARIES),
+                        timeout,
+                    )
+                    break
+                except asyncio.TimeoutError:
+                    print(f"  case {case.id}: no answer in {timeout} s", flush=True)
+                    r = ConceptSearchResult(error=f"timed out after {timeout} s")
         return {
             "concept_code": r.concept.concept_code if r.concept else None,
             "concept_name": r.concept.concept_name if r.concept else None,
@@ -245,6 +264,12 @@ def main() -> None:
     parser.add_argument("--repeats", nargs="+", type=int, default=[1, 2, 3])
     parser.add_argument("--max-tool-calls", type=int, default=8)
     parser.add_argument("--concurrency", type=int, default=8)
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=300,
+        help="Seconds per search, then retry once.",
+    )
     parser.add_argument("--summary-only", action="store_true")
     parser.add_argument(
         "--vector-db",
@@ -279,10 +304,14 @@ def main() -> None:
             max_tool_calls=args.max_tool_calls,
         )
         for repeat, variant in itertools.product(args.repeats, args.variants):
-            print(f"Repeat {repeat}, variant {variant}: {len(cases)} cases...")
+            print(
+                f"Repeat {repeat}, variant {variant}: {len(cases)} cases...", flush=True
+            )
             wall = time.perf_counter()
-            found = asyncio.run(run_variant(agent, cases, variant, args.concurrency))
-            print(f"  {time.perf_counter() - wall:.0f} s")
+            found = asyncio.run(
+                run_variant(agent, cases, variant, args.concurrency, args.timeout)
+            )
+            print(f"  {time.perf_counter() - wall:.0f} s", flush=True)
             for (_, case), result in zip(cases.iterrows(), found):
                 rows.append(
                     {
