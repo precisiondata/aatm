@@ -40,6 +40,7 @@ _LAZY = {
     "OmopRun": "aatm.omop.runner",
     "RunSummary": "aatm.omop.runner",
     "StageStats": "aatm.omop.runner",
+    "RunPlan": "aatm.omop.plan",
     "RunLedger": "aatm.omop.runner",
     "notes_from_sql": "aatm.omop.runner",
     "SqlSource": "aatm.omop.runner",

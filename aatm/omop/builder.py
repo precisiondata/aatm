@@ -58,6 +58,7 @@ from aatm.omop.vocabulary import (
 
 if TYPE_CHECKING:
     from aatm.llm.usage import Prices
+    from aatm.omop.plan import RunPlan
     from aatm.omop.runner import RunSummary
 
 logger = get_logger(__name__)
@@ -1295,8 +1296,11 @@ class OmopExtractionPipeline:
                 a path to a CSV or Parquet file (or a folder of Parquet files), or
                 `aatm.omop.notes_from_sql`. Every note needs a unique `note_id`.
             output_dir: Where the tables and the run's ledger are written.
-            chunk_size: Notes extracted and built together. Memory use grows with
-                it, not with the dataset.
+            chunk_size: Notes built and written together. Memory use grows with
+                it, not with the dataset. It does not limit extraction: up to
+                `aatm.omop.runner.extraction_concurrency` calls are in flight (by
+                default 16 for a hosted API, 4 for a local server). Check the
+                settings with `plan` first.
             columns: Renames source columns to `ClinicalNote` fields, e.g.
                 ``{"note_text": "text"}``. Other unknown columns are ignored.
             max_attempts: Times a failing note is tried, across runs.
@@ -1337,6 +1341,76 @@ class OmopExtractionPipeline:
             poll_every=poll_every,
             max_batches=max_batches,
             shard=shard,
+        )
+
+    def plan(
+        self,
+        source: Any = None,
+        output_dir: Optional[str | Path] = None,
+        *,
+        chunk_size: Optional[int] = None,
+        batch: Optional[bool] = None,
+        max_batches: Optional[int] = None,
+        poll_every: Optional[float] = None,
+        shard: Optional[tuple[int, int]] = None,
+        total: Optional[int] = None,
+        pilot: Any = None,
+        prices: Optional["Prices"] = None,
+    ) -> "RunPlan":
+        """A dry run of `run`: its settings, an estimate and warnings, at no cost.
+
+        Makes no model call and reads no note (Parquet files, DataFrames and lists
+        are counted from their metadata or length). Print the result for a report:
+
+        ```text
+        Run plan for output/ecog
+        notes: 120,000 in the source, 2,000 already built; 118,000 to extract
+        settings:
+          max_concurrency  16   [default]  extraction calls in flight; ...
+          chunk_size       100  [default]  notes built and written together: ...
+        estimate (from a pilot of 300 notes): 236,000 LLM calls, ..., about 2h03m
+        warnings: none
+        ```
+
+        Args:
+            source: The notes, as for `run`. Optional: without it (or `total`), the
+                plan has no note count and no estimate.
+            output_dir: The run's folder: notes an earlier run did there are left
+                out of the estimate, and its run summaries serve as the pilot when
+                `pilot` is not given.
+            chunk_size: As for `run`. Settings left out are reported as the
+                defaults of `run`.
+            batch: As for `run`.
+            max_batches: As for `run`.
+            poll_every: As for `run`.
+            shard: As for `run`.
+            total: Notes in the source, for a CSV file or a query.
+            pilot: A run on a sample of the dataset, for the estimate: its output
+                folder, its `RunSummary`, or a list of summaries. Calls, tokens and
+                cost per note are scaled to the notes left, and its time per call to
+                this run's concurrency.
+            prices: Model prices per million input and output tokens, as for `run`;
+                otherwise the cost comes from the pilot's own prices, if it had any.
+
+        Returns:
+            A `aatm.omop.plan.RunPlan`: ``str(plan)`` is a readable report;
+            ``plan.settings``, ``plan.estimate`` and ``plan.warnings`` hold the same
+            as data. See `aatm.omop.plan`.
+        """
+        from aatm.omop.plan import plan_run
+
+        return plan_run(
+            self,
+            source,
+            output_dir,
+            chunk_size=chunk_size,
+            batch=batch,
+            max_batches=max_batches,
+            poll_every=poll_every,
+            shard=shard,
+            total=total,
+            pilot=pilot,
+            prices=prices,
         )
 
     async def rebuild(
