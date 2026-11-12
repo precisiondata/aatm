@@ -16,6 +16,7 @@ import copy
 
 from aatm.selectors import (
     BaseSelector,
+    DecisionSelector,
     FirstResultSelector,
     GeminiLLMSelector,
     OpenAILLMSelector,
@@ -137,6 +138,25 @@ SELECTORS_SPECS += [
     )
 ]
 
+DECISION_SELECTOR_PREFIX = "decision-"
+"""``decision-<decision model id>`` names a `DecisionSelector`."""
+
+# Decision models (aatm.llm.create_decision_model) choosing among the retrieved
+# candidates. Any other pinned id works too: "decision-jev-compatible/<model>", or
+# "decision-llm/<llm id>" (no probabilities). See `load_selector`.
+SELECTORS_SPECS += [
+    SelectorRegistryEntry(
+        name=f"{DECISION_SELECTOR_PREFIX}{model_id}",
+        selector_class=DecisionSelector,
+        kwargs={"model": model_id},
+    )
+    for model_id in (
+        "openai/gpt-6-luna",
+        "gemini/gemini-decision-1",
+        "openrouter/typesafe/jev-1.13",
+    )
+]
+
 SELECTORS_REGISTRY: dict[str, SelectorRegistryEntry] = {
     entry.name: entry for entry in SELECTORS_SPECS
 }
@@ -148,6 +168,10 @@ def load_selector(name: str, **kwargs: Any) -> BaseSelector:
     This function looks up a selector specification by name, copies its default
     keyword arguments, applies any user-provided overrides, and returns a new
     selector instance.
+
+    Names starting with ``decision-`` that are not registered are read as
+    ``decision-<decision model id>`` (a `DecisionSelector`), e.g.
+    ``"decision-jev-compatible/my-model"`` with ``model_kwargs={"base_url": ...}``.
 
     Args:
         name: Registry name of the selector to instantiate.
@@ -163,6 +187,14 @@ def load_selector(name: str, **kwargs: Any) -> BaseSelector:
         TypeError: If the provided arguments are invalid for the selector
             constructor.
     """
+    if name not in SELECTORS_REGISTRY and name.startswith(DECISION_SELECTOR_PREFIX):
+        # Any decision model id, e.g. "decision-llm/anthropic/claude-haiku-5-5".
+        spec = SelectorRegistryEntry(
+            name=name,
+            selector_class=DecisionSelector,
+            kwargs={"model": name[len(DECISION_SELECTOR_PREFIX) :]},
+        )
+        return _instantiate(spec, kwargs)
     try:
         spec = SELECTORS_REGISTRY[name]
     except KeyError as e:
@@ -170,7 +202,11 @@ def load_selector(name: str, **kwargs: Any) -> BaseSelector:
         raise ValueError(
             f"Selector '{name}' not found. Available selectors: {available}"
         ) from e
+    return _instantiate(spec, kwargs)
 
+
+def _instantiate(spec: SelectorRegistryEntry, kwargs: dict[str, Any]) -> BaseSelector:
+    name = spec.name
     selector_kwargs = copy.deepcopy(spec.kwargs)
     selector_kwargs.update(kwargs)
 
