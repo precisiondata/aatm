@@ -181,11 +181,20 @@ attribute: the attribute is then left out, as the extractor would.
 | Label written | only when **both give the same answer** (both "not stated" counts as agreeing) | the **decision model's** answer |
 | A disagreement | goes to review, nothing is written | cannot happen: only one model labels |
 | Cost | the extraction, plus one decision call per mention | a smaller extraction, plus one decision call per mention |
-| Use it when | a wrong label costs more than a withheld one; you are trying a decision model on your notes | you have checked, on your notes, that the decision model labels as well as the extractor |
+| Mentions without a required label | the extractor rejects them, and the decision model never sees them | the extractor keeps them; the decision model labels them |
+| What the decision model reads | the mention and **its line** of the note | the mention and **its line** of the note |
+| Use it when | your extractor is strong, and a wrong label costs more than a withheld one | your extractor is small or cheap and struggles with the labels, and you have checked the decision model on your notes |
 
-In the [benchmark](#which-mode-the-benchmark) below, `verify` wrote no wrong label
-with any of the three decision models, and `replace` cost about 13 % less but wrote
-whatever the decision model answered.
+In the [benchmark](#which-mode-the-benchmark) below:
+
+- **`verify`** wrote almost no wrong labels: none at all with a strong extractor.
+  It withheld some correct labels for review instead.
+- **`replace`** was the cheapest. It lifted a small extractor from 37 to 57–59
+  correct labels out of 62.
+
+The decision model reads only the mention's line. So a label that depends on a
+section heading ("HOME MEDICATIONS:" for a drug taken at home) goes to review in
+`verify`, and, when the attribute is required, loses the mention in `replace`.
 
 **`min_probability`** is a threshold on the decision model's probability. With
 `min_probability=0.8`, only labels the model gives at least 80 % are written. The
@@ -210,24 +219,47 @@ again and labels it then.
 
 ### Which mode: the benchmark
 
-`benchmarks/attribute_labels` labels 50 hand-written mentions (26 smoking statuses,
-24 ECOG grades and ranges) with `openai/gpt-5-mini` as the extractor (2026-11-12):
+`benchmarks/attribute_labels` labels 112 hand-written mentions (2026-11-12):
 
-| Setup | Correct | Wrong | Review | USD / 1,000 mentions |
-|---|---|---|---|---|
-| extractor alone | 50 | 0 | 0 | 1.88 |
-| `verify`, jev-1.13 | 50 | 0 | 0 | 1.91 |
-| `verify`, gpt-6-luna | 48 | 0 | 2 | 1.96 |
-| `verify`, gemini-decision-1 | 49 | 0 | 1 | 1.88 |
-| `replace`, jev-1.13 | 50 | 0 | 0 | 1.64 |
-| `replace`, gpt-6-luna | 48 | 2 | 0 | 1.68 |
-| `replace`, gemini-decision-1 | 49 | 1 | 0 | 1.61 |
+- a basic set of 50 one-line smoking statuses and ECOG grades;
+- a hard set of 62, with drug `kind` and `route`, family history `relative`, notes
+  with sections, and harder smoking and ECOG phrasing.
 
-The extractor alone got every label right on this set, so it cannot show `verify`
-catching the extractor's mistakes; it does show that `replace` is only as good as the
-decision model. A `min_probability` of 0.5 caught the low-probability errors, while
-0.8 and 0.9 mostly sent correct labels to review. Measure on your own notes before
-choosing `replace` or a threshold. Details, errors and calibration are in the
+It compares two extractors: `openai/gpt-5-mini` and the smaller `openai/gpt-5-nano`.
+"Dropped" counts mentions that were found but rejected because a required attribute
+got no label.
+
+Hard set, 62 mentions:
+
+| Extractor | Setup | Correct | Wrong | Review | Dropped | USD / 1,000 mentions (both sets) |
+|---|---|---|---|---|---|---|
+| gpt-5-mini | extractor alone | 61 | 1 | 0 | 0 | 2.05 |
+| | `verify`, jev-1.13 | 55 | 0 | 7 | 0 | 2.08 |
+| | `verify`, gpt-6-luna | 58 | 0 | 4 | 0 | 2.11 |
+| | `verify`, gemini-decision-1 | 56 | 0 | 6 | 0 | 2.05* |
+| | `replace`, jev-1.13 | 57 | 1 | 0 | 4 | 1.65 |
+| | `replace`, gpt-6-luna | 58 | 4 | 0 | 0 | 1.68 |
+| | `replace`, gemini-decision-1 | 57 | 1 | 0 | 4 | 1.62* |
+| gpt-5-nano | extractor alone | 37 | 9 | 0 | 16 | 0.77 |
+| | `verify`, jev-1.13 | 35 | 0 | 11 | 16 | 0.80 |
+| | `verify`, gemini-decision-1 | 37 | 1 | 8 | 16 | 0.77* |
+| | `replace`, jev-1.13 | 57 | 1 | 0 | 4 | 0.70 |
+| | `replace`, gemini-decision-1 | 59 | 1 | 0 | 2 | 0.67* |
+
+\* Without the Gemini decision calls, which have no published price.
+
+On the basic set, gpt-5-mini alone got all 50 labels right.
+
+- **Strong extractor:** `verify` keeps its accuracy and removes its rare mistakes,
+  at 1–3 % more cost, but withholds a few correct labels for review.
+- **Small extractor:** `verify` turns its wrong labels into reviews, but cannot
+  recover the mentions it rejected for a missing required label. `replace` lets it
+  find them all, and the decision model labels them.
+- **Decision models:** gpt-6-luna misses the lower bound of most ECOG ranges.
+- **Thresholds:** `min_probability` above 0.5 mostly withheld correct labels.
+
+Measure on your own notes before choosing `replace` or a threshold. Every setup,
+error and calibration figure is in the
 [benchmark's README](https://github.com/precisiondata/aatm/tree/main/benchmarks/attribute_labels).
 
 Each mention and its line are sent to the decision provider; see the data governance

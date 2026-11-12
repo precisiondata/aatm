@@ -1,11 +1,12 @@
 {
  "model": "openai/gpt-5-mini",
+ "key": "faede61111404cb8abc82c7310da72673af2774f36313131c5c051bfbd27a420",
  "stats": {
-  "calls": 44,
-  "input_tokens": 110858,
-  "output_tokens": 26259,
-  "cost": 0.0802325,
-  "seconds": 38.50147649999417
+  "calls": 81,
+  "input_tokens": 286125,
+  "output_tokens": 54801,
+  "cost": 0.18113325,
+  "seconds": 70.83345759999065
  },
  "results": {
   "1": {
@@ -26,9 +27,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -53,9 +60,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -80,9 +93,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -107,9 +126,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -134,9 +159,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -147,13 +178,13 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "current smoker.",
+     "text": "Tobacco: current smoker.",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
-     "start": 9,
+     "start": 0,
      "end": 24,
      "attribute_probabilities": {}
     }
@@ -161,9 +192,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -188,9 +225,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -215,9 +258,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -242,9 +291,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -269,9 +324,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -296,9 +357,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -323,9 +390,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -350,9 +423,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -377,9 +456,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -404,9 +489,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -431,9 +522,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -444,23 +541,29 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "Smokes half a pack daily, trying to cut down.",
+     "text": "Smokes half a pack daily",
      "key": "smoking_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
      "start": 0,
-     "end": 45,
+     "end": 24,
      "attribute_probabilities": {}
     }
    ],
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -485,9 +588,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -512,9 +621,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -539,9 +654,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -566,9 +687,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -593,9 +720,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -620,9 +753,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -647,9 +786,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -674,9 +819,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -701,9 +852,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
     "ecog_performance_status",
+    "family_history",
     "pack_years",
-    "pack_years_value"
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -728,9 +885,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -755,9 +918,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -782,9 +951,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -809,9 +984,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -836,9 +1017,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -863,9 +1050,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -890,9 +1083,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -903,18 +1102,18 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG 0 at diagnosis",
+     "text": "ECOG 0",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
      "start": 0,
-     "end": 19,
+     "end": 6,
      "attribute_probabilities": {}
     },
     {
-     "id": "e3",
+     "id": "e2",
      "text": "at diagnosis",
      "key": "assessment_date",
      "line": "L1",
@@ -928,7 +1127,7 @@
      "attribute_probabilities": {}
     },
     {
-     "id": "e2",
+     "id": "e3",
      "text": "ECOG 2",
      "key": "ecog_performance_status",
      "line": "L1",
@@ -942,9 +1141,15 @@
    ],
    "unmatched_entities": [],
    "unmatched_keys": [
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -969,9 +1174,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -996,9 +1207,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -1023,9 +1240,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -1050,9 +1273,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -1077,9 +1306,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -1090,23 +1325,29 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG is 2.",
+     "text": "ECOG is 2",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
      "start": 46,
-     "end": 56,
+     "end": 55,
      "attribute_probabilities": {}
     }
    ],
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -1117,23 +1358,29 @@
    "validated_entities": [
     {
      "id": "e1",
-     "text": "ECOG 2",
+     "text": "Estado funcional ECOG 2.",
      "key": "ecog_performance_status",
      "line": "L1",
      "occurrence": null,
      "parents": [],
      "attributes": [],
-     "start": 17,
-     "end": 23,
+     "start": 0,
+     "end": 24,
      "attribute_probabilities": {}
     }
    ],
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -1158,9 +1405,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -1185,9 +1438,15 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],
@@ -1212,9 +1471,1439 @@
    "unmatched_entities": [],
    "unmatched_keys": [
     "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
     "pack_years",
     "pack_years_value",
-    "smoking_status"
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "45": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "lisinopril 10 mg",
+     "key": "drug_name",
+     "line": "L2",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 20,
+     "end": 36,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "atorvastatin 40 mg",
+     "key": "drug_name",
+     "line": "L3",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 48,
+     "end": 66,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e3",
+     "text": "metformin 500 mg",
+     "key": "drug_name",
+     "line": "L5",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 89,
+     "end": 105,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "46": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "ceftriaxone 1 g",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 11,
+     "end": 26,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "IV given",
+     "key": "sig",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 27,
+     "end": 35,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e3",
+     "text": "azithromycin 250 mg",
+     "key": "drug_name",
+     "line": "L2",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 51,
+     "end": 70,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e4",
+     "text": "by mouth daily for 4 days",
+     "key": "sig",
+     "line": "L2",
+     "occurrence": null,
+     "parents": [
+      "e3"
+     ],
+     "attributes": [],
+     "start": 71,
+     "end": 96,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e5",
+     "text": "4 days",
+     "key": "drug_duration",
+     "line": "L2",
+     "occurrence": null,
+     "parents": [
+      "e3"
+     ],
+     "attributes": [],
+     "start": 90,
+     "end": 96,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "47": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Insulina NPH 10 UI",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 19,
+     "end": 37,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "SC \u00e0 noite",
+     "key": "sig",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 38,
+     "end": 48,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "48": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Albuterol MDI",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 13,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "2 puffs q4h PRN wheeze",
+     "key": "sig",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 14,
+     "end": 36,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "49": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Timolol 0.5% eye drops",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 22,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "OU BID - continue",
+     "key": "sig",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 23,
+     "end": 40,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "50": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Fentanyl 25 mcg/h patch",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 23,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "51": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Ondansetron 4 mg",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 16,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "SL given for nausea, may repeat once",
+     "key": "sig",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 17,
+     "end": 53,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "52": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "hydrocortisone 1% cream",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 5,
+     "end": 28,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e3",
+     "text": "to the rash BID x 7 days",
+     "key": "sig",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 29,
+     "end": 53,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "7 days",
+     "key": "drug_duration",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 47,
+     "end": 53,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "53": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "aspirin 81 mg",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 23,
+     "end": 36,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "54": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "paclitaxel 175 mg/m2",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 9,
+     "end": 29,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "55": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Fluticasone nasal spray",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 23,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "2 sprays each nostril daily (home)",
+     "key": "sig",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [
+      "e1"
+     ],
+     "attributes": [],
+     "start": 25,
+     "end": 59,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "56": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Vitamin B12 1000 mcg",
+     "key": "drug_name",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 20,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "57": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "breast cancer",
+     "key": "family_history",
+     "line": "L2",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 24,
+     "end": 37,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e2",
+     "text": "MI",
+     "key": "family_history",
+     "line": "L3",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 53,
+     "end": 55,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e3",
+     "text": "type 2 diabetes",
+     "key": "family_history",
+     "line": "L3",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 63,
+     "end": 78,
+     "attribute_probabilities": {}
+    },
+    {
+     "id": "e4",
+     "text": "ovarian cancer",
+     "key": "family_history",
+     "line": "L4",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 99,
+     "end": 113,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "58": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "colon cancer",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 18,
+     "end": 30,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "59": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Alzheimer disease",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 25,
+     "end": 42,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "60": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "type 1 diabetes",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 27,
+     "end": 42,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "61": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "l\u00fapus",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 28,
+     "end": 33,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "62": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "epilepsy",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 34,
+     "end": 42,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "63": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "cystic fibrosis",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 11,
+     "end": 26,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "64": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "glaucoma",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 23,
+     "end": 31,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "65": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "schizophrenia",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 18,
+     "end": 31,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "66": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "stroke",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 35,
+     "end": 41,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "67": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "migraine",
+     "key": "family_history",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 46,
+     "end": 54,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "68": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Tobacco: Former",
+     "key": "smoking_status",
+     "line": "L2",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 15,
+     "end": 30,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "69": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Tobacco: yes, 1/2 ppd",
+     "key": "smoking_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 21,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "70": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Smoked 2 packs/day for 30 years until his CABG in 2019.",
+     "key": "smoking_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 55,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "71": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Currently smoking again after quitting in 2018.",
+     "key": "smoking_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 47,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "72": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Has cut down to a cigarette now and then.",
+     "key": "smoking_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 41,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "73": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Fumante de 1 ma\u00e7o por dia.",
+     "key": "smoking_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 26,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "74": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "never smoked cigarettes.",
+     "key": "smoking_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 24,
+     "end": 48,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "ecog_performance_status",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "75": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "PS 1 per ECOG.",
+     "key": "ecog_performance_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 14,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "76": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "ECOG 1",
+     "key": "ecog_performance_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 20,
+     "end": 26,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "77": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "ECOG 0",
+     "key": "ecog_performance_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 44,
+     "end": 50,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "78": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "Zubrod 3.",
+     "key": "ecog_performance_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 9,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "79": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "ECOG PS 2 to 3.",
+     "key": "ecog_performance_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 15,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "80": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "ECOG: II-III.",
+     "key": "ecog_performance_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 13,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
+   ],
+   "required_attribute_issues": [],
+   "optional_attribute_issues": [],
+   "attribute_reviews": [],
+   "error": null
+  },
+  "81": {
+   "validated_entities": [
+    {
+     "id": "e1",
+     "text": "ECOG performance status: 1.",
+     "key": "ecog_performance_status",
+     "line": "L1",
+     "occurrence": null,
+     "parents": [],
+     "attributes": [],
+     "start": 0,
+     "end": 27,
+     "attribute_probabilities": {}
+    }
+   ],
+   "unmatched_entities": [],
+   "unmatched_keys": [
+    "assessment_date",
+    "drug_duration",
+    "drug_name",
+    "family_history",
+    "pack_years",
+    "pack_years_value",
+    "sig",
+    "smoking_status",
+    "verbatim_end_date",
+    "verbatim_start_date"
    ],
    "required_attribute_issues": [],
    "optional_attribute_issues": [],

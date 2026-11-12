@@ -3,380 +3,573 @@
  "decision_models": {
   "openrouter/typesafe/jev-1.13": {
    "calibration": {
-    "answers": 50,
-    "accuracy": 1.0,
-    "brier": 0.0063772080000000005,
-    "mean_probability_right": 0.950528,
-    "mean_probability_wrong": null
+    "basic": {
+     "answers": 50,
+     "accuracy": 1.0,
+     "brier": 0.0075576418000000015,
+     "mean_probability_right": 0.9472459999999999,
+     "mean_probability_wrong": null
+    },
+    "hard": {
+     "answers": 62,
+     "accuracy": 0.9516129032258065,
+     "brier": 0.0400958170967742,
+     "mean_probability_right": 0.9568033898305085,
+     "mean_probability_wrong": 0.7600000000000001
+    }
    },
    "usage": {
-    "calls": 45,
-    "input_tokens": 40775,
-    "output_tokens": 3972,
-    "cost": 0.0017125500000000002,
-    "seconds": 8.787073900006362
+    "calls": 88,
+    "input_tokens": 81576,
+    "output_tokens": 10220,
+    "cost": 0.003426192,
+    "seconds": 15.44203990000824
    }
   },
   "openai/gpt-6-luna": {
    "calibration": {
-    "answers": 50,
-    "accuracy": 0.96,
-    "brier": 0.028690812399999998,
-    "mean_probability_right": 0.9551083333333333,
-    "mean_probability_wrong": 0.6676
+    "basic": {
+     "answers": 50,
+     "accuracy": 0.96,
+     "brier": 0.0288752516,
+     "mean_probability_right": 0.9540958333333333,
+     "mean_probability_wrong": 0.6676
+    },
+    "hard": {
+     "answers": 62,
+     "accuracy": 0.9354838709677419,
+     "brier": 0.057309191290322574,
+     "mean_probability_right": 0.9448689655172413,
+     "mean_probability_wrong": 0.7975
+    }
    },
    "usage": {
-    "calls": 45,
-    "input_tokens": 39662,
+    "calls": 88,
+    "input_tokens": 71510,
     "output_tokens": 0,
-    "cost": 0.0039662000000000005,
-    "seconds": 2.431352900006459
+    "cost": 0.007151,
+    "seconds": 3.9511399999901187
    }
   },
   "gemini/gemini-decision-1": {
    "calibration": {
-    "answers": 50,
-    "accuracy": 0.98,
-    "brier": 0.026713958738189773,
-    "mean_probability_right": 0.9051226449394019,
-    "mean_probability_wrong": 0.47105338856642237
+    "basic": {
+     "answers": 50,
+     "accuracy": 0.98,
+     "brier": 0.027100269312102573,
+     "mean_probability_right": 0.9029964492581172,
+     "mean_probability_wrong": 0.47105338856642237
+    },
+    "hard": {
+     "answers": 62,
+     "accuracy": 0.9516129032258065,
+     "brier": 0.0355030244531733,
+     "mean_probability_right": 0.9444362441302084,
+     "mean_probability_wrong": 0.6514519590263589
+    }
    },
    "usage": {
-    "calls": 45,
-    "input_tokens": 33001,
+    "calls": 88,
+    "input_tokens": 62039,
     "output_tokens": 0,
     "cost": 0.0,
-    "seconds": 3.5821856999973534
+    "seconds": 5.362480099996901
    }
   }
  },
  "summary": {
-  "extractor": {
-   "correct": 50,
-   "wrong": 0,
-   "review": 0,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "calls": 44,
-    "input_tokens": 137258,
-    "output_tokens": 29770,
-    "cost": 0.0938545,
-    "seconds": 39.418004799998016
+  "basic": {
+   "extractor": {
+    "correct": 50,
+    "wrong": 0,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify jev-1.13": {
+    "correct": 50,
+    "wrong": 0,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify jev-1.13 @0.5": {
+    "correct": 50,
+    "wrong": 0,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify jev-1.13 @0.8": {
+    "correct": 48,
+    "wrong": 0,
+    "review": 2,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify jev-1.13 @0.9": {
+    "correct": 41,
+    "wrong": 0,
+    "review": 9,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "replace jev-1.13": {
+    "correct": 50,
+    "wrong": 0,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "replace jev-1.13 @0.5": {
+    "correct": 50,
+    "wrong": 0,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "replace jev-1.13 @0.8": {
+    "correct": 48,
+    "wrong": 0,
+    "review": 2,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "replace jev-1.13 @0.9": {
+    "correct": 41,
+    "wrong": 0,
+    "review": 9,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify gpt-6-luna": {
+    "correct": 48,
+    "wrong": 0,
+    "review": 2,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify gpt-6-luna @0.5": {
+    "correct": 48,
+    "wrong": 0,
+    "review": 2,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify gpt-6-luna @0.8": {
+    "correct": 46,
+    "wrong": 0,
+    "review": 4,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify gpt-6-luna @0.9": {
+    "correct": 40,
+    "wrong": 0,
+    "review": 10,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "replace gpt-6-luna": {
+    "correct": 48,
+    "wrong": 2,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 0.96
+   },
+   "replace gpt-6-luna @0.5": {
+    "correct": 48,
+    "wrong": 1,
+    "review": 1,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 0.9795918367346939
+   },
+   "replace gpt-6-luna @0.8": {
+    "correct": 46,
+    "wrong": 1,
+    "review": 3,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 0.9787234042553191
+   },
+   "replace gpt-6-luna @0.9": {
+    "correct": 40,
+    "wrong": 1,
+    "review": 9,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 0.975609756097561
+   },
+   "verify gemini-decision-1": {
+    "correct": 49,
+    "wrong": 0,
+    "review": 1,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify gemini-decision-1 @0.5": {
+    "correct": 49,
+    "wrong": 0,
+    "review": 1,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify gemini-decision-1 @0.8": {
+    "correct": 39,
+    "wrong": 0,
+    "review": 11,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "verify gemini-decision-1 @0.9": {
+    "correct": 37,
+    "wrong": 0,
+    "review": 13,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "replace gemini-decision-1": {
+    "correct": 49,
+    "wrong": 1,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 0.98
+   },
+   "replace gemini-decision-1 @0.5": {
+    "correct": 49,
+    "wrong": 0,
+    "review": 1,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "replace gemini-decision-1 @0.8": {
+    "correct": 39,
+    "wrong": 0,
+    "review": 11,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
+   },
+   "replace gemini-decision-1 @0.9": {
+    "correct": 37,
+    "wrong": 0,
+    "review": 13,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 50,
+    "precision": 1.0
    }
+  },
+  "hard": {
+   "extractor": {
+    "correct": 61,
+    "wrong": 1,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.9838709677419355
+   },
+   "verify jev-1.13": {
+    "correct": 55,
+    "wrong": 0,
+    "review": 7,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "verify jev-1.13 @0.5": {
+    "correct": 55,
+    "wrong": 0,
+    "review": 7,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "verify jev-1.13 @0.8": {
+    "correct": 51,
+    "wrong": 0,
+    "review": 11,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "verify jev-1.13 @0.9": {
+    "correct": 46,
+    "wrong": 0,
+    "review": 16,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "replace jev-1.13": {
+    "correct": 57,
+    "wrong": 1,
+    "review": 0,
+    "dropped": 4,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.9827586206896551
+   },
+   "replace jev-1.13 @0.5": {
+    "correct": 56,
+    "wrong": 1,
+    "review": 1,
+    "dropped": 4,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.9824561403508771
+   },
+   "replace jev-1.13 @0.8": {
+    "correct": 55,
+    "wrong": 1,
+    "review": 2,
+    "dropped": 4,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.9821428571428571
+   },
+   "replace jev-1.13 @0.9": {
+    "correct": 49,
+    "wrong": 1,
+    "review": 8,
+    "dropped": 4,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.98
+   },
+   "verify gpt-6-luna": {
+    "correct": 58,
+    "wrong": 0,
+    "review": 4,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "verify gpt-6-luna @0.5": {
+    "correct": 58,
+    "wrong": 0,
+    "review": 4,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "verify gpt-6-luna @0.8": {
+    "correct": 50,
+    "wrong": 0,
+    "review": 12,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "verify gpt-6-luna @0.9": {
+    "correct": 47,
+    "wrong": 0,
+    "review": 15,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "replace gpt-6-luna": {
+    "correct": 58,
+    "wrong": 4,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.9354838709677419
+   },
+   "replace gpt-6-luna @0.5": {
+    "correct": 58,
+    "wrong": 4,
+    "review": 0,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.9354838709677419
+   },
+   "replace gpt-6-luna @0.8": {
+    "correct": 51,
+    "wrong": 2,
+    "review": 9,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.9622641509433962
+   },
+   "replace gpt-6-luna @0.9": {
+    "correct": 48,
+    "wrong": 2,
+    "review": 12,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.96
+   },
+   "verify gemini-decision-1": {
+    "correct": 56,
+    "wrong": 0,
+    "review": 6,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "verify gemini-decision-1 @0.5": {
+    "correct": 55,
+    "wrong": 0,
+    "review": 7,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "verify gemini-decision-1 @0.8": {
+    "correct": 51,
+    "wrong": 0,
+    "review": 11,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "verify gemini-decision-1 @0.9": {
+    "correct": 48,
+    "wrong": 0,
+    "review": 14,
+    "dropped": 0,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "replace gemini-decision-1": {
+    "correct": 57,
+    "wrong": 1,
+    "review": 0,
+    "dropped": 4,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.9827586206896551
+   },
+   "replace gemini-decision-1 @0.5": {
+    "correct": 56,
+    "wrong": 1,
+    "review": 1,
+    "dropped": 4,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 0.9824561403508771
+   },
+   "replace gemini-decision-1 @0.8": {
+    "correct": 52,
+    "wrong": 0,
+    "review": 6,
+    "dropped": 4,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   },
+   "replace gemini-decision-1 @0.9": {
+    "correct": 49,
+    "wrong": 0,
+    "review": 9,
+    "dropped": 4,
+    "missed": 0,
+    "mentions": 62,
+    "precision": 1.0
+   }
+  }
+ },
+ "stats": {
+  "extractor": {
+   "calls": 81,
+   "input_tokens": 395475,
+   "output_tokens": 65179,
+   "cost": 0.22922675,
+   "seconds": 89.57478589999664
   },
   "verify jev-1.13": {
-   "correct": 50,
-   "wrong": 0,
-   "review": 0,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.095567218,
-    "seconds": 47.7016403000016,
-    "decision_calls": 45
-   }
-  },
-  "verify jev-1.13 @0.5": {
-   "correct": 50,
-   "wrong": 0,
-   "review": 0,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.095567218,
-    "seconds": 47.7016403000016,
-    "decision_calls": 45
-   }
-  },
-  "verify jev-1.13 @0.8": {
-   "correct": 48,
-   "wrong": 0,
-   "review": 2,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.095567218,
-    "seconds": 47.7016403000016,
-    "decision_calls": 45
-   }
-  },
-  "verify jev-1.13 @0.9": {
-   "correct": 41,
-   "wrong": 0,
-   "review": 9,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.095567218,
-    "seconds": 47.7016403000016,
-    "decision_calls": 45
-   }
+   "cost": 0.23268041,
+   "seconds": 105.42647489999945,
+   "decision_calls": 89
   },
   "replace jev-1.13": {
-   "correct": 50,
-   "wrong": 0,
-   "review": 0,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.08194504999999999,
-    "seconds": 47.28855040000053,
-    "decision_calls": 45
-   }
-  },
-  "replace jev-1.13 @0.5": {
-   "correct": 50,
-   "wrong": 0,
-   "review": 0,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.08194504999999999,
-    "seconds": 47.28855040000053,
-    "decision_calls": 45
-   }
-  },
-  "replace jev-1.13 @0.8": {
-   "correct": 49,
-   "wrong": 0,
-   "review": 1,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.08194504999999999,
-    "seconds": 47.28855040000053,
-    "decision_calls": 45
-   }
-  },
-  "replace jev-1.13 @0.9": {
-   "correct": 41,
-   "wrong": 0,
-   "review": 9,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.08194504999999999,
-    "seconds": 47.28855040000053,
-    "decision_calls": 45
-   }
+   "cost": 0.184559442,
+   "seconds": 86.27549749999889,
+   "decision_calls": 88
   },
   "verify gpt-6-luna": {
-   "correct": 48,
-   "wrong": 0,
-   "review": 2,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.09782099999999999,
-    "seconds": 42.822738200004096,
-    "decision_calls": 45
-   }
-  },
-  "verify gpt-6-luna @0.5": {
-   "correct": 48,
-   "wrong": 0,
-   "review": 2,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.09782099999999999,
-    "seconds": 42.822738200004096,
-    "decision_calls": 45
-   }
-  },
-  "verify gpt-6-luna @0.8": {
-   "correct": 46,
-   "wrong": 0,
-   "review": 4,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.09782099999999999,
-    "seconds": 42.822738200004096,
-    "decision_calls": 45
-   }
-  },
-  "verify gpt-6-luna @0.9": {
-   "correct": 40,
-   "wrong": 0,
-   "review": 10,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.09782099999999999,
-    "seconds": 42.822738200004096,
-    "decision_calls": 45
-   }
+   "cost": 0.23641815,
+   "seconds": 93.72421069999109,
+   "decision_calls": 89
   },
   "replace gpt-6-luna": {
-   "correct": 48,
-   "wrong": 2,
-   "review": 0,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 0.96,
-   "stats": {
-    "cost": 0.0841987,
-    "seconds": 40.93282940000063,
-    "decision_calls": 45
-   }
-  },
-  "replace gpt-6-luna @0.5": {
-   "correct": 48,
-   "wrong": 1,
-   "review": 1,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 0.9795918367346939,
-   "stats": {
-    "cost": 0.0841987,
-    "seconds": 40.93282940000063,
-    "decision_calls": 45
-   }
-  },
-  "replace gpt-6-luna @0.8": {
-   "correct": 46,
-   "wrong": 1,
-   "review": 3,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 0.9787234042553191,
-   "stats": {
-    "cost": 0.0841987,
-    "seconds": 40.93282940000063,
-    "decision_calls": 45
-   }
-  },
-  "replace gpt-6-luna @0.9": {
-   "correct": 40,
-   "wrong": 1,
-   "review": 9,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 0.975609756097561,
-   "stats": {
-    "cost": 0.0841987,
-    "seconds": 40.93282940000063,
-    "decision_calls": 45
-   }
+   "cost": 0.18828425,
+   "seconds": 74.78459759998077,
+   "decision_calls": 88
   },
   "verify gemini-decision-1": {
-   "correct": 49,
-   "wrong": 0,
-   "review": 1,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.0938545,
-    "seconds": 44.39488829999755,
-    "decision_calls": 45
-   }
-  },
-  "verify gemini-decision-1 @0.5": {
-   "correct": 49,
-   "wrong": 0,
-   "review": 1,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.0938545,
-    "seconds": 44.39488829999755,
-    "decision_calls": 45
-   }
-  },
-  "verify gemini-decision-1 @0.8": {
-   "correct": 39,
-   "wrong": 0,
-   "review": 11,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.0938545,
-    "seconds": 44.39488829999755,
-    "decision_calls": 45
-   }
-  },
-  "verify gemini-decision-1 @0.9": {
-   "correct": 37,
-   "wrong": 0,
-   "review": 13,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.0938545,
-    "seconds": 44.39488829999755,
-    "decision_calls": 45
-   }
+   "cost": 0.22922675,
+   "seconds": 96.07741119999264,
+   "decision_calls": 89
   },
   "replace gemini-decision-1": {
-   "correct": 49,
-   "wrong": 1,
-   "review": 0,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 0.98,
-   "stats": {
-    "cost": 0.0802325,
-    "seconds": 42.08366219999152,
-    "decision_calls": 45
-   }
-  },
-  "replace gemini-decision-1 @0.5": {
-   "correct": 49,
-   "wrong": 0,
-   "review": 1,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.0802325,
-    "seconds": 42.08366219999152,
-    "decision_calls": 45
-   }
-  },
-  "replace gemini-decision-1 @0.8": {
-   "correct": 39,
-   "wrong": 0,
-   "review": 11,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.0802325,
-    "seconds": 42.08366219999152,
-    "decision_calls": 45
-   }
-  },
-  "replace gemini-decision-1 @0.9": {
-   "correct": 37,
-   "wrong": 0,
-   "review": 13,
-   "missed": 0,
-   "mentions": 50,
-   "precision": 1.0,
-   "stats": {
-    "cost": 0.0802325,
-    "seconds": 42.08366219999152,
-    "decision_calls": 45
-   }
+   "cost": 0.18113325,
+   "seconds": 76.19593769998755,
+   "decision_calls": 88
   }
  }
 }
