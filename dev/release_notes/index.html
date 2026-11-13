@@ -1231,6 +1231,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2455,6 +2466,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2590,9 +2612,24 @@ vocabularies, decision models, and two hosted vector databases.</p>
   <code>on_error="record"</code> to keep a batch going when one note fails.</li>
 <li><strong>JSON Schema for entity definitions</strong>: completion and inline errors in your editor.</li>
 </ul>
+<h3 id="fixes">Fixes</h3>
+<ul>
+<li><code>TerminologyMapper.map</code> and <code>amap</code> wrote their results to the mapper's own folder
+  and ignored the <code>output_dir</code> argument. They now write to the folder given.</li>
+<li><code>pipeline.plan()</code> estimated the notes left from counts alone, so new notes next to an
+  earlier run could show as "0 to extract". It now matches note ids with the run's
+  ledger when they are cheap to read (lists, DataFrames, Parquet), and
+  <code>RunPlan.by_note_id</code> says which method was used. A sharded plan counts the notes of
+  its shard exactly.</li>
+<li><code>Pilot.compare</code> with the same version twice crashed; it now says so.</li>
+<li><code>aatm amap</code>, which was never implemented, is hidden from the command line help.</li>
+</ul>
 <h3 id="documentation">Documentation</h3>
 <ul>
 <li>Versioned documentation (latest, previous and dev).</li>
+<li>A <a href="../reference/cli/">command line reference</a> generated from the CLI, with every
+  command, argument and option; clearer <code>--help</code> texts for <code>init</code>, <code>map</code>, <code>search-ui</code>
+  and <code>serve</code>.</li>
 <li>New pages: <a href="../getting-started/">Start here</a>,
   <a href="../getting-started/setup/">Set up the vocabularies</a>, a
   <a href="../getting-started/quick_start_omop/">notes-to-OMOP quick start</a>, a
