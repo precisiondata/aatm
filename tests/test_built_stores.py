@@ -228,3 +228,27 @@ def test_without_a_store_the_coder_searches_the_vocabulary(
     build("fake-small")
     coder = AgenticCoder(ScriptedLLM([]), retriever=False, vocabulary=vocab_db)
     assert coder.agent.tools.retriever is None
+
+
+def test_a_store_sqlite_cannot_count_is_opened_with_chromadb(project, monkeypatch):
+    build("fake-small", n=2)
+    monkeypatch.setattr(built_stores, "_local_count", lambda path, name: None)
+
+    (store,) = built_vector_databases()
+    assert store.count == 2
+
+
+def test_a_store_that_cannot_be_opened_is_not_built(project, monkeypatch):
+    build("fake-small")
+    build("fake-large")
+
+    def broken(path, name):
+        if path.endswith("fake-large"):
+            raise RuntimeError("Error loading hnsw index")
+        return 2
+
+    monkeypatch.setattr(built_stores, "_local_count", broken)
+
+    assert [s.embedding_model for s in built_vector_databases()] == ["fake-small"]
+    with pytest.raises(VectorDatabaseNotBuiltError, match="could not be opened"):
+        registry.load_retriever("fake-large")

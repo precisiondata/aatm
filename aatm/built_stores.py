@@ -34,7 +34,12 @@ from typing import Any, cast
 import yaml
 
 from aatm.logs import get_logger
-from aatm.vector_db import VECTOR_DB_MODES, VectorDbMode, resolve_vector_db_mode
+from aatm.vector_db import (
+    VECTOR_DB_MODES,
+    VectorDatabaseConfigError,
+    VectorDbMode,
+    resolve_vector_db_mode,
+)
 
 logger = get_logger(__name__)
 
@@ -172,6 +177,45 @@ def recorded_vector_databases(vector_db: str | None = None) -> list[BuiltStore]:
 # --- what is built -----------------------------------------------------------------
 
 
+def _local_count(path: str, collection_name: str) -> int | None:
+    """Count a local collection's records from ``chroma.sqlite3``, read-only.
+
+    Opening a ChromaDB client loads the collection's vector index, which takes
+    memory and time for each of several multi-million-row databases; the
+    record count is in the SQLite file. Returns ``None`` if the file cannot be
+    read this way (e.g. another ChromaDB version), so the caller opens a client.
+
+    Raises:
+        chromadb.errors.NotFoundError: If there is no such collection.
+    """
+    import sqlite3
+
+    from chromadb.errors import NotFoundError
+
+    file = Path(path) / "chroma.sqlite3"
+    if not file.exists():
+        return None
+    try:
+        db = sqlite3.connect(f"{file.resolve().as_uri()}?mode=ro", uri=True)
+        try:
+            row = db.execute(
+                "SELECT id FROM collections WHERE name = ?", (collection_name,)
+            ).fetchone()
+            if row is None:
+                raise NotFoundError(collection_name)
+            (count,) = db.execute(
+                "SELECT COUNT(*) FROM embeddings WHERE segment_id IN "
+                "(SELECT id FROM segments WHERE collection = ? AND scope = 'METADATA')",
+                (row[0],),
+            ).fetchone()
+        finally:
+            db.close()
+    except sqlite3.Error as e:
+        logger.debug(f"Could not count {file} with SQLite: {e!r}")
+        return None
+    return int(count)
+
+
 def _store_status(spec: Any, mode: VectorDbMode, local_path: str | None = None):
     """Return ``(location, count, reason)`` for one model's database.
 
@@ -203,10 +247,21 @@ def _store_status(spec: Any, mode: VectorDbMode, local_path: str | None = None):
         location = collection_name
         where = "Chroma Cloud has"
     try:
-        collection = connection.client().get_collection(collection_name)
+        local_count = (
+            _local_count(location, collection_name) if mode == "local" else None
+        )
+        if local_count is not None:
+            count = local_count
+        else:
+            collection = connection.client().get_collection(collection_name)
+            count = collection.count()
     except NotFoundError:
         return location, None, f"{where} no collection '{collection_name}'"
-    count = collection.count()
+    except VectorDatabaseConfigError:
+        raise
+    except Exception as e:  # e.g. an interrupted build left a broken index
+        logger.debug(f"Could not open {location}: {e!r}")
+        return location, None, f"{location} could not be opened: {e}"
     if count == 0:
         return location, None, f"{where} an empty collection '{collection_name}'"
     return location, count, None
