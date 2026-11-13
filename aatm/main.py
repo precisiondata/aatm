@@ -42,6 +42,14 @@ The CLI is responsible for orchestrating high-level workflows such as:
     Write the JSON Schema of entity definition files, for autocompletion
     and inline errors in editors.
 
+- `omop run`, `omop rebuild`, `omop status`, `omop failures`:
+    Extract notes into OMOP tables in chunks, resuming where a run stopped,
+    rebuild the tables from stored results, and inspect a run (see
+    `aatm.omop.cli`).
+
+- `omop pilot log`, `omop pilot compare`:
+    Read a pilot workspace (see `aatm.omop.Pilot`).
+
 Attributes:
     LOCAL_HELPER_PATH (Path): Path to the local helper directory used by AATM
         to store generated artifacts and local resources.
@@ -1370,7 +1378,8 @@ def cache_clear(
     console.print(f"Deleted {removed} entries from {path}")
 
 
-omop_app = typer.Typer(help="Work with OMOP extraction runs")
+from aatm.omop.cli import omop_app  # noqa: E402
+
 app.add_typer(omop_app, name="omop")
 pilot_app = typer.Typer(
     help=(

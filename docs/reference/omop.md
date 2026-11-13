@@ -7,6 +7,8 @@ Mapping extracted entities to OMOP CDM table rows. See
 
 ::: aatm.omop.runner
 
+::: aatm.omop.cli
+
 ::: aatm.omop.shards
 
 ::: aatm.omop.plan
