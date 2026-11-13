@@ -1,161 +1,124 @@
-# Python API Quick Start
+# Quick start: terminology mapping in Python
 
-This page shows how to use **AATM from the Python API**.
+This page maps local terms to standard OMOP concepts with `TerminologyMapper`, from a
+list of texts or a CSV file, and then shows each component of the mapper on its own.
 
----
-
-## What you can do from the Python API
-
-With the Python API, you can:
-
-- initialize and configure a terminology mapping pipeline in code
-- load translators, retrievers, rerankers, and selectors from registries
-- instantiate `TerminologyMapper` directly
-- build a mapper from a structured task configuration
-- run mapping jobs from Python
-- work with pipeline components individually
-- compose stages with the `|` operator
-
-The package exposes dedicated base classes and concrete implementations for translators, retrievers, rerankers, selectors, and the main `TerminologyMapper` orchestration class. 
-
----
-
-
-## 1. Understand the main Python entry point
-
-The main class is `TerminologyMapper`.
-
-It orchestrates the full mapping workflow by combining:
-
-- a translator
-- a retriever
-- an optional reranker
-- a selector
-
-Its constructor accepts these components directly, along with settings such as `input_file`, `output_dir`, `batch_size`, `rate_limit`, `column_mapping`, and `limit_to`. It also provides defaults when some components are omitted. 
-
-Conceptually, the pipeline looks like this:
+**Before you start:** run `aatm init` ([Set up the vocabularies](setup.md)). The mapper
+searches the index it builds.
 
 ```mermaid
 flowchart LR
-    A[Source Concepts] --> B[Translator]
-    B --> C[Retriever]
-    C --> D[Reranker]
+    A[Source terms] --> B[Translator<br/>optional]
+    B --> C[Retriever<br/>search index]
+    C --> D[Reranker<br/>optional]
     D --> E[Selector]
-    E --> F[Mapped Results]
+    E --> F[Standard concepts]
 ```
-
-The mapping flow inside `TerminologyMapper.map()` processes source concepts in batches, translates them, retrieves candidates, optionally reranks them, selects final matches, and writes the output DataFrame to disk.
 
 ---
 
-## 2. Example
-
-A good first setup is:
-
-- `empty-translator`
-- `embeddinggemma-300M`
-- `bm25-reranker`
-- `first-result-selector`
-
-These can be loaded from the package registries and passed into `TerminologyMapper`. 
+## 1. Map a few terms
 
 ```python
 from aatm.terminology_mapper import TerminologyMapper
-from aatm.registries.translators import load_translator
-from aatm.registries.retrievers import load_retriever
-from aatm.registries.rerankers import load_reranker
-from aatm.registries.selectors import load_selector
 
-mapper = TerminologyMapper(
-    translator=load_translator("empty-translator"),
-    retriever=load_retriever("embeddinggemma-300M"),
-    reranker=load_reranker("bm25-reranker"),
-    selector=load_selector("first-result-selector"),
-    batch_size=100,
-)
-
-results_df = mapper.map("data/source_to_concept_map.csv")
-print(results_df.head())
+mapper = TerminologyMapper()   # the index aatm init built; the closest candidate wins
+df = mapper.map(["chest pain", "type 2 diabetes mellitus"], save_to_disk=False)
+df[["source_code_description", "target_concept_id", "target_vocabulary_id", "domain_id", "confidence_score"]]
 ```
 
----
+Each row is one source term with the standard concept chosen for it: its id, vocabulary,
+code and domain, and a `confidence_score`. Without `save_to_disk=False`, the result is
+also written to `output/mapped_source_concepts.csv`.
 
-## 3. Prepare your input CSV
+## 2. Choose the components
 
-The mapper expects an OMOP-style `SOURCE_TO_CONCEPT_MAP` input structure.
+The default selector takes the closest candidate, which is fast but often wrong for
+short or ambiguous terms. Every component can be named by its registry id, or passed
+as an object:
 
-The required columns checked by `map_csv_to_source_concepts()` are:
+```python
+mapper = TerminologyMapper(
+    translator="gemini-2.5-flash",       # translate to English first (optional)
+    retriever="text-embedding-3-small",  # which index to search (optional: the one aatm init built)
+    reranker="bm25-reranker",            # reorder the candidates (optional)
+    selector="gpt-5-mini",               # an LLM picks among the candidates
+)
+mapper.retriever.top_k = 30              # how many candidates the selector sees
+df = mapper.map(["dor no peito", "diabetes mellitus tipo 2"], save_to_disk=False)
+```
 
-- `source_code`
-- `source_concept_id`
-- `source_vocabulary_id`
-- `source_code_description`
-- `valid_start_date`
-- `valid_end_date`
-- `invalid_reason`
+| Component | Registry ids |
+|---|---|
+| Translator | `empty-translator` (default), `gemini-2.5-flash` |
+| Retriever | `text-embedding-3-small`, `text-embedding-3-large`, `gemini-embedding-001`, `embeddinggemma-300M`, `qwen3-06B`, `qwen3-4B` (only those you built) |
+| Reranker | none (default), `bm25-reranker`, `qwen3-reranker-0.6b`, `qwen3-reranker-4b`, `qwen3-reranker-8b` |
+| Selector | `first-result-selector` (default); LLMs: `gpt-5-mini`, `gpt-5`, `gpt-5.2`, `gpt-5-nano`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro`, `gemini-3-flash-preview`, `gemini-3-pro-preview`; agent: `agent-gpt-5-mini`, `agent-gpt-5`, `agent-gpt-5.2`, `agent-gemini-2.5-flash`, `agent-gemini-3-flash-preview`; decision models: `decision-<decision model id>`, e.g. `decision-openrouter/typesafe/jev-1.13` |
 
-These required columns are hardcoded in `TerminologyMapper.expected_columns`, and the CSV loader validates them before continuing.
+LLM selectors only choose among the retrieved candidates. The **agent** searches
+further when none fits: its own semantic searches, lexical search over names and
+synonyms, code lookups, and the concept hierarchy:
 
-Example:
+```python
+from aatm.concept_search import AgenticSelector
 
-```csv
+mapper = TerminologyMapper(selector=AgenticSelector("openai/gpt-5-mini", max_tool_calls=8))
+df = mapper.map(["HbA1c", "creatinina sérica"], save_to_disk=False)
+df[["source_code_description", "target_concept_id", "confidence_score", "mapping_rationale"]]
+```
+
+The agent adds a `mapping_rationale` (its reason) and a `mapping_trace` (its searches)
+to each row, and its `confidence_score` is its confidence level: 0.9 (high), 0.6
+(medium) or 0.3 (low). Any `aatm.llm` model id works, e.g.
+`"anthropic/claude-sonnet-5-5"` or `"ollama/llama3.3"`. See
+[Choosing between the mapper and the agent](coding_text.md#choosing-between-the-mapper-and-the-agent)
+for a comparison on lab tests.
+
+## 3. Restrict the search
+
+`where` limits the candidates to a domain and vocabularies, written in ChromaDB's filter
+syntax:
+
+```python
+from aatm.omop.coding import retriever_filter
+
+df = mapper.map(
+    ["potassium", "hemoglobin"],
+    where=retriever_filter("Measurement", ["LOINC"]),
+    save_to_disk=False,
+)
+```
+
+See [Metadata filters](concepts.md#metadata-filters) for how filtering works on large
+indexes.
+
+## 4. Map a CSV file
+
+The input follows the OMOP `SOURCE_TO_CONCEPT_MAP` layout, with these columns:
+`source_code`, `source_concept_id`, `source_vocabulary_id`, `source_code_description`
+(the text that is mapped), `valid_start_date`, `valid_end_date` and `invalid_reason`.
+
+```csv title="source_to_concept_map.csv"
 source_code,source_concept_id,source_vocabulary_id,source_code_description,valid_start_date,valid_end_date,invalid_reason
 A01,,LOCAL,"Dor no peito",2020-01-01,2099-12-31,
 B02,,LOCAL,"Diabetes mellitus tipo 2",2020-01-01,2099-12-31,
 ```
 
----
-
-## 4. Run mapping from Python
-
-Once your mapper is configured, run mapping like this:
-
 ```python
-results_df = mapper.map("data/source_to_concept_map.csv")
+mapper = TerminologyMapper(translator="gemini-2.5-flash", selector="gpt-5-mini", batch_size=100)
+df = mapper.map(file_path="source_to_concept_map.csv", limit_to=20, output_dir="output")
 ```
 
-You can also limit the number of rows processed during testing:
+`limit_to` maps only the first rows, for a test. The result is written to
+`output/mapped_source_concepts.csv`; the original descriptions are kept in
+`source_code_description_original` when a translator changed them.
+
+If your columns have other names, rename them with `column_mapping` (the mapper does not
+create missing columns):
 
 ```python
-results_df = mapper.map("data/source_to_concept_map.csv", limit_to=20)
-```
-
-You can control whether confidence scores are included:
-
-```python
-results_df = mapper.map(
-    "data/source_to_concept_map.csv",
-    return_confidence_scores=True,
-)
-```
-
-Although `source_code_description` values are translated as defined by the translator, the original values are stored in the column `source_code_description_original`.
-
-The `map()` method writes the mapped results to `mapped_source_concepts.csv` inside the configured output directory and returns the resulting DataFrame.
-
----
-
-## 5. Use custom column names
-
-If your CSV uses different column names, pass `column_mapping` when constructing the mapper.
-
-`map_csv_to_source_concepts()` renames columns using this mapping before validating the expected schema. 
-
-Note that the `TerminologyMapper` class won't create the required columns for you. You need to prepare the table beforehand.
-
-```python
-from aatm.terminology_mapper import TerminologyMapper
-from aatm.registries.translators import load_translator
-from aatm.registries.retrievers import load_retriever
-from aatm.registries.rerankers import load_reranker
-from aatm.registries.selectors import load_selector
-
 mapper = TerminologyMapper(
-    translator=load_translator("empty-translator"),
-    retriever=load_retriever("embeddinggemma-300M"),
-    reranker=load_reranker("bm25-reranker"),
-    selector=load_selector("first-result-selector"),
+    selector="gpt-5-mini",
     column_mapping={
         "code": "source_code",
         "description": "source_code_description",
@@ -166,338 +129,85 @@ mapper = TerminologyMapper(
         "concept_id": "source_concept_id",
     },
 )
-
-results_df = mapper.map("data/my_input.csv")
+df = mapper.map(file_path="my_input.csv")
 ```
 
----
+!!! warning "Pass files as `file_path=`"
+    The first argument of `map` is a list of terms. `mapper.map("file.csv")` maps the
+    characters of the path; write `mapper.map(file_path="file.csv")`.
 
-## 6. Build a mapper from a task configuration object
+## 5. Save the configuration
 
-You can also create the mapper from a structured `TerminologyMappingTask` object by calling `TerminologyMapper.from_task_config()`.
+The same settings as a reusable file, which `aatm map --task-config-path` also reads:
 
-That classmethod resolves the configured translator, retriever, selector, and reranker from their registries and returns a ready-to-use mapper.
+```yaml title="task.yaml"
+input_file: source_to_concept_map.csv
+output_dir: output
+translator_id: gemini-2.5-flash
+selector_id: gpt-5-mini
+batch_size: 100
+```
 
 ```python
-from pathlib import Path
-
 from aatm.data_models import TerminologyMappingTask
 from aatm.terminology_mapper import TerminologyMapper
 
-task = TerminologyMappingTask(
-    input_file=Path("data/source_to_concept_map.csv"),
-    output_dir=Path("output"),
-    translator_id="empty-translator",
-    retriever_id="embeddinggemma-300M",
-    reranker_id="bm25-reranker",
-    selector_id="first-result-selector",
-    batch_size=100,
-    rate_limit=None,
-    limit_to=None,
-)
+task = TerminologyMappingTask.from_config_file("task.yaml")
+df = TerminologyMapper.from_task_config(task).map()
+```
 
-mapper = TerminologyMapper.from_task_config(task)
-results_df = mapper.map()
+## 6. Asynchronous mapping
+
+In an async application (or a notebook), `amap` maps a file without blocking the event
+loop, and writes `mapped_source_concepts.csv` like `map`:
+
+```python
+df = await mapper.amap("source_to_concept_map.csv", limit_to=20)
 ```
 
 ---
 
-## 7. Load components directly from registries
+## The components on their own
 
-The package provides registry loaders for translators, retrievers, rerankers, and selectors.
-
-### Translators
-
-The translator registry exposes at least:
-
-- `empty-translator`
-- `gemini-2.5-flash`
-
-through `load_translator(name, **kwargs)`. 
+Each component is callable, so you can inspect what each step produces, and they
+compose with `|`:
 
 ```python
+from aatm.registries.rerankers import load_reranker
+from aatm.registries.retrievers import load_retriever
+from aatm.registries.selectors import load_selector
 from aatm.registries.translators import load_translator
 
 translator = load_translator("empty-translator")
-```
-
-### Retrievers
-
-Retriever models are loaded with `load_retriever(model_name)`, which constructs a `ChromaDBRetriever` backed by the configured embedding function and ChromaDB path, or a `PineconeRetriever` when `AATM_VECTOR_DB=pinecone` (see [Environment variables](env.md#pinecone)). 
-
-Common registered retriever IDs include:
-
-- `qwen3-06B`
-- `qwen3-4B`
-- `gemini-embedding-001`
-- `embeddinggemma-300M`
-- `text-embedding-3-small`
-- `text-embedding-3-large` 
-
-```python
-from aatm.registries.retrievers import load_retriever
-
-retriever = load_retriever("embeddinggemma-300M")
-```
-
-### Rerankers
-
-The reranker registry exposes:
-
-- `bm25-reranker`
-- `qwen3-reranker-0.6b`
-- `qwen3-reranker-4b`
-- `qwen3-reranker-8b` 
-
-```python
-from aatm.registries.rerankers import load_reranker
-
+retriever = load_retriever()             # the index aatm init built
 reranker = load_reranker("bm25-reranker")
+selector = load_selector("gpt-5-mini")
+
+translations = translator(["chest pain", "cough"])   # list[Translation]
+candidates = retriever(translations)                  # RetrieverResults: candidates per query
+reranked = reranker(candidates)                       # RetrieverResults, reordered
+selected = selector(reranked)                         # SelectorResults: one choice per query
+
+selected = ["chest pain", "cough"] | translator | retriever | reranker | selector
 ```
 
-### Selectors
-
-The selector registry exposes:
-
-- `first-result-selector`
-- `gpt-5.2`
-- `gpt-5`
-- `gpt-5-mini`
-- `gpt-5-nano`
-- `gemini-3-pro-preview`
-- `gemini-3-flash-preview`
-- `gemini-2.5-flash`
-- `gemini-2.5-flash-lite`
-- `gemini-2.5-pro` 
-- `agent-gpt-5-mini`, `agent-gpt-5`, `agent-gpt-5.2`, `agent-gemini-3-flash-preview`,
-  `agent-gemini-2.5-flash`: the concept search agent (see below)
-
-```python
-from aatm.registries.selectors import load_selector
-
-selector = load_selector("first-result-selector")
-```
-
-### Agentic selector
-
-The other selectors can only pick among the retrieved candidates. `AgenticSelector`
-starts from them, and when none fits, an LLM agent searches further: its own semantic
-searches with the mapper's retriever (expanding abbreviations, translating), lexical
-search over concept names and synonyms, code lookups, concept details and the
-hierarchy, in the vocabulary database built by `aatm init`. Each source concept's code
-and vocabulary are given to the agent, so `ICD10CM E11` can be looked up directly.
-
-```python
-from aatm.concept_search import AgenticSelector
-from aatm.terminology_mapper import TerminologyMapper
-
-mapper = TerminologyMapper(
-    input_file="source_concepts.csv",
-    retriever="text-embedding-3-small",
-    selector=AgenticSelector("openai/gpt-5-mini", max_tool_calls=8),
-)
-df = mapper.map()
-df[["source_code_description", "target_concept_id", "confidence_score", "mapping_rationale"]]
-```
-
-The output gains a `mapping_rationale` column (the agent's reason) and a
-`mapping_trace` column (its searches, as JSON). `confidence_score` is the agent's
-confidence level: 0.9 (high), 0.6 (medium) or 0.3 (low); see
-[Searching with an agent](coding_text.md#searching-with-an-agent). Any `aatm.llm` model
-id works, e.g. `"anthropic/claude-sonnet-5-5"` or `"ollama/llama3.3"`. The same agent
-codes extracted text in OMOP tables, with `aatm.omop.AgenticCoder`.
-
----
-
-## 8. Work with components directly in Python
-
-You do not need to go through `TerminologyMapper` for every workflow. The components are callable and can be used independently.
-
-### Translator example
-
-`BaseTranslator.__call__()` accepts a string, a list of strings, or a list of `SourceConcept` objects and returns a list of `Translation` objects. 
-
-```python
-from aatm.registries.translators import load_translator
-
-translator = load_translator("empty-translator")
-translations = translator(["Dor no peito", "Tosse"])
-print(translations)
-```
-
-### Retriever example
-
-`BaseRetriever.__call__()` accepts a string, a `Translation`, a list of strings, or a list of `Translation` objects and returns `RetrieverResults`. 
-
-```python
-from aatm.registries.retrievers import load_retriever
-
-retriever = load_retriever("embeddinggemma-300M")
-results = retriever(["chest pain", "cough"])
-print(results)
-```
-
-### Reranker example
-
-Rerankers consume `RetrieverResults` and return reordered `RetrieverResults`. 
-
-```python
-from aatm.registries.rerankers import load_reranker
-
-reranker = load_reranker("bm25-reranker")
-reranked = reranker(results)
-print(reranked)
-```
-
-### Selector example
-
-Selectors consume `RetrieverResults` and return `SelectorResults`. 
-
-```python
-from aatm.registries.selectors import load_selector
-
-selector = load_selector("first-result-selector")
-selected = selector(reranked)
-print(selected)
-```
-
----
-
-## 9. Compose the pipeline with `|`
-
-AATM components inherit pipeline behavior from `PipelineBaseClass`, which overloads the `|` operator. 
-
-That means you can compose stages directly in Python:
-
-```python
-from aatm.registries.translators import load_translator
-from aatm.registries.retrievers import load_retriever
-from aatm.registries.rerankers import load_reranker
-from aatm.registries.selectors import load_selector
-
-translator = load_translator("empty-translator")
-retriever = load_retriever("embeddinggemma-300M")
-reranker = load_reranker("bm25-reranker")
-selector = load_selector("first-result-selector")
-
-selected = (
-    ["Dor no peito", "Tosse"]
-    | translator
-    | retriever
-    | reranker
-    | selector
-)
-
-print(selected)
-```
-
-Inside `TerminologyMapper.map()`, the same style is used for the core pipeline flow. 
-
----
-
-## 10. Understand the default behaviors
-
-If you instantiate `TerminologyMapper()` without passing components:
-
-- translator defaults to `EmptyTranslator()`
-- retriever defaults to a `ChromaDBRetriever` backed by `GoogleEmbeddingFunction(model="gemini-embedding-001")`
-- selector defaults to `FirstResultSelector()`
-- reranker defaults to `PipelineBaseClass()` as an identity-like empty reranker stage 
-
-That can be convenient, but for reproducible setups it is usually better to pass your components explicitly.
-
----
-
-## 11. Asynchronous mapping
-
-`TerminologyMapper` also defines an `amap()` method for asynchronous mapping. It follows the same high-level idea as `map()`, processing source concepts in batches and returning a DataFrame. 
-
-A minimal pattern looks like this:
-
-```python
-import asyncio
-
-from aatm.terminology_mapper import TerminologyMapper
-
-mapper = TerminologyMapper()
-
-async def main():
-    df = await mapper.amap("data/source_to_concept_map.csv", limit_to=20)
-    print(df.head())
-
-asyncio.run(main())
-```
-
-Use this only if your configured components support the async flow you want.
-
----
-
-## 12. What gets created locally
-
-A normal Python workflow may create or use local artifacts such as:
-
-```text
-.aatm/
-├── omop.db
-├── datasets/
-└── chroma_vector_dbs/
-```
-
-Mapped outputs are typically written to:
-
-```text
-output/mapped_source_concepts.csv
-```
-
-The retriever registry also derives ChromaDB paths from `.aatm/chroma_vector_dbs/<model_name>`. 
-
----
-
-## End-to-end Python example
-
-Here is a full Python-only path.
-
-```python
-from aatm.terminology_mapper import TerminologyMapper
-from aatm.registries.translators import load_translator
-from aatm.registries.retrievers import load_retriever
-from aatm.registries.rerankers import load_reranker
-from aatm.registries.selectors import load_selector
-
-mapper = TerminologyMapper(
-    translator=load_translator("empty-translator"),
-    retriever=load_retriever("embeddinggemma-300M"),
-    reranker=load_reranker("bm25-reranker"),
-    selector=load_selector("first-result-selector"),
-    batch_size=100,
-    output_dir="output",
-)
-
-results_df = mapper.map(
-    file_path="data/source_to_concept_map.csv",
-    limit_to=50,
-    return_confidence_scores=True,
-)
-
-print(results_df.head())
-```
+`candidates.results[0]` lists the concepts retrieved for the first term, with their
+`std_concept_id`, `std_concept_name`, `std_vocabulary_id`, `std_domain_id` and
+`distance`. To write a selector or another component of your own, see the
+[low-level guide](low_level.md#terminology-mapping-piece-by-piece).
+
+A configured `TerminologyMapper` can also code the text extracted from clinical notes
+into OMOP tables: pass it as `coder=` (see [Coding extracted text](coding_text.md)).
 
 ---
 
 ## Troubleshooting
 
-### The retriever fails because the local vector database is missing
-
-Make sure you already created the local ChromaDB resources for the retriever model you want to use.
-
-### Your CSV fails validation
-
-Make sure your input file contains the expected OMOP columns, or pass `column_mapping`.
-
-### API-backed components fail
-
-Check your `.env` file and confirm the required API keys are present.
-
-### A selector or reranker name is rejected
-
-Use one of the registered names shown in this page. The registry loaders raise `ValueError` when a name is unknown. 
+| You see | Fix |
+|---|---|
+| `No vector database for '<model>'` | That index is not built: use a model `aatm vector-db check` lists, leave `retriever` out, or build it with `aatm init --embedding-model <model>` |
+| `Several vector databases are built and none is recorded` | Pass `retriever="<model>"`, or run `aatm init --embedding-model <model>` and choose Skip to record it |
+| The CSV fails validation | Check the required columns above, or pass `column_mapping` |
+| The results are one row per character of your file name | Pass the file as `file_path=` |
+| An LLM component fails with an authentication error | Check the provider's key in `.env` ([Environment variables](env.md)) |
+| A component name is rejected | Use a registry id from the table above; `load_*` raises `ValueError` for unknown names |

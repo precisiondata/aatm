@@ -24,7 +24,7 @@ on its *entity definitions*.
    The predefined definitions on this page use **SNOMED**, **LOINC** and **UCUM**
    (units), so include at least those three. Athena emails you a link to the bundle.
 3. **Run `aatm init --vocab-zip "<link from Athena>"`**
-   ([CLI quick start](quick_start_cli.md#1-get-your-omop-vocabularies)). It downloads
+   ([Set up the vocabularies](setup.md)). It downloads
    and unpacks the bundle, then builds the local
    vocabulary database (`.aatm/omop.db`), which every example on this page reads, and
    the search index the terminology mapper uses. It records the embedding model you

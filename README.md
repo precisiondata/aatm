@@ -7,251 +7,158 @@
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![License MIT](https://img.shields.io/github/license/precisiondata/aatm)](https://opensource.org/licenses/MIT)
 
-**Any-to-Any Terminology Mapping** is an open-source Python framework designed to facilitate terminology mapping tasks. The library organizes this process in a modular and extensible way to support multiple use cases and incorporate new techniques as they emerge.
+**AATM** is an open-source Python library that turns healthcare text into standard
+concepts of the [OMOP vocabularies](https://athena.ohdsi.org/search-terms/start):
 
-In simple terms, mapping a new expression to a specific terminology involves considering many possible expressions, retrieving the best candidate target terms, and selecting them manually, which can be effortful and time-consuming.
+- **Clinical notes to OMOP tables.** An LLM extracts what your entity definitions
+  describe; AATM checks every mention against the note, codes it with the vocabularies
+  and fills the OMOP CDM `measurement`, `observation`, `condition_occurrence`,
+  `drug_exposure` and `device_exposure` tables. Every row keeps the words it came from.
+- **Information extraction.** Conditions, drugs, dates, scores and their attributes,
+  grounded in the text, without tables.
+- **Terminology mapping.** Local codes and descriptions, in any language, mapped to
+  standard concepts as a `SOURCE_TO_CONCEPT_MAP`.
 
-AATM leverages the [OMOP vocabularies](https://athena.ohdsi.org/search-terms/start) to facilitate this task. These vocabularies reflect large, community-driven mapping efforts that connect many different health-related terminologies and classifications worldwide and organize them around standard terminologies, which serve as the central connecting nodes in the system. As these mapping efforts continue, healthcare-related concepts become increasingly well represented in these vocabularies, creating a virtuous cycle and increasing the chances of finding a strong correspondence for a new unmapped expression.
+It runs from the command line or from Python, scales from one note to millions
+(resumable runs, batch pricing, sharding, cost estimates), and every step can be
+replaced by your own code.
+
+**Documentation: https://precisiondata.github.io/aatm**
 
 <p align="center">
-  <img src="https://github.com/precisiondata/aatm/blob/main/docs/assets/std_vocabs_diagram.png?raw=true" alt="Standard vocabularies">
+  <img src="https://github.com/precisiondata/aatm/blob/main/docs/assets/std_vocabs_diagram.png?raw=true" alt="Standard vocabularies connect the world's terminologies">
 </p>
 
-To accomplish this, AATM organizes the mapping process into very simple steps: 
+---
 
-- **translation**, which can be optional; 
-- **retrieval**, which explores what is available from prior mapping efforts; and
-- **selection**, which connects a standard concept to the new expression being mapped. 
-
-Once this connection is made, every link associated with that standard concept becomes immediately available, enabling mapping to many different terminologies and classifications that are already connected to that concept, effectively breaking down barriers to interoperability in healthcare.
-
-![Terminology mapping pipeline](https://github.com/precisiondata/aatm/blob/main/docs/assets/aatm-pipeline-diagram.jpg?raw=true)
-
-
-## Documentation
-
-The full documentation is available at: https://precisiondata.github.io/aatm
-
-## Contributing
-
-If you want to contribute to this project, please refer to our [Contributing guide](./CONTRIBUTING.md)
-
-## Installation
-
-The recommended way is with [uv](https://docs.astral.sh/uv/), which also picks the right
-PyTorch build for your hardware (NVIDIA GPU, Apple GPU or CPU):
+## Install
 
 ```bash
-uv pip install aatm --torch-backend=auto
+uv pip install aatm --torch-backend=auto   # picks the right PyTorch for your GPU, or CPU
 ```
 
-With pip:
+or with pip:
 
 ```bash
 pip install aatm
-aatm doctor
+aatm doctor   # tells you whether local models will use your GPU, and how to fix it
 ```
 
-A GPU is optional. Local models run on an NVIDIA GPU (CUDA) or an Apple Silicon GPU
-(MPS) when PyTorch can see one, and on the CPU otherwise. `aatm doctor` tells you
-whether your GPU is being used and, if not, prints the exact commands to fix it (for
-example, installing a CUDA build of PyTorch on Windows). Set `AATM_DEVICE=cpu` (or
-`cuda` / `mps`) to override the automatic choice. See the
-[installation guide](https://precisiondata.github.io/aatm/getting-started/installation/)
-for details.
+Extras: `aatm[anthropic]` for Anthropic models, `aatm[pinecone]` for a Pinecone index.
 
-To build from source, clone the repository and install it locally:
+## Set up the vocabularies (once)
 
-```bash
-git clone https://github.com/precisiondata/aatm.git
-cd aatm
-uv sync
-```
-
-## 1. Get your OMOP vocabularies
-
-AATM cannot ship the OMOP vocabularies because several of them have their own licences. You request them from [Athena](https://athena.ohdsi.org/vocabulary/list), which has no API for this, so this step is done in the browser:
-
-1. Log in to [Athena](https://athena.ohdsi.org/vocabulary/list) and open **Download**.
-2. Select the vocabularies you need (for example SNOMED, LOINC, RxNorm and UCUM) and accept the licences of the restricted ones.
-3. Click **Download vocabularies** and name the bundle. Athena emails you a link to a zip file when it is ready, which can take a while.
-
-Then let `aatm init` do the rest by passing it the link, or the zip if you already downloaded it:
+AATM cannot ship the OMOP vocabularies, since several have their own licences. Request
+them on [Athena](https://athena.ohdsi.org/vocabulary/list) (SNOMED, LOINC, UCUM and
+RxNorm cover every predefined definition), then pass the link Athena emails you:
 
 ```bash
 aatm init --vocab-zip "https://athena.ohdsi.org/api/v1/vocabularies/zip/<bundle-id>"
-aatm init --vocab-zip ~/Downloads/vocabulary_download_v5_<bundle-id>.zip
 ```
 
-With `--vocab-zip`, `aatm init`:
+This builds the vocabulary database and a search index of every concept name and
+synonym in `.aatm/`. Put your LLM provider's key in a `.env` file, e.g.
+`OPENAI_API_KEY=...`. See
+[Set up the vocabularies](https://precisiondata.github.io/aatm/latest/getting-started/setup/).
 
-- downloads the bundle into `.aatm/downloads` (resuming if the connection drops). If Athena returns a login page or the link has expired, it says so: request the bundle again, or download it in your browser and pass the zip's path instead;
-- unpacks it into `./vocabularies`, or into `--vocab-dir`. It asks before overwriting existing files; pass `--force` to overwrite without asking;
-- checks that the required files (`CONCEPT.csv`, `CONCEPT_RELATIONSHIP.csv`, `CONCEPT_SYNONYM.csv`, `VOCABULARY.csv`, `DOMAIN.csv`) are present, and lists the vocabularies and versions in the bundle;
-- adds the CPT4 concept names when the bundle includes CPT4. This needs [Java](https://adoptium.net) and a [UMLS API key](https://uts.nlm.nih.gov/uts/profile), passed with `--umls-api-key` or the `UMLS_API_KEY` environment variable. Without a key, CPT4 concepts are kept without names.
+## Clinical notes to OMOP tables
 
-### Using an unpacked directory
-
-If you unpacked the zip yourself, put the CSVs in `./vocabularies`, where the CLI looks by default:
-
-```text
-./vocabularies
-```
-
-To use another location, pass `--vocab-dir` or `-vd`. The CLI validates this path during initialization. In that case, add the CPT4 names yourself by following the `readme.txt` in the bundle.
-
----
-
-## 2. Run the initialization command
-
-The `init` command is the main CLI setup workflow.
-
-It does all of the following for you:
-
-- creates the local `.aatm` helper directory where the local databases and aatm config files will be stored
-- ensures `.aatm` is added to `.gitignore`
-- builds the local OMOP SQLite database
-- lets you choose an embedding model
-- lets you choose the standard vocabularies
-- builds the mapping datasets
-- builds the local vector database
-
-That means you do **not** need to call Python setup functions manually for the normal setup flow. At the end, you will be ready to run terminology mapping tasks.
-
-### Simplest setup
+From a CSV or Parquet file with a `note_id` and a `text` per note (and `person_id`,
+`note_date`... when you have them):
 
 ```bash
-aatm init
+aatm omop run notes.parquet output/ \
+  --definitions condition_occurrence --definitions drug_exposure \
+  --model openai/gpt-5-mini --coder agent --cache
+aatm omop status output/
 ```
 
-This uses the default vocab directory and interactively asks you to choose the embedding model, standard vocabularies and other options.
+The same in Python:
 
-### Setup with a custom vocab directory
+```python
+from aatm.omop import AgenticCoder, OmopExtractionPipeline, OmopRun
 
-```bash
-aatm init --vocab-dir ./my_vocabularies
+pipeline = OmopExtractionPipeline(
+    ["condition_occurrence", "drug_exposure"],
+    model_id="openai/gpt-5-mini",
+    coder=AgenticCoder("openai/gpt-5-mini"),  # searches the vocabularies for each text
+    cache=True,                               # codes each distinct text once
+)
+summary = await pipeline.run("notes.parquet", "output/")
+
+run = OmopRun("output/")
+run.table("condition_occurrence")   # CDM rows, as a DataFrame
+run.provenance()                    # the note and text span behind each row
+run.issues()                        # what could not be filled, and why
 ```
 
-### Setup with an explicit embedding model
+Each table is written as Parquet files. Running the same command again resumes where it
+stopped. Eight entity definitions are predefined (conditions, drugs, devices, lab
+results, ECOG, smoking, family and medical history), and your own are YAML files.
 
-```bash
-aatm init --embedding-model embeddinggemma-300M
-```
+- [Quick start: notes to OMOP tables](https://precisiondata.github.io/aatm/latest/getting-started/quick_start_omop/)
+- [High-level guide: a full dataset](https://precisiondata.github.io/aatm/latest/getting-started/high_level/): pilot, cost estimate, run, rebuild, load
+- [Writing entity definitions](https://precisiondata.github.io/aatm/latest/getting-started/entity_definitions/)
 
-### Setup with explicit standard vocabularies
-
-```bash
-aatm init --standard-vocabs LOINC --standard-vocabs SNOMED --standard-vocabs RxNorm
-```
-
-### Fully explicit setup
-
-```bash
-aatm init \
-  --vocab-dir ./vocabularies \
-  --embedding-model embeddinggemma-300M \
-  --standard-vocabs LOINC \
-  --standard-vocabs SNOMED \
-  --standard-vocabs RxNorm
-```
-
-## 3. Prepare your input CSV
-
-After initialization, prepare the CSV you want to map.
-
-The mapper expects an OMOP-style `SOURCE_TO_CONCEPT_MAP` input structure, including these columns:
-
-- `source_code`
-- `source_concept_id`
-- `source_vocabulary_id`
-- `source_code_description`
-- `valid_start_date`
-- `valid_end_date`
-- `invalid_reason`
-
-Example:
-
-```csv
-source_code,source_concept_id,source_vocabulary_id,source_code_description,valid_start_date,valid_end_date,invalid_reason
-A01,,LOCAL,"Dor no peito",2020-01-01,2099-12-31,
-B02,,LOCAL,"Diabetes mellitus tipo 2",2020-01-01,2099-12-31,
-```
-
----
-
-## 4. Run mapping directly from the CLI
-
-The `map` command runs a terminology mapping task. You can use it in two ways:
-
-- with a task config file
-- with explicit CLI options
-
-Both paths are supported directly by the CLI implementation.
-
-### Option A: run from explicit CLI arguments
-
-This is the most direct fully-CLI workflow.
-
-```bash
-aatm map \
-  --input-file data/source_to_concept_map.csv \
-  --output-dir output \
-  --translator-id empty-translator \
-  --retriever-id embeddinggemma-300M \
-  --reranker-id bm25-reranker \
-  --selector-id first-result-selector \
-  --batch-size 100
-```
-
-#### Run a small test job
-
-Use `--limit-to` when you want to test with only a few rows.
-
-```bash
-aatm map \
-  --input-file data/source_to_concept_map.csv \
-  --output-dir output \
-  --translator-id empty-translator \
-  --retriever-id embeddinggemma-300M \
-  --reranker-id bm25-reranker \
-  --selector-id first-result-selector \
-  --limit-to 20
-```
-
-#### Apply rate limiting
-
-If needed, you can also pass a rate limit:
-
-```bash
-aatm map \
-  --input-file data/source_to_concept_map.csv \
-  --output-dir output \
-  --translator-id gemini-2.5-flash \
-  --retriever-id embeddinggemma-300M \
-  --reranker-id bm25-reranker \
-  --selector-id first-result-selector \
-  --batch-size 50 \
-  --rate-limit 100
-```
-
-The CLI accepts all of these options directly.
-
-## 5. Extract information from clinical documents
-
-AATM can also extract entities such as conditions, drugs and their dates from clinical notes with an LLM. Every extracted span is checked against the note and linked to the entity it belongs to.
+## Information extraction
 
 ```python
 from aatm.data_models.extractors import EntityDefinitions
 from aatm.extractors import SimpleLLMExtractor
 
 extractor = SimpleLLMExtractor(
-    model_id="openai/gpt-5",  # or "gemini/...", "anthropic/...", "ollama/...", ...
+    model_id="openai/gpt-5-mini",  # or "gemini/...", "anthropic/...", "ollama/...", ...
     entity_definitions=EntityDefinitions.from_predefined("condition_occurrence"),
 )
-results = await extractor([clinical_note])
+results = await extractor(["Type 2 diabetes since 2019. Denies chest pain."])
 
 for record in results[0].to_records():
-    print(record.text, {k: [c.text for c in v] for k, v in record.children.items()})
+    print(record.text, record.attributes, {k: [c.text for c in v] for k, v in record.children.items()})
+# e.g. Type 2 diabetes {'status': 'confirmed'} {'verbatim_start_date': ['2019']}
 ```
 
-See the [Information extraction quick start](https://precisiondata.github.io/aatm/getting-started/quick_start_extraction/) for entity definitions, validation and working with the results.
+See the [Information extraction quick start](https://precisiondata.github.io/aatm/latest/getting-started/quick_start_extraction/).
+
+## Terminology mapping
+
+From a `SOURCE_TO_CONCEPT_MAP`-style CSV (`source_code`, `source_code_description`,
+`source_vocabulary_id`...):
+
+```bash
+aatm map --input-file source_to_concept_map.csv --output-dir output --selector-id gpt-5-mini
+```
+
+```python
+from aatm.terminology_mapper import TerminologyMapper
+
+mapper = TerminologyMapper(selector="gpt-5-mini")   # an LLM picks among the candidates
+mapped = mapper.map("source_to_concept_map.csv")
+```
+
+Each text is translated (optionally), searched in the index, reranked (optionally) and
+matched to the best standard concept by the closest match, an LLM, a decision model or
+an agent. See the
+[terminology mapping quick start](https://precisiondata.github.io/aatm/latest/getting-started/quick_start_cli/).
+
+![Terminology mapping pipeline](https://github.com/precisiondata/aatm/blob/main/docs/assets/aatm-pipeline-diagram.jpg?raw=true)
+
+## High level or low level
+
+| Level | You write | Guide |
+|---|---|---|
+| Command line | Flags, or a YAML file of options | [High-level guide](https://precisiondata.github.io/aatm/latest/getting-started/high_level/) |
+| Pipelines | A few lines of Python: `OmopExtractionPipeline`, `Pilot`, `TerminologyMapper` | [High-level guide](https://precisiondata.github.io/aatm/latest/getting-started/high_level/) |
+| Building blocks | Your own LLM client, coder, selector or vocabulary source, plugged into the pipelines | [Low-level guide](https://precisiondata.github.io/aatm/latest/getting-started/low_level/) |
+
+## Examples
+
+Runnable notebooks with their output saved are in [`examples/`](./examples/README.md).
+
+## Contributing
+
+See the [Contributing guide](./CONTRIBUTING.md). What changed in each version is in the
+[release notes](https://precisiondata.github.io/aatm/latest/release_notes/).
+
+## License
+
+MIT

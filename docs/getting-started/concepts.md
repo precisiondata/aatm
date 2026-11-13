@@ -20,21 +20,21 @@ Typical usage:
 
 ```python
 from aatm.terminology_mapper import TerminologyMapper
-from aatm.registries.translators import load_translator
-from aatm.registries.retrievers import load_retriever
-from aatm.registries.rerankers import load_reranker
-from aatm.registries.selectors import load_selector
 
 mapper = TerminologyMapper(
-    translator=load_translator("empty-translator"),
-    retriever=load_retriever("embeddinggemma-300M"),
-    reranker=load_reranker("bm25-reranker"),
-    selector=load_selector("first-result-selector"),
+    translator="empty-translator",
+    retriever="embeddinggemma-300M",   # optional: the index aatm init built
+    reranker="bm25-reranker",
+    selector="gpt-5-mini",
     batch_size=100,
 )
 
-results_df = mapper.map("source_to_concept_map.csv")
+results_df = mapper.map(file_path="source_to_concept_map.csv")
+results_df = mapper.map(["chest pain", "cough"], save_to_disk=False)
 ```
+
+Each component can be given as a registry id, as above, or as an object. A configured
+mapper is also a **coder** for OMOP tables (see [below](#notes-to-omop-tables)).
 
 ## Translator
 
@@ -146,11 +146,12 @@ Examples:
 
 Selectors choose the final mapped concept from the retrieved candidates.
 
-Examples:
-
-- `FirstResultSelector`
-- `OpenAILLMSelector`
-- `GeminiLLMSelector`
+| Selector | Chooses by |
+|---|---|
+| `FirstResultSelector` | The closest candidate (default) |
+| `OpenAILLMSelector`, `GeminiLLMSelector` | An LLM, among the candidates |
+| `DecisionSelector` | A [decision model](../reference/decision_models.md), with probabilities |
+| `AgenticSelector` | An agent that starts from the candidates and searches the vocabularies with tools when none fits |
 
 ## Information extraction
 
@@ -160,5 +161,18 @@ The extraction pipeline turns clinical text into structured entities that can la
 - **Extractor** (`SimpleLLMExtractor`) sends each document to an LLM as numbered lines. The model returns each mention with an id, its exact text, its line and the ids of its parents.
 - **Validation** (`validate_extracted_entity`) keeps only mentions that exist on the given line, checks keys, parent links and attribute labels, and records why every rejected mention failed. A wrong label on an optional attribute is reported without dropping the mention.
 - **Records** (`EntityValidationResult.to_records()`) nest validated entities under their parents, ready to become table rows.
+- **Attribute labeller** (`DecisionAttributeLabeller`, optional) labels or verifies attributes with a [decision model](../reference/decision_models.md) instead of the extraction call.
 
 See the [Information extraction quick start](quick_start_extraction.md).
+
+## Notes to OMOP tables
+
+The OMOP pipeline adds three pieces after extraction:
+
+- **`omop` blocks** in the entity definitions say which CDM table an entity fills and where each column's value comes from: the mention's text, a child, an attribute's label, the note's context, a fixed code, a code lookup, or the coder. They are never sent to the model. See [From notes to OMOP tables](omop_tables.md).
+- **Coder** (`TextCoder`): turns extracted text into a standard concept id, for `map` sources. A configured `TerminologyMapper`, the concept search agent (`AgenticCoder`), or your own. Results can be cached on disk across runs. See [Coding extracted text](coding_text.md).
+- **Table builder** (`OmopTableBuilder`): builds the rows from the validated entities, checks every concept against the vocabulary database (standard, right domain), and records each row's provenance and every gap as an issue.
+
+`OmopExtractionPipeline` chains the extractor and the builder. Calling it builds tables in memory; its `run` method processes a dataset of any size in chunks, with a **ledger** (`ledger.db`) of every extraction, so a run resumes, retries failed notes, and can be **rebuilt** after a mapping change without calling the model again. `OmopRun` reads a run's output. See [Processing large datasets](large_datasets.md).
+
+A **`ClinicalNote`** is a note's text with the values that come with it: `note_id`, `person_id`, `note_date`, `visit_occurrence_id`, `visit_detail_id`, `provider_id`.
