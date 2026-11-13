@@ -346,3 +346,38 @@ def test_another_coder_rebuilds_and_the_cache_is_shared(tmp_path):
 
     # Back to the first coder: its version is reused, its codes come from the cache.
     assert run(pilot, lab_pipeline(IdentifiedCoder(model="m1"))[0]).name == first.name
+
+
+# --- the command line -----------------------------------------------------------------
+
+
+def test_cli_log_and_compare(tmp_path):
+    from typer.testing import CliRunner
+
+    from aatm.main import app
+
+    pilot = Pilot(tmp_path, source=notes(4), sample=4)
+    run(pilot, make_pipeline()[0])
+    run(pilot, make_pipeline(definitions("An ECOG or PS performance status."))[0])
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["omop", "pilot", "log", "-p", str(tmp_path), "--diff"])
+    assert result.exit_code == 0, result.output
+    assert "first version" in result.output
+    assert "definitions: 1 line added, 1 removed" in result.output
+    assert "+  definition: An ECOG or PS performance status." in result.output
+
+    result = runner.invoke(
+        app, ["omop", "pilot", "compare", "v001", "v002", "-p", str(tmp_path)]
+    )
+    assert result.exit_code == 0, result.output
+    assert "mentions: 2 added, 0 removed, 0 changed" in result.output
+
+    result = runner.invoke(
+        app, ["omop", "pilot", "compare", "v001", "v7", "-p", str(tmp_path)]
+    )
+    assert result.exit_code == 1
+    assert "No version 'v7'" in result.output
+
+    result = runner.invoke(app, ["omop", "pilot", "log", "-p", str(tmp_path / "none")])
+    assert result.exit_code == 1
