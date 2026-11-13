@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
-from chromadb.errors import NotFoundError
 
+from ..built_stores import check_built, default_vector_database
 from ..device import get_device
 from ..embedding_functions import (
     GemmaEmbeddingFunction,
@@ -225,7 +225,7 @@ CHROMADB_RETRIEVER_MODEL_REGISTRY: dict[str, ChromaRetrieverModelSpec] = {
 
 
 def load_retriever(
-    model_name: str,
+    model_name: str | None = None,
     vector_db: str | None = None,
     local_path: str | None = None,
     **retriever_kwargs: Any,
@@ -237,8 +237,14 @@ def load_retriever(
     database, Chroma Cloud or Pinecone, see `aatm.vector_db`), instantiates the
     corresponding embedding function, and returns a configured retriever.
 
+    Only a built vector database is opened: one that does not exist or is
+    empty raises an error that lists the built ones (see
+    `aatm.built_stores.check_built`).
+
     Args:
-        model_name: Registry name of the retriever model to instantiate.
+        model_name: Registry name of the retriever model to instantiate. If
+            ``None``, the model built by ``aatm init`` (see
+            `aatm.built_stores.default_vector_database`).
         vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
         local_path: Directory of the local database, in local mode. Defaults
@@ -252,7 +258,14 @@ def load_retriever(
     Raises:
         ValueError: If the provided model name is not present in the retriever
             registry, or the vector database configuration is invalid.
+        VectorDatabaseNotBuiltError: If the model's vector database is not
+            built, or ``model_name`` is ``None`` and no default can be chosen.
     """
+    if model_name is None:
+        default = default_vector_database(vector_db)
+        model_name = default.embedding_model
+        if default.vector_db == "local" and local_path is None:
+            local_path = default.location
     try:
         spec = CHROMADB_RETRIEVER_MODEL_REGISTRY[model_name]
     except KeyError as e:
@@ -261,6 +274,7 @@ def load_retriever(
             f"Unknown retriever model '{model_name}'. Available models: {available}"
         ) from e
 
+    check_built(model_name, vector_db, local_path)
     if resolve_vector_db_mode(vector_db) == "pinecone":
         return _load_pinecone_retriever(spec, **retriever_kwargs)
 
@@ -270,10 +284,7 @@ def load_retriever(
     # Encode queries in the precision the database was built with.
     model_kwargs: dict[str, Any] = {}
     if getattr(spec.embedding_function_cls, "is_local", False):
-        try:
-            metadata = client.get_collection(collection_name).metadata or {}
-        except NotFoundError:
-            metadata = {}
+        metadata = client.get_collection(collection_name).metadata or {}
         dtype = dtype_for_queries(metadata.get(COLLECTION_DTYPE_KEY), get_device())
         if dtype is not None:
             model_kwargs["dtype"] = dtype
@@ -303,21 +314,11 @@ def _query_model_kwargs(
 def _load_pinecone_retriever(
     spec: ChromaRetrieverModelSpec, **retriever_kwargs: Any
 ) -> PineconeRetriever:
-    """Open a model's Pinecone index and return a retriever for it.
-
-    Raises:
-        ValueError: If the index does not exist or Pinecone is not configured.
-    """
-    from ..vector_stores import PineconeVectorStore, pinecone_index_exists
+    """Open a model's Pinecone index (checked to be built) and return a retriever."""
+    from ..vector_stores import PineconeVectorStore
 
     connection, index_name = spec.pinecone_location()
     client = connection.client()
-    if not pinecone_index_exists(client, index_name):
-        raise ValueError(
-            f"Pinecone has no index '{index_name}' for '{spec.name}'. Build it with "
-            f"`aatm init --vector-db pinecone --embedding-model {spec.name}`, or copy "
-            f"a local index with `aatm vector-db upload --to pinecone -e {spec.name}`."
-        )
     store = PineconeVectorStore.open(client, index_name)
     model_kwargs = _query_model_kwargs(spec, store.index_metadata())
     return PineconeRetriever(

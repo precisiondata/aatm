@@ -1129,6 +1129,7 @@ def vector_db_check(
                 "[green]built[/green]" if path and Path(path).exists() else "not built"
             )
             console.print(f"  {name}: {path} ({status})")
+        _print_recorded_default(mode)
         return
 
     connection = next(iter(locations.values()))[0]
@@ -1152,6 +1153,19 @@ def vector_db_check(
     for name, (_, collection_name) in locations.items():
         status = "[green]built[/green]" if collection_name in existing else "not built"
         console.print(f"  {name}: {kind} '{collection_name}' ({status})")
+    _print_recorded_default(mode)
+
+
+def _print_recorded_default(mode: str) -> None:
+    """Print the vector database a retriever defaults to, if one is recorded."""
+    from aatm.built_stores import CONFIG_PATH, recorded_vector_databases
+
+    recorded = recorded_vector_databases(mode)
+    if recorded:
+        console.print(
+            f"Default retriever: [bold]{recorded[0].embedding_model}[/bold] "
+            f"(most recently built, recorded in {CONFIG_PATH.as_posix()})"
+        )
 
 
 @vector_db_app.command(

@@ -29,6 +29,7 @@ from rich.console import Console
 from rich.progress import Progress, TaskID, track
 
 from aatm.background_iterator import BackgroundIterator
+from aatm.built_stores import record_vector_database
 from aatm.device import get_device
 from aatm.gpu_memory import (
     CANDIDATE_BATCH_SIZES,
@@ -700,10 +701,14 @@ def build_local_vector_database(
     # Set in Pinecone mode only; `client` is a ChromaDB client otherwise.
     pinecone_client: Any | None = None
 
-    if resolve_vector_db_mode(vector_db) == "pinecone":
+    mode = resolve_vector_db_mode(vector_db)
+    # Where the database is recorded in .aatm/config.yaml (see aatm.built_stores).
+    record_location: str | Path
+    if mode == "pinecone":
         if vector_db_dir is not None:
             raise ValueError("vector_db_dir only applies to a local vector database.")
         connection, collection_name = spec.pinecone_location()
+        record_location = collection_name
         console.print(f"Using {connection.describe()}, index '{collection_name}'")
         # Opening the client does not authenticate; the first call does.
         with profiler.time_block("pinecone_client_init"):
@@ -713,6 +718,7 @@ def build_local_vector_database(
         connection, collection_name = location
         if vector_db_dir is not None:
             raise ValueError("vector_db_dir only applies to a local vector database.")
+        record_location = collection_name
         console.print(f"Using {connection.describe()}, collection '{collection_name}'")
         # Opening the client authenticates, so bad credentials fail here.
         with profiler.time_block("chromadb_client_init"):
@@ -725,6 +731,7 @@ def build_local_vector_database(
 
         if vector_db_dir is None:
             vector_db_dir = Path(spec.chromadb_path)
+        record_location = vector_db_dir
 
         # ChromaDB caches clients by path string; an absolute path keeps a cached
         # client from pointing at another directory after a change of cwd.
@@ -743,6 +750,9 @@ def build_local_vector_database(
         ).ask()
 
         if user_preference == "Skip":
+            record_vector_database(
+                embedding_model_name, mode, record_location, keep_date=True
+            )
             return
 
         if user_preference == "Overwrite":
@@ -982,6 +992,8 @@ def build_local_vector_database(
 
     profiler.log_summary(label="final")
 
+    record_vector_database(embedding_model_name, mode, record_location)
+
 
 UPLOAD_READ_PAGE_SIZE = 5000
 """Rows read from the local database per page when uploading it to the cloud.
@@ -1197,6 +1209,7 @@ def upload_vector_database_to_cloud(
     console.print(
         f"Uploaded {uploaded} rows; {skipped} were already in the destination."
     )
+    record_vector_database(embedding_model_name, to, collection_name)  # type: ignore[arg-type]
     return UploadSummary(
         collection_name=collection_name,
         total=total,
