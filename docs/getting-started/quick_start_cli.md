@@ -160,6 +160,9 @@ aatm map \
   --batch-size 100
 ```
 
+`--retriever-id` is optional: without it, `aatm map` uses the embedding model built by
+`aatm init` (recorded in `.aatm/config.yaml`).
+
 #### Run a small test job
 
 Use `--limit-to` when you want to test with only a few rows.

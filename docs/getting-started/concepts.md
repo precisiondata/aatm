@@ -58,6 +58,24 @@ Implementations, both returned by `load_retriever()` depending on `AATM_VECTOR_D
 - `ChromaDBRetriever`: a local or Chroma Cloud collection.
 - `PineconeRetriever`: a Pinecone index.
 
+`aatm init` and `aatm vector-db upload` record the embedding model they built, the vector
+database and the build date in `.aatm/config.yaml`. Without a model name,
+`load_retriever()`, `TerminologyMapper()`, `AgenticCoder(model_id)` and `aatm map` use
+the most recently built one for the configured vector database (and log which), or,
+with nothing recorded, the only built one. `aatm vector-db check` shows that default.
+
+A retriever only opens an index that is built: naming a model whose index does not
+exist or is empty raises `VectorDatabaseNotBuiltError` instead of searching an empty
+collection. The message lists the indexes that are built and how to build the one
+asked for:
+
+```text
+No vector database for 'text-embedding-3-large' (.aatm/chroma_vector_dbs/text-embedding-3-large not found).
+Built and ready:
+  - text-embedding-3-small  local  .aatm/chroma_vector_dbs/text-embedding-3-small  (2,512,331 expressions)
+Use retriever="text-embedding-3-small", or build it with: aatm init --embedding-model text-embedding-3-large
+```
+
 Both share their filtering logic (`VectorStoreRetriever`), and distances mean the same
 on both, so selectors and thresholds do not depend on the backend.
 

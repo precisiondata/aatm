@@ -16,6 +16,7 @@ retrievers to be chained with other components such as rerankers and selectors.
 from abc import ABC, abstractmethod
 from typing import Any, Callable, List, Literal, Mapping, Sequence, get_args
 import chromadb
+from chromadb.errors import NotFoundError
 
 from .data_models import RetrievedExpressionMetadata, RetrieverResults, Translation
 from .pipeline import PipelineBaseClass
@@ -494,8 +495,8 @@ class ChromaDBRetriever(VectorStoreRetriever):
     ):
         """Initialize the ChromaDB retriever.
 
-        This constructor stores the ChromaDB client configuration, creates or
-        retrieves the target collection, and sets default retrieval parameters
+        This constructor stores the ChromaDB client configuration, opens the
+        target collection (which must exist), and sets default retrieval parameters
         such as the number of results to return and any metadata filter to
         apply.
 
@@ -523,10 +524,20 @@ class ChromaDBRetriever(VectorStoreRetriever):
         self.client = client
         self.collection_name = collection_name
         self.embedding_function = embedding_function
-        self.collection = self.client.get_or_create_collection(
-            collection_name,
-            embedding_function=embedding_function,  # type: ignore[arg-type]
-        )
+        # Only building creates a collection: a missing one is an error, not
+        # an empty collection that finds nothing.
+        try:
+            self.collection = self.client.get_collection(
+                collection_name,
+                embedding_function=embedding_function,  # type: ignore[arg-type]
+            )
+        except NotFoundError as e:
+            from aatm.built_stores import VectorDatabaseNotBuiltError
+
+            raise VectorDatabaseNotBuiltError(
+                f"The vector database has no collection '{collection_name}'. "
+                "Build it with: aatm init"
+            ) from e
         self.store = ChromaVectorStore(self.collection)
         self._configure(
             top_k,

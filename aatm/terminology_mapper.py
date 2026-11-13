@@ -36,10 +36,8 @@ from aatm.registries.selectors import load_selector
 from aatm.registries.translators import load_translator
 from aatm.rerankers import BaseReranker
 from aatm.translators import BaseTranslator, EmptyTranslator
-from aatm.retrievers import BaseRetriever, ChromaDBRetriever
+from aatm.retrievers import BaseRetriever
 from aatm.selectors import FirstResultSelector, BaseSelector
-from aatm.embedding_functions import GoogleEmbeddingFunction
-from aatm.vector_db import ChromaConnection, resolve_vector_db_mode
 
 
 console = Console()
@@ -134,6 +132,8 @@ class TerminologyMapper:
             translator: Optional translator component used before retrieval. Expects a BaseTranslator or the translator id in the registry.
             retriever: Optional retriever component used to fetch candidate
                 concepts. Expects a BaseRetriever or the retriever id in the registry.
+                Defaults to the embedding model built by ``aatm init`` (the most
+                recently built one, see `aatm.built_stores`).
             selector: Optional selector component used to choose the final
                 mapped concept. Expects a BaseSelector or the selector id in the registry.
             reranker: Optional reranker component used to reorder retrieved
@@ -168,19 +168,8 @@ class TerminologyMapper:
         # Define retriever
         self.retriever: BaseRetriever
         if retriever is None:
-            if resolve_vector_db_mode() == "pinecone":
-                # Pinecone keeps one index per model (see aatm.vector_db).
-                self.retriever = load_retriever("gemini-embedding-001")
-            else:
-                # ChromaDB's default local path, or Chroma Cloud.
-                client = ChromaConnection.from_env(local_path="./chroma").client()
-                self.retriever = ChromaDBRetriever(
-                    client=client,
-                    collection_name="expressions",
-                    embedding_function=GoogleEmbeddingFunction(
-                        model="gemini-embedding-001"
-                    ),
-                )
+            # The embedding model built by `aatm init` (see aatm.built_stores).
+            self.retriever = load_retriever()
 
         elif isinstance(retriever, str):
             self.retriever = load_retriever(retriever)

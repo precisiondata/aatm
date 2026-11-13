@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import numpy as np
 from chromadb import EmbeddingFunction
 import pytest
@@ -164,6 +166,28 @@ def test_build_writes_every_row_once(fake_project):
     ids = stored_ids(fake_project)
     assert len(ids) == len(set(ids)) == 280
     assert sum(len(call) for call in FakeEmbeddingFunction.calls) == 280
+
+
+def test_build_records_the_database(fake_project, monkeypatch):
+    from aatm.built_stores import recorded_vector_databases
+
+    ldu.build_local_vector_database("fake-model", chunk_size=100)
+
+    (store,) = recorded_vector_databases()
+    assert store.embedding_model == "fake-model"
+    assert store.vector_db == "local"
+    assert store.location == ".aatm/chroma_vector_dbs/fake-model"
+    assert store.built_at
+
+    # Keeping the existing database keeps its build date.
+    later = datetime(2100, 1, 1, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        "aatm.built_stores.datetime",
+        type("Later", (), {"now": staticmethod(lambda tz: later)}),
+    )
+    answer_prompt(monkeypatch, "Skip")
+    ldu.build_local_vector_database("fake-model", chunk_size=100)
+    assert recorded_vector_databases() == [store]
 
 
 def test_repair_only_embeds_missing_rows(fake_project, monkeypatch):
@@ -391,6 +415,14 @@ def test_cloud_build_writes_to_the_model_collection(cloud_project, fake_project)
     ids = cloud_ids(cloud_project)
     assert len(ids) == len(set(ids)) == 280
     assert not fake_project.exists()  # nothing built locally
+
+    from aatm.built_stores import recorded_vector_databases
+
+    (store,) = recorded_vector_databases("cloud")
+    assert (store.embedding_model, store.location) == (
+        "fake-model",
+        "expressions-fake-model",
+    )
 
 
 def test_cloud_overwrite_deletes_the_collection(cloud_project, monkeypatch):

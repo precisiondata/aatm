@@ -190,6 +190,21 @@ def _load_trace(trace: Optional[str]) -> Optional[list[dict[str, Any]]]:
     return json.loads(trace) if trace else None
 
 
+def _default_retriever() -> Any:
+    """The retriever built by ``aatm init``, or ``None`` if nothing is built."""
+    from aatm.built_stores import NoVectorDatabaseError
+    from aatm.logs import get_logger
+    from aatm.registries.retrievers import load_retriever
+
+    try:
+        return load_retriever()
+    except NoVectorDatabaseError as e:
+        get_logger(__name__).warning(
+            f"{e} The agent searches with the vocabulary tools only."
+        )
+        return None
+
+
 class AgenticCoder:
     """`TextCoder` that codes each text with `aatm.concept_search.ConceptSearchAgent`.
 
@@ -204,8 +219,10 @@ class AgenticCoder:
             `aatm.llm.StructuredLLM`.
         retriever: The retriever for semantic search: a registry name such as
             ``"text-embedding-3-small"`` (the embedding model chosen in
-            ``aatm init``) or a `aatm.retrievers.BaseRetriever`. ``None`` leaves
-            only the vocabulary tools.
+            ``aatm init``) or a `aatm.retrievers.BaseRetriever`. ``None`` uses the
+            embedding model built by ``aatm init`` (see `aatm.built_stores`),
+            and only the vocabulary tools if no vector database is built.
+            ``False`` leaves only the vocabulary tools.
         vocabulary: The vocabulary database (path or
             `aatm.concept_search.VocabularySearch`) for lexical search, code
             lookups, concept details and hierarchy. Defaults to ``.aatm/omop.db``.
@@ -232,7 +249,11 @@ class AgenticCoder:
         from aatm.concept_search.tools import ConceptSearchTools
         from aatm.omop.vocabulary import DEFAULT_VOCABULARY_DB
 
-        if isinstance(retriever, str):
+        if retriever is False:
+            retriever = None
+        elif retriever is None:
+            retriever = _default_retriever()
+        elif isinstance(retriever, str):
             from aatm.registries.retrievers import load_retriever
 
             retriever = load_retriever(retriever)
