@@ -242,7 +242,8 @@ class TerminologyMapperCoder:
         kwargs: dict[str, Any] = {}
         if contexts is not None and self.uses_context:
             kwargs["contexts"] = list(contexts)
-        mapped = self.mapper.map(
+        # return_as="mapped_source_concepts" returns a list of MappedSourceConcept.
+        mapped: list[Any] = self.mapper.map(  # type: ignore[assignment]
             expressions=list(texts),
             return_as="mapped_source_concepts",
             save_to_disk=False,
