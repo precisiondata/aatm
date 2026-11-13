@@ -11,6 +11,8 @@ Mapping extracted entities to OMOP CDM table rows. See
 
 ::: aatm.omop.plan
 
+::: aatm.omop.pilot
+
 ::: aatm.omop.mapping
 
 ::: aatm.omop.coding
