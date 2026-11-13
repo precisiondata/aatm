@@ -298,6 +298,64 @@ choices to the next developer.
 
 ---
 
+## Editor support
+
+AATM publishes a [JSON Schema](https://json-schema.org/) for definition files. Editors
+that read it give you, while you type:
+
+- **autocompletion** of every key: entity fields, attribute fields, the OMOP tables,
+  the columns of the table you chose under `fields`, and source keys such as `from`,
+  `map` and `lookup`;
+- **descriptions on hover**, the same as in this guide;
+- **inline errors**: a misspelt key (`atributes`, `value_as_numbr`), an unknown table
+  or `context.` field, a key that is not `snake_case`, `has_parent: true` without
+  `parent_key`, a `concept` not written as `VOCABULARY:code`, or a source with both
+  `from` and `value`.
+
+Point a file at the schema with this line at the top:
+
+```yaml
+# yaml-language-server: $schema=https://precisiondata.github.io/aatm/latest/schemas/entity_definitions.schema.json
+```
+
+The predefined definitions and the examples already have it.
+
+- **VS Code**: install the [YAML extension by Red Hat](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml).
+  It reads the line above.
+- **JetBrains IDEs** (PyCharm, IntelliJ): recent versions read the line as well. If
+  yours does not, add the schema under *Settings → Languages & Frameworks → Schemas and DTDs → JSON Schema
+  Mappings*.
+- **Other editors** that use the YAML language server (Neovim, Helix, Zed, Emacs)
+  read the line too.
+
+### Offline, or pinned to your version
+
+The schema at the URL above follows the latest release. To use the schema of the
+version you have installed, or to work without network access, write it next to your
+files:
+
+```bash
+aatm schema definitions/
+```
+
+and point at the local file, with a path relative to the definition file:
+
+```yaml
+# yaml-language-server: $schema=entity_definitions.schema.json
+```
+
+### What the schema does not check
+
+The schema sees one file as plain data. Loading the file is still the full check
+(see below): it also verifies things such as a `parent_key` or `child.<key>` that
+names an entity of the file, an `attribute.<key>` or `when` label that the entity
+defines, and a `period_start` column listed before its column. The codes themselves
+are checked against the OMOP vocabulary when the table builder is created. The schema is also a little stricter than loading in one way: it reports
+unknown entity, attribute and label keys, which loading ignores, because they are
+almost always typos.
+
+---
+
 ## Checking a file before using it
 
 ### Load errors

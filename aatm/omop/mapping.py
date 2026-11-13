@@ -138,7 +138,40 @@ class MapSpec(BaseModel):
 
 
 class FieldSource(BaseModel):
-    """Where one column's value comes from. See the module docstring."""
+    """Where one column's value comes from: ``from``, ``value`` or ``concept``.
+
+    See `aatm.omop.mapping` for examples.
+
+    Attributes:
+        from: Where in the note the value comes from: ``text`` (the mention),
+            ``attribute.<key>`` (the label of an attribute), ``child.<key>`` (the text
+            of the first child mention with that key) or ``context.<name>`` (a value
+            given with the note, e.g. ``context.person_id``). Use exactly one of
+            ``from``, ``value`` and ``concept``.
+        value: A fixed value, e.g. the type concept id ``32858`` (NLP).
+        concept: A concept written as ``<VOCABULARY>:<code>``, e.g.
+            ``"SNOMED:423740007"``. The column gets its concept id, looked up in the
+            local OMOP vocabulary database.
+        concepts: With ``from: attribute.<key>``, the concept of each label, e.g.
+            ``{positive: "SNOMED:10828004"}``. The column gets the concept id instead
+            of the label.
+        maps_to: Replace the concept by the standard concept it maps to ("Maps to"),
+            as the CDM requires for ``*_concept_id`` columns. Needs ``concept`` or
+            ``concepts``.
+        map: Code the text with the terminology mapper (translation, retrieval,
+            reranking, selection), e.g. ``{domain: Measurement, min_score: 0.8}``.
+        lookup: Find the text as a code of this vocabulary, e.g. ``UCUM`` for the unit
+            ``"mg/dL"``.
+        as: Convert the value: ``int``, ``float``, ``str``, ``date`` (parsed from text
+            such as "March 2024") or ``days`` (a duration such as "2 weeks", as a number
+            of days).
+        period_start: A date column listed before this one. The value is a number of
+            days N, and this column gets that date plus N - 1 days: the end of an N-day
+            period.
+        when: Use this source only for mentions whose attribute has one of these
+            labels, e.g. ``{attribute.status: [current]}``; otherwise the next source
+            is tried.
+    """
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -279,7 +312,15 @@ class FieldSource(BaseModel):
 
 
 class OmopMapping(BaseModel):
-    """The ``omop`` block of an entity definition: one table row per mention."""
+    """The ``omop`` block of an entity definition: one table row per mention.
+
+    Attributes:
+        table: The OMOP CDM table each mention becomes a row of, e.g.
+            ``measurement``.
+        fields: The source of each column, e.g. ``person_id: {from:
+            context.person_id}``, or a list of sources: the first one with a value
+            wins.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

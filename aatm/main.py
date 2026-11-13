@@ -38,6 +38,10 @@ The CLI is responsible for orchestrating high-level workflows such as:
     Check whether local models can use a GPU and print the commands that
     enable it.
 
+- `schema`:
+    Write the JSON Schema of entity definition files, for autocompletion
+    and inline errors in editors.
+
 Attributes:
     LOCAL_HELPER_PATH (Path): Path to the local helper directory used by AATM
         to store generated artifacts and local resources.
@@ -1079,6 +1083,40 @@ def doctor() -> None:
 
     if diagnosis.status == "action":
         raise typer.Exit(code=1)
+
+
+@app.command(
+    "schema",
+    help="Write the JSON Schema of entity definition files, for editor support offline.",
+)
+def schema(
+    directory: Annotated[
+        Path,
+        typer.Argument(
+            help="Directory to write entity_definitions.schema.json to.",
+        ),
+    ] = Path("."),
+) -> None:
+    """Write ``entity_definitions.schema.json`` and print how to use it.
+
+    Editors such as VS Code (with the Red Hat YAML extension) then autocomplete
+    entity definition files and underline mistakes. The same schema is published at
+    `aatm.data_models.entity_schema.SCHEMA_URL`; a local copy works offline and
+    always matches the installed version of AATM.
+    """
+    from aatm.data_models.entity_schema import write_schema
+
+    path = write_schema(directory)
+    console.print(f"Wrote {path.as_posix()}")
+    console.print(
+        "Add this line at the top of a definition file, with the path relative to it:"
+    )
+    console.print(
+        f"# yaml-language-server: $schema={path.name}",
+        markup=False,
+        highlight=False,
+        soft_wrap=True,
+    )
 
 
 vector_db_app = typer.Typer(
