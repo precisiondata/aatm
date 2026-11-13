@@ -587,9 +587,7 @@ def test_terminology_mapper_coder_passes_contexts_to_an_agentic_selector(
     coder = TerminologyMapperCoder(mapper)
     assert coder.uses_context
 
-    builder = OmopTableBuilder(
-        lab_definitions(), vocabulary=UnitLookup(), coder=mapper
-    )
+    builder = OmopTableBuilder(lab_definitions(), vocabulary=UnitLookup(), coder=mapper)
     tables = run(
         builder,
         "creatinine 1.4 mg/dL",

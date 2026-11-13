@@ -411,9 +411,7 @@ def test_terminology_mapper_without_filter_is_unchanged(tmp_path):
 
 def test_builder_wraps_a_terminology_mapper(tmp_path):
     mapper = TerminologyMapper(retriever=RecordingRetriever(), output_dir=tmp_path)
-    builder = OmopTableBuilder(
-        lab_definitions(), vocabulary=UnitLookup(), coder=mapper
-    )
+    builder = OmopTableBuilder(lab_definitions(), vocabulary=UnitLookup(), coder=mapper)
     assert isinstance(builder.coder, TerminologyMapperCoder)
     tables = run(builder, "Hb 11", [lab("e1", "Hb")])
     assert tables.rows["measurement"][0].measurement_concept_id == 3000963
