@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import sqlite3
 
 import pandas as pd
@@ -361,6 +362,8 @@ def test_help_shows_every_default(cli):
         main.app, ["omop", "run", "--help"], env={"COLUMNS": "200"}
     )
     assert result.exit_code == 0
+    # CI forces colours on: drop the ANSI codes that split the option names.
+    text = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     for option in ("--chunk-size", "--max-attempts", "--coder", "--poll-every"):
-        assert option in result.output
-    assert "[default: (100)]" in result.output
+        assert option in text
+    assert "[default: (100)]" in text
