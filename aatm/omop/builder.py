@@ -821,17 +821,32 @@ class OmopTableBuilder:
             for (text, context_key), result in zip(ordered, results):
                 coded[(key, text, context_key)] = result
 
-        # Coders may not return concept names (TerminologyMapperCoder does not):
-        # add them for review.
-        unnamed = {
-            c.concept_id for c in coded.values() if c.concept_id and not c.concept_name
-        }
-        if unnamed and self.vocabulary is not None:
-            names = self.vocabulary.by_id(unnamed)
-            for c in coded.values():
-                if c.concept_id in names and not c.concept_name:
-                    c.concept_name = names[c.concept_id].concept_name
+        self._check_against_vocabulary(
+            [c for (key, _, _), c in coded.items() if key[0] == "map"]
+        )
         return coded
+
+    def _check_against_vocabulary(self, results: list[CodedText]) -> None:
+        """Take each coded concept's standard flag and domain from the vocabulary.
+
+        Coders report them from their own index, which may be wrong: a
+        `TerminologyMapperCoder` marks every concept standard, as the indexes
+        ``aatm init`` builds hold only standard concepts, but a custom retriever's
+        index may not. The builder then stores ``0`` for a non-standard concept, and
+        reports a domain mismatch, as for any coder. Names are added for review, as
+        some coders do not return them.
+        """
+        ids = {c.concept_id for c in results if c.concept_id}
+        if not ids or self.vocabulary is None:
+            return
+        known = self.vocabulary.by_id(ids)
+        for c in results:
+            concept = known.get(c.concept_id) if c.concept_id else None
+            if concept is None:
+                continue
+            c.concept_name = c.concept_name or concept.concept_name
+            c.standard = concept.is_standard
+            c.domain_id = concept.domain_id
 
     def _lookup_codes(self, vocabulary_id: str, texts: list[str]) -> list[CodedText]:
         """Find texts as codes of a vocabulary: an exact match, else one standard match ignoring case."""
