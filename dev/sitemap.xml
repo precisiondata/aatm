@@ -5,11 +5,19 @@
          <lastmod>2026-11-13</lastmod>
     </url>
     <url>
+         <loc>https://precisiondata.github.io/aatm/dev/release_notes/</loc>
+         <lastmod>2026-11-13</lastmod>
+    </url>
+    <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/</loc>
          <lastmod>2026-11-13</lastmod>
     </url>
     <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/artifacts/</loc>
+         <lastmod>2026-11-13</lastmod>
+    </url>
+    <url>
+         <loc>https://precisiondata.github.io/aatm/dev/getting-started/coding_text/</loc>
          <lastmod>2026-11-13</lastmod>
     </url>
     <url>
@@ -25,7 +33,19 @@
          <lastmod>2026-11-13</lastmod>
     </url>
     <url>
+         <loc>https://precisiondata.github.io/aatm/dev/getting-started/high_level/</loc>
+         <lastmod>2026-11-13</lastmod>
+    </url>
+    <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/installation/</loc>
+         <lastmod>2026-11-13</lastmod>
+    </url>
+    <url>
+         <loc>https://precisiondata.github.io/aatm/dev/getting-started/large_datasets/</loc>
+         <lastmod>2026-11-13</lastmod>
+    </url>
+    <url>
+         <loc>https://precisiondata.github.io/aatm/dev/getting-started/low_level/</loc>
          <lastmod>2026-11-13</lastmod>
     </url>
     <url>
@@ -41,7 +61,15 @@
          <lastmod>2026-11-13</lastmod>
     </url>
     <url>
+         <loc>https://precisiondata.github.io/aatm/dev/getting-started/quick_start_omop/</loc>
+         <lastmod>2026-11-13</lastmod>
+    </url>
+    <url>
          <loc>https://precisiondata.github.io/aatm/dev/getting-started/quick_start_python_api/</loc>
+         <lastmod>2026-11-13</lastmod>
+    </url>
+    <url>
+         <loc>https://precisiondata.github.io/aatm/dev/getting-started/setup/</loc>
          <lastmod>2026-11-13</lastmod>
     </url>
     <url>
