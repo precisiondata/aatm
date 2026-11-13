@@ -26,8 +26,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, get_args
 
 import asyncio
+import inspect
 import re
 import time
+import warnings
 
 import pandas as pd
 from dateutil import parser as date_parser
@@ -43,9 +45,9 @@ from aatm.logs import get_logger
 from aatm.omop.cache import CachedCoder, CacheStats, CodingCache, as_cache
 from aatm.omop.coding import (
     CodedText,
-    TerminologyMapperCoder,
     TextCoder,
-    uses_context,
+    as_coder,
+    reads_context,
 )
 from aatm.omop.mapping import ClinicalNote, ConceptRef, FieldSource, OmopMapping
 from aatm.omop.tables import OMOP_TABLES, OmopTableRow
@@ -57,7 +59,10 @@ from aatm.omop.vocabulary import (
 )
 
 if TYPE_CHECKING:
+    from aatm.extractors.attribute_labeller import DecisionAttributeLabeller
+    from aatm.llm.base import LLMSettings
     from aatm.llm.usage import Prices
+    from aatm.terminology_mapper import TerminologyMapper
     from aatm.omop.plan import RunPlan
     from aatm.omop.runner import RunSummary
 
@@ -133,7 +138,7 @@ class ConceptMapping(BaseModel):
         vocabulary_id: Its vocabulary.
         concept_code: Its code.
         domain_id: Its domain.
-        score: The mapper's confidence, for ``"map"``.
+        score: The coder's confidence, for ``"map"``.
         stored: The value stored in the column: the concept id, or ``0`` when the
             mapping was rejected.
         rationale: Why the concept was chosen, when the coder explains its choice
@@ -393,10 +398,11 @@ class OmopTableBuilder:
             ``aatm init`` (default ``.aatm/omop.db``) or a `ConceptLookup`.
         dayfirst: Read ambiguous dates such as "05/12/2025" as day first (12 May would
             be month first).
-        mapper: Codes ``map`` sources: a configured
-            `aatm.terminology_mapper.TerminologyMapper`, or any `TextCoder`. Required
-            when a mapping uses ``map``.
-        cache: Keep the mapper's results across batches and runs: ``True`` for the
+        coder: Codes ``map`` sources: a configured
+            `aatm.terminology_mapper.TerminologyMapper` (wrapped in a
+            `aatm.omop.TerminologyMapperCoder`), an `aatm.omop.AgenticCoder`, or any
+            `aatm.omop.coding.TextCoder`. Required when a mapping uses ``map``.
+        cache: Keep the coder's results across batches and runs: ``True`` for the
             default file (``.aatm/coding_cache.db``), a path, or a
             `aatm.omop.CodingCache` (to set a size limit). ``None`` (default) or
             ``False`` turns it off. Results are only reused for identical inputs; see
@@ -405,7 +411,11 @@ class OmopTableBuilder:
     Raises:
         ValueError: If no definition has an ``omop`` block, or a concept is unknown,
             has no single standard mapping, or belongs to the wrong domain, or a
-            ``map`` source has no mapper or an unsupported vocabulary or domain.
+            ``map`` source has no coder or an unsupported vocabulary or domain.
+        TypeError: If `coder` is neither a `TerminologyMapper` nor a `TextCoder`.
+
+    ``mapper=`` is the former name of ``coder=``. It still works, with a
+    `DeprecationWarning`, and will be removed in a later minor version.
     """
 
     def __init__(
@@ -413,9 +423,12 @@ class OmopTableBuilder:
         entity_definitions: EntityDefinitions,
         vocabulary: ConceptLookup | str | Path = DEFAULT_VOCABULARY_DB,
         dayfirst: bool = False,
-        mapper: Any = None,
+        coder: "TextCoder | TerminologyMapper | None" = None,
         cache: CodingCache | str | Path | bool | None = None,
+        *,
+        mapper: Any = None,
     ):
+        coder = _renamed_coder(coder, mapper)
         self.entity_definitions = entity_definitions
         self.dayfirst = dayfirst
         self.mappings: dict[str, OmopMapping] = {
@@ -442,16 +455,15 @@ class OmopTableBuilder:
                 if isinstance(vocabulary, (str, Path))
                 else vocabulary
             )
+        # Checked first, so a wrong object fails before any model call.
         self.coder: Optional[TextCoder] = None
-        if mapper is not None:
-            self.coder = (
-                mapper if hasattr(mapper, "code") else TerminologyMapperCoder(mapper)
-            )
+        if coder is not None:
+            self.coder = as_coder(coder)
         store = as_cache(cache)
         if store is not None and self.coder is not None:
             if isinstance(self.coder, CachedCoder):
                 raise ValueError(
-                    "The mapper is already a CachedCoder: pass it without 'cache'"
+                    "The coder is already a CachedCoder: pass it without 'cache'"
                 )
             self.coder = CachedCoder(self.coder, store)
         # Configuration checks first: they are cheap and need no database.
@@ -475,8 +487,9 @@ class OmopTableBuilder:
                 continue
             if self.coder is None:
                 raise ValueError(
-                    f"{where} uses 'map', so the builder needs a terminology mapper: "
-                    "OmopTableBuilder(..., mapper=TerminologyMapper(...))"
+                    f"{where} uses 'map', so the builder needs a coder: "
+                    "OmopTableBuilder(..., coder=TerminologyMapper(...)), or an "
+                    "AgenticCoder or another TextCoder"
                 )
             unknown = set(source.map.vocabularies or []) - indexed
             if unknown:
@@ -704,7 +717,7 @@ class OmopTableBuilder:
 
     @property
     def _coder_uses_context(self) -> bool:
-        return self.coder is not None and uses_context(self.coder)
+        return self.coder is not None and reads_context(self.coder)
 
     def _context(
         self,
@@ -808,7 +821,8 @@ class OmopTableBuilder:
             for (text, context_key), result in zip(ordered, results):
                 coded[(key, text, context_key)] = result
 
-        # The mapper does not return concept names: add them for review.
+        # Coders may not return concept names (TerminologyMapperCoder does not):
+        # add them for review.
         unnamed = {
             c.concept_id for c in coded.values() if c.concept_id and not c.concept_name
         }
@@ -1039,7 +1053,7 @@ class OmopTableBuilder:
         )
         result = ctx.coded.get((key, text, context_key)) or CodedText(text=text)
         how = (
-            f"the terminology mapper ({', '.join(key[2]) or 'all vocabularies'})"
+            f"the coder ({', '.join(key[2]) or 'all vocabularies'})"
             if method == "map"
             else f"a {key[1]} code lookup"
         )
@@ -1203,6 +1217,50 @@ def _check_unique_keys(loaded: list[tuple[str, EntityDefinitions]]) -> None:
     )
 
 
+def _renamed_coder(coder: Any, mapper: Any) -> Any:
+    """The ``coder`` argument, accepting the deprecated ``mapper`` alias."""
+    if mapper is None:
+        return coder
+    if coder is not None:
+        raise TypeError("Pass the coder as coder=..., not both coder= and mapper=")
+    warnings.warn(
+        "mapper= is deprecated and will be removed in a later minor version: pass "
+        "coder= instead (it takes the same TerminologyMapper or TextCoder)",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    return mapper
+
+
+# Set by the pipeline itself, so not accepted in **extractor_kwargs.
+_PIPELINE_SETS = ("model_id", "entity_definitions")
+
+
+def _check_extractor_kwargs(extractor: Any, extractor_kwargs: dict[str, Any]) -> None:
+    """Reject extractor arguments that `SimpleLLMExtractor` would not take or use."""
+    if not extractor_kwargs:
+        return
+    names = sorted(extractor_kwargs)
+    if extractor is not None:
+        raise TypeError(
+            f"{', '.join(names)} configure the default SimpleLLMExtractor, so they "
+            "would be ignored with extractor=...: set them on your extractor instead"
+        )
+    from aatm.extractors import SimpleLLMExtractor
+
+    valid = sorted(
+        name
+        for name in inspect.signature(SimpleLLMExtractor.__init__).parameters
+        if name not in ("self", *_PIPELINE_SETS)
+    )
+    unknown = [n for n in names if n not in valid]
+    if unknown:
+        raise TypeError(
+            "OmopExtractionPipeline got unknown extractor argument(s) "
+            f"{', '.join(map(repr, unknown))}. Valid: {', '.join(valid)}"
+        )
+
+
 class OmopExtractionPipeline:
     """Extract entities from notes and build OMOP CDM tables in one call.
 
@@ -1216,9 +1274,31 @@ class OmopExtractionPipeline:
         extractor: A ready-made extractor, e.g. a configured `SimpleLLMExtractor`.
         vocabulary: See `OmopTableBuilder`.
         dayfirst: See `OmopTableBuilder`.
-        mapper: See `OmopTableBuilder`.
+        coder: Codes ``map`` sources: a `aatm.terminology_mapper.TerminologyMapper`,
+            an `aatm.omop.AgenticCoder` or any `aatm.omop.coding.TextCoder`. See
+            `OmopTableBuilder`.
         cache: See `OmopTableBuilder`. Off by default.
-        **extractor_kwargs: Passed to `SimpleLLMExtractor`, e.g. ``max_concurrency``.
+        attribute_labeller: Labels the attributes of each mention (e.g. negated,
+            family member) with a decision model instead of the extraction model:
+            a `aatm.extractors.DecisionAttributeLabeller`. See
+            `SimpleLLMExtractor`.
+        max_concurrency: Notes extracted at the same time. ``None`` (default)
+            leaves it to the model's provider limits.
+        settings: Generation settings of the extraction model
+            (`aatm.llm.LLMSettings` or a dict), e.g. ``{"temperature": 0}`` on
+            models that accept it.
+        **extractor_kwargs: Other `SimpleLLMExtractor` arguments, e.g.
+            ``instructions``, ``on_error``, ``max_segment_chars``, ``api_key``,
+            ``base_url``. An unknown name raises a `TypeError` listing the valid
+            ones.
+
+    Raises:
+        TypeError: If `coder` is neither a `TerminologyMapper` nor a `TextCoder`,
+            an extractor argument is unknown, or extractor arguments are given with
+            `extractor` (they would be ignored).
+
+    ``mapper=`` is the former name of ``coder=``. It still works, with a
+    `DeprecationWarning`, and will be removed in a later minor version.
     """
 
     def __init__(
@@ -1231,17 +1311,31 @@ class OmopExtractionPipeline:
         extractor: Any = None,
         vocabulary: ConceptLookup | str | Path = DEFAULT_VOCABULARY_DB,
         dayfirst: bool = False,
-        mapper: Any = None,
+        coder: "TextCoder | TerminologyMapper | None" = None,
         cache: CodingCache | str | Path | bool | None = None,
+        *,
+        attribute_labeller: Optional["DecisionAttributeLabeller"] = None,
+        max_concurrency: Optional[int] = None,
+        settings: "LLMSettings | dict[str, Any] | None" = None,
+        mapper: Any = None,
         **extractor_kwargs: Any,
     ):
+        coder = _renamed_coder(coder, mapper)
+        explicit = {
+            "attribute_labeller": attribute_labeller,
+            "max_concurrency": max_concurrency,
+            "settings": settings,
+        }
+        extractor_kwargs.update({k: v for k, v in explicit.items() if v is not None})
+        # Checked before anything is built, so a typo fails at once.
+        _check_extractor_kwargs(extractor, extractor_kwargs)
         entity_definitions = _load_definitions(entity_definitions)
         self.entity_definitions = entity_definitions
         self.builder = OmopTableBuilder(
             entity_definitions,
             vocabulary=vocabulary,
             dayfirst=dayfirst,
-            mapper=mapper,
+            coder=coder,
             cache=cache,
         )
         if extractor is None:
@@ -1263,7 +1357,7 @@ class OmopExtractionPipeline:
             ClinicalNote(text=n) if isinstance(n, str) else n for n in notes
         ]
         results = await self.extractor([n.text for n in clinical_notes])
-        # Building may call the terminology mapper, which blocks: keep the loop free.
+        # Building may call the coder, which blocks: keep the loop free.
         return await asyncio.to_thread(
             self.builder.build, clinical_notes, results, id_start
         )
