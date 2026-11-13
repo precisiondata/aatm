@@ -27,8 +27,9 @@ on its *entity definitions*.
    ([CLI quick start](quick_start_cli.md#1-get-your-omop-vocabularies)). It downloads
    and unpacks the bundle, then builds the local
    vocabulary database (`.aatm/omop.db`), which every example on this page reads, and
-   the search index the terminology mapper uses. Note the embedding model you choose
-   (for example `text-embedding-3-small`): you pass the same name to the mapper later.
+   the search index the terminology mapper uses. It records the embedding model you
+   choose (for example `text-embedding-3-small`) in `.aatm/config.yaml`, and the
+   mapper uses that index unless you pass another `retriever`.
 4. **Set an API key** for the model provider, e.g. `OPENAI_API_KEY`
    ([Environment variables](env.md)).
 
@@ -389,7 +390,7 @@ from aatm.selectors import OpenAILLMSelector
 from aatm.terminology_mapper import TerminologyMapper
 
 mapper = TerminologyMapper(
-    retriever="text-embedding-3-small",          # the embedding model chosen in `aatm init`
+    retriever="text-embedding-3-small",          # optional: defaults to the model built by `aatm init`
     selector=OpenAILLMSelector("gpt-5-mini"),    # an LLM picks among the candidates
 )
 mapper.retriever.top_k = 30                      # how many candidates it sees
@@ -446,7 +447,7 @@ from aatm.omop import AgenticCoder, ClinicalNote, OmopExtractionPipeline
 
 coder = AgenticCoder(
     "openai/gpt-5-mini",                 # any aatm.llm model id
-    retriever="text-embedding-3-small",  # the embedding model chosen in `aatm init`
+    retriever="text-embedding-3-small",  # optional: defaults to the model built by `aatm init`
     max_tool_calls=8,                    # per text
 )
 pipeline = OmopExtractionPipeline("lab_results", model_id="openai/gpt-5-mini", mapper=coder)
@@ -1290,7 +1291,9 @@ column. `OmopTableBuilder.build(..., row_ids="note")` numbers rows the same way.
 | `'weight_val' is not a child entity of 'body_weight'` | `from: child.<key>` names an entity that is not a child of this one | Use the child's `key`, and check its `parent_key` |
 | `... uses 'map', so the builder needs a terminology mapper` | The definition codes text, but no mapper was given | Pass `mapper=TerminologyMapper(...)` |
 | `SyntaxError: 'await' outside function` | `await` used in a script | Use `asyncio.run(pipeline(notes))`, or run it in a notebook |
-| Every `map` is `unmapped` | The mapper found no candidates, e.g. the search index for its retriever was not built | Use the embedding model you chose in `aatm init` as the `retriever` |
+| `No vector database for 'text-embedding-3-large' (...). Built and ready: ...` | `retriever` names an embedding model whose search index was not built (or is empty) | Use a model the message lists as built, leave `retriever` out to use the one `aatm init` built, or build it with the `aatm init` command shown |
+| `Several vector databases are built and none is recorded in .aatm/config.yaml` | No `retriever` was given, and indexes built before `.aatm/config.yaml` existed leave the choice open | Pass `retriever="<model>"`, or run `aatm init --embedding-model <model>` and choose Skip to record it |
+| `No vector database is built in local mode, so there is no retriever to default to` | `aatm init` has not built a search index here, or `AATM_VECTOR_DB` points to another vector database | Run `aatm init`, or set `AATM_VECTOR_DB` to where the index lives |
 | `... has no cache_identity(): pass identity=...` | `cache=` was given with a custom coder that does not describe itself | Add a `cache_identity()` method, or wrap it in `CachedCoder(coder, cache, identity=...)` |
 | `Coding cache ...: the vocabulary or search index of this coder changed since N results were cached` | The vocabulary database or index was rebuilt; the old results are no longer used | Nothing is wrong; run the `aatm cache clear --coder ...` it shows to free their space |
 | `Coding cache ...: changes to the content of ... cannot be detected` | A retriever whose data the cache cannot fingerprint | After rebuilding its index, run `aatm cache clear` |
