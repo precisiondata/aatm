@@ -434,11 +434,22 @@ def test_location_is_one_index_per_model(pinecone_env, monkeypatch):
     assert name == "aatm-expressions-fake-model"
 
 
+def built_index(connection, name, tags=None):
+    """Create a Pinecone index with one record: built and not empty."""
+    client = connection.client()
+    create_pinecone_index(client, name, 4, "aws", "us-east-1", tags=tags)
+    store = PineconeVectorStore.open(client, name)
+    store.write(
+        ["0"],
+        np.ones((1, 4), dtype=np.float32),
+        ["expression 0"],
+        [record_metadata(0, "Measurement")],
+    )
+
+
 def test_load_retriever_opens_the_models_index(pinecone_env, monkeypatch):
     register(monkeypatch, "fake-model", FakeEmbeddingFunction)
-    create_pinecone_index(
-        pinecone_env.client(), "aatm-expressions-fake-model", 4, "aws", "us-east-1"
-    )
+    built_index(pinecone_env, "aatm-expressions-fake-model")
 
     retriever = registry.load_retriever("fake-model", top_k=3)
 
@@ -451,8 +462,37 @@ def test_load_retriever_opens_the_models_index(pinecone_env, monkeypatch):
 def test_load_retriever_explains_a_missing_index(pinecone_env, monkeypatch):
     register(monkeypatch, "fake-model", FakeEmbeddingFunction)
 
-    with pytest.raises(ValueError, match="aatm init --vector-db pinecone"):
+    with pytest.raises(ValueError, match="--vector-db pinecone") as error:
         registry.load_retriever("fake-model")
+    assert "Pinecone has no index 'aatm-expressions-fake-model'" in str(error.value)
+    assert "aatm vector-db upload --to pinecone -e fake-model" in str(error.value)
+
+
+def test_load_retriever_refuses_an_empty_index(pinecone_env, monkeypatch):
+    register(monkeypatch, "fake-model", FakeEmbeddingFunction)
+    create_pinecone_index(
+        pinecone_env.client(), "aatm-expressions-fake-model", 4, "aws", "us-east-1"
+    )
+
+    with pytest.raises(ValueError, match="is empty"):
+        registry.load_retriever("fake-model")
+
+
+def test_a_missing_index_lists_the_built_ones(pinecone_env, monkeypatch):
+    register(monkeypatch, "fake-model", FakeEmbeddingFunction)
+    register(monkeypatch, "fake-other", FakeEmbeddingFunction)
+    built_index(pinecone_env, "aatm-expressions-fake-other")
+
+    with pytest.raises(ValueError) as error:
+        registry.load_retriever("fake-model")
+
+    message = str(error.value)
+    assert "Built and ready:" in message
+    assert (
+        "fake-other  pinecone  index aatm-expressions-fake-other  (1 expressions)"
+        in message
+    )
+    assert 'Use retriever="fake-other"' in message
 
 
 def test_queries_are_encoded_in_the_indexs_precision(pinecone_env, monkeypatch):
@@ -464,12 +504,9 @@ def test_queries_are_encoded_in_the_indexs_precision(pinecone_env, monkeypatch):
     )
     FakeLocalModel.loaded_dtypes = []
     register(monkeypatch, "fake-local", FakeLocalModel)
-    create_pinecone_index(
-        pinecone_env.client(),
+    built_index(
+        pinecone_env,
         "aatm-expressions-fake-local",
-        4,
-        "aws",
-        "us-east-1",
         tags={"aatm_embedding_dtype": "bfloat16"},
     )
 

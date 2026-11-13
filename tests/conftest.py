@@ -32,3 +32,12 @@ def _local_vector_db_by_default(monkeypatch):
         PINECONE_REGION_ENV_VAR,
     ):
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _record_built_stores_in_tmp(monkeypatch, tmp_path_factory):
+    """Keep the tests' records of built vector databases out of ``.aatm/config.yaml``."""
+    from aatm import built_stores
+
+    path = tmp_path_factory.mktemp("aatm") / "config.yaml"
+    monkeypatch.setattr(built_stores, "CONFIG_PATH", path)

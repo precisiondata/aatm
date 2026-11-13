@@ -183,6 +183,12 @@ def test_load_retriever_queries_the_cloud_collection(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ChromaConnection, "client", lambda self: fake_cloud(cloud_dir).client()
     )
+    collection = (
+        fake_cloud(cloud_dir)
+        .client()
+        .create_collection("expressions-fake-model", embedding_function=None)
+    )
+    collection.add(ids=["0"], embeddings=[[1.0, 1.0, 1.0]], documents=["x"])
 
     retriever = retrievers.load_retriever("fake-model", top_k=3)
 

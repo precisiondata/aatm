@@ -164,7 +164,9 @@ def recorded_vector_databases(vector_db: str | None = None) -> list[BuiltStore]:
                 built_at=str(entry["built_at"]) if entry.get("built_at") else None,
             )
         )
-    return sorted(stores, key=lambda s: s.built_at or "", reverse=True)
+    # Newest first; of two built in the same second, the one recorded last.
+    order = {id(store): i for i, store in enumerate(stores)}
+    return sorted(stores, key=lambda s: (s.built_at or "", order[id(s)]), reverse=True)
 
 
 # --- what is built -----------------------------------------------------------------
@@ -193,7 +195,7 @@ def _store_status(spec: Any, mode: VectorDbMode, local_path: str | None = None):
     connection, collection_name = spec.chroma_location(mode, local_path)
     if mode == "local":
         # Opening a local client would create the directory: check it first.
-        location = local_path or spec.chromadb_path
+        location = Path(local_path or spec.chromadb_path).as_posix()
         if not Path(location).exists():
             return location, None, f"{location} not found"
         where = f"{location} has"
