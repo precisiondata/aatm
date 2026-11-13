@@ -320,6 +320,7 @@ def _estimate(
         )
         return estimate
 
+    seconds: Optional[float]
     if timed and concurrency:
         per_call = call_seconds / timed
         extract_s = to_extract * per_call / concurrency
