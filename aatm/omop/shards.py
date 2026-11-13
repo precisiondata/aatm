@@ -239,6 +239,16 @@ def combine_summaries(
         "issues",
     ):
         setattr(combined, name, sum(getattr(s, name) for s in summaries))
+    settings = [s.settings for s in summaries]
+    if all(settings):
+        # Shards run side by side: their calls in flight add up.
+        caps = [s.max_concurrency for s in settings]  # type: ignore[union-attr]
+        combined.settings = settings[0].model_copy(  # type: ignore[union-attr]
+            update={
+                "max_concurrency": None if None in caps else sum(caps),  # type: ignore[arg-type]
+                "shard": "0/1",
+            }
+        )
     totals = [s.total for s in summaries]
     combined.total = None if None in totals else sum(t or 0 for t in totals)
     for summary in summaries:

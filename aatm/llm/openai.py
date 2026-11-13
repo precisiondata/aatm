@@ -230,6 +230,7 @@ class OpenAICompatibleLLM:
     ):
         self.model = model
         self.model_id = f"{provider}/{model}"
+        self.base_url = base_url
         self.settings = settings or LLMSettings()
         # Local servers usually need no key, but the OpenAI client requires one. One
         # client per event loop: openai 3.x binds its connection pool to the first.

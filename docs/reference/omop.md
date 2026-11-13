@@ -9,6 +9,8 @@ Mapping extracted entities to OMOP CDM table rows. See
 
 ::: aatm.omop.shards
 
+::: aatm.omop.plan
+
 ::: aatm.omop.mapping
 
 ::: aatm.omop.coding
