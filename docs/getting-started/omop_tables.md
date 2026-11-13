@@ -378,8 +378,10 @@ The predefined `lab_results` definition codes the test name this way:
         map: {}          # any standard concept of the column's domain (Measurement)
 ```
 
-The YAML says **what** to code. Your code chooses **how**, by configuring the mapper,
-because that involves search models, LLMs and API keys:
+The YAML says **what** to code. Your code chooses **how**, by passing a **coder**,
+because that involves search models, LLMs and API keys. `coder=` takes a configured
+`TerminologyMapper`, the [agent](#searching-with-an-agent) (`AgenticCoder`), or a
+[coder of your own](#writing-your-own-coder):
 
 ```python
 import asyncio
@@ -418,6 +420,14 @@ How it works:
 - **`min_score`** (`map: {min_score: 0.8}`) stores `0` and reports `low_confidence`
   below that score. Scores depend on the retriever, so look at real scores in
   `mappings_dataframe()` before choosing a threshold.
+- **Every concept is checked against the vocabulary database.** A concept that is not
+  standard is stored as `0` and reported `unmapped`; one of another domain is reported
+  `domain_mismatch`. The indexes `aatm init` builds hold only standard concepts, but a
+  retriever over an index of your own may not.
+
+!!! note "`mapper=` is now `coder=`"
+    Earlier versions called this argument `mapper=`. It still works, with a
+    `DeprecationWarning`, and will be removed in a later minor version.
 
 !!! warning "Review the mappings"
     Short names are ambiguous. In a small test with nine lab results, the default
@@ -538,6 +548,71 @@ terminology mapping and a mapper you already configured can use it:
 `TerminologyMapper(retriever=..., selector=AgenticSelector("openai/gpt-5-mini"))`. In a
 builder, that mapper also receives the context.
 
+### Writing your own coder
+
+A coder is any object with a `code` method that returns one `CodedText` per text, in
+order (the `TextCoder` protocol). The builder calls it once per domain and
+vocabularies, with each distinct text once:
+
+```python
+from aatm.omop import CodedText, OmopExtractionPipeline
+
+
+class DictionaryCoder:
+    """Codes the texts of a local dictionary: text -> concept_id."""
+
+    def __init__(self, concept_ids: dict[str, int]):
+        self.concept_ids = concept_ids
+
+    def code(self, texts, domain=None, vocabularies=None):
+        return [
+            CodedText(text=t, concept_id=self.concept_ids.get(t.lower()), score=1.0)
+            for t in texts
+        ]
+
+
+pipeline = OmopExtractionPipeline(
+    "lab_results",
+    model_id="openai/gpt-5-mini",
+    coder=DictionaryCoder({"hb": 3000963, "creatinine": 3016723}),
+)
+```
+
+Leave `concept_id` as `None` when nothing fits; the builder stores `0` and reports
+`unmapped`. You need not fill `concept_name`, `domain_id` or `standard`: the builder
+takes them from the vocabulary database. Set `error` when coding failed, so the result
+is not cached.
+
+Two optional protocols add what the built-in coders do:
+
+- **`ContextualTextCoder`**: a `uses_context` attribute (or property) and a `contexts`
+  argument to `code`. When `uses_context` is true, the builder passes one
+  `CodingContext` per text (related values such as the unit, the sentence of the note,
+  the target column), and codes each distinct text *in its context* once.
+- **`CacheableCoder`**: a `cache_identity()` method returning JSON-compatible values
+  that cover everything that changes the results (models, settings, prompts, index),
+  so `cache=True` can reuse them. See [custom coders](#keeping-results-across-runs) in
+  the cache section.
+
+```python
+class ContextualDictionaryCoder(DictionaryCoder):
+    uses_context = True
+
+    def code(self, texts, domain=None, vocabularies=None, contexts=None):
+        # contexts[i].related holds the mention's other values, e.g. {"lab_unit": "g/dL"}
+        return super().code(texts, domain, vocabularies)
+
+    def cache_identity(self):
+        return {"coder": "ContextualDictionaryCoder", "concept_ids": self.concept_ids}
+```
+
+The builder checks the coder when it is created: an object that is neither a
+`TerminologyMapper` nor has a `code` method (a retriever, a selector, a model name)
+raises a `TypeError` before any note is processed. `isinstance(obj, TextCoder)` and
+the other two protocols tell you which parts an object implements, and
+`mapper.as_coder()` returns the `TerminologyMapperCoder` a `TerminologyMapper` is
+wrapped in.
+
 ### Keeping results across runs
 
 Coding is usually the most expensive step. Without a cache, every batch and every rerun
@@ -627,8 +702,10 @@ aatm cache clear --coder <hash>
     must stay reproducible, and clear the cache when you change it.
 
 **Custom coders.** A coder of your own is cached when it has a `cache_identity()`
-method returning JSON-compatible values that cover everything that changes its results.
-Otherwise wrap it yourself and say what it is:
+method (the `CacheableCoder` protocol, see
+[Writing your own coder](#writing-your-own-coder)) returning JSON-compatible values
+that cover everything that changes its results. Otherwise wrap it yourself and say
+what it is:
 `CachedCoder(my_coder, cache, identity={"name": "my_coder", "version": 2})`.
 
 ### Rate limits for long runs
@@ -1054,6 +1131,14 @@ summary = asyncio.run(
 print(summary)  # notes built, skipped and failed, rows per table, cache hit rate
 ```
 
+**Extraction settings.** `max_concurrency`, `settings` (generation settings of the
+extraction model, e.g. `{"temperature": 0}`) and `attribute_labeller` (a
+[decision model](../reference/decision_models.md) labelling attributes) are arguments of
+the pipeline. Any other `SimpleLLMExtractor` argument, such as `instructions` or
+`on_error`, is passed through too; a misspelt name raises a `TypeError` that lists the
+valid ones. With `extractor=` (an extractor you built yourself), set them on that
+extractor instead: the pipeline raises rather than ignore them.
+
 **Check the plan first.** `pipeline.plan("notes.parquet", "output/ecog")` is a dry
 run: no model call. It prints the settings the run would use and where each came from,
 the notes left to do, the calls, tokens, cost and time a pilot run predicts, and
@@ -1288,7 +1373,11 @@ column. `OmopTableBuilder.build(..., row_ids="note")` numbers rows the same way.
 | `... is not a standard concept. Add 'maps_to: true' to use the standard concept it maps to` | A `*_concept_id` column got a non-standard code | Add `maps_to: true`, or use the standard concept's code |
 | `Table 'measurement' has no column 'value_as_numbr'` | A typo in a column name | Use the column names of the [CDM table](https://ohdsi.github.io/CommonDataModel/cdm55.html) |
 | `'weight_val' is not a child entity of 'body_weight'` | `from: child.<key>` names an entity that is not a child of this one | Use the child's `key`, and check its `parent_key` |
-| `... uses 'map', so the builder needs a terminology mapper` | The definition codes text, but no mapper was given | Pass `coder=TerminologyMapper(...)` |
+| `... uses 'map', so the builder needs a coder` | The definition codes text, but no coder was given | Pass `coder=TerminologyMapper(...)` or `coder=AgenticCoder(...)` |
+| `coder must be a TerminologyMapper or a TextCoder ..., got ...` | `coder=` got something else, e.g. a retriever or a model name | Pass a `TerminologyMapper` built with that retriever, or a [coder](#writing-your-own-coder) |
+| `DeprecationWarning: mapper= is deprecated` | Code written for an earlier version | Rename `mapper=` to `coder=` |
+| `OmopExtractionPipeline got unknown extractor argument(s) ...` | A misspelt keyword, e.g. `max_concurency` | Use one of the valid names the message lists |
+| `... configure the default SimpleLLMExtractor, so they would be ignored with extractor=...` | Extractor settings given together with your own extractor | Set them on your extractor |
 | `SyntaxError: 'await' outside function` | `await` used in a script | Use `asyncio.run(pipeline(notes))`, or run it in a notebook |
 | Every `map` is `unmapped` | The mapper found no candidates, e.g. the search index for its retriever was not built | Use the embedding model you chose in `aatm init` as the `retriever` |
 | `... has no cache_identity(): pass identity=...` | `cache=` was given with a custom coder that does not describe itself | Add a `cache_identity()` method, or wrap it in `CachedCoder(coder, cache, identity=...)` |
