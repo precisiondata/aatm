@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://precisiondata.github.io/aatm/latest/schemas/entity_definitions.schema.json
+
 # Body weight, stored in the OMOP measurement table with its unit.
 # Used by examples/03_custom_entity_definition.ipynb.
 

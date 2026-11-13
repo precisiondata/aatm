@@ -1,0 +1,989 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://precisiondata.github.io/aatm/latest/schemas/entity_definitions.schema.json",
+  "title": "AATM entity definitions",
+  "description": "A list of entities to extract from clinical notes, and optionally how each one becomes a row of an OMOP CDM table. See https://precisiondata.github.io/aatm/latest/getting-started/entity_definitions/",
+  "$defs": {
+    "AttributeDefinition": {
+      "description": "A classification attached to each mention of an entity, e.g. the result of a test.\n\nThe model picks one label per attribute, based on what the note states about that\nmention. It is not a span: the label does not have to appear in the text.",
+      "properties": {
+        "key": {
+          "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$",
+          "type": "string",
+          "description": "The key of the attribute, e.g. `\"result\"`. Unique within the entity.",
+          "markdownDescription": "The key of the attribute, e.g. `\"result\"`. Unique within the entity."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the attribute describes. The model reads it.",
+          "markdownDescription": "What the attribute describes. The model reads it."
+        },
+        "required": {
+          "default": false,
+          "type": "boolean",
+          "description": "If True, a mention without a valid label for this attribute is rejected. If False (default), the mention is kept without the attribute.",
+          "markdownDescription": "If True, a mention without a valid label for this attribute is rejected. If False (default), the mention is kept without the attribute."
+        },
+        "ordered": {
+          "default": false,
+          "type": "boolean",
+          "description": "Whether the labels form a scale, listed lowest first, e.g. the ECOG grades 0 to 5. A decision model then answers a score question, which knows that 2 lies between 1 and 3, instead of a choice question (see `aatm.extractors.DecisionAttributeLabeller`). The extractor's prompt does not use it.",
+          "markdownDescription": "Whether the labels form a scale, listed lowest first, e.g. the ECOG grades 0 to 5. A decision model then answers a score question, which knows that 2 lies between 1 and 3, instead of a choice question (see `aatm.extractors.DecisionAttributeLabeller`). The extractor's prompt does not use it."
+        },
+        "labels": {
+          "items": {
+            "$ref": "#/$defs/AttributeLabel"
+          },
+          "minItems": 1,
+          "type": "array",
+          "description": "The allowed labels.",
+          "markdownDescription": "The allowed labels."
+        }
+      },
+      "required": [
+        "key",
+        "description",
+        "labels"
+      ],
+      "type": "object",
+      "additionalProperties": false,
+      "markdownDescription": "A classification attached to each mention of an entity, e.g. the result of a test.\n\nThe model picks one label per attribute, based on what the note states about that\nmention. It is not a span: the label does not have to appear in the text."
+    },
+    "AttributeLabel": {
+      "description": "One allowed value of an attribute.",
+      "properties": {
+        "value": {
+          "minLength": 1,
+          "type": "string",
+          "description": "The label, e.g. `\"positive\"`. This is what the model returns.",
+          "markdownDescription": "The label, e.g. `\"positive\"`. This is what the model returns."
+        },
+        "description": {
+          "type": "string",
+          "description": "When this label applies. The model reads it.",
+          "markdownDescription": "When this label applies. The model reads it."
+        }
+      },
+      "required": [
+        "value",
+        "description"
+      ],
+      "type": "object",
+      "additionalProperties": false,
+      "markdownDescription": "One allowed value of an attribute."
+    },
+    "Concept": {
+      "type": "string",
+      "pattern": "^[^:]*[^:\\s][^:]*:.*\\S.*$",
+      "description": "A concept written as `<VOCABULARY>:<code>`, e.g. `SNOMED:423740007`.",
+      "markdownDescription": "A concept written as `<VOCABULARY>:<code>`, e.g. `SNOMED:423740007`."
+    },
+    "ConceptRef": {
+      "description": "A concept identified by its vocabulary and code, e.g. `SNOMED:423740007`.",
+      "properties": {
+        "vocabulary_id": {
+          "type": "string"
+        },
+        "concept_code": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "vocabulary_id",
+        "concept_code"
+      ],
+      "type": "object",
+      "markdownDescription": "A concept identified by its vocabulary and code, e.g. `SNOMED:423740007`."
+    },
+    "EntityDefinition": {
+      "description": "A definition of an entity.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the entity.",
+          "markdownDescription": "The name of the entity."
+        },
+        "key": {
+          "type": "string",
+          "description": "The key of the entity. If not provided, the name will be used with all letters lowercased and spaces replaced by underscores.",
+          "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$",
+          "markdownDescription": "The key of the entity. If not provided, the name will be used with all letters lowercased and spaces replaced by underscores."
+        },
+        "definition": {
+          "type": "string",
+          "description": "The definition of the entity.",
+          "markdownDescription": "The definition of the entity."
+        },
+        "has_parent": {
+          "default": false,
+          "type": "boolean",
+          "description": "Whether extracted spans of this entity must reference a parent span.",
+          "markdownDescription": "Whether extracted spans of this entity must reference a parent span."
+        },
+        "parent_key": {
+          "type": "string",
+          "description": "The key of the parent entity. Required when `has_parent` is True.",
+          "markdownDescription": "The key of the parent entity. Required when `has_parent` is True."
+        },
+        "attributes": {
+          "items": {
+            "$ref": "#/$defs/AttributeDefinition"
+          },
+          "type": "array",
+          "description": "Classifications the model assigns to each mention of this entity, e.g. the result of a test.",
+          "markdownDescription": "Classifications the model assigns to each mention of this entity, e.g. the result of a test."
+        },
+        "omop": {
+          "$ref": "#/$defs/OmopMapping",
+          "description": "How each mention becomes a row of an OMOP CDM table, see `aatm.omop.mapping`. Never sent to the model.",
+          "markdownDescription": "How each mention becomes a row of an OMOP CDM table, see `aatm.omop.mapping`. Never sent to the model."
+        }
+      },
+      "required": [
+        "name",
+        "definition"
+      ],
+      "type": "object",
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "has_parent": {
+            "const": true
+          }
+        },
+        "required": [
+          "has_parent"
+        ]
+      },
+      "then": {
+        "required": [
+          "parent_key"
+        ]
+      },
+      "markdownDescription": "A definition of an entity."
+    },
+    "FieldSource": {
+      "additionalProperties": false,
+      "description": "Where one column's value comes from: `from`, `value` or `concept`.\n\nSee `aatm.omop.mapping` for examples.",
+      "properties": {
+        "from": {
+          "description": "Where in the note the value comes from: `text` (the mention), `attribute.<key>` (the label of an attribute), `child.<key>` (the text of the first child mention with that key) or `context.<name>` (a value given with the note, e.g. `context.person_id`). Use exactly one of `from`, `value` and `concept`.",
+          "anyOf": [
+            {
+              "enum": [
+                "text",
+                "context.note_id",
+                "context.person_id",
+                "context.note_date",
+                "context.visit_occurrence_id",
+                "context.visit_detail_id",
+                "context.provider_id"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^(attribute|child)\\.\\S+$"
+            }
+          ],
+          "markdownDescription": "Where in the note the value comes from: `text` (the mention), `attribute.<key>` (the label of an attribute), `child.<key>` (the text of the first child mention with that key) or `context.<name>` (a value given with the note, e.g. `context.person_id`). Use exactly one of `from`, `value` and `concept`."
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "A fixed value, e.g. the type concept id `32858` (NLP).",
+          "markdownDescription": "A fixed value, e.g. the type concept id `32858` (NLP)."
+        },
+        "concept": {
+          "description": "A concept written as `<VOCABULARY>:<code>`, e.g. `\"SNOMED:423740007\"`. The column gets its concept id, looked up in the local OMOP vocabulary database.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Concept"
+            },
+            {
+              "$ref": "#/$defs/ConceptRef"
+            }
+          ],
+          "markdownDescription": "A concept written as `<VOCABULARY>:<code>`, e.g. `\"SNOMED:423740007\"`. The column gets its concept id, looked up in the local OMOP vocabulary database."
+        },
+        "concepts": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Concept"
+              },
+              {
+                "$ref": "#/$defs/ConceptRef"
+              }
+            ]
+          },
+          "type": "object",
+          "description": "With `from: attribute.<key>`, the concept of each label, e.g. `{positive: \"SNOMED:10828004\"}`. The column gets the concept id instead of the label.",
+          "markdownDescription": "With `from: attribute.<key>`, the concept of each label, e.g. `{positive: \"SNOMED:10828004\"}`. The column gets the concept id instead of the label."
+        },
+        "maps_to": {
+          "default": false,
+          "type": "boolean",
+          "description": "Replace the concept by the standard concept it maps to (\"Maps to\"), as the CDM requires for `*_concept_id` columns. Needs `concept` or `concepts`.",
+          "markdownDescription": "Replace the concept by the standard concept it maps to (\"Maps to\"), as the CDM requires for `*_concept_id` columns. Needs `concept` or `concepts`."
+        },
+        "map": {
+          "$ref": "#/$defs/MapSpec",
+          "description": "Code the text with the terminology mapper (translation, retrieval, reranking, selection), e.g. `{domain: Measurement, min_score: 0.8}`.",
+          "markdownDescription": "Code the text with the terminology mapper (translation, retrieval, reranking, selection), e.g. `{domain: Measurement, min_score: 0.8}`."
+        },
+        "lookup": {
+          "type": "string",
+          "description": "Find the text as a code of this vocabulary, e.g. `UCUM` for the unit `\"mg/dL\"`.",
+          "markdownDescription": "Find the text as a code of this vocabulary, e.g. `UCUM` for the unit `\"mg/dL\"`."
+        },
+        "as": {
+          "enum": [
+            "int",
+            "float",
+            "str",
+            "date",
+            "days"
+          ],
+          "type": "string",
+          "description": "Convert the value: `int`, `float`, `str`, `date` (parsed from text such as \"March 2024\") or `days` (a duration such as \"2 weeks\", as a number of days).",
+          "markdownDescription": "Convert the value: `int`, `float`, `str`, `date` (parsed from text such as \"March 2024\") or `days` (a duration such as \"2 weeks\", as a number of days)."
+        },
+        "period_start": {
+          "type": "string",
+          "description": "A date column listed before this one. The value is a number of days N, and this column gets that date plus N - 1 days: the end of an N-day period.",
+          "markdownDescription": "A date column listed before this one. The value is a number of days N, and this column gets that date plus N - 1 days: the end of an N-day period."
+        },
+        "when": {
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "type": "object",
+          "description": "Use this source only for mentions whose attribute has one of these labels, e.g. `{attribute.status: [current]}`; otherwise the next source is tried.",
+          "propertyNames": {
+            "pattern": "^attribute\\.\\S+$"
+          },
+          "markdownDescription": "Use this source only for mentions whose attribute has one of these labels, e.g. `{attribute.status: [current]}`; otherwise the next source is tried."
+        }
+      },
+      "type": "object",
+      "oneOf": [
+        {
+          "required": [
+            "from"
+          ]
+        },
+        {
+          "required": [
+            "value"
+          ]
+        },
+        {
+          "required": [
+            "concept"
+          ]
+        }
+      ],
+      "markdownDescription": "Where one column's value comes from: `from`, `value` or `concept`.\n\nSee `aatm.omop.mapping` for examples."
+    },
+    "MapSpec": {
+      "additionalProperties": false,
+      "description": "How to code a text with the terminology mapper.",
+      "properties": {
+        "vocabularies": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Optionally, only retrieve from these vocabularies, e.g. `[\"LOINC\"]`. By default every indexed vocabulary is searched: what a `*_concept_id` column requires is a standard concept, not a vocabulary.",
+          "markdownDescription": "Optionally, only retrieve from these vocabularies, e.g. `[\"LOINC\"]`. By default every indexed vocabulary is searched: what a `*_concept_id` column requires is a standard concept, not a vocabulary."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Domain to retrieve from, e.g. `\"Measurement\"`. Defaults to the domain the column requires.",
+          "markdownDescription": "Domain to retrieve from, e.g. `\"Measurement\"`. Defaults to the domain the column requires."
+        },
+        "min_score": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+          "description": "Mappings with a lower confidence score are stored as `0` (an unmapped value, as the CDM asks) and reported.",
+          "markdownDescription": "Mappings with a lower confidence score are stored as `0` (an unmapped value, as the CDM asks) and reported."
+        }
+      },
+      "type": "object",
+      "markdownDescription": "How to code a text with the terminology mapper."
+    },
+    "OmopMapping": {
+      "additionalProperties": false,
+      "description": "The `omop` block of an entity definition: one table row per mention.",
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "The OMOP CDM table each mention becomes a row of, e.g. `measurement`.",
+          "enum": [
+            "measurement",
+            "observation",
+            "condition_occurrence",
+            "drug_exposure",
+            "device_exposure"
+          ],
+          "markdownDescription": "The OMOP CDM table each mention becomes a row of, e.g. `measurement`."
+        },
+        "fields": {
+          "type": "object",
+          "description": "The source of each column, e.g. `person_id: {from: context.person_id}`, or a list of sources: the first one with a value wins.",
+          "markdownDescription": "The source of each column, e.g. `person_id: {from: context.person_id}`, or a list of sources: the first one with a value wins."
+        }
+      },
+      "required": [
+        "table",
+        "fields"
+      ],
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "table": {
+                "const": "measurement"
+              }
+            },
+            "required": [
+              "table"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "properties": {
+                  "person_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `person_id` of `measurement` (integer). Required by the CDM.",
+                    "markdownDescription": "Column `person_id` of `measurement` (integer). Required by the CDM."
+                  },
+                  "measurement_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `measurement_concept_id` of `measurement` (integer). Required by the CDM. Holds a concept of the 'Measurement' domain.",
+                    "markdownDescription": "Column `measurement_concept_id` of `measurement` (integer). Required by the CDM. Holds a concept of the 'Measurement' domain."
+                  },
+                  "measurement_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `measurement_date` of `measurement` (date). Required by the CDM.",
+                    "markdownDescription": "Column `measurement_date` of `measurement` (date). Required by the CDM."
+                  },
+                  "measurement_datetime": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `measurement_datetime` of `measurement` (date-time).",
+                    "markdownDescription": "Column `measurement_datetime` of `measurement` (date-time)."
+                  },
+                  "measurement_time": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `measurement_time` of `measurement` (string).",
+                    "markdownDescription": "Column `measurement_time` of `measurement` (string)."
+                  },
+                  "measurement_type_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `measurement_type_concept_id` of `measurement` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain.",
+                    "markdownDescription": "Column `measurement_type_concept_id` of `measurement` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain."
+                  },
+                  "operator_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `operator_concept_id` of `measurement` (integer). Holds a concept of the 'Meas Value Operator' domain.",
+                    "markdownDescription": "Column `operator_concept_id` of `measurement` (integer). Holds a concept of the 'Meas Value Operator' domain."
+                  },
+                  "value_as_number": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_as_number` of `measurement` (number).",
+                    "markdownDescription": "Column `value_as_number` of `measurement` (number)."
+                  },
+                  "value_as_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_as_concept_id` of `measurement` (integer).",
+                    "markdownDescription": "Column `value_as_concept_id` of `measurement` (integer)."
+                  },
+                  "unit_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unit_concept_id` of `measurement` (integer). Holds a concept of the 'Unit' domain.",
+                    "markdownDescription": "Column `unit_concept_id` of `measurement` (integer). Holds a concept of the 'Unit' domain."
+                  },
+                  "range_low": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `range_low` of `measurement` (number).",
+                    "markdownDescription": "Column `range_low` of `measurement` (number)."
+                  },
+                  "range_high": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `range_high` of `measurement` (number).",
+                    "markdownDescription": "Column `range_high` of `measurement` (number)."
+                  },
+                  "provider_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `provider_id` of `measurement` (integer).",
+                    "markdownDescription": "Column `provider_id` of `measurement` (integer)."
+                  },
+                  "visit_occurrence_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_occurrence_id` of `measurement` (integer).",
+                    "markdownDescription": "Column `visit_occurrence_id` of `measurement` (integer)."
+                  },
+                  "visit_detail_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_detail_id` of `measurement` (integer).",
+                    "markdownDescription": "Column `visit_detail_id` of `measurement` (integer)."
+                  },
+                  "measurement_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `measurement_source_value` of `measurement` (string).",
+                    "markdownDescription": "Column `measurement_source_value` of `measurement` (string)."
+                  },
+                  "measurement_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `measurement_source_concept_id` of `measurement` (integer).",
+                    "markdownDescription": "Column `measurement_source_concept_id` of `measurement` (integer)."
+                  },
+                  "unit_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unit_source_value` of `measurement` (string).",
+                    "markdownDescription": "Column `unit_source_value` of `measurement` (string)."
+                  },
+                  "unit_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unit_source_concept_id` of `measurement` (integer).",
+                    "markdownDescription": "Column `unit_source_concept_id` of `measurement` (integer)."
+                  },
+                  "value_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_source_value` of `measurement` (string).",
+                    "markdownDescription": "Column `value_source_value` of `measurement` (string)."
+                  },
+                  "value_as_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_as_source_concept_id` of `measurement` (integer).",
+                    "markdownDescription": "Column `value_as_source_concept_id` of `measurement` (integer)."
+                  },
+                  "measurement_event_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `measurement_event_id` of `measurement` (integer).",
+                    "markdownDescription": "Column `measurement_event_id` of `measurement` (integer)."
+                  },
+                  "meas_event_field_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `meas_event_field_concept_id` of `measurement` (integer).",
+                    "markdownDescription": "Column `meas_event_field_concept_id` of `measurement` (integer)."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "table": {
+                "const": "observation"
+              }
+            },
+            "required": [
+              "table"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "properties": {
+                  "person_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `person_id` of `observation` (integer). Required by the CDM.",
+                    "markdownDescription": "Column `person_id` of `observation` (integer). Required by the CDM."
+                  },
+                  "observation_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `observation_concept_id` of `observation` (integer). Required by the CDM.",
+                    "markdownDescription": "Column `observation_concept_id` of `observation` (integer). Required by the CDM."
+                  },
+                  "observation_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `observation_date` of `observation` (date). Required by the CDM.",
+                    "markdownDescription": "Column `observation_date` of `observation` (date). Required by the CDM."
+                  },
+                  "observation_datetime": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `observation_datetime` of `observation` (date-time).",
+                    "markdownDescription": "Column `observation_datetime` of `observation` (date-time)."
+                  },
+                  "observation_type_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `observation_type_concept_id` of `observation` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain.",
+                    "markdownDescription": "Column `observation_type_concept_id` of `observation` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain."
+                  },
+                  "value_as_number": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_as_number` of `observation` (number).",
+                    "markdownDescription": "Column `value_as_number` of `observation` (number)."
+                  },
+                  "value_as_string": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_as_string` of `observation` (string).",
+                    "markdownDescription": "Column `value_as_string` of `observation` (string)."
+                  },
+                  "value_as_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_as_concept_id` of `observation` (integer).",
+                    "markdownDescription": "Column `value_as_concept_id` of `observation` (integer)."
+                  },
+                  "value_as_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_as_date` of `observation` (date).",
+                    "markdownDescription": "Column `value_as_date` of `observation` (date)."
+                  },
+                  "qualifier_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `qualifier_concept_id` of `observation` (integer).",
+                    "markdownDescription": "Column `qualifier_concept_id` of `observation` (integer)."
+                  },
+                  "unit_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unit_concept_id` of `observation` (integer). Holds a concept of the 'Unit' domain.",
+                    "markdownDescription": "Column `unit_concept_id` of `observation` (integer). Holds a concept of the 'Unit' domain."
+                  },
+                  "provider_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `provider_id` of `observation` (integer).",
+                    "markdownDescription": "Column `provider_id` of `observation` (integer)."
+                  },
+                  "visit_occurrence_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_occurrence_id` of `observation` (integer).",
+                    "markdownDescription": "Column `visit_occurrence_id` of `observation` (integer)."
+                  },
+                  "visit_detail_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_detail_id` of `observation` (integer).",
+                    "markdownDescription": "Column `visit_detail_id` of `observation` (integer)."
+                  },
+                  "observation_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `observation_source_value` of `observation` (string).",
+                    "markdownDescription": "Column `observation_source_value` of `observation` (string)."
+                  },
+                  "observation_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `observation_source_concept_id` of `observation` (integer).",
+                    "markdownDescription": "Column `observation_source_concept_id` of `observation` (integer)."
+                  },
+                  "unit_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unit_source_value` of `observation` (string).",
+                    "markdownDescription": "Column `unit_source_value` of `observation` (string)."
+                  },
+                  "unit_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unit_source_concept_id` of `observation` (integer).",
+                    "markdownDescription": "Column `unit_source_concept_id` of `observation` (integer)."
+                  },
+                  "qualifier_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `qualifier_source_value` of `observation` (string).",
+                    "markdownDescription": "Column `qualifier_source_value` of `observation` (string)."
+                  },
+                  "value_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_source_value` of `observation` (string).",
+                    "markdownDescription": "Column `value_source_value` of `observation` (string)."
+                  },
+                  "value_as_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `value_as_source_concept_id` of `observation` (integer).",
+                    "markdownDescription": "Column `value_as_source_concept_id` of `observation` (integer)."
+                  },
+                  "observation_event_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `observation_event_id` of `observation` (integer).",
+                    "markdownDescription": "Column `observation_event_id` of `observation` (integer)."
+                  },
+                  "obs_event_field_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `obs_event_field_concept_id` of `observation` (integer).",
+                    "markdownDescription": "Column `obs_event_field_concept_id` of `observation` (integer)."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "table": {
+                "const": "condition_occurrence"
+              }
+            },
+            "required": [
+              "table"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "properties": {
+                  "person_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `person_id` of `condition_occurrence` (integer). Required by the CDM.",
+                    "markdownDescription": "Column `person_id` of `condition_occurrence` (integer). Required by the CDM."
+                  },
+                  "condition_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_concept_id` of `condition_occurrence` (integer). Required by the CDM. Holds a concept of the 'Condition' domain.",
+                    "markdownDescription": "Column `condition_concept_id` of `condition_occurrence` (integer). Required by the CDM. Holds a concept of the 'Condition' domain."
+                  },
+                  "condition_start_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_start_date` of `condition_occurrence` (date). Required by the CDM.",
+                    "markdownDescription": "Column `condition_start_date` of `condition_occurrence` (date). Required by the CDM."
+                  },
+                  "condition_start_datetime": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_start_datetime` of `condition_occurrence` (date-time).",
+                    "markdownDescription": "Column `condition_start_datetime` of `condition_occurrence` (date-time)."
+                  },
+                  "condition_end_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_end_date` of `condition_occurrence` (date).",
+                    "markdownDescription": "Column `condition_end_date` of `condition_occurrence` (date)."
+                  },
+                  "condition_end_datetime": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_end_datetime` of `condition_occurrence` (date-time).",
+                    "markdownDescription": "Column `condition_end_datetime` of `condition_occurrence` (date-time)."
+                  },
+                  "condition_type_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_type_concept_id` of `condition_occurrence` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain.",
+                    "markdownDescription": "Column `condition_type_concept_id` of `condition_occurrence` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain."
+                  },
+                  "condition_status_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_status_concept_id` of `condition_occurrence` (integer). Holds a concept of the 'Condition Status' domain.",
+                    "markdownDescription": "Column `condition_status_concept_id` of `condition_occurrence` (integer). Holds a concept of the 'Condition Status' domain."
+                  },
+                  "stop_reason": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `stop_reason` of `condition_occurrence` (string).",
+                    "markdownDescription": "Column `stop_reason` of `condition_occurrence` (string)."
+                  },
+                  "provider_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `provider_id` of `condition_occurrence` (integer).",
+                    "markdownDescription": "Column `provider_id` of `condition_occurrence` (integer)."
+                  },
+                  "visit_occurrence_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_occurrence_id` of `condition_occurrence` (integer).",
+                    "markdownDescription": "Column `visit_occurrence_id` of `condition_occurrence` (integer)."
+                  },
+                  "visit_detail_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_detail_id` of `condition_occurrence` (integer).",
+                    "markdownDescription": "Column `visit_detail_id` of `condition_occurrence` (integer)."
+                  },
+                  "condition_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_source_value` of `condition_occurrence` (string).",
+                    "markdownDescription": "Column `condition_source_value` of `condition_occurrence` (string)."
+                  },
+                  "condition_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_source_concept_id` of `condition_occurrence` (integer).",
+                    "markdownDescription": "Column `condition_source_concept_id` of `condition_occurrence` (integer)."
+                  },
+                  "condition_status_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `condition_status_source_value` of `condition_occurrence` (string).",
+                    "markdownDescription": "Column `condition_status_source_value` of `condition_occurrence` (string)."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "table": {
+                "const": "drug_exposure"
+              }
+            },
+            "required": [
+              "table"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "properties": {
+                  "person_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `person_id` of `drug_exposure` (integer). Required by the CDM.",
+                    "markdownDescription": "Column `person_id` of `drug_exposure` (integer). Required by the CDM."
+                  },
+                  "drug_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `drug_concept_id` of `drug_exposure` (integer). Required by the CDM. Holds a concept of the 'Drug' domain.",
+                    "markdownDescription": "Column `drug_concept_id` of `drug_exposure` (integer). Required by the CDM. Holds a concept of the 'Drug' domain."
+                  },
+                  "drug_exposure_start_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `drug_exposure_start_date` of `drug_exposure` (date). Required by the CDM.",
+                    "markdownDescription": "Column `drug_exposure_start_date` of `drug_exposure` (date). Required by the CDM."
+                  },
+                  "drug_exposure_start_datetime": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `drug_exposure_start_datetime` of `drug_exposure` (date-time).",
+                    "markdownDescription": "Column `drug_exposure_start_datetime` of `drug_exposure` (date-time)."
+                  },
+                  "drug_exposure_end_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `drug_exposure_end_date` of `drug_exposure` (date). Required by the CDM.",
+                    "markdownDescription": "Column `drug_exposure_end_date` of `drug_exposure` (date). Required by the CDM."
+                  },
+                  "drug_exposure_end_datetime": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `drug_exposure_end_datetime` of `drug_exposure` (date-time).",
+                    "markdownDescription": "Column `drug_exposure_end_datetime` of `drug_exposure` (date-time)."
+                  },
+                  "verbatim_end_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `verbatim_end_date` of `drug_exposure` (date).",
+                    "markdownDescription": "Column `verbatim_end_date` of `drug_exposure` (date)."
+                  },
+                  "drug_type_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `drug_type_concept_id` of `drug_exposure` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain.",
+                    "markdownDescription": "Column `drug_type_concept_id` of `drug_exposure` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain."
+                  },
+                  "stop_reason": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `stop_reason` of `drug_exposure` (string).",
+                    "markdownDescription": "Column `stop_reason` of `drug_exposure` (string)."
+                  },
+                  "refills": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `refills` of `drug_exposure` (integer).",
+                    "markdownDescription": "Column `refills` of `drug_exposure` (integer)."
+                  },
+                  "quantity": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `quantity` of `drug_exposure` (number).",
+                    "markdownDescription": "Column `quantity` of `drug_exposure` (number)."
+                  },
+                  "days_supply": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `days_supply` of `drug_exposure` (integer).",
+                    "markdownDescription": "Column `days_supply` of `drug_exposure` (integer)."
+                  },
+                  "sig": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `sig` of `drug_exposure` (string).",
+                    "markdownDescription": "Column `sig` of `drug_exposure` (string)."
+                  },
+                  "route_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `route_concept_id` of `drug_exposure` (integer). Holds a concept of the 'Route' domain.",
+                    "markdownDescription": "Column `route_concept_id` of `drug_exposure` (integer). Holds a concept of the 'Route' domain."
+                  },
+                  "lot_number": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `lot_number` of `drug_exposure` (string).",
+                    "markdownDescription": "Column `lot_number` of `drug_exposure` (string)."
+                  },
+                  "provider_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `provider_id` of `drug_exposure` (integer).",
+                    "markdownDescription": "Column `provider_id` of `drug_exposure` (integer)."
+                  },
+                  "visit_occurrence_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_occurrence_id` of `drug_exposure` (integer).",
+                    "markdownDescription": "Column `visit_occurrence_id` of `drug_exposure` (integer)."
+                  },
+                  "visit_detail_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_detail_id` of `drug_exposure` (integer).",
+                    "markdownDescription": "Column `visit_detail_id` of `drug_exposure` (integer)."
+                  },
+                  "drug_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `drug_source_value` of `drug_exposure` (string).",
+                    "markdownDescription": "Column `drug_source_value` of `drug_exposure` (string)."
+                  },
+                  "drug_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `drug_source_concept_id` of `drug_exposure` (integer).",
+                    "markdownDescription": "Column `drug_source_concept_id` of `drug_exposure` (integer)."
+                  },
+                  "route_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `route_source_value` of `drug_exposure` (string).",
+                    "markdownDescription": "Column `route_source_value` of `drug_exposure` (string)."
+                  },
+                  "dose_unit_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `dose_unit_source_value` of `drug_exposure` (string).",
+                    "markdownDescription": "Column `dose_unit_source_value` of `drug_exposure` (string)."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "table": {
+                "const": "device_exposure"
+              }
+            },
+            "required": [
+              "table"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fields": {
+                "properties": {
+                  "person_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `person_id` of `device_exposure` (integer). Required by the CDM.",
+                    "markdownDescription": "Column `person_id` of `device_exposure` (integer). Required by the CDM."
+                  },
+                  "device_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `device_concept_id` of `device_exposure` (integer). Required by the CDM. Holds a concept of the 'Device' domain.",
+                    "markdownDescription": "Column `device_concept_id` of `device_exposure` (integer). Required by the CDM. Holds a concept of the 'Device' domain."
+                  },
+                  "device_exposure_start_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `device_exposure_start_date` of `device_exposure` (date). Required by the CDM.",
+                    "markdownDescription": "Column `device_exposure_start_date` of `device_exposure` (date). Required by the CDM."
+                  },
+                  "device_exposure_start_datetime": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `device_exposure_start_datetime` of `device_exposure` (date-time).",
+                    "markdownDescription": "Column `device_exposure_start_datetime` of `device_exposure` (date-time)."
+                  },
+                  "device_exposure_end_date": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `device_exposure_end_date` of `device_exposure` (date).",
+                    "markdownDescription": "Column `device_exposure_end_date` of `device_exposure` (date)."
+                  },
+                  "device_exposure_end_datetime": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `device_exposure_end_datetime` of `device_exposure` (date-time).",
+                    "markdownDescription": "Column `device_exposure_end_datetime` of `device_exposure` (date-time)."
+                  },
+                  "device_type_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `device_type_concept_id` of `device_exposure` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain.",
+                    "markdownDescription": "Column `device_type_concept_id` of `device_exposure` (integer). Required by the CDM. Holds a concept of the 'Type Concept' domain."
+                  },
+                  "unique_device_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unique_device_id` of `device_exposure` (string).",
+                    "markdownDescription": "Column `unique_device_id` of `device_exposure` (string)."
+                  },
+                  "production_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `production_id` of `device_exposure` (string).",
+                    "markdownDescription": "Column `production_id` of `device_exposure` (string)."
+                  },
+                  "quantity": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `quantity` of `device_exposure` (integer).",
+                    "markdownDescription": "Column `quantity` of `device_exposure` (integer)."
+                  },
+                  "provider_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `provider_id` of `device_exposure` (integer).",
+                    "markdownDescription": "Column `provider_id` of `device_exposure` (integer)."
+                  },
+                  "visit_occurrence_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_occurrence_id` of `device_exposure` (integer).",
+                    "markdownDescription": "Column `visit_occurrence_id` of `device_exposure` (integer)."
+                  },
+                  "visit_detail_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `visit_detail_id` of `device_exposure` (integer).",
+                    "markdownDescription": "Column `visit_detail_id` of `device_exposure` (integer)."
+                  },
+                  "device_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `device_source_value` of `device_exposure` (string).",
+                    "markdownDescription": "Column `device_source_value` of `device_exposure` (string)."
+                  },
+                  "device_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `device_source_concept_id` of `device_exposure` (integer).",
+                    "markdownDescription": "Column `device_source_concept_id` of `device_exposure` (integer)."
+                  },
+                  "unit_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unit_concept_id` of `device_exposure` (integer). Holds a concept of the 'Unit' domain.",
+                    "markdownDescription": "Column `unit_concept_id` of `device_exposure` (integer). Holds a concept of the 'Unit' domain."
+                  },
+                  "unit_source_value": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unit_source_value` of `device_exposure` (string).",
+                    "markdownDescription": "Column `unit_source_value` of `device_exposure` (string)."
+                  },
+                  "unit_source_concept_id": {
+                    "$ref": "#/$defs/Sources",
+                    "description": "Column `unit_source_concept_id` of `device_exposure` (integer).",
+                    "markdownDescription": "Column `unit_source_concept_id` of `device_exposure` (integer)."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      ],
+      "markdownDescription": "The `omop` block of an entity definition: one table row per mention."
+    },
+    "Sources": {
+      "if": {
+        "type": "array"
+      },
+      "then": {
+        "items": {
+          "$ref": "#/$defs/FieldSource"
+        },
+        "minItems": 1
+      },
+      "else": {
+        "$ref": "#/$defs/FieldSource"
+      }
+    }
+  },
+  "items": {
+    "$ref": "#/$defs/EntityDefinition"
+  },
+  "type": "array"
+}

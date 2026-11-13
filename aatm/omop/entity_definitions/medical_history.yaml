@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://precisiondata.github.io/aatm/latest/schemas/entity_definitions.schema.json
+
 # Medical history entity definitions
 #
 # This file contains the entity definitions for extracting the patient's past
