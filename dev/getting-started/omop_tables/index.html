@@ -15,7 +15,7 @@
         <link rel="prev" href="../entity_definitions/">
       
       
-        <link rel="next" href="../../reference/cli/">
+        <link rel="next" href="../tuning_omop_runs/">
       
       
         
@@ -365,6 +365,8 @@
       
         
           
+        
+      
         
       
         
@@ -1160,6 +1162,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning_omop_runs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tuning large OMOP runs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3680,10 +3710,12 @@ method returning JSON-compatible values that cover everything that changes its r
 Otherwise wrap it yourself and say what it is:
 <code>CachedCoder(my_coder, cache, identity={"name": "my_coder", "version": 2})</code>.</p>
 <h3 id="rate-limits-for-long-runs">Rate limits for long runs</h3>
-<p>No rate limits are set by default: the pipeline sends model calls as fast as it can,
-and retries rate-limit and transient errors on its own. For large datasets, or a
-provider quota you must stay under, set limits once before the run; they cover
-extraction and coding together:</p>
+<p>No rate limits are set by default, and rate-limit and transient errors are retried on
+their own. A chunked run (<code>pipeline.run</code>) keeps 16 extraction calls in flight with a
+hosted API and 4 with a local server, unless you set <code>max_concurrency</code>. For large
+datasets, or a provider quota you must stay under, set limits once before the run;
+they cover extraction and coding together, and a run derives its extraction
+concurrency from them:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.llm</span><span class="w"> </span><span class="kn">import</span> <span class="n">set_rate_limits</span>
 </span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
 </span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">set_rate_limits</span><span class="p">(</span><span class="s2">"openai"</span><span class="p">,</span> <span class="n">max_concurrency</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">requests_per_minute</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span>
@@ -4287,7 +4319,7 @@ its progress, so a run that stops can be resumed.</p>
 </span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span>
 </span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>    <span class="s2">"ecog_performance_status"</span><span class="p">,</span>
 </span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span>
-</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    <span class="n">max_concurrency</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>  <span class="c1"># notes extracted at once</span>
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    <span class="n">max_concurrency</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>  <span class="c1"># notes extracted at once (16 is the default for a hosted API)</span>
 </span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>    <span class="n">cache</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>          <span class="c1"># code each distinct text once, across chunks and runs</span>
 </span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="p">)</span>
 </span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="n">summary</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
@@ -4300,6 +4332,12 @@ its progress, so a run that stops can be resumed.</p>
 </span><span id="__span-22-17"><a id="__codelineno-22-17" name="__codelineno-22-17" href="#__codelineno-22-17"></a><span class="p">)</span>
 </span><span id="__span-22-18"><a id="__codelineno-22-18" name="__codelineno-22-18" href="#__codelineno-22-18"></a><span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span>  <span class="c1"># notes built, skipped and failed, rows per table, cache hit rate</span>
 </span></code></pre></div>
+<p><strong>Check the plan first.</strong> <code>pipeline.plan("notes.parquet", "output/ecog")</code> is a dry
+run: no model call. It prints the settings the run would use and where each came from,
+the notes left to do, the calls, tokens, cost and time a pilot run predicts, and
+warnings with a fix, such as a low <code>max_concurrency</code> with a hosted API. Which settings
+matter for your case, and which you can leave alone, is in
+<a href="../tuning_omop_runs/">Tuning large OMOP runs</a>.</p>
 <p><strong>Sources.</strong> A CSV or Parquet file, a folder of Parquet files, a DataFrame, an iterable
 of <code>ClinicalNote</code> objects or dicts, or a database query:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sqlite3</span>
@@ -4465,20 +4503,17 @@ over parts of a dataset, such as shards; ids never repeat across tables. They ne
 column. <code>OmopTableBuilder.build(..., row_ids="note")</code> numbers rows the same way.</p>
 <div class="admonition tip">
 <p class="admonition-title">Speed and cost</p>
-<p><code>max_concurrency</code> (default 1) sets how many notes are extracted at once; set
-<a href="#rate-limits-for-long-runs">rate limits</a> to stay under your provider's quota.
-With <code>cache=True</code>, a text seen in an earlier chunk or run is not coded again.
-<code>chunk_size</code> bounds memory; larger chunks let the builder group more repeated
-texts per coding call. It does not limit extraction: a new call starts as soon as
-one ends, so <code>max_concurrency</code> calls stay in flight and a slow note holds up no
-other.</p>
+<p>Most runs need no throughput setting: a run keeps 16 extraction calls in flight
+with a hosted API (4 with a local server), whatever the <code>chunk_size</code>. Check what a
+run would do, and what it would cost from a pilot, with <code>pipeline.plan(...)</code>; see
+<a href="../tuning_omop_runs/">Tuning large OMOP runs</a> for which settings matter in your
+case.</p>
 <p>While a chunk is built (coded and written), extraction goes on, so the slower of
 the two stages sets the pace. This pays off when coding takes about as long as
 extraction, e.g. with the <a href="#searching-with-an-agent">agent</a>; without a mapper,
 building takes milliseconds and extraction is all the time. A few chunks are in
 memory at most: the one being built, up to two waiting, and the notes being
-extracted. The two stages share the per-minute rate limits, but each gets its own
-<code>max_concurrency</code>, so up to twice as many calls may be in flight.</p>
+extracted.</p>
 </div>
 <hr>
 <h2 id="troubleshooting">Troubleshooting</h2>
@@ -4641,13 +4676,13 @@ extracted. The two stages share the per-minute rate limits, but each gets its ow
         
         
           
-          <a href="../../reference/cli/" class="md-footer__link md-footer__link--next" aria-label="Next: Command Line Interface">
+          <a href="../tuning_omop_runs/" class="md-footer__link md-footer__link--next" aria-label="Next: Tuning large OMOP runs">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Command Line Interface
+                Tuning large OMOP runs
               </div>
             </div>
             <div class="md-footer__button md-icon">
