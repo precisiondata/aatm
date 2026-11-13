@@ -161,7 +161,7 @@ def make_builder(coder=None, **map_options):
     return OmopTableBuilder(
         lab_definitions(**map_options),
         vocabulary=UnitLookup(),
-        mapper=coder or FakeCoder(),
+        coder=coder or FakeCoder(),
     )
 
 
@@ -187,7 +187,7 @@ def test_invalid_coded_sources(source, message):
 
 
 def test_map_needs_a_mapper():
-    with pytest.raises(ValueError, match="needs a terminology mapper"):
+    with pytest.raises(ValueError, match="needs a coder"):
         OmopTableBuilder(lab_definitions(), vocabulary=UnitLookup())
 
 
@@ -197,7 +197,7 @@ def test_map_vocabulary_must_be_indexed():
         "ICD10"
     ]
     with pytest.raises(ValueError, match="only indexes .* not \\['ICD10'\\]"):
-        OmopTableBuilder(defs, vocabulary=UnitLookup(), mapper=FakeCoder())
+        OmopTableBuilder(defs, vocabulary=UnitLookup(), coder=FakeCoder())
 
 
 def test_map_domain_must_match_the_column():
@@ -411,9 +411,7 @@ def test_terminology_mapper_without_filter_is_unchanged(tmp_path):
 
 def test_builder_wraps_a_terminology_mapper(tmp_path):
     mapper = TerminologyMapper(retriever=RecordingRetriever(), output_dir=tmp_path)
-    builder = OmopTableBuilder(
-        lab_definitions(), vocabulary=UnitLookup(), mapper=mapper
-    )
+    builder = OmopTableBuilder(lab_definitions(), vocabulary=UnitLookup(), coder=mapper)
     assert isinstance(builder.coder, TerminologyMapperCoder)
     tables = run(builder, "Hb 11", [lab("e1", "Hb")])
     assert tables.rows["measurement"][0].measurement_concept_id == 3000963
@@ -440,7 +438,7 @@ def test_predefined_lab_results_resolve_in_local_vocabulary():
     builder = OmopTableBuilder(
         EntityDefinitions.from_predefined("lab_results"),
         vocabulary=SqliteConceptLookup(".aatm/omop.db"),
-        mapper=FakeCoder(),
+        coder=FakeCoder(),
     )
     operators = builder.describe_concepts().set_index("label")["concept_name"]
     assert operators.to_dict() == {"<": "<", "<=": "<=", ">": ">", ">=": ">="}

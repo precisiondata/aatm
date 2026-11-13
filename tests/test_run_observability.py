@@ -134,7 +134,7 @@ def lab_pipeline():
         definitions,
         extractor=MeteredExtractor(definitions),
         vocabulary=UnitLookup(),
-        mapper=MeteredCoder(),
+        coder=MeteredCoder(),
     )
 
 

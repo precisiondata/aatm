@@ -60,7 +60,7 @@ class ConditionCoder:
 
 def builder(coder=None):
     defs = EntityDefinitions.from_predefined("condition_occurrence")
-    return OmopTableBuilder(defs, vocabulary=Lookup(), mapper=coder or ConditionCoder())
+    return OmopTableBuilder(defs, vocabulary=Lookup(), coder=coder or ConditionCoder())
 
 
 def build(text, entities, coder=None, **note_kwargs):
@@ -114,7 +114,7 @@ def test_map_into_another_domain_fails():
         ]
     )
     with pytest.raises(ValueError, match="'Observation' domain, not 'Condition'"):
-        OmopTableBuilder(defs, vocabulary=Lookup(), mapper=ConditionCoder())
+        OmopTableBuilder(defs, vocabulary=Lookup(), coder=ConditionCoder())
 
 
 # --- the predefined definition -------------------------------------------------------
@@ -275,7 +275,7 @@ def test_condition_without_a_valid_status_is_rejected(attributes):
 
 
 def test_condition_occurrence_needs_a_mapper():
-    with pytest.raises(ValueError, match="needs a terminology mapper"):
+    with pytest.raises(ValueError, match="needs a coder"):
         OmopTableBuilder(
             EntityDefinitions.from_predefined("condition_occurrence"),
             vocabulary=Lookup(),
@@ -299,7 +299,7 @@ def test_pipeline_dataframe():
         "condition_occurrence",
         extractor=Extractor(),
         vocabulary=Lookup(),
-        mapper=ConditionCoder(),
+        coder=ConditionCoder(),
     )
     tables = asyncio.run(pipeline([note("pneumonia")]))
     df = tables["condition_occurrence"]
@@ -322,7 +322,7 @@ def test_predefined_condition_concepts_resolve_in_local_vocabulary():
     b = OmopTableBuilder(
         EntityDefinitions.from_predefined("condition_occurrence"),
         vocabulary=SqliteConceptLookup(".aatm/omop.db"),
-        mapper=ConditionCoder(),
+        coder=ConditionCoder(),
     )
     assert set(b.describe_concepts().concept_name) == {
         "Confirmed diagnosis",

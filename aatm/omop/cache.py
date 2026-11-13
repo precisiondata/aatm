@@ -11,7 +11,7 @@ cache = CodingCache(max_entries=500_000)  # .aatm/coding_cache.db
 pipeline = OmopExtractionPipeline(
     "lab_results",
     model_id="openai/gpt-5-mini",
-    mapper=AgenticCoder("openai/gpt-5-mini", retriever="text-embedding-3-small"),
+    coder=AgenticCoder("openai/gpt-5-mini", retriever="text-embedding-3-small"),
     cache=cache,
 )
 tables = await pipeline(notes)
@@ -66,7 +66,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Iterator, Optional, Sequence
 from pydantic import BaseModel
 
 from aatm.logs import get_logger
-from aatm.omop.coding import CodedText, uses_context
+from aatm.omop.coding import CacheableCoder, CodedText, reads_context
 
 if TYPE_CHECKING:  # pragma: no cover
     from aatm.concept_search.agent import CodingContext
@@ -387,14 +387,14 @@ class CachedCoder:
         if isinstance(coder, CachedCoder):
             raise ValueError("The coder is already cached")
         if identity is None:
-            describe = getattr(coder, "cache_identity", None)
-            if not callable(describe):
+            if not isinstance(coder, CacheableCoder):
                 raise TypeError(
-                    f"{type(coder).__name__} has no cache_identity(): pass "
-                    "identity=... describing everything that affects its results "
-                    "(models, settings, prompts, index)"
+                    f"{type(coder).__name__} has no cache_identity() (see "
+                    "aatm.omop.coding.CacheableCoder): pass identity=... describing "
+                    "everything that affects its results (models, settings, "
+                    "prompts, index)"
                 )
-            identity = describe()
+            identity = coder.cache_identity()
         self.coder = coder
         self.cache = cache if isinstance(cache, CodingCache) else CodingCache(cache)
         self.identity = {
@@ -426,7 +426,7 @@ class CachedCoder:
 
     @property
     def uses_context(self) -> bool:
-        return uses_context(self.coder)
+        return reads_context(self.coder)
 
     def key(
         self,

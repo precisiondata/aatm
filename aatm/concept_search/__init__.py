@@ -5,7 +5,7 @@ gets the text and its context and searches with tools (semantic search, lexical
 search, code lookup, concept details, hierarchy) until it finds the standard concept
 or concludes there is none. It is available in both pipelines:
 
-- **Notes to OMOP tables**: ``OmopTableBuilder(definitions, mapper=AgenticCoder(...))``
+- **Notes to OMOP tables**: ``OmopTableBuilder(definitions, coder=AgenticCoder(...))``
   (`aatm.omop.AgenticCoder`). The builder passes each text's related values and note
   line.
 - **Terminology mapping**: ``TerminologyMapper(selector=AgenticSelector(...))``. The

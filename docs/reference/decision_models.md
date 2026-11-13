@@ -90,7 +90,7 @@ mapper = TerminologyMapper(
     retriever="text-embedding-3-small",
     selector="decision-openrouter/typesafe/jev-1.13",
 )
-builder = OmopTableBuilder(definitions, mapper=mapper)
+builder = OmopTableBuilder(definitions, coder=mapper)
 ```
 
 Registered names are `decision-openai/gpt-6-luna`, `decision-gemini/gemini-decision-1`

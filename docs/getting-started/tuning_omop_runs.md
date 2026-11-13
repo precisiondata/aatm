@@ -74,7 +74,7 @@ These decide what the run produces and what it costs. Set them for every run.
 - **Definitions**: which entities to extract and how they map to OMOP
   ([Writing entity definitions](entity_definitions.md)).
 - **Model**: `model_id`, the extraction model. Try a small one on the pilot first.
-- **Coder**: `mapper=`, how extracted texts get concept ids
+- **Coder**: `coder=`, how extracted texts get concept ids
   ([the agent](omop_tables.md#searching-with-an-agent) or a terminology mapper), and
   `min_score` in the mappings, the confidence below which `0` is stored.
 - **`cache=True`**: each distinct text is coded once, across chunks, runs and rebuilds.

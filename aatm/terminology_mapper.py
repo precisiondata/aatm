@@ -14,7 +14,7 @@ concept files, process them in batches, and write the mapped output to disk.
 from pathlib import Path
 import asyncio
 import time
-from typing import Any, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, Any, List, Literal, Optional, Tuple
 from rich.console import Console
 from rich.progress import track
 from tqdm import tqdm
@@ -38,6 +38,9 @@ from aatm.rerankers import BaseReranker
 from aatm.translators import BaseTranslator, EmptyTranslator
 from aatm.retrievers import BaseRetriever
 from aatm.selectors import FirstResultSelector, BaseSelector
+
+if TYPE_CHECKING:  # pragma: no cover
+    from aatm.omop.coding import TerminologyMapperCoder
 
 
 console = Console()
@@ -303,6 +306,19 @@ class TerminologyMapper:
             batch_size=api_config.batch_size if api_config else None,
             rate_limit=api_config.rate_limit if api_config else None,
         )
+
+    def as_coder(self) -> "TerminologyMapperCoder":
+        """This mapper as an `aatm.omop.TerminologyMapperCoder`.
+
+        The coder `aatm.omop.OmopTableBuilder` and
+        `aatm.omop.OmopExtractionPipeline` use for ``coder=mapper``: it is wrapped
+        automatically, so this is for using or wrapping the coder yourself, e.g.
+        in an `aatm.omop.CachedCoder`.
+        """
+        # Imported here, so this module does not import aatm.omop when loaded.
+        from aatm.omop.coding import TerminologyMapperCoder
+
+        return TerminologyMapperCoder(self)
 
     def map(
         self,

@@ -76,7 +76,7 @@ class DrugCoder:
 
 def builder(coder=None):
     defs = EntityDefinitions.from_predefined("drug_exposure")
-    return OmopTableBuilder(defs, vocabulary=Lookup(), mapper=coder or DrugCoder())
+    return OmopTableBuilder(defs, vocabulary=Lookup(), coder=coder or DrugCoder())
 
 
 def build(text, entities, coder=None, **note_kwargs):
@@ -341,7 +341,7 @@ def test_drug_without_kind_is_rejected():
 
 
 def test_drug_exposure_needs_a_mapper():
-    with pytest.raises(ValueError, match="needs a terminology mapper"):
+    with pytest.raises(ValueError, match="needs a coder"):
         OmopTableBuilder(
             EntityDefinitions.from_predefined("drug_exposure"), vocabulary=Lookup()
         )
@@ -359,7 +359,7 @@ def test_pipeline_dataframe():
         "drug_exposure",
         extractor=Extractor(),
         vocabulary=Lookup(),
-        mapper=DrugCoder(),
+        coder=DrugCoder(),
     )
     tables = asyncio.run(pipeline([note("aspirin")]))
     df = tables["drug_exposure"]
@@ -381,7 +381,7 @@ def test_predefined_drug_concepts_resolve_in_local_vocabulary():
     b = OmopTableBuilder(
         EntityDefinitions.from_predefined("drug_exposure"),
         vocabulary=SqliteConceptLookup(".aatm/omop.db"),
-        mapper=DrugCoder(),
+        coder=DrugCoder(),
     )
     concepts = b.describe_concepts()
     assert set(concepts.domain_id) == {"Route"}

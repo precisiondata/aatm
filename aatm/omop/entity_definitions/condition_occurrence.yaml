@@ -29,7 +29,7 @@
 # - condition_concept_id is coded from the mention with the terminology mapper
 #   (aatm.terminology_mapper.TerminologyMapper), restricted to standard concepts of the
 #   Condition domain, from any vocabulary. The builder needs a mapper for this file:
-#   OmopTableBuilder(definitions, mapper=TerminologyMapper(...)).
+#   OmopTableBuilder(definitions, coder=TerminologyMapper(...)).
 # - condition_status_concept_id is the standard Condition Status concept of the status:
 #   32893 "Confirmed diagnosis" or 32899 "Preliminary diagnosis". The CDM's own
 #   examples of statuses are the point in the visit when the diagnosis was given

@@ -10,7 +10,7 @@ from aatm.terminology_mapper import TerminologyMapper
 from aatm.omop import OmopTableBuilder
 
 mapper = TerminologyMapper(retriever="text-embedding-3-small")
-builder = OmopTableBuilder(definitions, mapper=mapper)  # wrapped automatically
+builder = OmopTableBuilder(definitions, coder=mapper)  # wrapped automatically
 ```
 
 `AgenticCoder` codes each text with an LLM agent that searches the vocabularies with
@@ -21,21 +21,25 @@ the note); see `aatm.concept_search`:
 from aatm.omop import AgenticCoder
 
 builder = OmopTableBuilder(
-    definitions, mapper=AgenticCoder("openai/gpt-5-mini", retriever="text-embedding-3-small")
+    definitions, coder=AgenticCoder("openai/gpt-5-mini", retriever="text-embedding-3-small")
 )
 ```
 
 The same agent can be the selector of a `TerminologyMapper`
 (`aatm.concept_search.AgenticSelector`); the builder then passes it the context too.
+
+A custom coder implements `TextCoder`. To read the context of each text, it also
+implements `ContextualTextCoder`; to be cached, `CacheableCoder`.
 """
 
 import json
-from typing import TYPE_CHECKING, Any, Optional, Protocol, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Protocol, Sequence, runtime_checkable
 
 from pydantic import BaseModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from aatm.concept_search.agent import CodingContext, ConceptSearchResult
+    from aatm.terminology_mapper import TerminologyMapper
 
 
 class CodedText(BaseModel):
@@ -76,17 +80,17 @@ class CodedText(BaseModel):
     cached: bool = False
 
 
+@runtime_checkable
 class TextCoder(Protocol):
     """Maps texts to standard concepts, optionally restricted to a domain and vocabularies.
 
-    A coder with ``uses_context = True`` also accepts ``contexts``: one
-    `aatm.concept_search.CodingContext` per text (related values, the sentence of the
-    note, the target column). The builder then codes each distinct text *in its
-    context* once, rather than each distinct text once.
+    The builder calls ``code`` once per domain and vocabularies, with each distinct
+    text once. Two optional protocols extend it:
 
-    To be cached (`aatm.omop.CachedCoder`), a coder also describes itself with
-    ``cache_identity()``: JSON-compatible values covering everything that changes its
-    results (models, settings, prompts, index).
+    - `ContextualTextCoder`: the coder reads the context of each text (related
+      values, the sentence of the note, the target column);
+    - `CacheableCoder`: the coder describes itself, so `aatm.omop.CachedCoder` can
+      reuse its results.
     """
 
     def code(
@@ -99,9 +103,81 @@ class TextCoder(Protocol):
         ...
 
 
-def uses_context(coder: Any) -> bool:
-    """Whether a coder (or a selector) reads the context of the texts."""
-    return bool(getattr(coder, "uses_context", False))
+@runtime_checkable
+class ContextualTextCoder(TextCoder, Protocol):
+    """A `TextCoder` that can read the context of each text.
+
+    When ``uses_context`` is true, the builder passes ``contexts``: one
+    `aatm.concept_search.CodingContext` per text (related values, the sentence of
+    the note, the target column), and codes each distinct text *in its context*
+    once, rather than each distinct text once. When it is false, ``contexts`` is
+    not passed.
+
+    Attributes:
+        uses_context: Whether to pass the contexts. A property works too, for a
+            coder that reads context only in some configurations.
+    """
+
+    uses_context: bool
+
+    def code(
+        self,
+        texts: Sequence[str],
+        domain: Optional[str] = None,
+        vocabularies: Optional[Sequence[str]] = None,
+        contexts: Optional[Sequence["CodingContext"]] = None,
+    ) -> list[CodedText]:
+        """Return one `CodedText` per text, in order."""
+        ...
+
+
+@runtime_checkable
+class CacheableCoder(Protocol):
+    """A coder whose results `aatm.omop.CachedCoder` can store and reuse."""
+
+    def cache_identity(self) -> dict[str, Any]:
+        """JSON-compatible values covering everything that changes the results.
+
+        Models, settings, prompts, the search index. Two coders with the same
+        identity must return the same results for the same texts; settings that do
+        not change the results (such as concurrency) are left out.
+        `aatm.omop.cache.describe_component` describes most components.
+        """
+        ...
+
+
+def reads_context(coder: Any) -> bool:
+    """Whether the builder should pass contexts to a coder (`ContextualTextCoder`)."""
+    return isinstance(coder, ContextualTextCoder) and bool(coder.uses_context)
+
+
+def uses_context(component: Any) -> bool:
+    """Whether a component, such as a selector, reads the context of the texts."""
+    return bool(getattr(component, "uses_context", False))
+
+
+def as_coder(obj: "TextCoder | TerminologyMapper") -> TextCoder:
+    """The `TextCoder` for an object passed as ``coder=``.
+
+    A `aatm.terminology_mapper.TerminologyMapper` is wrapped in a
+    `TerminologyMapperCoder`; a `TextCoder` is returned as is.
+
+    Raises:
+        TypeError: For anything else, so a wrong object fails when the builder is
+            created, not at the first coding call.
+    """
+    if isinstance(obj, TextCoder):
+        return obj
+    # Imported here: aatm.terminology_mapper is slow to import, and only needed
+    # when the object is not already a coder.
+    from aatm.terminology_mapper import TerminologyMapper
+
+    if isinstance(obj, TerminologyMapper):
+        return TerminologyMapperCoder(obj)
+    raise TypeError(
+        f"coder must be a TerminologyMapper or a TextCoder (an object with a "
+        f"code(texts, domain, vocabularies) method), got {type(obj).__name__}"
+    )
 
 
 def retriever_filter(
@@ -128,9 +204,17 @@ class TerminologyMapperCoder:
     Domain and vocabularies become a filter on the mapper's retriever, so only
     matching standard concepts are candidates. When the mapper's selector reads
     context (`aatm.concept_search.AgenticSelector`), the contexts are passed on.
+
+    Every concept it returns is marked ``standard=True``: the indexes ``aatm init``
+    builds hold standard concepts only. A custom retriever over an index with
+    non-standard concepts breaks this assumption; the builder still checks each
+    concept against the vocabulary database, stores ``0`` for one that is not
+    standard (or of the wrong domain) and reports it.
+
+    ``TerminologyMapper.as_coder()`` returns one.
     """
 
-    def __init__(self, mapper: Any):
+    def __init__(self, mapper: "TerminologyMapper"):
         self.mapper = mapper
 
     @property
@@ -158,7 +242,8 @@ class TerminologyMapperCoder:
         kwargs: dict[str, Any] = {}
         if contexts is not None and self.uses_context:
             kwargs["contexts"] = list(contexts)
-        mapped = self.mapper.map(
+        # return_as="mapped_source_concepts" returns a list of MappedSourceConcept.
+        mapped: list[Any] = self.mapper.map(  # type: ignore[assignment]
             expressions=list(texts),
             return_as="mapped_source_concepts",
             save_to_disk=False,

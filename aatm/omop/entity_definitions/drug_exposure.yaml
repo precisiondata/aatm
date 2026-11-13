@@ -34,7 +34,7 @@
 # - drug_concept_id is coded from the mention with the terminology mapper
 #   (aatm.terminology_mapper.TerminologyMapper), restricted to standard concepts of the
 #   Drug domain, from any vocabulary (RxNorm, in practice). The builder needs a mapper
-#   for this file: OmopTableBuilder(definitions, mapper=TerminologyMapper(...)).
+#   for this file: OmopTableBuilder(definitions, coder=TerminologyMapper(...)).
 # - drug_exposure_start_date is the start date the note gives, else the note date: the
 #   order date for a prescription, the recording date for an administration, and the
 #   date the patient is known to take the drug for a medication list.

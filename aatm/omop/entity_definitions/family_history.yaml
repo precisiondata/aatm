@@ -22,7 +22,7 @@
 # - The condition is coded from the mention with the terminology mapper, restricted to
 #   standard concepts of the Condition domain, from any vocabulary. The builder needs a
 #   mapper for this file:
-#   OmopTableBuilder(definitions, mapper=TerminologyMapper(...)).
+#   OmopTableBuilder(definitions, coder=TerminologyMapper(...)).
 # - The relative goes to qualifier_concept_id as a standard SNOMED relationship concept
 #   ("Mother", "Sister"...). The CDM has no dedicated column for the relative; this is
 #   a convention of this file.
