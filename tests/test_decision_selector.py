@@ -368,3 +368,28 @@ def test_amap_gives_no_confidence_without_a_distance(tmp_path):
     # A selection without a distance, or no selection, is not full confidence.
     assert scores[0] == pytest.approx(0.75)
     assert pd.isna(scores[1]) and pd.isna(scores[2])
+
+
+def test_map_and_amap_write_to_the_output_dir_given(tmp_path):
+    from aatm.aio.translators import EmptyTranslator
+
+    (tmp_path / "in.csv").write_text(AMAP_CSV)
+    default, given = tmp_path / "default", tmp_path / "given" / "nested"
+    mapper = TerminologyMapper(
+        translator=EmptyTranslator(),
+        retriever=FakeRetriever(default=(SERUM,)),
+        selector=AsyncFixedSelector(),
+        output_dir=default,
+    )
+    asyncio.run(mapper.amap(file_path=tmp_path / "in.csv", output_dir=given))
+    assert (given / "mapped_source_concepts.csv").exists()
+    assert not (default / "mapped_source_concepts.csv").exists()
+
+    sync = TerminologyMapper(
+        retriever=FakeRetriever(default=(SERUM,)), output_dir=default
+    )
+    sync.map(file_path=tmp_path / "in.csv", output_dir=given / "sync")
+    assert (given / "sync" / "mapped_source_concepts.csv").exists()
+    assert not (default / "mapped_source_concepts.csv").exists()
+    sync.map(file_path=tmp_path / "in.csv")  # without it, the mapper's own folder
+    assert (default / "mapped_source_concepts.csv").exists()

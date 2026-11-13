@@ -659,6 +659,10 @@ class Pilot:
                     f"{new.name} is the first version: name one to compare"
                 )
             old = earlier[-1]
+        if old.name == new.name:
+            raise ValueError(
+                f"{new.name} is compared with itself: name two different versions"
+            )
         return compare_versions(old, new, versions)
 
 

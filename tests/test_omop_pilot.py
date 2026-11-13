@@ -228,6 +228,14 @@ def test_compare_needs_two_versions(tmp_path):
         pilot.compare("v001", "v009")
 
 
+def test_compare_refuses_a_version_with_itself(tmp_path):
+    pilot = Pilot(tmp_path, source=notes(2), sample=2)
+    run(pilot, make_pipeline()[0])
+    for a, b in (("v001", "v001"), ("v001", 1), (None, "v001")):
+        with pytest.raises(ValueError, match="itself|first version|two versions"):
+            pilot.compare(a, b)
+
+
 def test_mentions_with_another_span_or_label_are_changed():
     note = ClinicalNote(note_id=1, text="first line\nECOG 1 today")
 

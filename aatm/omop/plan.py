@@ -1,7 +1,7 @@
 """A dry run of `OmopExtractionPipeline.run`: its settings, an estimate and warnings.
 
-`OmopExtractionPipeline.plan` runs nothing costly: no model call, no note read beyond
-what counting them takes. It reports
+`OmopExtractionPipeline.plan` runs nothing costly: no model call, and of the notes
+only their ids are read, to match them with an earlier run. It reports
 
 - the effective settings of the run and where each came from (``default``,
   ``argument`` or ``set_rate_limits``);
@@ -43,8 +43,9 @@ from aatm.omop.runner import (
     count_notes,
     extraction_concurrency,
     model_location,
+    source_note_ids,
 )
-from aatm.omop.shards import check_shard, shard_dirs
+from aatm.omop.shards import check_shard, shard_dirs, shard_of
 
 if TYPE_CHECKING:
     from aatm.omop.builder import OmopExtractionPipeline
@@ -121,6 +122,12 @@ class RunPlan(BaseModel):
         status: Notes per status in the output folder, from earlier runs.
         to_extract: Notes still to extract (one model call each), when known.
         to_build: Notes extracted by earlier runs, still to build.
+        by_note_id: Whether `to_extract` and `to_build` come from matching the
+            source's note ids with the output folder's ledger. When the ids are not
+            cheap to read (CSV files, queries, iterators), they are estimated from
+            the counts instead: the notes in the source minus those the folder
+            already has, which is only right when the source is the one the earlier
+            runs read.
         settings: The effective settings and where each came from.
         estimate: Calls, tokens, cost and time, when there is a pilot.
         warnings: Combinations to change, each with a fix.
@@ -131,6 +138,7 @@ class RunPlan(BaseModel):
     status: dict[str, int] = {}
     to_extract: Optional[int] = None
     to_build: int = 0
+    by_note_id: bool = False
     settings: list[PlanSetting] = []
     estimate: Optional[PlanEstimate] = None
     warnings: list[PlanWarning] = []
@@ -377,31 +385,59 @@ def plan_run(
     chunk_size, chunk_source = _given(chunk_size, "chunk_size")
     batch, batch_source = _given(batch, "batch")
     shard_value, shard_source = _given(shard, "shard")
+    shard_index, shards = 0, 1
+    if shard_value is not None:
+        shard_index, shards = check_shard(shard_value)
+    # The ids, when cheap to read, so the notes left are matched by id rather than
+    # estimated from counts. `total` says the caller knows the count better.
+    ids = source_note_ids(source) if source is not None and total is None else None
+    if ids is not None:
+        ids = list(dict.fromkeys(ids))  # a repeated note is extracted once
+        if shards > 1:
+            ids = [i for i in ids if shard_of(i, shards) == shard_index]
     count = (
         total
         if total is not None
-        else (count_notes(source) if source is not None else None)
+        else (
+            len(ids)
+            if ids is not None
+            else (count_notes(source) if source is not None else None)
+        )
     )
-    shards = 1
-    if shard_value is not None:
-        _, shards = check_shard(shard_value)
-        if count is not None and total is None and shards > 1:
-            count = -(-count // shards)
+    if count is not None and ids is None and total is None and shards > 1:
+        count = -(-count // shards)
     plan.total = count
 
     folder = Path(output_dir) if output_dir is not None else None
+    ledger_paths: list[Path] = []
     if folder is not None and (folder / LEDGER_FILE).exists():
-        ledger = RunLedger(folder / LEDGER_FILE)
+        ledger_paths = [folder / LEDGER_FILE]
+    elif folder is not None and shard_dirs(folder):
+        ledger_paths = [
+            d / LEDGER_FILE for d in shard_dirs(folder) if (d / LEDGER_FILE).exists()
+        ]
+    statuses: dict[int, str] = {}
+    for path in ledger_paths:
+        ledger = RunLedger(path)
         try:
-            plan.status = ledger.counts()
+            for status, n in ledger.counts().items():
+                plan.status[status] = plan.status.get(status, 0) + n
+            if ids is not None:
+                statuses.update(
+                    (note_id, state.status)
+                    for note_id, state in ledger.states(ids).items()
+                )
         finally:
             ledger.close()
-    elif folder is not None and shard_dirs(folder):
-        plan.status = OmopRun(folder).status()
-    plan.to_build = plan.status.get("extracted", 0)
-    if count is not None:
-        started = sum(plan.status.values())
-        plan.to_extract = max(count - started, 0) + plan.status.get("failed", 0)
+    if ids is not None:
+        plan.by_note_id = True
+        plan.to_extract = sum(1 for i in ids if statuses.get(i, "failed") == "failed")
+        plan.to_build = sum(1 for i in ids if statuses.get(i) == "extracted")
+    else:
+        plan.to_build = plan.status.get("extracted", 0)
+        if count is not None:
+            started = sum(plan.status.values())
+            plan.to_extract = max(count - started, 0) + plan.status.get("failed", 0)
 
     # --- settings ------------------------------------------------------------------
     limits = get_rate_limits(model_id) if isinstance(model_id, str) else None

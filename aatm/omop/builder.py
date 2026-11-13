@@ -1468,8 +1468,11 @@ class OmopExtractionPipeline:
     ) -> "RunPlan":
         """A dry run of `run`: its settings, an estimate and warnings, at no cost.
 
-        Makes no model call and reads no note (Parquet files, DataFrames and lists
-        are counted from their metadata or length). Print the result for a report:
+        Makes no model call and reads no note text. The notes left are matched by
+        `note_id` with what `output_dir` already has, when the ids are cheap to read
+        (lists, DataFrames, the ``note_id`` column of Parquet files); otherwise
+        (CSV files, queries) they are estimated from the counts. Print the result for
+        a report:
 
         ```text
         Run plan for output/ecog

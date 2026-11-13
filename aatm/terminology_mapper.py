@@ -455,11 +455,7 @@ class TerminologyMapper:
                 ]
             )
 
-            output_dir = output_dir if output_dir is not None else self.output_dir
-
-            mapped_source_concepts_df.to_csv(
-                self.output_dir / "mapped_source_concepts.csv", index=False
-            )
+            self._write_output(mapped_source_concepts_df, output_dir)
 
         if return_as == "df":
             if mapped_source_concepts_df is None:
@@ -564,13 +560,28 @@ class TerminologyMapper:
         if return_confidence_scores:
             mapped_source_concepts_df["confidence_score"] = confidence_scores
 
-        output_dir = output_dir if output_dir is not None else self.output_dir
-
-        mapped_source_concepts_df.to_csv(
-            self.output_dir / "mapped_source_concepts.csv", index=False
-        )
+        self._write_output(mapped_source_concepts_df, output_dir)
 
         return mapped_source_concepts_df
+
+    def _write_output(
+        self, df: pd.DataFrame, output_dir: str | Path | None = None
+    ) -> Path:
+        """Write the mapped source concepts to ``mapped_source_concepts.csv``.
+
+        Args:
+            df: The mapped source concepts.
+            output_dir: The folder to write to, made if missing; the mapper's
+                ``output_dir`` when ``None``.
+
+        Returns:
+            The path of the file written.
+        """
+        folder = Path(output_dir) if output_dir is not None else self.output_dir
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / "mapped_source_concepts.csv"
+        df.to_csv(path, index=False)
+        return path
 
     def map_csv_to_source_concepts(
         self, file_path: Path, limit_to: Optional[int] = None
