@@ -7,16 +7,21 @@ site_author: Vinicius Anjos de Almeida (https://github.com/almeidava93) supporte
 
 nav:
   - Home: 'index.md'
-  - Getting Started: 
+  - Getting Started:
     - 'getting-started/index.md'
     - Installation: 'getting-started/installation.md'
+    - Set up the vocabularies: 'getting-started/setup.md'
     - Environment variables: 'getting-started/env.md'
-    - Project artifacts created locally: 'getting-started/artifacts.md'
+    - Files AATM creates: 'getting-started/artifacts.md'
     - Basic concepts: 'getting-started/concepts.md'
-    - Quick start:
-      - Command Line Interface: 'getting-started/quick_start_cli.md'
-      - Python API: 'getting-started/quick_start_python_api.md'
-      - Information extraction: 'getting-started/quick_start_extraction.md'
+  - Quick starts:
+    - Notes to OMOP tables: 'getting-started/quick_start_omop.md'
+    - Information extraction: 'getting-started/quick_start_extraction.md'
+    - Terminology mapping (CLI): 'getting-started/quick_start_cli.md'
+    - Terminology mapping (Python): 'getting-started/quick_start_python_api.md'
+  - Guides:
+    - High-level guide: 'getting-started/high_level.md'
+    - Low-level guide: 'getting-started/low_level.md'
     - Writing entity definitions: 'getting-started/entity_definitions.md'
     - From notes to OMOP tables: 'getting-started/omop_tables.md'
     - Coding extracted text: 'getting-started/coding_text.md'
