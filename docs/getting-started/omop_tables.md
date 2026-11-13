@@ -223,6 +223,12 @@ The `omop` block is **never sent to the model**: it only tells AATM how to fill 
 table. You can check what the model will read with
 `definitions.to_prompt_str()`.
 
+!!! tip "Let your editor help"
+    With the [entity definition schema](entity_definitions.md#editor-support), your
+    editor completes the column names of the table, suggests `from`, `map`, `lookup`
+    and the other source keys, and underlines a misspelt column such as
+    `value_as_numbr` as you type.
+
 ### 3. Check the codes before spending model calls
 
 ```python
