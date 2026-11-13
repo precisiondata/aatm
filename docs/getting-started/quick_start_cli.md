@@ -15,12 +15,15 @@ With the CLI, you can:
 - build the mapping datasets
 - build the local vector database
 - run terminology mapping jobs
+- extract clinical notes into OMOP tables, and inspect or rebuild the runs
 - launch the interactive search UI
 
 The main commands are:
 
 - `aatm init`
 - `aatm map`
+- `aatm omop run`, `aatm omop rebuild`, `aatm omop status`, `aatm omop failures`
+  (see [Processing large datasets](omop_tables.md#processing-large-datasets))
 - `aatm search-ui`
 
 ---

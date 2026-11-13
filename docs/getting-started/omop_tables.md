@@ -1198,6 +1198,49 @@ summary = asyncio.run(
 print(summary)  # notes built, skipped and failed, rows per table, cache hit rate
 ```
 
+**From the command line.** `aatm omop run` does the same, for shell scripts, cron jobs
+and schedulers (SLURM, Kubernetes), with no Python wrapper:
+
+```bash
+aatm omop run notes.parquet output/ecog   --definitions ecog_performance_status   --model openai/gpt-5-mini --max-concurrency 16 --cache   --chunk-size 200 --columns note_text=text   --price openai/gpt-5-mini=0.25,2.00
+```
+
+Repeat `--definitions` for several files (predefined names or your own YAML files) and
+`--columns` for several renames. Coding `map` sources takes `--coder mapper` (the
+terminology mapper, with `--retriever` and `--selector`) or `--coder agent` (the
+concept search agent, with `--coder-model`, `--retriever` and `--max-tool-calls`); the
+retriever defaults to the one `aatm init` built. `--min-score` applies to `map`
+sources without a `min_score` of their own, and `--labeller <decision model>
+--labeller-mode verify --min-probability 0.8` labels attributes with a decision model.
+`aatm omop run --help` lists every option with its default.
+
+For anything longer than a few flags, write the options in a YAML file, under their
+names with underscores, and commit it so the run can be repeated. Flags override it:
+
+```yaml
+# run.yaml
+source: notes.parquet
+output: output/ecog
+definitions: [ecog_performance_status, ./body_weight.yaml]
+model: openai/gpt-5-mini
+coder: agent
+columns: {note_text: text, patient_id: person_id}
+prices: {openai/gpt-5-mini: [0.25, 2.00]}
+chunk_size: 200
+cache: true
+```
+
+```bash
+aatm omop run --config run.yaml
+aatm omop run --config run.yaml --limit 50 --json   # a quick pilot on 50 notes
+```
+
+Progress is logged to standard error; standard output gets the path of the run's
+summary, or the summary itself with `--json`. The exit code tells a scheduler how it
+went: `0` when every note is built, `2` when the run completed but some notes failed
+(`aatm omop failures output/ecog` lists them; running again retries them), `1` for an
+error, `130` when stopped with Ctrl+C. Running the same command again resumes.
+
 **Extraction settings.** `max_concurrency`, `settings` (generation settings of the
 extraction model, e.g. `{"temperature": 0}`) and `attribute_labeller` (a
 [decision model](../reference/decision_models.md) labelling attributes) are arguments of
@@ -1229,6 +1272,14 @@ source = notes_from_sql(
 summary = await pipeline.run(source, "output/ecog")
 ```
 
+From the command line, `--sql` takes the query and `--db` the database's SQLAlchemy
+URL (`sqlite:///cdm.db` works without SQLAlchemy; other databases need it and their
+driver):
+
+```bash
+aatm omop run output/ecog --sql "SELECT note_id, note_text AS text, person_id FROM note"   --db postgresql+psycopg://user@host/cdm --definitions ecog_performance_status   --model openai/gpt-5-mini
+```
+
 Columns that are not `ClinicalNote` fields are ignored. Every note needs a unique
 **`note_id`**: it is how a resumed run knows what is done.
 
@@ -1247,6 +1298,11 @@ run.status()                # {"built": 9850, "failed": 3}
 run.dataset("measurement")  # a pyarrow Dataset, to filter without loading it all
 ```
 
+From the command line, `aatm omop status output/ecog` prints the notes built and
+failed, the rows per table, the issues by reason and the last run's summary, and
+`aatm omop failures output/ecog` the failed notes with their error (both take
+`--json`).
+
 DuckDB, Polars and Spark read the folders directly, e.g.
 `SELECT * FROM 'output/ecog/measurement/*.parquet'`.
 
@@ -1264,6 +1320,14 @@ them, with no extraction calls:
 ```python
 await pipeline.rebuild("output/ecog")
 ```
+
+```bash
+aatm omop rebuild output/ecog --definitions ./ecog_performance_status.yaml
+```
+
+`aatm omop run` saves the options it used in `output/ecog/options.yaml`, and
+`rebuild` starts from them: give only what changed, such as the definitions or
+`--coder agent`.
 
 A run refuses to add rows built with other mappings to an existing folder until you
 rebuild, and refuses a folder made with other entity definitions or another extractor:
@@ -1318,6 +1382,8 @@ summary = await pipeline.run(
 )
 OmopRun("output/ecog").batches()  # the jobs: id, status, notes
 ```
+
+From the command line: `aatm omop run ... --batch --chunk-size 1000 --poll-every 300`.
 
 Only extraction is batched: coding stays live. Each job is recorded in the ledger as
 soon as it is submitted, so you can stop the run (or lose the machine) while jobs are
@@ -1405,6 +1471,14 @@ from aatm.omop import shard_dir
 
 index = int(os.environ["SHARD_INDEX"])
 await pipeline.run("notes.parquet", shard_dir("output/ecog", index, 8), shard=(index, 8))
+```
+
+From the command line, `--shard <index>/<count>` writes to the shard's folder under
+the output folder, e.g. as a SLURM array job:
+
+```bash
+aatm omop run --config run.yaml --shard "$SLURM_ARRAY_TASK_ID/8"
+aatm omop status output/ecog   # every shard: notes built and failed, issues, last summary
 ```
 
 Each machine keeps its own coding cache: entries are not shared across machines.
