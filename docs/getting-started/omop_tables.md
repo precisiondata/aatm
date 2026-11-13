@@ -11,9 +11,16 @@ Five tables are supported: `measurement` (scores, lab results), `observation`
 (diagnoses, signs and symptoms), `drug_exposure` (drugs prescribed, given or taken) and
 `device_exposure` (implants, equipment and supplies).
 
-If you have not extracted entities from a note before, read the
-[Information extraction quick start](quick_start_extraction.md) first: this page builds
-on its *entity definitions*.
+This is the reference for the tables and for writing your own `omop` blocks. For a
+first run, start with the [quick start](quick_start_omop.md); for a full dataset, the
+[high-level guide](high_level.md). The page builds on *entity definitions*: see the
+[Information extraction quick start](quick_start_extraction.md) if they are new to you.
+
+| Topic | Page |
+|---|---|
+| The tables, the `omop` block, the predefined definitions | This page |
+| How `map` sources are coded: mapper, agent, your own coder, the cache | [Coding extracted text](coding_text.md) |
+| Datasets of any size: runs, resume, rebuild, batch, shards, the CLI | [Processing large datasets](large_datasets.md) |
 
 ---
 

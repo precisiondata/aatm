@@ -1,5 +1,9 @@
 # Coding extracted text
 
+This page is about the `map` sources of an [`omop` block](omop_tables.md#reference-the-omop-block):
+how extracted text gets a standard concept id, how to choose a coder, and how to keep
+its results across runs.
+
 Some concepts never change (body weight is always *Body weight*), but many depend on
 what the note says: the name of a lab test, a condition. A `map` source sends the
 extracted text to the same `TerminologyMapper` used for

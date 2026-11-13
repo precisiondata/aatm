@@ -29,4 +29,4 @@ The first cell of each notebook moves to the project root, where `.aatm/` and `.
 so you can open the notebooks from `examples/` or from the root. LLM outputs vary a little
 between runs.
 
-More detail: [From notes to OMOP tables](https://precisiondata.github.io/aatm/getting-started/omop_tables/).
+More detail: [From notes to OMOP tables](https://precisiondata.github.io/aatm/latest/getting-started/omop_tables/).
