@@ -339,7 +339,11 @@ def main(
 
 
 @app.command(
-    help="Set up your environment to work with OMOP vocabularies and create terminology mappings."
+    help=(
+        "Set up the OMOP vocabularies: unpack an Athena bundle, build the vocabulary "
+        "database (.aatm/omop.db) and the search index of an embedding model. "
+        "Run once per project, before any other command."
+    )
 )
 def init(
     vocab_dir: Annotated[
@@ -676,7 +680,10 @@ def build_search_ui_command(
     return command
 
 
-@app.command("search-ui")
+@app.command(
+    "search-ui",
+    help="Open an interactive search over the vocabularies in the browser (Streamlit).",
+)
 def search_ui() -> None:
     """Launch the Streamlit-based search interface.
 
@@ -700,14 +707,21 @@ def search_ui() -> None:
     subprocess.run(build_search_ui_command(streamlit_app), check=True)
 
 
-@app.command("map", help="Run a terminology mapping task")
+@app.command(
+    "map",
+    help=(
+        "Map a CSV of source terms (SOURCE_TO_CONCEPT_MAP layout) to standard "
+        "concepts; the result is <output-dir>/mapped_source_concepts.csv. Give the "
+        "options as flags or in a --task-config-path file."
+    ),
+)
 def map(
     task_config_path: Annotated[
         Optional[Path],
         typer.Option(
             "--task-config-path",
             "-t",
-            help="Path to the task config file",
+            help="A YAML or JSON file of the options below (names with underscores)",
         ),
     ] = None,
     input_file: Annotated[
@@ -715,7 +729,7 @@ def map(
         typer.Option(
             "--input-file",
             "-i",
-            help="Path to the input file containing source concepts",
+            help="The CSV of source terms, with the SOURCE_TO_CONCEPT_MAP columns",
         ),
     ] = None,
     output_dir: Annotated[
@@ -723,7 +737,8 @@ def map(
         typer.Option(
             "--output-dir",
             "-o",
-            help="Path to the output directory",
+            help="Where to write mapped_source_concepts.csv",
+            show_default="output",
         ),
     ] = None,
     translator_id: Annotated[
@@ -731,7 +746,8 @@ def map(
         typer.Option(
             "--translator-id",
             "-tr",
-            help="ID of the translator to use",
+            help="Translate the terms first: empty-translator or gemini-2.5-flash",
+            show_default="no translation",
         ),
     ] = None,
     retriever_id: Annotated[
@@ -739,7 +755,8 @@ def map(
         typer.Option(
             "--retriever-id",
             "-r",
-            help="ID of the retriever to use",
+            help="The embedding model whose index to search, e.g. text-embedding-3-small",
+            show_default="the one aatm init built",
         ),
     ] = None,
     selector_id: Annotated[
@@ -747,7 +764,8 @@ def map(
         typer.Option(
             "--selector-id",
             "-s",
-            help="ID of the selector to use",
+            help="How the concept is chosen: first-result-selector, an LLM (e.g. gpt-5-mini), the agent (e.g. agent-gpt-5-mini) or decision-<model>",
+            show_default="first-result-selector",
         ),
     ] = None,
     reranker_id: Annotated[
@@ -755,7 +773,8 @@ def map(
         typer.Option(
             "--reranker-id",
             "-rr",
-            help="ID of the reranker to use",
+            help="Reorder the candidates: bm25-reranker or qwen3-reranker-0.6b/-4b/-8b",
+            show_default="no reranking",
         ),
     ] = None,
     batch_size: Annotated[
@@ -763,7 +782,8 @@ def map(
         typer.Option(
             "--batch-size",
             "-b",
-            help="Batch size to use when mapping source concepts",
+            help="Terms mapped together",
+            show_default="100",
         ),
     ] = None,
     rate_limit: Annotated[
@@ -771,7 +791,8 @@ def map(
         typer.Option(
             "--rate-limit",
             "-rl",
-            help="Rate limit to use when mapping source concepts",
+            help="Terms mapped per minute at most",
+            show_default="no limit",
         ),
     ] = None,
     limit_to: Annotated[
@@ -779,7 +800,8 @@ def map(
         typer.Option(
             "--limit-to",
             "-l",
-            help="Limit the number of source concepts to map. Useful for testing and debugging.",
+            help="Map only the first N terms, e.g. for a test",
+            show_default="all",
         ),
     ] = None,
 ) -> None:
@@ -883,12 +905,19 @@ def map(
     console.print("[green]Done![/green]\n")
 
 
-@app.command("amap", help="Run a terminology mapping task with asynchronous methods")
+@app.command(
+    "amap",
+    help="Not implemented yet: use aatm map",
+    hidden=True,
+)
 def amap() -> None:
     raise NotImplementedError
 
 
-@app.command("serve", help="Serve a FastAPI application with AATM's functionality")
+@app.command(
+    "serve",
+    help="Serve terminology mapping as a REST API (FastAPI), configured by .aatm/api_config.yaml",
+)
 def serve(
     host: Annotated[
         str,
@@ -1310,7 +1339,9 @@ app.add_typer(cache_app, name="cache")
 
 CachePathOption = Annotated[
     Path,
-    typer.Option("--path", "-p", help="The cache file"),
+    typer.Option(
+        "--path", "-p", help="The cache file", show_default=".aatm/coding_cache.db"
+    ),
 ]
 
 
