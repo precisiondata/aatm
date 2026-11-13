@@ -13,11 +13,11 @@ against the note. Only spans that really exist in the note survive, each with it
 character position, linked to the entity it belongs to.
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[Clinical note] --> B[Numbered lines]
-    D[Entity definitions] --> C
     B --> C[LLM extraction]
-    C --> E[Validation]
+    D[Entity definitions] --> C
+    C --> E[Validation against the note]
     E --> F[Validated entities<br/>+ rejected candidates]
     F --> G[Records view]
 ```

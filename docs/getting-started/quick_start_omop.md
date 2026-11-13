@@ -6,7 +6,7 @@ from the command line or from Python. Each step works on its own, so you can sto
 the one you need.
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[Clinical notes] --> B[LLM extraction]
     D[Entity definitions] --> B
     B --> C[Coding with the<br/>OMOP vocabularies]

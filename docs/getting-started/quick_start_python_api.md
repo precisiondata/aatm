@@ -11,11 +11,11 @@ the text extracted from notes into OMOP tables.
 searches the index it builds.
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[Source terms] --> B[Translator<br/>optional]
     B --> C[Retriever<br/>search index]
     C --> D[Reranker<br/>optional]
-    D --> E[Selector]
+    D --> E[Selector<br/>closest, LLM, decision model or agent]
     E --> F[Standard concepts]
 ```
 

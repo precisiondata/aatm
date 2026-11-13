@@ -18,15 +18,21 @@ table builder), see the [low-level guide](low_level.md).
 
 ```mermaid
 flowchart LR
-    S[aatm init] --> D[Choose definitions]
-    D --> C[Check the codes]
-    C --> P[Pilot on a sample]
-    P -->|edit wording| P
-    P --> E[Plan: cost and time]
-    E --> R[Full run]
-    R -->|stopped or failed notes| R
-    R --> B[Rebuild after<br/>mapping changes]
-    R --> L[Load into your CDM]
+    subgraph prepare [On a sample]
+      direction TB
+      S[aatm init] --> D[Choose definitions]
+      D --> C[Check the codes]
+      C --> P[Pilot on a sample]
+      P -->|edit the wording| P
+    end
+    subgraph full [On the full dataset]
+      direction TB
+      E[Plan: cost and time] --> R[Full run]
+      R -->|resume, retry| R
+      R --> B[Rebuild after<br/>a mapping change]
+      R --> L[Load into your CDM]
+    end
+    prepare --> full
 ```
 
 ---

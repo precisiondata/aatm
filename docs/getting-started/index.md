@@ -56,22 +56,23 @@ Python equivalent.
 ## The whole pipeline at a glance
 
 ```mermaid
-flowchart LR
-    subgraph setup [Once]
-      A[Athena bundle] --> I[aatm init]
-      I --> DB[(omop.db<br/>vocabularies)]
-      I --> VX[(search index)]
+flowchart TB
+    subgraph extraction [Information extraction]
+      direction LR
+      N[Clinical notes] --> X[Extract<br/>LLM + definitions]
+      X --> V[Validate<br/>against the note]
     end
-    N[Clinical notes] --> X[Extract<br/>LLM + entity definitions]
-    X --> V[Validate<br/>against the note]
-    V --> C[Code<br/>mapper or agent]
-    VX --> C
-    DB --> C
-    C --> B[Build rows<br/>CDM conventions]
-    B --> T[OMOP tables<br/>+ provenance, issues]
-    S[Local codes CSV] --> M[aatm map]
-    VX --> M
-    M --> STCM[SOURCE_TO_CONCEPT_MAP]
+    subgraph coding [Medical coding: extracted text or your own terms]
+      direction LR
+      R[Retrieve candidates<br/>from the search index] --> SEL[Select<br/>LLM, decision model or agent]
+      SEL --> CHK[Check against the<br/>vocabulary database]
+    end
+    subgraph omop [Notes to OMOP tables]
+      direction LR
+      BLD[Build rows<br/>CDM conventions] --> T[OMOP tables<br/>+ provenance, issues]
+    end
+    extraction --> coding
+    coding --> omop
 ```
 
 The [Basic concepts](concepts.md) page defines each box.

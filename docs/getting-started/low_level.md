@@ -6,7 +6,7 @@ and each replaceable. This guide shows them one by one, and how to put your own 
 back into the high-level pipeline, so you keep resuming, caching, batching and sharding.
 
 ```mermaid
-flowchart LR
+flowchart TB
     N[Note text] --> S[segment_text<br/>numbered lines]
     S --> L[StructuredLLM<br/>one call per note]
     D[EntityDefinitions] --> L
