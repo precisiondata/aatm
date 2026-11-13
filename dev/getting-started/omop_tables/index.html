@@ -2787,8 +2787,9 @@ on its <em>entity definitions</em>.</p>
    (<a href="../quick_start_cli/#1-get-your-omop-vocabularies">CLI quick start</a>). It downloads
    and unpacks the bundle, then builds the local
    vocabulary database (<code>.aatm/omop.db</code>), which every example on this page reads, and
-   the search index the terminology mapper uses. Note the embedding model you choose
-   (for example <code>text-embedding-3-small</code>): you pass the same name to the mapper later.</li>
+   the search index the terminology mapper uses. It records the embedding model you
+   choose (for example <code>text-embedding-3-small</code>) in <code>.aatm/config.yaml</code>, and the
+   mapper uses that index unless you pass another <code>retriever</code>.</li>
 <li><strong>Set an API key</strong> for the model provider, e.g. <code>OPENAI_API_KEY</code>
    (<a href="../env/">Environment variables</a>).</li>
 </ol>
@@ -3379,7 +3380,7 @@ because that involves search models, LLMs and API keys:</p>
 </span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.terminology_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminologyMapper</span>
 </span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
 </span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="n">mapper</span> <span class="o">=</span> <span class="n">TerminologyMapper</span><span class="p">(</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span>          <span class="c1"># the embedding model chosen in `aatm init`</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span>          <span class="c1"># optional: defaults to the model built by `aatm init`</span>
 </span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="n">selector</span><span class="o">=</span><span class="n">OpenAILLMSelector</span><span class="p">(</span><span class="s2">"gpt-5-mini"</span><span class="p">),</span>    <span class="c1"># an LLM picks among the candidates</span>
 </span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="p">)</span>
 </span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="n">mapper</span><span class="o">.</span><span class="n">retriever</span><span class="o">.</span><span class="n">top_k</span> <span class="o">=</span> <span class="mi">30</span>                      <span class="c1"># how many candidates it sees</span>
@@ -3462,7 +3463,7 @@ concept or concludes there is none:</p>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
 </span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">coder</span> <span class="o">=</span> <span class="n">AgenticCoder</span><span class="p">(</span>
 </span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span>                 <span class="c1"># any aatm.llm model id</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span>  <span class="c1"># the embedding model chosen in `aatm init`</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    <span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span>  <span class="c1"># optional: defaults to the model built by `aatm init`</span>
 </span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    <span class="n">max_tool_calls</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>                    <span class="c1"># per text</span>
 </span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="p">)</span>
 </span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">OmopExtractionPipeline</span><span class="p">(</span><span class="s2">"lab_results"</span><span class="p">,</span> <span class="n">model_id</span><span class="o">=</span><span class="s2">"openai/gpt-5-mini"</span><span class="p">,</span> <span class="n">mapper</span><span class="o">=</span><span class="n">coder</span><span class="p">)</span>
@@ -4562,9 +4563,19 @@ extracted.</p>
 <td>Use <code>asyncio.run(pipeline(notes))</code>, or run it in a notebook</td>
 </tr>
 <tr>
-<td>Every <code>map</code> is <code>unmapped</code></td>
-<td>The mapper found no candidates, e.g. the search index for its retriever was not built</td>
-<td>Use the embedding model you chose in <code>aatm init</code> as the <code>retriever</code></td>
+<td><code>No vector database for 'text-embedding-3-large' (...). Built and ready: ...</code></td>
+<td><code>retriever</code> names an embedding model whose search index was not built (or is empty)</td>
+<td>Use a model the message lists as built, leave <code>retriever</code> out to use the one <code>aatm init</code> built, or build it with the <code>aatm init</code> command shown</td>
+</tr>
+<tr>
+<td><code>Several vector databases are built and none is recorded in .aatm/config.yaml</code></td>
+<td>No <code>retriever</code> was given, and indexes built before <code>.aatm/config.yaml</code> existed leave the choice open</td>
+<td>Pass <code>retriever="&lt;model&gt;"</code>, or run <code>aatm init --embedding-model &lt;model&gt;</code> and choose Skip to record it</td>
+</tr>
+<tr>
+<td><code>No vector database is built in local mode, so there is no retriever to default to</code></td>
+<td><code>aatm init</code> has not built a search index here, or <code>AATM_VECTOR_DB</code> points to another vector database</td>
+<td>Run <code>aatm init</code>, or set <code>AATM_VECTOR_DB</code> to where the index lives</td>
 </tr>
 <tr>
 <td><code>... has no cache_identity(): pass identity=...</code></td>

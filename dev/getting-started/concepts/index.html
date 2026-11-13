@@ -2267,17 +2267,31 @@
 <li><code>ChromaDBRetriever</code>: a local or Chroma Cloud collection.</li>
 <li><code>PineconeRetriever</code>: a Pinecone index.</li>
 </ul>
+<p><code>aatm init</code> and <code>aatm vector-db upload</code> record the embedding model they built, the vector
+database and the build date in <code>.aatm/config.yaml</code>. Without a model name,
+<code>load_retriever()</code>, <code>TerminologyMapper()</code>, <code>AgenticCoder(model_id)</code> and <code>aatm map</code> use
+the most recently built one for the configured vector database (and log which), or,
+with nothing recorded, the only built one. <code>aatm vector-db check</code> shows that default.</p>
+<p>A retriever only opens an index that is built: naming a model whose index does not
+exist or is empty raises <code>VectorDatabaseNotBuiltError</code> instead of searching an empty
+collection. The message lists the indexes that are built and how to build the one
+asked for:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>No vector database for 'text-embedding-3-large' (.aatm/chroma_vector_dbs/text-embedding-3-large not found).
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Built and ready:
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  - text-embedding-3-small  local  .aatm/chroma_vector_dbs/text-embedding-3-small  (2,512,331 expressions)
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>Use retriever="text-embedding-3-small", or build it with: aatm init --embedding-model text-embedding-3-large
+</span></code></pre></div>
 <p>Both share their filtering logic (<code>VectorStoreRetriever</code>), and distances mean the same
 on both, so selectors and thresholds do not depend on the backend.</p>
 <h3 id="metadata-filters">Metadata filters</h3>
 <p>A retriever can restrict its candidates with a <code>where</code> filter, written in ChromaDB's
 syntax, which AATM translates for Pinecone. For example, to restrict them to
 one domain and some vocabularies. The OMOP builder does this for every <code>map</code> source:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop.coding</span><span class="w"> </span><span class="kn">import</span> <span class="n">retriever_filter</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">where</span> <span class="o">=</span> <span class="n">retriever_filter</span><span class="p">(</span><span class="s2">"Measurement"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"LOINC"</span><span class="p">])</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># {"$and": [{"std_domain_id": "Measurement"}, {"std_vocabulary_id": {"$in": ["LOINC"]}}]}</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">results</span> <span class="o">=</span> <span class="n">retriever</span><span class="p">([</span><span class="s2">"hemoglobin"</span><span class="p">],</span> <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.omop.coding</span><span class="w"> </span><span class="kn">import</span> <span class="n">retriever_filter</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">where</span> <span class="o">=</span> <span class="n">retriever_filter</span><span class="p">(</span><span class="s2">"Measurement"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"LOINC"</span><span class="p">])</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># {"$and": [{"std_domain_id": "Measurement"}, {"std_vocabulary_id": {"$in": ["LOINC"]}}]}</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">results</span> <span class="o">=</span> <span class="n">retriever</span><span class="p">([</span><span class="s2">"hemoglobin"</span><span class="p">],</span> <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">)</span>
 </span></code></pre></div>
 <p>ChromaDB applies a filter before the vector search, which takes seconds per query on a
 full index. So by default <code>ChromaDBRetriever</code> queries <strong>without</strong> the filter for more
@@ -2310,14 +2324,14 @@ only when too few match. <code>filter_strategy</code> chooses the method:</p>
 </tbody>
 </table>
 <p>Set it when you load the retriever, or per call:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">retriever</span> <span class="o">=</span> <span class="n">load_retriever</span><span class="p">(</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="s2">"text-embedding-3-small"</span><span class="p">,</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">filter_strategy</span><span class="o">=</span><span class="s2">"overfetch_fallback"</span><span class="p">,</span>  <span class="c1"># default</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">overfetch_factor</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>                   <span class="c1"># defaults</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">min_overfetch</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">max_overfetch</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">retriever</span><span class="p">([</span><span class="s2">"hemoglobin"</span><span class="p">],</span> <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">,</span> <span class="n">filter_strategy</span><span class="o">=</span><span class="s2">"chroma"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">retriever</span> <span class="o">=</span> <span class="n">load_retriever</span><span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="s2">"text-embedding-3-small"</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">filter_strategy</span><span class="o">=</span><span class="s2">"overfetch_fallback"</span><span class="p">,</span>  <span class="c1"># default</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">overfetch_factor</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>                   <span class="c1"># defaults</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">min_overfetch</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">max_overfetch</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">retriever</span><span class="p">([</span><span class="s2">"hemoglobin"</span><span class="p">],</span> <span class="n">where</span><span class="o">=</span><span class="n">where</span><span class="p">,</span> <span class="n">filter_strategy</span><span class="o">=</span><span class="s2">"chroma"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Both methods are approximate vector searches, so their results can differ slightly. The
 over-fetch can miss matches that rank deep in the unfiltered results, which happens when
