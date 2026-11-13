@@ -15,10 +15,10 @@ nav:
     - Files AATM creates: 'getting-started/artifacts.md'
     - Basic concepts: 'getting-started/concepts.md'
   - Quick starts:
-    - Notes to OMOP tables: 'getting-started/quick_start_omop.md'
     - Information extraction: 'getting-started/quick_start_extraction.md'
-    - Terminology mapping (CLI): 'getting-started/quick_start_cli.md'
-    - Terminology mapping (Python): 'getting-started/quick_start_python_api.md'
+    - Medical coding (Python): 'getting-started/quick_start_python_api.md'
+    - Medical coding (command line): 'getting-started/quick_start_cli.md'
+    - Notes to OMOP tables: 'getting-started/quick_start_omop.md'
   - Guides:
     - High-level guide: 'getting-started/high_level.md'
     - Low-level guide: 'getting-started/low_level.md'
@@ -125,6 +125,11 @@ markdown_extensions:
   - pymdownx.blocks.caption
   - admonition
   - pymdownx.details
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 validation:
   omitted_files: warn
   absolute_links: warn

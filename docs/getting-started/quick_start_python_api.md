@@ -1,7 +1,11 @@
-# Quick start: terminology mapping in Python
+# Quick start: medical coding in Python
 
-This page maps local terms to standard OMOP concepts with `TerminologyMapper`, from a
-list of texts or a CSV file, and then shows each component of the mapper on its own.
+Medical coding, or terminology mapping, links a term (a local code's description, a
+diagnosis written in a note, a lab test name in any language) to a standard OMOP
+concept, and through it to every terminology the vocabularies connect. This page does
+it with `TerminologyMapper`, from a list of texts or a CSV file, and then shows each
+component of the mapper on its own. The same mapper, or the concept search agent, codes
+the text extracted from notes into OMOP tables.
 
 **Before you start:** run `aatm init` ([Set up the vocabularies](setup.md)). The mapper
 searches the index it builds.

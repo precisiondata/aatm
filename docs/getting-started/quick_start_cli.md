@@ -1,4 +1,4 @@
-# Quick start: terminology mapping from the command line
+# Quick start: medical coding from the command line
 
 This page maps a CSV of local codes and descriptions to standard OMOP concepts with
 `aatm map`, without writing Python.

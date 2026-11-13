@@ -33,11 +33,11 @@ This page tells you what to read, in which order, for what you want to do.
     3. [Low-level guide](low_level.md), to use your own LLM client or validate output
        produced elsewhere.
 
-=== "Terminology mapping"
+=== "Medical coding"
 
-    1. [Terminology mapping from the command line](quick_start_cli.md): a CSV of local
+    1. [Medical coding from the command line](quick_start_cli.md): a CSV of local
        codes in, a mapped CSV out.
-    2. [Terminology mapping in Python](quick_start_python_api.md): the same with
+    2. [Medical coding in Python](quick_start_python_api.md): the same with
        `TerminologyMapper`, and each component on its own.
     3. [Basic concepts](concepts.md): retrievers, filters, rerankers, selectors.
 
