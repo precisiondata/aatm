@@ -1,48 +1,105 @@
-# Welcome
+# Any-to-Any Terminology Mapping
 
-**Any-to-Any Terminology Mapping** is an open-source Python framework designed to facilitate terminology mapping tasks. The library organizes this process in a modular and extensible way to support multiple use cases and incorporate new techniques as they emerge.
+**AATM** is an open-source Python library that turns healthcare text into standard
+concepts of the [OMOP vocabularies](https://athena.ohdsi.org/search-terms/start). It
+does three jobs, which build on each other:
 
-In simple terms, mapping a new expression to a specific terminology involves considering many possible expressions, retrieving the best candidate target terms, and selecting them manually, which can be effortful and time-consuming.
+| | You have | You get | Start with |
+|---|---|---|---|
+| **Clinical notes to OMOP tables** | Free-text notes | Rows of the OMOP CDM `measurement`, `observation`, `condition_occurrence`, `drug_exposure` and `device_exposure` tables, each traceable to the words it came from | [Quick start](getting-started/quick_start_omop.md) |
+| **Information extraction** | Free-text notes | Conditions, drugs, dates, scores... found by an LLM and checked against the text | [Quick start](getting-started/quick_start_extraction.md) |
+| **Terminology mapping** | Local codes and descriptions, in any language | A `SOURCE_TO_CONCEPT_MAP` to standard concepts | [Quick start](getting-started/quick_start_cli.md) |
 
-AATM leverages the [OMOP vocabularies](https://athena.ohdsi.org/search-terms/start) to facilitate this task. These vocabularies reflect large, community-driven mapping efforts that connect many different health-related terminologies and classifications worldwide and organize them around standard terminologies, which serve as the central connecting nodes in the system. As these mapping efforts continue, healthcare-related concepts become increasingly well represented in these vocabularies, creating a virtuous cycle and increasing the chances of finding a strong correspondence for a new unmapped expression.
+## In a few lines
+
+=== "Command line"
+
+    ```bash
+    pip install aatm
+    aatm init --vocab-zip "<the link Athena emailed you>"
+    aatm omop run notes.parquet output/ \
+      --definitions condition_occurrence --definitions drug_exposure \
+      --model openai/gpt-5-mini --coder agent --cache
+    ```
+
+=== "Python"
+
+    ```python
+    from aatm.omop import AgenticCoder, OmopExtractionPipeline
+
+    pipeline = OmopExtractionPipeline(
+        ["condition_occurrence", "drug_exposure"],
+        model_id="openai/gpt-5-mini",
+        coder=AgenticCoder("openai/gpt-5-mini"),
+        cache=True,
+    )
+    summary = await pipeline.run("notes.parquet", "output/")
+    ```
+
+The run reads the notes in chunks, writes each table as Parquet files, and resumes where
+it stopped. Every row keeps its provenance (the note and the span of text it came
+from), and everything that could not be filled is reported with a reason.
+
+## Pick your level
+
+AATM is built in layers. Use the highest one that does what you need, and go down a
+level only for the part you want to change:
+
+| Level | What you write | Read |
+|---|---|---|
+| **Command line** | A YAML file of options; `aatm init`, `aatm omop run`, `aatm map` | [High-level guide](getting-started/high_level.md) |
+| **Pipelines** | A few lines of Python: `OmopExtractionPipeline`, `Pilot`, `TerminologyMapper` | [High-level guide](getting-started/high_level.md) |
+| **Building blocks** | Your own LLM client, coder, selector or vocabulary source, plugged into the pipelines | [Low-level guide](getting-started/low_level.md) |
+
+What to extract, and where it goes in the tables, is never code: it is a YAML file of
+[entity definitions](getting-started/entity_definitions.md), with eight predefined ones
+to start from.
+
+## How it works
+
+Every job ends with the same step: connecting a text to a **standard concept**. The OMOP
+vocabularies are a community-built network that links the world's health terminologies
+and classifications through standard concepts. Once a text is linked to one, every
+terminology connected to it is one step away.
 
 ![Standard vocabularies](./assets/std_vocabs_diagram.png)
 /// caption
-Standard vocabularies
+Standard vocabularies connect the world's terminologies
 ///
 
-
-To accomplish this, AATM organizes the mapping process into very simple steps: 
-
-- **translation**, which can be optional; 
-- **retrieval**, which explores what is available from prior mapping efforts; and
-- **selection**, which connects a standard concept to the new expression being mapped. 
-
-Once this connection is made, every link associated with that standard concept becomes immediately available, enabling mapping to many different terminologies and classifications that are already connected to that concept, effectively breaking down barriers to interoperability in healthcare.
+AATM makes that link in three steps: an optional **translation**, a **retrieval** of
+candidate concepts from a search index of every concept name and synonym, and a
+**selection** of the best one, by the closest match, an LLM, a decision model, or an
+agent that searches the vocabularies with tools until it finds the concept.
 
 ![Terminology mapping pipeline](./assets/aatm-pipeline-diagram.jpg)
 /// caption
 Terminology mapping pipeline
 ///
 
-AATM also includes an **information extraction** pipeline that finds entities such as conditions, drugs and their dates in clinical documents with an LLM, and validates every extracted span against the source text. The extracted expressions can then be mapped with the terminology mapping pipeline. See the [Information extraction quick start](getting-started/quick_start_extraction.md).
+For notes, an LLM first **extracts** the mentions your entity definitions describe.
+AATM **validates** each one against the note, so only text that is really there
+survives, **codes** it with the step above, and **builds** the table rows as the
+[OMOP CDM conventions](https://ohdsi.github.io/CommonDataModel/cdm55.html) ask.
 
 ## Design principles
 
-**Modularity**
+**Modular.** Translation, retrieval, reranking, selection, extraction, coding and table
+building are separate components with small interfaces. Each can be used, tested and
+replaced on its own.
 
-AATM is designed as a pipeline of clearly separated components, each responsible for a specific part of the terminology mapping process. Translation, retrieval, reranking, and selection are treated as independent steps with well-defined interfaces. This separation makes the library easier to understand, test, maintain, and adapt. It also allows users to inspect and improve one part of the workflow without having to redesign the entire system.
+**Extensible.** New embedding models, vector databases, LLM providers, selectors and
+coders plug in without changing the rest. Most are a class with one method.
 
-This modular structure is especially important because terminology mapping is not a single uniform problem. Different use cases may require different translation strategies, retrieval methods, or selection criteria depending on the source language, target terminology, domain, or level of ambiguity in the input expressions. By isolating responsibilities, AATM allows each part of the pipeline to evolve independently while remaining compatible with the broader framework.
+**Simple to start, open to tune.** The defaults run a full pipeline from one command;
+every default can be overridden when your data needs it.
 
-**Extensibility**
+**Auditable.** Nothing an LLM returns is trusted as is: spans are grounded in the note,
+codes are checked against the vocabularies, and every gap is reported rather than
+filled with a guess.
 
-AATM was built with the expectation that terminology mapping methods will continue to evolve. New embedding models, retrieval systems, rerankers, large language model–based selectors, rule-based selectors, and domain-specific heuristics can be incorporated into the framework without requiring major changes to its core design. Users can replace existing components or add new ones while preserving the overall pipeline structure.
+## Where next
 
-This extensibility is important both for research and for production settings. In research, it enables rapid experimentation with new methods and easier comparison between approaches. In applied settings, it allows users to adapt the system to new terminologies, new languages, and new operational requirements. In this sense, AATM is intended not only as a tool for performing terminology mapping, but also as a flexible foundation for building and evaluating new mapping workflows.
-
-**Simplicity**
-
-Although terminology mapping can involve complex methods, AATM is designed to keep the overall process conceptually simple. The framework reduces the task to a small number of intuitive steps that reflect how a person might approach the problem: optionally translate the input, retrieve possible matches, rerank or organize the candidates, and select the best concept. This organization helps make the library more accessible to users who are not specialists in information retrieval or machine learning.
-
-Simplicity also guides the user experience. The library aims to provide clear abstractions, predictable behavior, and straightforward ways to configure and run mapping pipelines. This makes it easier to get started with basic workflows while still leaving room for more advanced customization when needed. By prioritizing simplicity, AATM seeks to lower the barrier to terminology mapping and make interoperable healthcare data workflows more approachable.
+- New here? [Start here](getting-started/index.md), then [install](getting-started/installation.md).
+- Upgrading? See the [release notes](release_notes.md).
+- Looking for a class or a function? See the API reference.

@@ -27,6 +27,7 @@ nav:
     - Coding extracted text: 'getting-started/coding_text.md'
     - Processing large datasets: 'getting-started/large_datasets.md'
     - Tuning large OMOP runs: 'getting-started/tuning_omop_runs.md'
+  - Release notes: 'release_notes.md'
   - API Reference:
     - Command Line Interface: 'reference/cli.md'
     - Pipeline components:

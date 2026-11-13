@@ -79,7 +79,9 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from aatm.extractors import SimpleLLMExtractor
-from aatm.llm import LLMResponseError
+from aatm.llm import LLMResponseError, get_rate_limiter
+from aatm.llm.limits import estimate_tokens
+from aatm.llm.usage import record_usage
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -92,9 +94,18 @@ class GatewayLLM:
         self.model_id = f"gateway/{model}"   # shown in usage and run summaries
 
     async def generate(self, *, system: str, user: str, output_type: type[T]) -> T:
+        # Optional, but gives your client AATM's rate limits and retries.
+        return await get_rate_limiter(self.model_id).run(
+            lambda: self._generate(system, user, output_type),
+            estimated_tokens=estimate_tokens(system, user),
+        )
+
+    async def _generate(self, system: str, user: str, output_type: type[T]) -> T:
         response = await self.client.complete(
             system=system, user=user, json_schema=output_type.model_json_schema()
         )
+        # Optional: counts the call's tokens in track_usage and run summaries.
+        record_usage(response.input_tokens, response.output_tokens, model_id=self.model_id)
         if not response.text:
             raise LLMResponseError("empty response")
         return output_type.model_validate_json(response.text)
@@ -122,8 +133,9 @@ extractor = SimpleLLMExtractor(model_id="gateway/clinical-70b", entity_definitio
 Any OpenAI-compatible server (vLLM, LM Studio, Together...) needs no code:
 `model_id="openai-compatible/<model>", base_url="http://localhost:8000/v1"`.
 
-**Limits and usage.** `set_rate_limits` applies to every call of a model id, whichever
-piece makes it, and `track_usage` counts the calls and tokens of a block:
+**Limits and usage.** `set_rate_limits` applies to every call of a model id that goes
+through `get_rate_limiter`, as the built-in clients and the example above do, whichever
+piece makes it. `track_usage` counts the calls and tokens of a block:
 
 ```python
 from aatm.llm import set_rate_limits, track_usage
