@@ -2267,7 +2267,7 @@ serve as the pilot.</p>
 <li><strong>Definitions</strong>: which entities to extract and how they map to OMOP
   (<a href="../entity_definitions/">Writing entity definitions</a>).</li>
 <li><strong>Model</strong>: <code>model_id</code>, the extraction model. Try a small one on the pilot first.</li>
-<li><strong>Coder</strong>: <code>mapper=</code>, how extracted texts get concept ids
+<li><strong>Coder</strong>: <code>coder=</code>, how extracted texts get concept ids
   (<a href="../omop_tables/#searching-with-an-agent">the agent</a> or a terminology mapper), and
   <code>min_score</code> in the mappings, the confidence below which <code>0</code> is stored.</li>
 <li><strong><code>cache=True</code></strong>: each distinct text is coded once, across chunks, runs and rebuilds.

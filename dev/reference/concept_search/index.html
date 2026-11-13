@@ -3445,7 +3445,7 @@ gets the text and its context and searches with tools (semantic search, lexical
 search, code lookup, concept details, hierarchy) until it finds the standard concept
 or concludes there is none. It is available in both pipelines:</p>
 <ul>
-<li><strong>Notes to OMOP tables</strong>: <code>OmopTableBuilder(definitions, mapper=AgenticCoder(...))</code>
+<li><strong>Notes to OMOP tables</strong>: <code>OmopTableBuilder(definitions, coder=AgenticCoder(...))</code>
   (<code>aatm.omop.AgenticCoder</code>). The builder passes each text's related values and note
   line.</li>
 <li><strong>Terminology mapping</strong>: <code>TerminologyMapper(selector=AgenticSelector(...))</code>. The

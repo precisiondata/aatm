@@ -3526,7 +3526,7 @@ concept (synonyms) are one option, so their probability is not split.</p>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">retriever</span><span class="o">=</span><span class="s2">"text-embedding-3-small"</span><span class="p">,</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">selector</span><span class="o">=</span><span class="s2">"decision-openrouter/typesafe/jev-1.13"</span><span class="p">,</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">)</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">builder</span> <span class="o">=</span> <span class="n">OmopTableBuilder</span><span class="p">(</span><span class="n">definitions</span><span class="p">,</span> <span class="n">mapper</span><span class="o">=</span><span class="n">mapper</span><span class="p">)</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">builder</span> <span class="o">=</span> <span class="n">OmopTableBuilder</span><span class="p">(</span><span class="n">definitions</span><span class="p">,</span> <span class="n">coder</span><span class="o">=</span><span class="n">mapper</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Registered names are <code>decision-openai/gpt-6-luna</code>, <code>decision-gemini/gemini-decision-1</code>
 and <code>decision-openrouter/typesafe/jev-1.13</code>; any other <code>decision-&lt;model id&gt;</code> works
