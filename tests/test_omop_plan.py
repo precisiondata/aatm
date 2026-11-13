@@ -141,9 +141,15 @@ def test_plan_warns_about_low_concurrency_with_a_hosted_api():
 
 
 def test_plan_warns_about_shards_with_a_hosted_api():
+    from aatm.omop import shard_of
+
     plan = hosted_pipeline().plan(notes(10), shard=(0, 4))
     assert any("share one rate limit" in w.message for w in plan.warnings)
-    assert plan.total == 3
+    # The notes of the shard, by id, rather than a tenth of them rounded up.
+    assert plan.total == sum(1 for i in range(1, 11) if shard_of(i, 4) == 0)
+    # Without ids, the count is divided among the shards.
+    plan = hosted_pipeline().plan(iter(notes(10)), shard=(0, 4), total=10)
+    assert plan.total == 10  # `total` is the shard's own count, as given
 
 
 def test_plan_warns_about_the_agent_coder_without_cache():
@@ -180,6 +186,60 @@ def test_plan_counts_what_an_earlier_run_did(tmp_path):
     assert plan.to_extract == 4
     # The earlier run serves as the pilot.
     assert plan.estimate is not None and plan.estimate.pilot_notes == 6
+
+
+def test_plan_matches_the_notes_left_by_id(tmp_path):
+    pipeline = hosted_pipeline()
+    run(pipeline, notes(6), tmp_path)
+    # Notes 5 and 6 are built, 7 and 8 are new: counting alone would say 0 to do.
+    plan = pipeline.plan(notes(4, start=5), tmp_path)
+    assert plan.by_note_id
+    assert plan.total == 4
+    assert plan.to_extract == 2
+    assert plan.status == {"built": 6}  # the folder's notes, as before
+    assert "2 to extract" in str(plan)
+
+
+def test_plan_counts_failed_notes_of_the_source_only(tmp_path):
+    pipeline, _ = make_pipeline(fail={notes(1, start=2)[0]["text"]})
+    pipeline.extractor.model_id = "openai/gpt-5-mini"
+    pipeline.extractor.on_error = "record"
+    run(pipeline, notes(3), tmp_path)
+    assert OmopRun(tmp_path).status() == {"built": 2, "failed": 1}
+    assert pipeline.plan(notes(3), tmp_path).to_extract == 1  # note 2 is retried
+    assert pipeline.plan(notes(1, start=3), tmp_path).to_extract == 0
+
+
+def test_plan_reads_note_ids_from_parquet_and_dataframes(tmp_path):
+    import pandas as pd
+
+    pipeline = hosted_pipeline()
+    run(pipeline, notes(3), tmp_path / "out")
+    frame = pd.DataFrame(notes(5))
+    frame.to_parquet(tmp_path / "notes.parquet")
+    for source in (frame, tmp_path / "notes.parquet"):
+        plan = pipeline.plan(source, tmp_path / "out")
+        assert plan.by_note_id and plan.to_extract == 2
+
+
+def test_plan_falls_back_to_counts_without_ids(tmp_path):
+    pipeline = hosted_pipeline()
+    run(pipeline, notes(3), tmp_path / "out")
+    texts = [n["text"] for n in notes(5)]  # plain strings have no note id
+    plan = pipeline.plan(texts, tmp_path / "out")
+    assert not plan.by_note_id and plan.to_extract == 2
+    # `total` is taken as given, without reading the ids.
+    plan = pipeline.plan(notes(5), tmp_path / "out", total=5)
+    assert not plan.by_note_id and plan.to_extract == 2
+
+
+def test_plan_keeps_the_ids_of_its_shard():
+    from aatm.omop import shard_of
+
+    source = notes(40)
+    plan = hosted_pipeline().plan(source, shard=(1, 4))
+    expected = sum(1 for n in source if shard_of(n["note_id"], 4) == 1)
+    assert plan.by_note_id and plan.total == expected == plan.to_extract
 
 
 def pilot_summary(extracted=100, seconds=50.0, concurrency=10, calls=100):

@@ -2027,6 +2027,49 @@ def count_notes(source: Any) -> Optional[int]:
     return None
 
 
+def source_note_ids(source: Any) -> Optional[list[int]]:
+    """The note ids of a source, when it is cheap to know, else ``None``.
+
+    Known for lists of `ClinicalNote` objects or dicts, DataFrames and Parquet files
+    or folders with a ``note_id`` column (only that column is read). ``None`` for CSV
+    files, queries, iterators, plain strings, and sources where a note has no id.
+    """
+    ids: list[Any]
+    if isinstance(source, (str, Path)):
+        path = Path(source)
+        if not (path.exists() and (path.is_dir() or path.suffix == ".parquet")):
+            return None
+        import pyarrow.dataset as ds
+
+        try:
+            dataset = ds.dataset(path, format="parquet")
+            if "note_id" not in dataset.schema.names:
+                return None
+            ids = dataset.to_table(columns=["note_id"]).column("note_id").to_pylist()
+        except Exception:
+            return None
+    elif isinstance(source, pd.DataFrame):
+        if "note_id" not in source.columns:
+            return None
+        ids = source["note_id"].tolist()
+    elif isinstance(source, (list, tuple)):
+        ids = []
+        for note in source:
+            if isinstance(note, ClinicalNote):
+                ids.append(note.note_id)
+            elif isinstance(note, dict):
+                ids.append(note.get("note_id"))
+            else:
+                return None
+    else:
+        return None
+    # A missing id (None, NaN) or one that is not a number: no matching by id.
+    try:
+        return [int(i) for i in ids]
+    except (TypeError, ValueError):
+        return None
+
+
 # --- reading the output -------------------------------------------------------------
 
 
