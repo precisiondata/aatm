@@ -303,7 +303,7 @@ df[["source_code_description", "target_concept_id", "confidence_score", "mapping
 The output gains a `mapping_rationale` column (the agent's reason) and a
 `mapping_trace` column (its searches, as JSON). `confidence_score` is the agent's
 confidence level: 0.9 (high), 0.6 (medium) or 0.3 (low); see
-[Searching with an agent](omop_tables.md#searching-with-an-agent). Any `aatm.llm` model
+[Searching with an agent](coding_text.md#searching-with-an-agent). Any `aatm.llm` model
 id works, e.g. `"anthropic/claude-sonnet-5-5"` or `"ollama/llama3.3"`. The same agent
 codes extracted text in OMOP tables, with `aatm.omop.AgenticCoder`.
 

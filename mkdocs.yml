@@ -19,6 +19,8 @@ nav:
       - Information extraction: 'getting-started/quick_start_extraction.md'
     - Writing entity definitions: 'getting-started/entity_definitions.md'
     - From notes to OMOP tables: 'getting-started/omop_tables.md'
+    - Coding extracted text: 'getting-started/coding_text.md'
+    - Processing large datasets: 'getting-started/large_datasets.md'
     - Tuning large OMOP runs: 'getting-started/tuning_omop_runs.md'
   - API Reference:
     - Command Line Interface: 'reference/cli.md'
@@ -117,3 +119,8 @@ markdown_extensions:
   - pymdownx.blocks.caption
   - admonition
   - pymdownx.details
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn

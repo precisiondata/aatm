@@ -23,7 +23,7 @@ The main commands are:
 - `aatm init`
 - `aatm map`
 - `aatm omop run`, `aatm omop rebuild`, `aatm omop status`, `aatm omop failures`
-  (see [Processing large datasets](omop_tables.md#processing-large-datasets))
+  (see [Processing large datasets](large_datasets.md))
 - `aatm search-ui`
 
 ---
