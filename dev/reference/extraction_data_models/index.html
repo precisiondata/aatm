@@ -2020,6 +2020,61 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#json-schema-of-entity-definition-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON Schema of entity definition files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aatm.data_models.entity_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        entity_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aatm.data_models.entity_schema.entity_definitions_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        entity_definitions_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aatm.data_models.entity_schema.schema_json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema_json
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aatm.data_models.entity_schema.write_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        write_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2593,6 +2648,61 @@
     <span class="md-ellipsis">
       
         validate_extracted_entity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#json-schema-of-entity-definition-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON Schema of entity definition files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aatm.data_models.entity_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        entity_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aatm.data_models.entity_schema.entity_definitions_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        entity_definitions_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aatm.data_models.entity_schema.schema_json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema_json
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aatm.data_models.entity_schema.write_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        write_schema
       
     </span>
   </a>
@@ -6463,6 +6573,408 @@ candidates (in input order) and the entity keys with no validated entity.</p>
 </span><span id="__span-0-1126"><a id="__codelineno-0-1126" name="__codelineno-0-1126"></a>        <span class="n">required_attribute_issues</span><span class="o">=</span><span class="n">required_issues</span><span class="p">,</span>
 </span><span id="__span-0-1127"><a id="__codelineno-0-1127" name="__codelineno-0-1127"></a>        <span class="n">optional_attribute_issues</span><span class="o">=</span><span class="n">optional_issues</span><span class="p">,</span>
 </span><span id="__span-0-1128"><a id="__codelineno-0-1128" name="__codelineno-0-1128"></a>    <span class="p">)</span>
+</span></code></pre></div></td></tr></tbody></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="json-schema-of-entity-definition-files">JSON Schema of entity definition files</h2>
+<p>See <a href="../../getting-started/entity_definitions/#editor-support">Editor support</a>.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="aatm.data_models.entity_schema"></a>
+    <div class="doc doc-contents first">
+
+        <p>JSON Schema for entity definition YAML files, for editor support.</p>
+<p>Editors that understand JSON Schema (VS Code with the Red Hat YAML extension,
+JetBrains IDEs and others) use it to autocomplete keys and OMOP column names, show
+descriptions on hover and underline mistakes while a definition file is written, before
+any Python code runs.</p>
+<p>The schema is generated from the Pydantic models (<code>EntityDefinition</code>,
+<code>AttributeDefinition</code>, <code>AttributeLabel</code>, <code>OmopMapping</code>, <code>FieldSource</code>, <code>MapSpec</code>), so
+it cannot drift from the code, and adds what the models alone do not say: the
+supported OMOP tables, the columns of each one, the forms of <code>from:</code> and
+<code>concept:</code>, and the <code>context.</code> fields of <code>ClinicalNote</code>. The descriptions come from
+the <code>Attributes:</code> sections of the models' docstrings.</p>
+<p>Loading a file with <code>EntityDefinitions.from_yaml</code> stays the full check: the schema
+cannot see, for example, whether <code>child.&lt;key&gt;</code> names a real child entity.</p>
+<p>A copy is committed as <code>docs/schemas/entity_definitions.schema.json</code> and published
+with the documentation at <code>SCHEMA_URL</code>. <code>aatm schema</code> writes it next to your files,
+for use offline.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="aatm.data_models.entity_schema.entity_definitions_schema" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">entity_definitions_schema</span><span class="p">()</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Build the JSON Schema of an entity definition file.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A JSON Schema (draft 2020-12) for a YAML list of entity definitions.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>aatm/data_models/entity_schema.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-177">177</a></span>
+<span class="normal"><a href="#__codelineno-0-178">178</a></span>
+<span class="normal"><a href="#__codelineno-0-179">179</a></span>
+<span class="normal"><a href="#__codelineno-0-180">180</a></span>
+<span class="normal"><a href="#__codelineno-0-181">181</a></span>
+<span class="normal"><a href="#__codelineno-0-182">182</a></span>
+<span class="normal"><a href="#__codelineno-0-183">183</a></span>
+<span class="normal"><a href="#__codelineno-0-184">184</a></span>
+<span class="normal"><a href="#__codelineno-0-185">185</a></span>
+<span class="normal"><a href="#__codelineno-0-186">186</a></span>
+<span class="normal"><a href="#__codelineno-0-187">187</a></span>
+<span class="normal"><a href="#__codelineno-0-188">188</a></span>
+<span class="normal"><a href="#__codelineno-0-189">189</a></span>
+<span class="normal"><a href="#__codelineno-0-190">190</a></span>
+<span class="normal"><a href="#__codelineno-0-191">191</a></span>
+<span class="normal"><a href="#__codelineno-0-192">192</a></span>
+<span class="normal"><a href="#__codelineno-0-193">193</a></span>
+<span class="normal"><a href="#__codelineno-0-194">194</a></span>
+<span class="normal"><a href="#__codelineno-0-195">195</a></span>
+<span class="normal"><a href="#__codelineno-0-196">196</a></span>
+<span class="normal"><a href="#__codelineno-0-197">197</a></span>
+<span class="normal"><a href="#__codelineno-0-198">198</a></span>
+<span class="normal"><a href="#__codelineno-0-199">199</a></span>
+<span class="normal"><a href="#__codelineno-0-200">200</a></span>
+<span class="normal"><a href="#__codelineno-0-201">201</a></span>
+<span class="normal"><a href="#__codelineno-0-202">202</a></span>
+<span class="normal"><a href="#__codelineno-0-203">203</a></span>
+<span class="normal"><a href="#__codelineno-0-204">204</a></span>
+<span class="normal"><a href="#__codelineno-0-205">205</a></span>
+<span class="normal"><a href="#__codelineno-0-206">206</a></span>
+<span class="normal"><a href="#__codelineno-0-207">207</a></span>
+<span class="normal"><a href="#__codelineno-0-208">208</a></span>
+<span class="normal"><a href="#__codelineno-0-209">209</a></span>
+<span class="normal"><a href="#__codelineno-0-210">210</a></span>
+<span class="normal"><a href="#__codelineno-0-211">211</a></span>
+<span class="normal"><a href="#__codelineno-0-212">212</a></span>
+<span class="normal"><a href="#__codelineno-0-213">213</a></span>
+<span class="normal"><a href="#__codelineno-0-214">214</a></span>
+<span class="normal"><a href="#__codelineno-0-215">215</a></span>
+<span class="normal"><a href="#__codelineno-0-216">216</a></span>
+<span class="normal"><a href="#__codelineno-0-217">217</a></span>
+<span class="normal"><a href="#__codelineno-0-218">218</a></span>
+<span class="normal"><a href="#__codelineno-0-219">219</a></span>
+<span class="normal"><a href="#__codelineno-0-220">220</a></span>
+<span class="normal"><a href="#__codelineno-0-221">221</a></span>
+<span class="normal"><a href="#__codelineno-0-222">222</a></span>
+<span class="normal"><a href="#__codelineno-0-223">223</a></span>
+<span class="normal"><a href="#__codelineno-0-224">224</a></span>
+<span class="normal"><a href="#__codelineno-0-225">225</a></span>
+<span class="normal"><a href="#__codelineno-0-226">226</a></span>
+<span class="normal"><a href="#__codelineno-0-227">227</a></span>
+<span class="normal"><a href="#__codelineno-0-228">228</a></span>
+<span class="normal"><a href="#__codelineno-0-229">229</a></span>
+<span class="normal"><a href="#__codelineno-0-230">230</a></span>
+<span class="normal"><a href="#__codelineno-0-231">231</a></span>
+<span class="normal"><a href="#__codelineno-0-232">232</a></span>
+<span class="normal"><a href="#__codelineno-0-233">233</a></span>
+<span class="normal"><a href="#__codelineno-0-234">234</a></span>
+<span class="normal"><a href="#__codelineno-0-235">235</a></span>
+<span class="normal"><a href="#__codelineno-0-236">236</a></span>
+<span class="normal"><a href="#__codelineno-0-237">237</a></span>
+<span class="normal"><a href="#__codelineno-0-238">238</a></span>
+<span class="normal"><a href="#__codelineno-0-239">239</a></span>
+<span class="normal"><a href="#__codelineno-0-240">240</a></span>
+<span class="normal"><a href="#__codelineno-0-241">241</a></span>
+<span class="normal"><a href="#__codelineno-0-242">242</a></span>
+<span class="normal"><a href="#__codelineno-0-243">243</a></span>
+<span class="normal"><a href="#__codelineno-0-244">244</a></span>
+<span class="normal"><a href="#__codelineno-0-245">245</a></span>
+<span class="normal"><a href="#__codelineno-0-246">246</a></span>
+<span class="normal"><a href="#__codelineno-0-247">247</a></span>
+<span class="normal"><a href="#__codelineno-0-248">248</a></span>
+<span class="normal"><a href="#__codelineno-0-249">249</a></span>
+<span class="normal"><a href="#__codelineno-0-250">250</a></span>
+<span class="normal"><a href="#__codelineno-0-251">251</a></span>
+<span class="normal"><a href="#__codelineno-0-252">252</a></span>
+<span class="normal"><a href="#__codelineno-0-253">253</a></span>
+<span class="normal"><a href="#__codelineno-0-254">254</a></span>
+<span class="normal"><a href="#__codelineno-0-255">255</a></span>
+<span class="normal"><a href="#__codelineno-0-256">256</a></span>
+<span class="normal"><a href="#__codelineno-0-257">257</a></span>
+<span class="normal"><a href="#__codelineno-0-258">258</a></span>
+<span class="normal"><a href="#__codelineno-0-259">259</a></span>
+<span class="normal"><a href="#__codelineno-0-260">260</a></span>
+<span class="normal"><a href="#__codelineno-0-261">261</a></span>
+<span class="normal"><a href="#__codelineno-0-262">262</a></span>
+<span class="normal"><a href="#__codelineno-0-263">263</a></span>
+<span class="normal"><a href="#__codelineno-0-264">264</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-177"><a id="__codelineno-0-177" name="__codelineno-0-177"></a><span class="k">def</span><span class="w"> </span><span class="nf">entity_definitions_schema</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-0-178"><a id="__codelineno-0-178" name="__codelineno-0-178"></a><span class="w">    </span><span class="sd">"""Build the JSON Schema of an entity definition file.</span>
+</span><span id="__span-0-179"><a id="__codelineno-0-179" name="__codelineno-0-179"></a>
+</span><span id="__span-0-180"><a id="__codelineno-0-180" name="__codelineno-0-180"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-181"><a id="__codelineno-0-181" name="__codelineno-0-181"></a><span class="sd">        A JSON Schema (draft 2020-12) for a YAML list of entity definitions.</span>
+</span><span id="__span-0-182"><a id="__codelineno-0-182" name="__codelineno-0-182"></a><span class="sd">    """</span>
+</span><span id="__span-0-183"><a id="__codelineno-0-183" name="__codelineno-0-183"></a>    <span class="n">schema</span> <span class="o">=</span> <span class="n">TypeAdapter</span><span class="p">(</span><span class="nb">list</span><span class="p">[</span><span class="n">EntityDefinition</span><span class="p">])</span><span class="o">.</span><span class="n">json_schema</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"validation"</span><span class="p">)</span>
+</span><span id="__span-0-184"><a id="__codelineno-0-184" name="__codelineno-0-184"></a>    <span class="n">defs</span> <span class="o">=</span> <span class="n">schema</span><span class="p">[</span><span class="s2">"$defs"</span><span class="p">]</span>
+</span><span id="__span-0-185"><a id="__codelineno-0-185" name="__codelineno-0-185"></a>    <span class="n">_drop_titles</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span>
+</span><span id="__span-0-186"><a id="__codelineno-0-186" name="__codelineno-0-186"></a>    <span class="n">_drop_nulls</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span>
+</span><span id="__span-0-187"><a id="__codelineno-0-187" name="__codelineno-0-187"></a>
+</span><span id="__span-0-188"><a id="__codelineno-0-188" name="__codelineno-0-188"></a>    <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">_DOCUMENTED_MODELS</span><span class="p">:</span>
+</span><span id="__span-0-189"><a id="__codelineno-0-189" name="__codelineno-0-189"></a>        <span class="n">node</span> <span class="o">=</span> <span class="n">defs</span><span class="p">[</span><span class="n">model</span><span class="o">.</span><span class="vm">__name__</span><span class="p">]</span>
+</span><span id="__span-0-190"><a id="__codelineno-0-190" name="__codelineno-0-190"></a>        <span class="n">summary</span><span class="p">,</span> <span class="n">field_docs</span> <span class="o">=</span> <span class="n">_split_docstring</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</span><span id="__span-0-191"><a id="__codelineno-0-191" name="__codelineno-0-191"></a>        <span class="n">node</span><span class="p">[</span><span class="s2">"description"</span><span class="p">]</span> <span class="o">=</span> <span class="n">summary</span>
+</span><span id="__span-0-192"><a id="__codelineno-0-192" name="__codelineno-0-192"></a>        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">node</span><span class="p">[</span><span class="s2">"properties"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span id="__span-0-193"><a id="__codelineno-0-193" name="__codelineno-0-193"></a>            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">field_docs</span><span class="p">:</span>
+</span><span id="__span-0-194"><a id="__codelineno-0-194" name="__codelineno-0-194"></a>                <span class="n">prop</span><span class="p">[</span><span class="s2">"description"</span><span class="p">]</span> <span class="o">=</span> <span class="n">field_docs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+</span><span id="__span-0-195"><a id="__codelineno-0-195" name="__codelineno-0-195"></a>
+</span><span id="__span-0-196"><a id="__codelineno-0-196" name="__codelineno-0-196"></a>    <span class="c1"># Entities, attributes and labels: Python ignores unknown keys, but in an editor a</span>
+</span><span id="__span-0-197"><a id="__codelineno-0-197" name="__codelineno-0-197"></a>    <span class="c1"># misspelt key such as `atributes` is almost always a mistake.</span>
+</span><span id="__span-0-198"><a id="__codelineno-0-198" name="__codelineno-0-198"></a>    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"EntityDefinition"</span><span class="p">,</span> <span class="s2">"AttributeDefinition"</span><span class="p">,</span> <span class="s2">"AttributeLabel"</span><span class="p">):</span>
+</span><span id="__span-0-199"><a id="__codelineno-0-199" name="__codelineno-0-199"></a>        <span class="n">defs</span><span class="p">[</span><span class="n">name</span><span class="p">][</span><span class="s2">"additionalProperties"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="__span-0-200"><a id="__codelineno-0-200" name="__codelineno-0-200"></a>
+</span><span id="__span-0-201"><a id="__codelineno-0-201" name="__codelineno-0-201"></a>    <span class="n">entity</span> <span class="o">=</span> <span class="n">defs</span><span class="p">[</span><span class="s2">"EntityDefinition"</span><span class="p">]</span>
+</span><span id="__span-0-202"><a id="__codelineno-0-202" name="__codelineno-0-202"></a>    <span class="n">entity</span><span class="p">[</span><span class="s2">"properties"</span><span class="p">][</span><span class="s2">"key"</span><span class="p">][</span><span class="s2">"pattern"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_KEY_PATTERN</span>
+</span><span id="__span-0-203"><a id="__codelineno-0-203" name="__codelineno-0-203"></a>    <span class="n">entity</span><span class="p">[</span><span class="s2">"if"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-0-204"><a id="__codelineno-0-204" name="__codelineno-0-204"></a>        <span class="s2">"properties"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"has_parent"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"const"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}},</span>
+</span><span id="__span-0-205"><a id="__codelineno-0-205" name="__codelineno-0-205"></a>        <span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"has_parent"</span><span class="p">],</span>
+</span><span id="__span-0-206"><a id="__codelineno-0-206" name="__codelineno-0-206"></a>    <span class="p">}</span>
+</span><span id="__span-0-207"><a id="__codelineno-0-207" name="__codelineno-0-207"></a>    <span class="n">entity</span><span class="p">[</span><span class="s2">"then"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"parent_key"</span><span class="p">]}</span>
+</span><span id="__span-0-208"><a id="__codelineno-0-208" name="__codelineno-0-208"></a>
+</span><span id="__span-0-209"><a id="__codelineno-0-209" name="__codelineno-0-209"></a>    <span class="n">concept</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-0-210"><a id="__codelineno-0-210" name="__codelineno-0-210"></a>        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+</span><span id="__span-0-211"><a id="__codelineno-0-211" name="__codelineno-0-211"></a>        <span class="s2">"pattern"</span><span class="p">:</span> <span class="n">_CONCEPT_PATTERN</span><span class="p">,</span>
+</span><span id="__span-0-212"><a id="__codelineno-0-212" name="__codelineno-0-212"></a>        <span class="s2">"description"</span><span class="p">:</span> <span class="s2">"A concept written as `&lt;VOCABULARY&gt;:&lt;code&gt;`, e.g. `SNOMED:423740007`."</span><span class="p">,</span>
+</span><span id="__span-0-213"><a id="__codelineno-0-213" name="__codelineno-0-213"></a>    <span class="p">}</span>
+</span><span id="__span-0-214"><a id="__codelineno-0-214" name="__codelineno-0-214"></a>    <span class="n">concept_ref</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-0-215"><a id="__codelineno-0-215" name="__codelineno-0-215"></a>        <span class="s2">"anyOf"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"$ref"</span><span class="p">:</span> <span class="s2">"#/$defs/Concept"</span><span class="p">},</span> <span class="p">{</span><span class="s2">"$ref"</span><span class="p">:</span> <span class="s2">"#/$defs/ConceptRef"</span><span class="p">}]</span>
+</span><span id="__span-0-216"><a id="__codelineno-0-216" name="__codelineno-0-216"></a>    <span class="p">}</span>
+</span><span id="__span-0-217"><a id="__codelineno-0-217" name="__codelineno-0-217"></a>    <span class="n">defs</span><span class="p">[</span><span class="s2">"Concept"</span><span class="p">]</span> <span class="o">=</span> <span class="n">concept</span>
+</span><span id="__span-0-218"><a id="__codelineno-0-218" name="__codelineno-0-218"></a>
+</span><span id="__span-0-219"><a id="__codelineno-0-219" name="__codelineno-0-219"></a>    <span class="n">source</span> <span class="o">=</span> <span class="n">defs</span><span class="p">[</span><span class="s2">"FieldSource"</span><span class="p">]</span>
+</span><span id="__span-0-220"><a id="__codelineno-0-220" name="__codelineno-0-220"></a>    <span class="n">props</span> <span class="o">=</span> <span class="n">source</span><span class="p">[</span><span class="s2">"properties"</span><span class="p">]</span>
+</span><span id="__span-0-221"><a id="__codelineno-0-221" name="__codelineno-0-221"></a>    <span class="k">del</span> <span class="n">props</span><span class="p">[</span><span class="s2">"from"</span><span class="p">][</span><span class="s2">"type"</span><span class="p">]</span>
+</span><span id="__span-0-222"><a id="__codelineno-0-222" name="__codelineno-0-222"></a>    <span class="n">props</span><span class="p">[</span><span class="s2">"from"</span><span class="p">][</span><span class="s2">"anyOf"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-0-223"><a id="__codelineno-0-223" name="__codelineno-0-223"></a>        <span class="p">{</span><span class="s2">"enum"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"text"</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="sa">f</span><span class="s2">"context.</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">CONTEXT_FIELDS</span><span class="p">)]},</span>
+</span><span id="__span-0-224"><a id="__codelineno-0-224" name="__codelineno-0-224"></a>        <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"pattern"</span><span class="p">:</span> <span class="n">_KEYED_SOURCE_PATTERN</span><span class="p">},</span>
+</span><span id="__span-0-225"><a id="__codelineno-0-225" name="__codelineno-0-225"></a>    <span class="p">]</span>
+</span><span id="__span-0-226"><a id="__codelineno-0-226" name="__codelineno-0-226"></a>    <span class="k">del</span> <span class="n">props</span><span class="p">[</span><span class="s2">"concept"</span><span class="p">][</span><span class="s2">"$ref"</span><span class="p">]</span>
+</span><span id="__span-0-227"><a id="__codelineno-0-227" name="__codelineno-0-227"></a>    <span class="n">props</span><span class="p">[</span><span class="s2">"concept"</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">concept_ref</span><span class="p">))</span>
+</span><span id="__span-0-228"><a id="__codelineno-0-228" name="__codelineno-0-228"></a>    <span class="n">props</span><span class="p">[</span><span class="s2">"concepts"</span><span class="p">][</span><span class="s2">"additionalProperties"</span><span class="p">]</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">concept_ref</span><span class="p">)</span>
+</span><span id="__span-0-229"><a id="__codelineno-0-229" name="__codelineno-0-229"></a>    <span class="n">props</span><span class="p">[</span><span class="s2">"when"</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+</span><span id="__span-0-230"><a id="__codelineno-0-230" name="__codelineno-0-230"></a>        <span class="n">propertyNames</span><span class="o">=</span><span class="p">{</span><span class="s2">"pattern"</span><span class="p">:</span> <span class="sa">r</span><span class="s2">"^attribute\.\S+$"</span><span class="p">},</span>
+</span><span id="__span-0-231"><a id="__codelineno-0-231" name="__codelineno-0-231"></a>        <span class="n">additionalProperties</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-0-232"><a id="__codelineno-0-232" name="__codelineno-0-232"></a>            <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">,</span>
+</span><span id="__span-0-233"><a id="__codelineno-0-233" name="__codelineno-0-233"></a>            <span class="s2">"items"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">},</span>
+</span><span id="__span-0-234"><a id="__codelineno-0-234" name="__codelineno-0-234"></a>            <span class="s2">"minItems"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-0-235"><a id="__codelineno-0-235" name="__codelineno-0-235"></a>        <span class="p">},</span>
+</span><span id="__span-0-236"><a id="__codelineno-0-236" name="__codelineno-0-236"></a>    <span class="p">)</span>
+</span><span id="__span-0-237"><a id="__codelineno-0-237" name="__codelineno-0-237"></a>    <span class="n">source</span><span class="p">[</span><span class="s2">"oneOf"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[{</span><span class="s2">"required"</span><span class="p">:</span> <span class="p">[</span><span class="n">name</span><span class="p">]}</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"from"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">,</span> <span class="s2">"concept"</span><span class="p">)]</span>
+</span><span id="__span-0-238"><a id="__codelineno-0-238" name="__codelineno-0-238"></a>
+</span><span id="__span-0-239"><a id="__codelineno-0-239" name="__codelineno-0-239"></a>    <span class="c1"># One source, or a list tried in order. if/then/else rather than anyOf, so a</span>
+</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a>    <span class="c1"># mistake is reported inside the source, not as "matches none of the schemas".</span>
+</span><span id="__span-0-241"><a id="__codelineno-0-241" name="__codelineno-0-241"></a>    <span class="n">defs</span><span class="p">[</span><span class="s2">"Sources"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-0-242"><a id="__codelineno-0-242" name="__codelineno-0-242"></a>        <span class="s2">"if"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">},</span>
+</span><span id="__span-0-243"><a id="__codelineno-0-243" name="__codelineno-0-243"></a>        <span class="s2">"then"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"items"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"$ref"</span><span class="p">:</span> <span class="s2">"#/$defs/FieldSource"</span><span class="p">},</span> <span class="s2">"minItems"</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span>
+</span><span id="__span-0-244"><a id="__codelineno-0-244" name="__codelineno-0-244"></a>        <span class="s2">"else"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"$ref"</span><span class="p">:</span> <span class="s2">"#/$defs/FieldSource"</span><span class="p">},</span>
+</span><span id="__span-0-245"><a id="__codelineno-0-245" name="__codelineno-0-245"></a>    <span class="p">}</span>
+</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a>    <span class="n">mapping</span> <span class="o">=</span> <span class="n">defs</span><span class="p">[</span><span class="s2">"OmopMapping"</span><span class="p">]</span>
+</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a>    <span class="n">mapping</span><span class="p">[</span><span class="s2">"properties"</span><span class="p">][</span><span class="s2">"table"</span><span class="p">][</span><span class="s2">"enum"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">OMOP_TABLES</span><span class="p">)</span>
+</span><span id="__span-0-248"><a id="__codelineno-0-248" name="__codelineno-0-248"></a>    <span class="c1"># The columns, and their sources, are given per table by these rules.</span>
+</span><span id="__span-0-249"><a id="__codelineno-0-249" name="__codelineno-0-249"></a>    <span class="k">del</span> <span class="n">mapping</span><span class="p">[</span><span class="s2">"properties"</span><span class="p">][</span><span class="s2">"fields"</span><span class="p">][</span><span class="s2">"additionalProperties"</span><span class="p">]</span>
+</span><span id="__span-0-250"><a id="__codelineno-0-250" name="__codelineno-0-250"></a>    <span class="n">mapping</span><span class="p">[</span><span class="s2">"allOf"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_table_rules</span><span class="p">()</span>
+</span><span id="__span-0-251"><a id="__codelineno-0-251" name="__codelineno-0-251"></a>
+</span><span id="__span-0-252"><a id="__codelineno-0-252" name="__codelineno-0-252"></a>    <span class="n">_add_markdown</span><span class="p">(</span><span class="n">defs</span><span class="p">)</span>
+</span><span id="__span-0-253"><a id="__codelineno-0-253" name="__codelineno-0-253"></a>    <span class="k">return</span> <span class="p">{</span>
+</span><span id="__span-0-254"><a id="__codelineno-0-254" name="__codelineno-0-254"></a>        <span class="s2">"$schema"</span><span class="p">:</span> <span class="s2">"https://json-schema.org/draft/2020-12/schema"</span><span class="p">,</span>
+</span><span id="__span-0-255"><a id="__codelineno-0-255" name="__codelineno-0-255"></a>        <span class="s2">"$id"</span><span class="p">:</span> <span class="n">SCHEMA_URL</span><span class="p">,</span>
+</span><span id="__span-0-256"><a id="__codelineno-0-256" name="__codelineno-0-256"></a>        <span class="s2">"title"</span><span class="p">:</span> <span class="s2">"AATM entity definitions"</span><span class="p">,</span>
+</span><span id="__span-0-257"><a id="__codelineno-0-257" name="__codelineno-0-257"></a>        <span class="s2">"description"</span><span class="p">:</span> <span class="p">(</span>
+</span><span id="__span-0-258"><a id="__codelineno-0-258" name="__codelineno-0-258"></a>            <span class="s2">"A list of entities to extract from clinical notes, and optionally how "</span>
+</span><span id="__span-0-259"><a id="__codelineno-0-259" name="__codelineno-0-259"></a>            <span class="s2">"each one becomes a row of an OMOP CDM table. See "</span>
+</span><span id="__span-0-260"><a id="__codelineno-0-260" name="__codelineno-0-260"></a>            <span class="s2">"https://precisiondata.github.io/aatm/latest/getting-started/entity_definitions/"</span>
+</span><span id="__span-0-261"><a id="__codelineno-0-261" name="__codelineno-0-261"></a>        <span class="p">),</span>
+</span><span id="__span-0-262"><a id="__codelineno-0-262" name="__codelineno-0-262"></a>        <span class="o">**</span><span class="n">schema</span><span class="p">,</span>
+</span><span id="__span-0-263"><a id="__codelineno-0-263" name="__codelineno-0-263"></a>        <span class="s2">"$defs"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">defs</span><span class="o">.</span><span class="n">items</span><span class="p">())),</span>
+</span><span id="__span-0-264"><a id="__codelineno-0-264" name="__codelineno-0-264"></a>    <span class="p">}</span>
+</span></code></pre></div></td></tr></tbody></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="aatm.data_models.entity_schema.schema_json" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">schema_json</span><span class="p">()</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The schema as the JSON text that is committed and published.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>aatm/data_models/entity_schema.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-267">267</a></span>
+<span class="normal"><a href="#__codelineno-0-268">268</a></span>
+<span class="normal"><a href="#__codelineno-0-269">269</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-267"><a id="__codelineno-0-267" name="__codelineno-0-267"></a><span class="k">def</span><span class="w"> </span><span class="nf">schema_json</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-0-268"><a id="__codelineno-0-268" name="__codelineno-0-268"></a><span class="w">    </span><span class="sd">"""The schema as the JSON text that is committed and published."""</span>
+</span><span id="__span-0-269"><a id="__codelineno-0-269" name="__codelineno-0-269"></a>    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">entity_definitions_schema</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+</span></code></pre></div></td></tr></tbody></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="aatm.data_models.entity_schema.write_schema" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">write_schema</span><span class="p">(</span><span class="n">directory</span><span class="o">=</span><span class="s1">'.'</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Write the schema to <code>&lt;directory&gt;/entity_definitions.schema.json</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>directory</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Where to write it, created if missing.</p>
+              </div>
+            </td>
+            <td>
+                  <code>'.'</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The path of the written file.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>aatm/data_models/entity_schema.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-272">272</a></span>
+<span class="normal"><a href="#__codelineno-0-273">273</a></span>
+<span class="normal"><a href="#__codelineno-0-274">274</a></span>
+<span class="normal"><a href="#__codelineno-0-275">275</a></span>
+<span class="normal"><a href="#__codelineno-0-276">276</a></span>
+<span class="normal"><a href="#__codelineno-0-277">277</a></span>
+<span class="normal"><a href="#__codelineno-0-278">278</a></span>
+<span class="normal"><a href="#__codelineno-0-279">279</a></span>
+<span class="normal"><a href="#__codelineno-0-280">280</a></span>
+<span class="normal"><a href="#__codelineno-0-281">281</a></span>
+<span class="normal"><a href="#__codelineno-0-282">282</a></span>
+<span class="normal"><a href="#__codelineno-0-283">283</a></span>
+<span class="normal"><a href="#__codelineno-0-284">284</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-272"><a id="__codelineno-0-272" name="__codelineno-0-272"></a><span class="k">def</span><span class="w"> </span><span class="nf">write_schema</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">=</span> <span class="s2">"."</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+</span><span id="__span-0-273"><a id="__codelineno-0-273" name="__codelineno-0-273"></a><span class="w">    </span><span class="sd">"""Write the schema to ``&lt;directory&gt;/entity_definitions.schema.json``.</span>
+</span><span id="__span-0-274"><a id="__codelineno-0-274" name="__codelineno-0-274"></a>
+</span><span id="__span-0-275"><a id="__codelineno-0-275" name="__codelineno-0-275"></a><span class="sd">    Args:</span>
+</span><span id="__span-0-276"><a id="__codelineno-0-276" name="__codelineno-0-276"></a><span class="sd">        directory: Where to write it, created if missing.</span>
+</span><span id="__span-0-277"><a id="__codelineno-0-277" name="__codelineno-0-277"></a>
+</span><span id="__span-0-278"><a id="__codelineno-0-278" name="__codelineno-0-278"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a><span class="sd">        The path of the written file.</span>
+</span><span id="__span-0-280"><a id="__codelineno-0-280" name="__codelineno-0-280"></a><span class="sd">    """</span>
+</span><span id="__span-0-281"><a id="__codelineno-0-281" name="__codelineno-0-281"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span> <span class="o">/</span> <span class="n">SCHEMA_FILENAME</span>
+</span><span id="__span-0-282"><a id="__codelineno-0-282" name="__codelineno-0-282"></a>    <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-0-283"><a id="__codelineno-0-283" name="__codelineno-0-283"></a>    <span class="n">path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">schema_json</span><span class="p">(),</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-0-284"><a id="__codelineno-0-284" name="__codelineno-0-284"></a>    <span class="k">return</span> <span class="n">path</span>
 </span></code></pre></div></td></tr></tbody></table></div>
             </details>
     </div>

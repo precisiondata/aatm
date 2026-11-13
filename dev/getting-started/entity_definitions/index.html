@@ -953,6 +953,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#editor-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor support
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Editor support">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#offline-or-pinned-to-your-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Offline, or pinned to your version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-schema-does-not-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the schema does not check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#checking-a-file-before-using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2396,6 +2435,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#editor-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor support
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Editor support">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#offline-or-pinned-to-your-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Offline, or pinned to your version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-schema-does-not-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the schema does not check
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#checking-a-file-before-using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2940,6 +3018,50 @@ newline is removed when loaded.</p>
 <p>Comments start with <code>#</code> and are ignored, which makes them a good place to explain
 choices to the next developer.</p>
 <hr>
+<h2 id="editor-support">Editor support</h2>
+<p>AATM publishes a <a href="https://json-schema.org/">JSON Schema</a> for definition files. Editors
+that read it give you, while you type:</p>
+<ul>
+<li><strong>autocompletion</strong> of every key: entity fields, attribute fields, the OMOP tables,
+  the columns of the table you chose under <code>fields</code>, and source keys such as <code>from</code>,
+  <code>map</code> and <code>lookup</code>;</li>
+<li><strong>descriptions on hover</strong>, the same as in this guide;</li>
+<li><strong>inline errors</strong>: a misspelt key (<code>atributes</code>, <code>value_as_numbr</code>), an unknown table
+  or <code>context.</code> field, a key that is not <code>snake_case</code>, <code>has_parent: true</code> without
+  <code>parent_key</code>, a <code>concept</code> not written as <code>VOCABULARY:code</code>, or a source with both
+  <code>from</code> and <code>value</code>.</li>
+</ul>
+<p>Point a file at the schema with this line at the top:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># yaml-language-server: $schema=https://precisiondata.github.io/aatm/latest/schemas/entity_definitions.schema.json</span>
+</span></code></pre></div>
+<p>The predefined definitions and the examples already have it.</p>
+<ul>
+<li><strong>VS Code</strong>: install the <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml">YAML extension by Red Hat</a>.
+  It reads the line above.</li>
+<li><strong>JetBrains IDEs</strong> (PyCharm, IntelliJ): recent versions read the line as well. If
+  yours does not, add the schema under <em>Settings → Languages &amp; Frameworks → Schemas and DTDs → JSON Schema
+  Mappings</em>.</li>
+<li><strong>Other editors</strong> that use the YAML language server (Neovim, Helix, Zed, Emacs)
+  read the line too.</li>
+</ul>
+<h3 id="offline-or-pinned-to-your-version">Offline, or pinned to your version</h3>
+<p>The schema at the URL above follows the latest release. To use the schema of the
+version you have installed, or to work without network access, write it next to your
+files:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>aatm<span class="w"> </span>schema<span class="w"> </span>definitions/
+</span></code></pre></div>
+<p>and point at the local file, with a path relative to the definition file:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># yaml-language-server: $schema=entity_definitions.schema.json</span>
+</span></code></pre></div>
+<h3 id="what-the-schema-does-not-check">What the schema does not check</h3>
+<p>The schema sees one file as plain data. Loading the file is still the full check
+(see below): it also verifies things such as a <code>parent_key</code> or <code>child.&lt;key&gt;</code> that
+names an entity of the file, an <code>attribute.&lt;key&gt;</code> or <code>when</code> label that the entity
+defines, and a <code>period_start</code> column listed before its column. The codes themselves
+are checked against the OMOP vocabulary when the table builder is created. The schema is also a little stricter than loading in one way: it reports
+unknown entity, attribute and label keys, which loading ignores, because they are
+almost always typos.</p>
+<hr>
 <h2 id="checking-a-file-before-using-it">Checking a file before using it</h2>
 <h3 id="load-errors">Load errors</h3>
 <p>Invalid files fail when loaded, <strong>before any model call</strong>, with a message that names
@@ -2954,97 +3076,97 @@ the file:</p>
 <li>a missing <code>name</code>, <code>definition</code>, <code>description</code> or label <code>value</code>, or a value of the
   wrong type (see <a href="#yaml-pitfalls">YAML pitfalls</a>)</li>
 </ul>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>ValueError: Invalid entity definitions in brca.yaml:
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>1 validation error for EntityDefinitions
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>entities.0.attributes.0.labels.0.value
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  Input should be a valid string [type=string_type, input_value=True, input_type=bool]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>ValueError: Invalid entity definitions in brca.yaml:
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>1 validation error for EntityDefinitions
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>entities.0.attributes.0.labels.0.value
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  Input should be a valid string [type=string_type, input_value=True, input_type=bool]
 </span></code></pre></div>
 <p>The location (<code>entities.0.attributes.0.labels.0.value</code>) counts from 0: the first
 entity, its first attribute, its first label.</p>
 <h3 id="see-what-the-model-will-read">See what the model will read</h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">entity_definitions</span><span class="o">.</span><span class="n">to_prompt_str</span><span class="p">())</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">entity_definitions</span><span class="o">.</span><span class="n">to_prompt_str</span><span class="p">())</span>
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>BRCA gene test (key: `brca_test`, has_parent: False, parent_key: `None`): A mention of BRCA1 and/or BRCA2 genetic testing performed for the patient, e.g. "BRCA1/2 panel" or "germline BRCA testing". Does not include tests of relatives or tests that are only planned.
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  Attributes:
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  - `result` (optional): The result of the test as stated in the note.
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    - `positive`: A pathogenic or likely pathogenic variant was reported.
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    - `negative`: No pathogenic or likely pathogenic variant was found.
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    - `uncertain`: Only a variant of uncertain significance (VUS) was reported.
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>  - `origin` (optional): Whether germline or tumour (somatic) DNA was tested.
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    - `germline`: Germline testing, e.g. blood or saliva.
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    - `somatic`: Testing of tumour tissue.
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>Test date (key: `test_date`, has_parent: True, parent_key: `brca_test`): The date a BRCA test was performed or reported, e.g. "2024" or "March 2025".
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>BRCA gene test (key: `brca_test`, has_parent: False, parent_key: `None`): A mention of BRCA1 and/or BRCA2 genetic testing performed for the patient, e.g. "BRCA1/2 panel" or "germline BRCA testing". Does not include tests of relatives or tests that are only planned.
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  Attributes:
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  - `result` (optional): The result of the test as stated in the note.
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    - `positive`: A pathogenic or likely pathogenic variant was reported.
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    - `negative`: No pathogenic or likely pathogenic variant was found.
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    - `uncertain`: Only a variant of uncertain significance (VUS) was reported.
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>  - `origin` (optional): Whether germline or tumour (somatic) DNA was tested.
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    - `germline`: Germline testing, e.g. blood or saliva.
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    - `somatic`: Testing of tumour tissue.
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>Test date (key: `test_date`, has_parent: True, parent_key: `brca_test`): The date a BRCA test was performed or reported, e.g. "2024" or "March 2025".
 </span></code></pre></div>
 <p>If this text would confuse a colleague, it will confuse the model too.</p>
 <h3 id="test-it-without-a-model">Test it without a model</h3>
 <p><code>validate_extracted_entity</code> checks a hand-written answer against your definitions, so
 you can try edge cases in a unit test:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.data_models.extractors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExtractedEntityCandidates</span><span class="p">,</span> <span class="n">validate_extracted_entity</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">note</span> <span class="o">=</span> <span class="s2">"BRCA1/2 panel 2024: no pathogenic variants detected."</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">candidates</span> <span class="o">=</span> <span class="n">ExtractedEntityCandidates</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="p">{</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>        <span class="s2">"entities"</span><span class="p">:</span> <span class="p">[</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>            <span class="p">{</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>                <span class="s2">"id"</span><span class="p">:</span> <span class="s2">"e1"</span><span class="p">,</span> <span class="s2">"text"</span><span class="p">:</span> <span class="s2">"BRCA1/2 panel"</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">:</span> <span class="s2">"brca_test"</span><span class="p">,</span> <span class="s2">"line"</span><span class="p">:</span> <span class="s2">"L1"</span><span class="p">,</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>                <span class="s2">"attributes"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"key"</span><span class="p">:</span> <span class="s2">"result"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="s2">"negative"</span><span class="p">}],</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>            <span class="p">},</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>            <span class="p">{</span><span class="s2">"id"</span><span class="p">:</span> <span class="s2">"e2"</span><span class="p">,</span> <span class="s2">"text"</span><span class="p">:</span> <span class="s2">"2024"</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">:</span> <span class="s2">"test_date"</span><span class="p">,</span> <span class="s2">"line"</span><span class="p">:</span> <span class="s2">"L1"</span><span class="p">,</span> <span class="s2">"parents"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"e1"</span><span class="p">]},</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>        <span class="p">]</span>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="p">}</span>
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="p">)</span>
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="n">result</span> <span class="o">=</span> <span class="n">validate_extracted_entity</span><span class="p">(</span><span class="n">note</span><span class="p">,</span> <span class="n">entity_definitions</span><span class="p">,</span> <span class="n">candidates</span><span class="p">)</span>
-</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">validated_entities</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_attribute</span><span class="p">(</span><span class="s2">"result"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"negative"</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.data_models.extractors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExtractedEntityCandidates</span><span class="p">,</span> <span class="n">validate_extracted_entity</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">note</span> <span class="o">=</span> <span class="s2">"BRCA1/2 panel 2024: no pathogenic variants detected."</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">candidates</span> <span class="o">=</span> <span class="n">ExtractedEntityCandidates</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="p">{</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>        <span class="s2">"entities"</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>            <span class="p">{</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>                <span class="s2">"id"</span><span class="p">:</span> <span class="s2">"e1"</span><span class="p">,</span> <span class="s2">"text"</span><span class="p">:</span> <span class="s2">"BRCA1/2 panel"</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">:</span> <span class="s2">"brca_test"</span><span class="p">,</span> <span class="s2">"line"</span><span class="p">:</span> <span class="s2">"L1"</span><span class="p">,</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>                <span class="s2">"attributes"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"key"</span><span class="p">:</span> <span class="s2">"result"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="s2">"negative"</span><span class="p">}],</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>            <span class="p">},</span>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>            <span class="p">{</span><span class="s2">"id"</span><span class="p">:</span> <span class="s2">"e2"</span><span class="p">,</span> <span class="s2">"text"</span><span class="p">:</span> <span class="s2">"2024"</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">:</span> <span class="s2">"test_date"</span><span class="p">,</span> <span class="s2">"line"</span><span class="p">:</span> <span class="s2">"L1"</span><span class="p">,</span> <span class="s2">"parents"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"e1"</span><span class="p">]},</span>
+</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>        <span class="p">]</span>
+</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>    <span class="p">}</span>
+</span><span id="__span-12-14"><a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="p">)</span>
+</span><span id="__span-12-15"><a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="n">result</span> <span class="o">=</span> <span class="n">validate_extracted_entity</span><span class="p">(</span><span class="n">note</span><span class="p">,</span> <span class="n">entity_definitions</span><span class="p">,</span> <span class="n">candidates</span><span class="p">)</span>
+</span><span id="__span-12-16"><a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">validated_entities</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_attribute</span><span class="p">(</span><span class="s2">"result"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"negative"</span>
 </span></code></pre></div>
 <hr>
 <h2 id="other-ways-to-get-definitions">Other ways to get definitions</h2>
 <p><strong>Predefined files</strong> ship with AATM, aligned with OMOP CDM tables and common clinical
 scales. Their source in
 <code>aatm/omop/entity_definitions/</code> is a good starting point to copy:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"condition_occurrence"</span><span class="p">)</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"drug_exposure"</span><span class="p">)</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"ecog_performance_status"</span><span class="p">)</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"lab_results"</span><span class="p">)</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"smoking_status"</span><span class="p">)</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"family_history"</span><span class="p">)</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"medical_history"</span><span class="p">)</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"device_exposure"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"condition_occurrence"</span><span class="p">)</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"drug_exposure"</span><span class="p">)</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"ecog_performance_status"</span><span class="p">)</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"lab_results"</span><span class="p">)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"smoking_status"</span><span class="p">)</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"family_history"</span><span class="p">)</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"medical_history"</span><span class="p">)</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="n">EntityDefinitions</span><span class="o">.</span><span class="n">from_predefined</span><span class="p">(</span><span class="s2">"device_exposure"</span><span class="p">)</span>
 </span></code></pre></div>
 <p><strong>In Python</strong>, the same fields are available as models, which is handy for tests or
 definitions built at run time:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.data_models.extractors</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="n">AttributeDefinition</span><span class="p">,</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">AttributeLabel</span><span class="p">,</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">EntityDefinition</span><span class="p">,</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    <span class="n">EntityDefinitions</span><span class="p">,</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="p">)</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="n">entity_definitions</span> <span class="o">=</span> <span class="n">EntityDefinitions</span><span class="p">(</span>
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    <span class="n">entities</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>        <span class="n">EntityDefinition</span><span class="p">(</span>
-</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>            <span class="n">name</span><span class="o">=</span><span class="s2">"BRCA gene test"</span><span class="p">,</span>
-</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>            <span class="n">key</span><span class="o">=</span><span class="s2">"brca_test"</span><span class="p">,</span>
-</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>            <span class="n">definition</span><span class="o">=</span><span class="s2">"A mention of BRCA1 and/or BRCA2 genetic testing."</span><span class="p">,</span>
-</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>            <span class="n">attributes</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>                <span class="n">AttributeDefinition</span><span class="p">(</span>
-</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>                    <span class="n">key</span><span class="o">=</span><span class="s2">"result"</span><span class="p">,</span>
-</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>                    <span class="n">description</span><span class="o">=</span><span class="s2">"The result of the test as stated in the note."</span><span class="p">,</span>
-</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>                    <span class="n">labels</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>                        <span class="n">AttributeLabel</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">"positive"</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">"A pathogenic variant was reported."</span><span class="p">),</span>
-</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>                        <span class="n">AttributeLabel</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">"negative"</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">"No pathogenic variant was found."</span><span class="p">),</span>
-</span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>                        <span class="n">AttributeLabel</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">"uncertain"</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">"Only a VUS was reported."</span><span class="p">),</span>
-</span><span id="__span-11-22"><a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a>                    <span class="p">],</span>
-</span><span id="__span-11-23"><a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a>                <span class="p">)</span>
-</span><span id="__span-11-24"><a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a>            <span class="p">],</span>
-</span><span id="__span-11-25"><a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a>        <span class="p">),</span>
-</span><span id="__span-11-26"><a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a>        <span class="n">EntityDefinition</span><span class="p">(</span>
-</span><span id="__span-11-27"><a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a>            <span class="n">name</span><span class="o">=</span><span class="s2">"Test date"</span><span class="p">,</span>
-</span><span id="__span-11-28"><a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a>            <span class="n">definition</span><span class="o">=</span><span class="s2">"The date a BRCA test was performed."</span><span class="p">,</span>
-</span><span id="__span-11-29"><a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a>            <span class="n">has_parent</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-11-30"><a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a>            <span class="n">parent_key</span><span class="o">=</span><span class="s2">"brca_test"</span><span class="p">,</span>
-</span><span id="__span-11-31"><a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a>        <span class="p">),</span>
-</span><span id="__span-11-32"><a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a>    <span class="p">]</span>
-</span><span id="__span-11-33"><a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">aatm.data_models.extractors</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="n">AttributeDefinition</span><span class="p">,</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">AttributeLabel</span><span class="p">,</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">EntityDefinition</span><span class="p">,</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">EntityDefinitions</span><span class="p">,</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="p">)</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="n">entity_definitions</span> <span class="o">=</span> <span class="n">EntityDefinitions</span><span class="p">(</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    <span class="n">entities</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>        <span class="n">EntityDefinition</span><span class="p">(</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>            <span class="n">name</span><span class="o">=</span><span class="s2">"BRCA gene test"</span><span class="p">,</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>            <span class="n">key</span><span class="o">=</span><span class="s2">"brca_test"</span><span class="p">,</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>            <span class="n">definition</span><span class="o">=</span><span class="s2">"A mention of BRCA1 and/or BRCA2 genetic testing."</span><span class="p">,</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>            <span class="n">attributes</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>                <span class="n">AttributeDefinition</span><span class="p">(</span>
+</span><span id="__span-14-16"><a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a>                    <span class="n">key</span><span class="o">=</span><span class="s2">"result"</span><span class="p">,</span>
+</span><span id="__span-14-17"><a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a>                    <span class="n">description</span><span class="o">=</span><span class="s2">"The result of the test as stated in the note."</span><span class="p">,</span>
+</span><span id="__span-14-18"><a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a>                    <span class="n">labels</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-14-19"><a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a>                        <span class="n">AttributeLabel</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">"positive"</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">"A pathogenic variant was reported."</span><span class="p">),</span>
+</span><span id="__span-14-20"><a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a>                        <span class="n">AttributeLabel</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">"negative"</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">"No pathogenic variant was found."</span><span class="p">),</span>
+</span><span id="__span-14-21"><a id="__codelineno-14-21" name="__codelineno-14-21" href="#__codelineno-14-21"></a>                        <span class="n">AttributeLabel</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="s2">"uncertain"</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">"Only a VUS was reported."</span><span class="p">),</span>
+</span><span id="__span-14-22"><a id="__codelineno-14-22" name="__codelineno-14-22" href="#__codelineno-14-22"></a>                    <span class="p">],</span>
+</span><span id="__span-14-23"><a id="__codelineno-14-23" name="__codelineno-14-23" href="#__codelineno-14-23"></a>                <span class="p">)</span>
+</span><span id="__span-14-24"><a id="__codelineno-14-24" name="__codelineno-14-24" href="#__codelineno-14-24"></a>            <span class="p">],</span>
+</span><span id="__span-14-25"><a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a>        <span class="p">),</span>
+</span><span id="__span-14-26"><a id="__codelineno-14-26" name="__codelineno-14-26" href="#__codelineno-14-26"></a>        <span class="n">EntityDefinition</span><span class="p">(</span>
+</span><span id="__span-14-27"><a id="__codelineno-14-27" name="__codelineno-14-27" href="#__codelineno-14-27"></a>            <span class="n">name</span><span class="o">=</span><span class="s2">"Test date"</span><span class="p">,</span>
+</span><span id="__span-14-28"><a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a>            <span class="n">definition</span><span class="o">=</span><span class="s2">"The date a BRCA test was performed."</span><span class="p">,</span>
+</span><span id="__span-14-29"><a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a>            <span class="n">has_parent</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-14-30"><a id="__codelineno-14-30" name="__codelineno-14-30" href="#__codelineno-14-30"></a>            <span class="n">parent_key</span><span class="o">=</span><span class="s2">"brca_test"</span><span class="p">,</span>
+</span><span id="__span-14-31"><a id="__codelineno-14-31" name="__codelineno-14-31" href="#__codelineno-14-31"></a>        <span class="p">),</span>
+</span><span id="__span-14-32"><a id="__codelineno-14-32" name="__codelineno-14-32" href="#__codelineno-14-32"></a>    <span class="p">]</span>
+</span><span id="__span-14-33"><a id="__codelineno-14-33" name="__codelineno-14-33" href="#__codelineno-14-33"></a><span class="p">)</span>
 </span></code></pre></div>
 
 
