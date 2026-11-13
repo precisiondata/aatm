@@ -89,9 +89,24 @@ Most code runs unchanged. Check these:
   `on_error="record"` to keep a batch going when one note fails.
 - **JSON Schema for entity definitions**: completion and inline errors in your editor.
 
+### Fixes
+
+- `TerminologyMapper.map` and `amap` wrote their results to the mapper's own folder
+  and ignored the `output_dir` argument. They now write to the folder given.
+- `pipeline.plan()` estimated the notes left from counts alone, so new notes next to an
+  earlier run could show as "0 to extract". It now matches note ids with the run's
+  ledger when they are cheap to read (lists, DataFrames, Parquet), and
+  `RunPlan.by_note_id` says which method was used. A sharded plan counts the notes of
+  its shard exactly.
+- `Pilot.compare` with the same version twice crashed; it now says so.
+- `aatm amap`, which was never implemented, is hidden from the command line help.
+
 ### Documentation
 
 - Versioned documentation (latest, previous and dev).
+- A [command line reference](reference/cli.md) generated from the CLI, with every
+  command, argument and option; clearer `--help` texts for `init`, `map`, `search-ui`
+  and `serve`.
 - New pages: [Start here](getting-started/index.md),
   [Set up the vocabularies](getting-started/setup.md), a
   [notes-to-OMOP quick start](getting-started/quick_start_omop.md), a
