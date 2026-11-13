@@ -80,6 +80,11 @@ Clear documentation keeps our codebase maintainable.
   mkdocs build
   mkdocs serve
   ```
+* **Command line reference**: `docs/reference/cli.md` is generated from the CLI. After
+  adding or changing a command or an option, regenerate it (a test fails until you do):
+  ```bash
+  uv run python scripts/gen_cli_docs.py
+  ```
 
 ---
 

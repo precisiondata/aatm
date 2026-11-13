@@ -75,7 +75,7 @@ These decide what the run produces and what it costs. Set them for every run.
   ([Writing entity definitions](entity_definitions.md)).
 - **Model**: `model_id`, the extraction model. Try a small one on the pilot first.
 - **Coder**: `coder=`, how extracted texts get concept ids
-  ([the agent](omop_tables.md#searching-with-an-agent) or a terminology mapper), and
+  ([the agent](coding_text.md#searching-with-an-agent) or a terminology mapper), and
   `min_score` in the mappings, the confidence below which `0` is stored.
 - **`cache=True`**: each distinct text is coded once, across chunks, runs and rebuilds.
   Without it, the agent coder pays again for repeated texts in every chunk and on every
@@ -116,7 +116,7 @@ them together.
 **Offline, cheaper: `batch=True`.** Extraction goes through the provider's batch
 endpoint (OpenAI, Anthropic, Gemini): about half the price, results within 24 hours.
 Concurrency and rate limits no longer matter for extraction; coding stays live. See
-[Batch extraction](omop_tables.md#processing-large-datasets).
+[Batch extraction](large_datasets.md#batch-extraction-about-half-the-price).
 
 ## Tier 3: experts
 
@@ -139,7 +139,7 @@ Change these only when a plan, a pilot or the progress logs point at them.
 ## Reading a running job
 
 Each run logs a progress line every minute with the throughput and time left, and saves
-its summary in `runs/` (see [Processing large datasets](omop_tables.md#processing-large-datasets)).
+its summary in `runs/` (see [Processing large datasets](large_datasets.md)).
 The summary breaks the time down by stage: when extraction's notes/min is far below
 `max_concurrency` × 60 / seconds per call, the rate limits or 429 retries are the
 limit; when building is the slower stage, the coder is, and `cache=True` or a larger

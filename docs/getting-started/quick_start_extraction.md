@@ -13,11 +13,11 @@ against the note. Only spans that really exist in the note survive, each with it
 character position, linked to the entity it belongs to.
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[Clinical note] --> B[Numbered lines]
-    D[Entity definitions] --> C
     B --> C[LLM extraction]
-    C --> E[Validation]
+    D[Entity definitions] --> C
+    C --> E[Validation against the note]
     E --> F[Validated entities<br/>+ rejected candidates]
     F --> G[Records view]
 ```
@@ -32,7 +32,9 @@ The main pieces are:
 | `EntityValidationResult` | `aatm.data_models.extractors` | Validated entities, rejected candidates and the records view |
 
 The extracted text (for example `"Hypertension"` or `"Furosemide 40 mg"`) can then be
-mapped to standard concepts with the terminology mapping pipeline.
+mapped to standard concepts with the terminology mapping pipeline. To go straight to
+OMOP CDM tables, which does the coding for you, see the
+[notes-to-OMOP quick start](quick_start_omop.md).
 
 ---
 
@@ -583,7 +585,8 @@ extraction: many `text_not_in_line` rejections point to line-id mistakes, and ma
   For other cases you can add your own
   [attributes](entity_definitions.md#attributes-what-the-note-says-about-a-mention),
   e.g. an `assertion` attribute with `present`, `absent` and `possible`.
-- Attribute labels come from a single extraction call; there is no separate
-  classification pass per mention yet.
+- By default, attribute labels come from the single extraction call. For a separate
+  pass per mention, with probabilities, give the extractor a
+  [`DecisionAttributeLabeller`](../reference/decision_models.md#labelling-attributes-decisionattributelabeller).
 - `GeminiExtractor` (also in `aatm.extractors`) is an older interface based on
   `ExtractionTask` and does not use entity definitions or this validation.

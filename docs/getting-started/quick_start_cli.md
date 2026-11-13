@@ -1,265 +1,126 @@
-# CLI Quick Start
+# Quick start: medical coding from the command line
 
-This page shows how to use **AATM entirely from the command line**.
+This page maps a CSV of local codes and descriptions to standard OMOP concepts with
+`aatm map`, without writing Python.
 
-It is focused on the actual CLI workflow exposed by the commads: `init`, `map`, and `search-ui`.
+**Before you start:** run `aatm init` ([Set up the vocabularies](setup.md)). `aatm map`
+searches the index it builds.
 
----
+!!! tip "Every command"
+    | Command | Does |
+    |---|---|
+    | `aatm init` | Sets up the vocabularies and the search index ([Set up the vocabularies](setup.md)) |
+    | `aatm doctor` | Checks whether local models use your GPU ([Installation](installation.md#gpu-acceleration-optional)) |
+    | `aatm map` | Maps a CSV of terms to standard concepts (this page) |
+    | `aatm omop run`, `rebuild`, `status`, `failures`, `pilot` | Clinical notes to OMOP tables ([Quick start](quick_start_omop.md), [High-level guide](high_level.md)) |
+    | `aatm cache info`, `clear` | The coding cache of OMOP runs |
+    | `aatm vector-db check`, `upload` | Where the search index is, and copying it to Chroma Cloud or Pinecone ([Environment variables](env.md#vector-database-local-chroma-cloud-or-pinecone)) |
+    | `aatm search-ui` | An interactive search over the vocabularies (below) |
+    | `aatm serve` | A REST API for mapping |
 
-## What you can do from the CLI
-
-With the CLI, you can:
-
-- initialize the local environment
-- build the local SQLite vocabulary database
-- build the mapping datasets
-- build the local vector database
-- run terminology mapping jobs
-- extract clinical notes into OMOP tables, and inspect or rebuild the runs
-- launch the interactive search UI
-
-The main commands are:
-
-- `aatm init`
-- `aatm map`
-- `aatm omop run`, `aatm omop rebuild`, `aatm omop status`, `aatm omop failures`
-  (see [Processing large datasets](omop_tables.md#processing-large-datasets))
-- `aatm search-ui`
+    `aatm <command> --help` lists the options of each.
 
 ---
 
-## 1. Get your OMOP vocabularies
+## 1. Prepare your input CSV
 
-AATM cannot ship the OMOP vocabularies because several of them have their own licences. You request them from [Athena](https://athena.ohdsi.org/vocabulary/list), which has no API for this, so this step is done in the browser:
-
-1. Log in to [Athena](https://athena.ohdsi.org/vocabulary/list) and open **Download**.
-2. Select the vocabularies you need (for example SNOMED, LOINC, RxNorm and UCUM) and accept the licences of the restricted ones.
-3. Click **Download vocabularies** and name the bundle. Athena emails you a link to a zip file when it is ready, which can take a while.
-
-Then let `aatm init` do the rest by passing it the link, or the zip if you already downloaded it:
-
-```bash
-aatm init --vocab-zip "https://athena.ohdsi.org/api/v1/vocabularies/zip/<bundle-id>"
-aatm init --vocab-zip ~/Downloads/vocabulary_download_v5_<bundle-id>.zip
-```
-
-With `--vocab-zip`, `aatm init`:
-
-- downloads the bundle into `.aatm/downloads` (resuming if the connection drops). If Athena returns a login page or the link has expired, it says so: request the bundle again, or download it in your browser and pass the zip's path instead;
-- unpacks it into `./vocabularies`, or into `--vocab-dir`. It asks before overwriting existing files; pass `--force` to overwrite without asking;
-- checks that the required files (`CONCEPT.csv`, `CONCEPT_RELATIONSHIP.csv`, `CONCEPT_SYNONYM.csv`, `VOCABULARY.csv`, `DOMAIN.csv`) are present, and lists the vocabularies and versions in the bundle;
-- adds the CPT4 concept names when the bundle includes CPT4. This needs [Java](https://adoptium.net) and a [UMLS API key](https://uts.nlm.nih.gov/uts/profile), passed with `--umls-api-key` or the `UMLS_API_KEY` environment variable. Without a key, CPT4 concepts are kept without names.
-
-### Using an unpacked directory
-
-If you unpacked the zip yourself, put the CSVs in `./vocabularies`, where the CLI looks by default:
-
-```text
-./vocabularies
-```
-
-To use another location, pass `--vocab-dir` or `-vd`. The CLI validates this path during initialization. In that case, add the CPT4 names yourself by following the `readme.txt` in the bundle.
-
----
-
-## 2. Run the initialization command
-
-The `init` command is the main CLI setup workflow.
-
-It does all of the following for you:
-
-- creates the local `.aatm` helper directory where the local databases and aatm config files will be stored
-- ensures `.aatm` is added to `.gitignore`
-- builds the local OMOP SQLite database
-- lets you choose an embedding model
-- lets you choose the standard vocabularies
-- builds the mapping datasets
-- builds the local vector database
-
-That means you do **not** need to call Python setup functions manually for the normal setup flow. At the end, you will be ready to run terminology mapping tasks.
-
-### Simplest setup
-
-```bash
-aatm init
-```
-
-This uses the default vocab directory and interactively asks you to choose the embedding model, standard vocabularies and other options.
-
-### Setup with a custom vocab directory
-
-```bash
-aatm init --vocab-dir ./my_vocabularies
-```
-
-### Setup with an explicit embedding model
-
-```bash
-aatm init --embedding-model embeddinggemma-300M
-```
-
-### Setup with explicit standard vocabularies
-
-```bash
-aatm init --standard-vocabs LOINC --standard-vocabs SNOMED --standard-vocabs RxNorm
-```
-
-### Fully explicit setup
-
-```bash
-aatm init \
-  --vocab-dir ./vocabularies \
-  --embedding-model embeddinggemma-300M \
-  --standard-vocabs LOINC \
-  --standard-vocabs SNOMED \
-  --standard-vocabs RxNorm
-```
-
-## 3. Prepare your input CSV
-
-After initialization, prepare the CSV you want to map.
-
-The mapper expects an OMOP-style `SOURCE_TO_CONCEPT_MAP` input structure, including these columns:
+The input follows the OMOP `SOURCE_TO_CONCEPT_MAP` layout, with these columns:
 
 - `source_code`
 - `source_concept_id`
 - `source_vocabulary_id`
-- `source_code_description`
+- `source_code_description`: the text that is mapped
 - `valid_start_date`
 - `valid_end_date`
 - `invalid_reason`
 
-Example:
-
-```csv
+```csv title="data/source_to_concept_map.csv"
 source_code,source_concept_id,source_vocabulary_id,source_code_description,valid_start_date,valid_end_date,invalid_reason
 A01,,LOCAL,"Dor no peito",2020-01-01,2099-12-31,
 B02,,LOCAL,"Diabetes mellitus tipo 2",2020-01-01,2099-12-31,
 ```
 
----
-
-## 4. Run mapping directly from the CLI
-
-The `map` command runs a terminology mapping task. You can use it in two ways:
-
-- with a task config file
-- with explicit CLI options
-
-Both paths are supported directly by the CLI implementation.
-
-### Option A: run from explicit CLI arguments
-
-This is the most direct fully-CLI workflow.
+## 2. Map it
 
 ```bash
-aatm map \
-  --input-file data/source_to_concept_map.csv \
-  --output-dir output \
-  --translator-id empty-translator \
-  --retriever-id embeddinggemma-300M \
-  --reranker-id bm25-reranker \
-  --selector-id first-result-selector \
-  --batch-size 100
+aatm map --input-file data/source_to_concept_map.csv --output-dir output --limit-to 20
 ```
 
-`--retriever-id` is optional: without it, `aatm map` uses the embedding model built by
-`aatm init` (recorded in `.aatm/config.yaml`).
+This searches the index `aatm init` built and keeps the closest candidate, on the first
+20 rows. The result is `output/mapped_source_concepts.csv`, with the chosen concept's
+id, vocabulary, code and domain, and a confidence score for each row.
 
-#### Run a small test job
-
-Use `--limit-to` when you want to test with only a few rows.
-
-```bash
-aatm map \
-  --input-file data/source_to_concept_map.csv \
-  --output-dir output \
-  --translator-id empty-translator \
-  --retriever-id embeddinggemma-300M \
-  --reranker-id bm25-reranker \
-  --selector-id first-result-selector \
-  --limit-to 20
-```
-
-#### Apply rate limiting
-
-If needed, you can also pass a rate limit:
+The closest candidate is often wrong for short, abbreviated or non-English terms. Add a
+translator and let an LLM choose among the candidates:
 
 ```bash
 aatm map \
   --input-file data/source_to_concept_map.csv \
   --output-dir output \
   --translator-id gemini-2.5-flash \
-  --retriever-id embeddinggemma-300M \
   --reranker-id bm25-reranker \
-  --selector-id first-result-selector \
-  --batch-size 50 \
-  --rate-limit 100
+  --selector-id gpt-5-mini \
+  --batch-size 50
 ```
 
-The CLI accepts all of these options directly.
+| Option | Values | Default |
+|---|---|---|
+| `--translator-id` | `empty-translator`, `gemini-2.5-flash` | no translation |
+| `--retriever-id` | An embedding model whose index you built, e.g. `text-embedding-3-small` | the one `aatm init` built |
+| `--reranker-id` | `bm25-reranker`, `qwen3-reranker-0.6b`, `qwen3-reranker-4b`, `qwen3-reranker-8b` | no reranking |
+| `--selector-id` | `first-result-selector`; an LLM such as `gpt-5-mini` or `gemini-2.5-flash`; the agent, `agent-gpt-5-mini`; a decision model, `decision-openrouter/typesafe/jev-1.13` | `first-result-selector` |
+| `--batch-size` | Terms per batch | 100 |
+| `--rate-limit` | Terms per minute | no limit |
+| `--limit-to` | Map only the first N rows | every row |
 
----
+The full list of selectors is in the
+[Python quick start](quick_start_python_api.md#2-choose-the-components).
 
-### Option B. Run mapping from a config file
+## 3. Save the configuration
 
-The other CLI workflow is to store the mapping task in a config file and pass it with `--task-config-path` or `-t`.
+For runs you repeat, put the options in a file and pass it with `--task-config-path`
+(`-t`):
 
-#### Example command
+=== "YAML"
+
+    ```yaml title="task.yaml"
+    input_file: data/source_to_concept_map.csv
+    output_dir: output
+    translator_id: gemini-2.5-flash
+    reranker_id: bm25-reranker
+    selector_id: gpt-5-mini
+    batch_size: 50
+    ```
+
+=== "JSON"
+
+    ```json title="task.json"
+    {
+      "input_file": "data/source_to_concept_map.csv",
+      "output_dir": "output",
+      "translator_id": "gemini-2.5-flash",
+      "reranker_id": "bm25-reranker",
+      "selector_id": "gpt-5-mini",
+      "batch_size": 50
+    }
+    ```
 
 ```bash
 aatm map --task-config-path task.yaml
 ```
 
-When you do this, the CLI loads the task config file and runs the mapping task from it. 
-
-#### Example task config
-
-Task config files are supported as `.yaml` or `.json` files.
-
-=== "YAML"
-
-    ```yaml
-    input_file: data/source_to_concept_map.csv
-    output_dir: output
-    translator_id: empty-translator
-    retriever_id: embeddinggemma-300M
-    reranker_id: bm25-reranker
-    selector_id: first-result-selector
-    batch_size: 100
-    rate_limit: null
-    limit_to: null
-    ```
-
-=== "JSON"
-
-    ```json
-    {
-      "input_file": "data/source_to_concept_map.csv",
-      "output_dir": "output",
-      "translator_id": "empty-translator",
-      "retriever_id": "embeddinggemma-300M",
-      "reranker_id": "bm25-reranker",
-      "selector_id": "first-result-selector",
-      "batch_size": 100,
-      "rate_limit": null,
-      "limit_to": null
-    }
-    ```
-
-This is useful when you want reproducible runs or reusable task definitions.
-
 ---
 
-## 5. Launch the search UI from the CLI
-
-You can also launch the Streamlit-based search interface directly from the CLI:
+## 4. Explore the vocabularies in the search UI
 
 ```bash
 aatm search-ui
 ```
 
-The CLI resolves the packaged `search_ui.py` file and launches it through Streamlit using the current Python interpreter. Streamlit's file watcher is turned off, since it is only needed while editing the UI; set `STREAMLIT_SERVER_FILE_WATCHER_TYPE=auto` to turn it back on.
+This opens a Streamlit app where you type a term and see the candidates the search
+index returns, which helps choose a retriever and a `top_k`. Streamlit's file watcher
+is turned off; set `STREAMLIT_SERVER_FILE_WATCHER_TYPE=auto` to turn it back on while
+editing the UI.
 
 ![Streamlit search UI screenshot.](../assets/search-ui-screenshot.png)
 /// caption
@@ -268,127 +129,22 @@ Streamlit search UI screenshot.
 
 ---
 
-## 6. What gets created locally
+## Troubleshooting
 
-After a normal CLI setup and mapping workflow, you will typically have local artifacts such as:
+| You see | Fix |
+|---|---|
+| `No vector database for '<model>'` | That index is not built: use one `aatm vector-db check` lists, leave `--retriever-id` out, or build it with `aatm init --embedding-model <model>` |
+| `aatm map` says the task config file does not exist | Check the path given to `--task-config-path` |
+| The CSV fails validation | Check the required columns above |
+| An LLM component fails with an authentication error | Check the provider's key in `.env` ([Environment variables](env.md)) |
 
-```text
-.aatm/
-├── omop.db
-├── datasets/
-└── chroma_vector_dbs/
-```
-
-And your mapped output will typically be written to:
-
-```text
-output/mapped_source_concepts.csv
-```
-
-The CLI `init` command is responsible for creating the local helper resources, and the `map` command runs the terminology mapping workflow. 
-
----
-
-## 7. End-to-end CLI example
-
-Here is a full CLI-only path.
-
-### Step 1: initialize
-
-```bash
-aatm init \
-  --vocab-dir ./vocabularies \
-  --embedding-model embeddinggemma-300M \
-  --standard-vocabs LOINC \
-  --standard-vocabs SNOMED \
-  --standard-vocabs RxNorm
-```
-
-### Step 2: run mapping
-
-```bash
-aatm map \
-  --input-file data/source_to_concept_map.csv \
-  --output-dir output \
-  --translator-id empty-translator \
-  --retriever-id embeddinggemma-300M \
-  --reranker-id bm25-reranker \
-  --selector-id first-result-selector \
-  --batch-size 100
-```
-
-### Step 3: inspect output
-
-```bash
-ls output
-```
-
-You should see the mapped CSV file there.
-
-### Step 4: optionally launch the search UI
-
-```bash
-aatm search-ui
-```
-
----
-
-## 8. Troubleshooting
-
-### `aatm init` says the vocabulary directory does not exist
-
-Make sure your OMOP vocabulary files are present in `./vocabularies`, or pass the correct path with:
-
-```bash
-aatm init --vocab-dir /path/to/vocabularies
-```
-
-The CLI explicitly checks whether the provided directory exists. You can also skip the manual unpacking and pass the bundle with `--vocab-zip` (see [step 1](#1-get-your-omop-vocabularies)).
-
-### `aatm init --vocab-zip` says the link returned a web page or has expired
-
-Athena's link needs a valid, recent bundle. Request the bundle again on [Athena](https://athena.ohdsi.org/vocabulary/list) and use the new link, or open the link in your browser while logged in to Athena, save the zip, and pass its path to `--vocab-zip`.
-
-### `aatm init --vocab-zip` says files already exist
-
-The target directory already has vocabulary files. Confirm the overwrite when asked, pass `--force`, or unpack into another directory with `--vocab-dir`.
-
-### `aatm init --vocab-zip` warns about CPT4
-
-The bundle includes CPT4, whose names must be downloaded with your own UMLS licence. Install Java and pass your UMLS API key with `--umls-api-key` or the `UMLS_API_KEY` environment variable.
-
-### `aatm init` says the embedding model is unsupported
-
-Use one of the supported model names listed in this page. The CLI validates the model name before continuing. 
-
-### `aatm map` says the task config file does not exist
-
-Check the path you passed to:
-
-```bash
-aatm map --task-config-path task.yaml
-```
-
-The CLI verifies that the config file exists before loading it. 
-
-### Retrieval fails at mapping time
-
-Make sure you ran `aatm init` first and successfully built the local vector database for the retriever you want to use.
-
-### API-backed components fail
-
-Check that your `.env` file contains the required API keys.
-
-### Seeing more (or fewer) log messages
-
-Every command accepts a global `--log-level` option (or `-l`), placed before the command name. Logs are written to stderr:
+**More or fewer log messages.** Every command accepts a global `--log-level` (`-l`),
+placed before the command name, or the `AATM_LOG_LEVEL` environment variable. Logs go
+to standard error:
 
 ```bash
 aatm --log-level DEBUG map --task-config-path task.yaml
 ```
 
-The level can also be set with the `AATM_LOG_LEVEL` environment variable. It is passed on to `aatm serve` and `aatm search-ui`.
-
-### Output redirected to a file looks garbled or fails
-
-The CLI writes UTF-8 to files and pipes (for example `aatm serve > server.log`), so open such files as UTF-8.
+**Output redirected to a file looks garbled.** The CLI writes UTF-8 to files and pipes
+(e.g. `aatm serve > server.log`), so open such files as UTF-8.
