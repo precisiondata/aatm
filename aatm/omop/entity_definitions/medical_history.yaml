@@ -28,7 +28,7 @@
 # - The condition is coded from the mention with the terminology mapper, restricted to
 #   standard concepts of the Condition domain, from any vocabulary. The builder needs a
 #   mapper for this file:
-#   OmopTableBuilder(definitions, mapper=TerminologyMapper(...)).
+#   OmopTableBuilder(definitions, coder=TerminologyMapper(...)).
 # - observation_date is the note date, when the history was taken.
 # - observation_type_concept_id is 32858 "NLP".
 #

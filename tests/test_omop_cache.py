@@ -27,7 +27,7 @@ from test_omop_coding import (
 
 def cached_builder(coder, cache):
     return OmopTableBuilder(
-        lab_definitions(), vocabulary=UnitLookup(), mapper=coder, cache=cache
+        lab_definitions(), vocabulary=UnitLookup(), coder=coder, cache=cache
     )
 
 

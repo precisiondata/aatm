@@ -21,7 +21,7 @@
 # - measurement_concept_id is coded from the test name with the terminology mapper
 #   (aatm.terminology_mapper.TerminologyMapper), restricted to standard concepts of the
 #   Measurement domain, from any vocabulary. The builder needs a mapper for this file:
-#   OmopTableBuilder(definitions, mapper=TerminologyMapper(...)).
+#   OmopTableBuilder(definitions, coder=TerminologyMapper(...)).
 #   Test names often leave out the specimen ("Hemoglobin" in blood or urine), so check
 #   the mappings with OmopTables.mappings_dataframe().
 # - unit_concept_id is the unit looked up as a UCUM code ("g/dL" -> 8713), ignoring case

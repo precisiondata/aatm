@@ -443,7 +443,7 @@ def test_agentic_coder_gets_the_context_of_each_mention(vocab_db):
         ],
         vocab_db,
     )
-    builder = OmopTableBuilder(lab_definitions(), vocabulary=UnitLookup(), mapper=coder)
+    builder = OmopTableBuilder(lab_definitions(), vocabulary=UnitLookup(), coder=coder)
     text = "creatinine 1.4 mg/dL\nurine: creatinine 80"
     tables = run(
         builder,
@@ -480,7 +480,7 @@ def test_min_score_applies_to_the_agent_confidence(vocab_db):
         [step("finish", concept_id=3007760, confidence="low")], vocab_db
     )
     builder = OmopTableBuilder(
-        lab_definitions(min_score=0.5), vocabulary=UnitLookup(), mapper=coder
+        lab_definitions(min_score=0.5), vocabulary=UnitLookup(), coder=coder
     )
     tables = run(builder, "creatinine 80", [lab("e1", "creatinine")])
     assert tables.rows["measurement"][0].measurement_concept_id == 0
@@ -491,7 +491,7 @@ def test_plain_coders_still_code_each_text_once(vocab_db):
     from test_omop_coding import FakeCoder
 
     coder = FakeCoder()
-    builder = OmopTableBuilder(lab_definitions(), vocabulary=UnitLookup(), mapper=coder)
+    builder = OmopTableBuilder(lab_definitions(), vocabulary=UnitLookup(), coder=coder)
     run(
         builder,
         "Hb 11\nHb 12",
@@ -588,7 +588,7 @@ def test_terminology_mapper_coder_passes_contexts_to_an_agentic_selector(
     assert coder.uses_context
 
     builder = OmopTableBuilder(
-        lab_definitions(), vocabulary=UnitLookup(), mapper=mapper
+        lab_definitions(), vocabulary=UnitLookup(), coder=mapper
     )
     tables = run(
         builder,

@@ -268,7 +268,7 @@ def make_pipeline(config: Config) -> Any:
         )
     else:
         mapper = InstantCoder()
-    return OmopExtractionPipeline(definitions, extractor=extractor, mapper=mapper)
+    return OmopExtractionPipeline(definitions, extractor=extractor, coder=mapper)
 
 
 # --- measuring ------------------------------------------------------------------------

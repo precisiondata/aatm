@@ -80,7 +80,7 @@ async def main():
         definitions,
         extractor=SlowExtractor(definitions),
         vocabulary=UnitLookup(),
-        mapper=SlowCoder(),
+        coder=SlowCoder(),
     )
     summary = await pipeline.run(
         notes(120),  # a generator: the total is given so that the ETA can be shown

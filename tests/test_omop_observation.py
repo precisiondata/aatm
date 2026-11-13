@@ -109,7 +109,7 @@ def family_builder(coder=None):
         lookup.concepts[9000 + i] = concept(
             9000 + i, code, f"Relative {i}", "Relationship"
         )
-    return OmopTableBuilder(defs, vocabulary=lookup, mapper=coder or ConditionCoder())
+    return OmopTableBuilder(defs, vocabulary=lookup, coder=coder or ConditionCoder())
 
 
 # --- the table model -----------------------------------------------------------------
@@ -176,7 +176,7 @@ def test_map_into_an_excluded_domain_fails():
         ]
     )
     with pytest.raises(ValueError, match="'map' would retrieve concepts in the 'Drug'"):
-        OmopTableBuilder(defs, vocabulary=Lookup(), mapper=ConditionCoder())
+        OmopTableBuilder(defs, vocabulary=Lookup(), coder=ConditionCoder())
 
 
 def test_constant_zero_is_not_looked_up():
@@ -275,7 +275,7 @@ def test_family_history_rows():
 
 
 def test_family_history_needs_a_mapper():
-    with pytest.raises(ValueError, match="needs a terminology mapper"):
+    with pytest.raises(ValueError, match="needs a coder"):
         OmopTableBuilder(
             EntityDefinitions.from_predefined("family_history"), vocabulary=Lookup()
         )
@@ -288,7 +288,7 @@ HISTORY_NOTE = "History of type 2 diabetes in remission. H/o lupus."
 
 def history_builder(coder=None):
     defs = EntityDefinitions.from_predefined("medical_history")
-    return OmopTableBuilder(defs, vocabulary=Lookup(), mapper=coder or ConditionCoder())
+    return OmopTableBuilder(defs, vocabulary=Lookup(), coder=coder or ConditionCoder())
 
 
 def test_medical_history_rows():
@@ -321,7 +321,7 @@ def test_medical_history_rows():
 
 
 def test_medical_history_needs_a_mapper():
-    with pytest.raises(ValueError, match="needs a terminology mapper"):
+    with pytest.raises(ValueError, match="needs a coder"):
         OmopTableBuilder(
             EntityDefinitions.from_predefined("medical_history"), vocabulary=Lookup()
         )
@@ -359,7 +359,7 @@ def test_medical_history_and_conditions_share_one_extraction():
         ["condition_occurrence", "medical_history"],
         extractor=Extractor(),
         vocabulary=lookup,
-        mapper=ConditionCoder(),
+        coder=ConditionCoder(),
     )
     tables = asyncio.run(pipeline([note("H/o lupus. Has type 2 diabetes.")]))
     assert tables["observation"]["value_as_concept_id"].tolist() == [0]
@@ -398,7 +398,7 @@ def test_pipeline_combines_definitions():
         ["smoking_status", "family_history"],
         extractor=extractor,
         vocabulary=builder.vocabulary,
-        mapper=ConditionCoder(),
+        coder=ConditionCoder(),
     )
     assert {
         "smoking_status",
@@ -487,12 +487,12 @@ def test_predefined_observation_concepts_resolve_in_local_vocabulary():
     family = OmopTableBuilder(
         EntityDefinitions.from_predefined("family_history"),
         vocabulary=lookup,
-        mapper=ConditionCoder(),
+        coder=ConditionCoder(),
     )
     history = OmopTableBuilder(
         EntityDefinitions.from_predefined("medical_history"),
         vocabulary=lookup,
-        mapper=ConditionCoder(),
+        coder=ConditionCoder(),
     )
     names = (
         set(smoking.describe_concepts().concept_name)

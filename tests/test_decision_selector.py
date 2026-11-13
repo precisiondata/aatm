@@ -311,7 +311,7 @@ def test_min_score_thresholds_the_probability(tmp_path):
             output_dir=tmp_path,
         )
         builder = OmopTableBuilder(
-            lab_definitions(min_score=min_score), vocabulary=UnitLookup(), mapper=mapper
+            lab_definitions(min_score=min_score), vocabulary=UnitLookup(), coder=mapper
         )
         return run(builder, "creatinine 80", [lab("e1", "creatinine")])
 

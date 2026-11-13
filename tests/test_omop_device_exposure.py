@@ -57,7 +57,7 @@ class DeviceCoder:
 
 def builder(coder=None):
     defs = EntityDefinitions.from_predefined("device_exposure")
-    return OmopTableBuilder(defs, vocabulary=Lookup(), mapper=coder or DeviceCoder())
+    return OmopTableBuilder(defs, vocabulary=Lookup(), coder=coder or DeviceCoder())
 
 
 def build(text, entities, coder=None):
@@ -218,7 +218,7 @@ def test_device_without_kind_is_rejected():
 
 
 def test_device_exposure_needs_a_mapper():
-    with pytest.raises(ValueError, match="needs a terminology mapper"):
+    with pytest.raises(ValueError, match="needs a coder"):
         OmopTableBuilder(
             EntityDefinitions.from_predefined("device_exposure"), vocabulary=Lookup()
         )
@@ -236,7 +236,7 @@ def test_pipeline_dataframe():
         "device_exposure",
         extractor=Extractor(),
         vocabulary=Lookup(),
-        mapper=DeviceCoder(),
+        coder=DeviceCoder(),
     )
     tables = asyncio.run(pipeline([note("crutches")]))
     df = tables["device_exposure"]
@@ -260,5 +260,5 @@ def test_predefined_device_definition_resolves_in_local_vocabulary():
     OmopTableBuilder(
         EntityDefinitions.from_predefined("device_exposure"),
         vocabulary=SqliteConceptLookup(".aatm/omop.db"),
-        mapper=DeviceCoder(),
+        coder=DeviceCoder(),
     )

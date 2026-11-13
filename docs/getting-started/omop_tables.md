@@ -394,7 +394,7 @@ mapper = TerminologyMapper(
 )
 mapper.retriever.top_k = 30                      # how many candidates it sees
 
-pipeline = OmopExtractionPipeline("lab_results", model_id="openai/gpt-5-mini", mapper=mapper)
+pipeline = OmopExtractionPipeline("lab_results", model_id="openai/gpt-5-mini", coder=mapper)
 notes = [ClinicalNote(text="Labs 03/15/2025: Hb 11.2 g/dL, creatinine 1.4 mg/dl.", person_id=10)]
 tables = asyncio.run(pipeline(notes))
 tables.mappings_dataframe()
@@ -449,7 +449,7 @@ coder = AgenticCoder(
     retriever="text-embedding-3-small",  # the embedding model chosen in `aatm init`
     max_tool_calls=8,                    # per text
 )
-pipeline = OmopExtractionPipeline("lab_results", model_id="openai/gpt-5-mini", mapper=coder)
+pipeline = OmopExtractionPipeline("lab_results", model_id="openai/gpt-5-mini", coder=coder)
 notes = [ClinicalNote(text="Labs 03/15/2025: Hb 11.2 g/dL, creatinine 1.4 mg/dl.", person_id=10)]
 tables = asyncio.run(pipeline(notes))
 tables.mappings_dataframe()[["text", "concept_name", "score", "rationale", "trace", "usage"]]
@@ -548,7 +548,7 @@ texts again. Turn on the coding cache to store each result on disk and reuse it:
 from aatm.omop import CodingCache, OmopExtractionPipeline
 
 pipeline = OmopExtractionPipeline(
-    "lab_results", model_id="openai/gpt-5-mini", mapper=coder, cache=True
+    "lab_results", model_id="openai/gpt-5-mini", coder=coder, cache=True
 )
 tables = await pipeline(notes)
 tables.cache_stats  # CacheStats(hits=..., misses=..., stored=...), and .hit_rate
@@ -680,7 +680,7 @@ mapper.retriever.top_k = 30
 pipeline = OmopExtractionPipeline(
     ["smoking_status", "family_history", "medical_history"],  # names, YAML paths, or both
     model_id="openai/gpt-5-mini",
-    mapper=mapper,  # family_history and medical_history code conditions with it
+    coder=mapper,  # family_history and medical_history code conditions with it
 )
 notes = [
     ClinicalNote(
@@ -772,7 +772,7 @@ mapper.retriever.top_k = 30
 pipeline = OmopExtractionPipeline(
     "condition_occurrence",
     model_id="openai/gpt-5-mini",
-    mapper=mapper,  # codes condition names
+    coder=mapper,  # codes condition names
 )
 notes = [
     ClinicalNote(
@@ -866,7 +866,7 @@ mapper.retriever.top_k = 30
 pipeline = OmopExtractionPipeline(
     "drug_exposure",
     model_id="openai/gpt-5-mini",
-    mapper=mapper,  # codes drug names
+    coder=mapper,  # codes drug names
 )
 notes = [
     ClinicalNote(
@@ -964,7 +964,7 @@ mapper.retriever.top_k = 30
 pipeline = OmopExtractionPipeline(
     "device_exposure",
     model_id="openai/gpt-5-mini",
-    mapper=mapper,  # codes device names
+    coder=mapper,  # codes device names
 )
 notes = [
     ClinicalNote(
@@ -1288,7 +1288,7 @@ column. `OmopTableBuilder.build(..., row_ids="note")` numbers rows the same way.
 | `... is not a standard concept. Add 'maps_to: true' to use the standard concept it maps to` | A `*_concept_id` column got a non-standard code | Add `maps_to: true`, or use the standard concept's code |
 | `Table 'measurement' has no column 'value_as_numbr'` | A typo in a column name | Use the column names of the [CDM table](https://ohdsi.github.io/CommonDataModel/cdm55.html) |
 | `'weight_val' is not a child entity of 'body_weight'` | `from: child.<key>` names an entity that is not a child of this one | Use the child's `key`, and check its `parent_key` |
-| `... uses 'map', so the builder needs a terminology mapper` | The definition codes text, but no mapper was given | Pass `mapper=TerminologyMapper(...)` |
+| `... uses 'map', so the builder needs a terminology mapper` | The definition codes text, but no mapper was given | Pass `coder=TerminologyMapper(...)` |
 | `SyntaxError: 'await' outside function` | `await` used in a script | Use `asyncio.run(pipeline(notes))`, or run it in a notebook |
 | Every `map` is `unmapped` | The mapper found no candidates, e.g. the search index for its retriever was not built | Use the embedding model you chose in `aatm init` as the `retriever` |
 | `... has no cache_identity(): pass identity=...` | `cache=` was given with a custom coder that does not describe itself | Add a `cache_identity()` method, or wrap it in `CachedCoder(coder, cache, identity=...)` |
