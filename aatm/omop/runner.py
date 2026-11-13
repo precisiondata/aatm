@@ -179,7 +179,7 @@ from aatm.omop.tables import OMOP_TABLES
 if TYPE_CHECKING:
     import pyarrow as pa
 
-    from aatm.omop.builder import OmopExtractionPipeline
+    from aatm.omop.builder import OmopExtractionPipeline, OmopTableBuilder
 
 logger = get_logger(__name__)
 
@@ -1062,6 +1062,52 @@ def _fingerprint(value: Any) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+def extraction_fingerprint(pipeline: "OmopExtractionPipeline") -> str:
+    """A hash of what the stored extraction results depend on.
+
+    The entity definitions without their ``omop`` blocks, the extractor's class,
+    model and instructions, and its attribute labeller. A run refuses a folder whose
+    results were extracted with another fingerprint.
+    """
+    extractor = pipeline.extractor
+    definitions = pipeline.entity_definitions
+    value: dict[str, Any] = {
+        # `ordered` only changes a labeller's questions, which the labeller's
+        # own fingerprint covers; leaving it out keeps earlier runs resumable.
+        "entities": [
+            e.model_dump(
+                mode="json",
+                exclude={"omop": True, "attributes": {"__all__": {"ordered"}}},
+            )
+            for e in definitions.entities
+        ],
+        "extractor": type(extractor).__qualname__,
+        "model_id": getattr(extractor, "model_id", None),
+        "instructions": getattr(extractor, "instructions", None),
+    }
+    labeller = getattr(extractor, "attribute_labeller", None)
+    if labeller is not None:
+        value["attribute_labeller"] = labeller.fingerprint(definitions)
+    return _fingerprint(value)
+
+
+def mapping_fingerprint(builder: "OmopTableBuilder") -> str:
+    """A hash of the ``omop`` blocks and date settings the tables are built with.
+
+    Changing it needs a rebuild (`OmopExtractionPipeline.rebuild`), with no
+    extraction call.
+    """
+    return _fingerprint(
+        {
+            "omop": {
+                key: m.model_dump(mode="json", by_alias=True)
+                for key, m in builder.mappings.items()
+            },
+            "dayfirst": builder.dayfirst,
+        }
+    )
+
+
 def _merge(parts: Sequence[OmopTables]) -> OmopTables:
     merged = OmopTables()
     for tables in parts:
@@ -1265,37 +1311,10 @@ class ChunkedRun:
     # Fingerprints of what the stored results depend on.
 
     def _extraction_fingerprint(self) -> str:
-        extractor = self.pipeline.extractor
-        definitions = self.pipeline.entity_definitions
-        value: dict[str, Any] = {
-            # `ordered` only changes a labeller's questions, which the labeller's
-            # own fingerprint covers; leaving it out keeps earlier runs resumable.
-            "entities": [
-                e.model_dump(
-                    mode="json",
-                    exclude={"omop": True, "attributes": {"__all__": {"ordered"}}},
-                )
-                for e in definitions.entities
-            ],
-            "extractor": type(extractor).__qualname__,
-            "model_id": getattr(extractor, "model_id", None),
-            "instructions": getattr(extractor, "instructions", None),
-        }
-        labeller = getattr(extractor, "attribute_labeller", None)
-        if labeller is not None:
-            value["attribute_labeller"] = labeller.fingerprint(definitions)
-        return _fingerprint(value)
+        return extraction_fingerprint(self.pipeline)
 
     def _mapping_fingerprint(self) -> str:
-        return _fingerprint(
-            {
-                "omop": {
-                    key: m.model_dump(mode="json", by_alias=True)
-                    for key, m in self.builder.mappings.items()
-                },
-                "dayfirst": self.builder.dayfirst,
-            }
-        )
+        return mapping_fingerprint(self.builder)
 
     def _check_shard(self, ledger: RunLedger, shard: tuple[int, int]) -> None:
         """Refuse a folder that holds another shard, or notes of the whole dataset."""

@@ -291,6 +291,66 @@ pounds as `[lb_av]`. The row is kept with `unit_concept_id = 0`, which the CDM u
     said only "copied as written", and the model returned "Weight 72 kg today." and
     "lb.". Adding "Stop at the unit: no words or punctuation after it" fixed both.
 
+### 6. Iterate on a sample with a pilot
+
+Each wording change means another run, and a run refuses a folder made with other
+definitions. A `Pilot` keeps the attempts apart as versions of one workspace, on a
+sample of notes picked once, so every version sees the same notes:
+
+```python
+from aatm.omop import OmopExtractionPipeline, Pilot
+
+pilot = Pilot("pilot/", source="notes.parquet", sample=50, seed=0)
+
+pipeline = OmopExtractionPipeline("body_weight.yaml", model_id="openai/gpt-5-mini")
+v1 = await pilot.run(pipeline)    # pilot/v001-3f9a2c1/
+
+# Edit the wording in body_weight.yaml, then run again:
+pipeline = OmopExtractionPipeline("body_weight.yaml", model_id="openai/gpt-5-mini")
+v2 = await pilot.run(pipeline)    # pilot/v002-8be01d4/
+
+print(pilot.compare("v001", "v002"))
+```
+
+`pilot.run` picks what to do by itself:
+
+| What changed | What happens |
+|---|---|
+| The definitions (but not only their `omop` blocks), the model, the instructions or the attribute labeller | A new version, extracted from scratch |
+| Only `omop` blocks, `dayfirst` or the coder | A new version, rebuilt from the stored results of the latest version with the same extraction: no extraction call |
+| Nothing | The matching version is reused (and finished, if its run stopped partway) |
+
+When the pipeline's coder has no cache, the versions share one,
+`pilot/coding_cache.db`, so a text is coded once.
+
+`print(pilot.compare(...))` shows, side by side, the rows per table, the issues per
+reason, every mention added, removed or changed in each note (with its line of the
+note), the codes that changed, and the tokens and cost per note:
+
+```text
+Comparison of v001-3f9a2c1 and v002-8be01d4
+  definitions: 1 line added, 1 removed
+notes extracted: 50 in v001-3f9a2c1, 50 in v002-8be01d4, 50 in both
+
+rows per table:
+               v001-3f9a2c1  v002-8be01d4  change
+  measurement            41            47       6
+
+mentions: 6 added, 0 removed, 2 changed
+  note 1043:
+    ~ body_weight 'Weight 72 kg today.' [12:31] -> 'Weight 72 kg' [12:24]  (line 2: 'Weight 72 kg today.')
+  ...
+```
+
+Each part is also a DataFrame: `comparison.rows`, `.issues`, `.mentions`, `.mappings`
+and `.usage`. `pilot.log()` lists the versions with what changed in each, and a diff of
+the definitions (`version.definitions_diff`). From the command line:
+
+```bash
+aatm omop pilot log --path pilot --diff
+aatm omop pilot compare v001 v002 --path pilot
+```
+
 ---
 
 ## Reference: the `omop` block

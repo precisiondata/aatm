@@ -1368,3 +1368,70 @@ def cache_clear(
         raise typer.Exit()
     removed = cache.clear(coder)
     console.print(f"Deleted {removed} entries from {path}")
+
+
+omop_app = typer.Typer(help="Work with OMOP extraction runs")
+app.add_typer(omop_app, name="omop")
+pilot_app = typer.Typer(
+    help=(
+        "Read a pilot workspace: versioned runs on a fixed sample of notes "
+        "(see aatm.omop.Pilot)"
+    )
+)
+omop_app.add_typer(pilot_app, name="pilot")
+
+PilotPathOption = Annotated[
+    Path,
+    typer.Option("--path", "-p", help="The pilot workspace folder"),
+]
+
+
+def _open_pilot(path: Path):
+    from aatm.omop.pilot import Pilot
+
+    pilot = Pilot(path)
+    if not pilot.versions():
+        console.print(f"No pilot versions in {path}")
+        raise typer.Exit(code=1)
+    return pilot
+
+
+@pilot_app.command("log", help="List the versions and what changed in each")
+def pilot_log(
+    path: PilotPathOption = Path("pilot"),
+    diff: Annotated[
+        bool, typer.Option("--diff", help="Show the diff of the definitions")
+    ] = False,
+) -> None:
+    """Print each version: when it was made, how, and what changed from the one before."""
+    pilot = _open_pilot(path)
+    for version in pilot.log():
+        console.print(str(version), markup=False, highlight=False, soft_wrap=True)
+        if diff and version.definitions_diff:
+            console.print(
+                version.definitions_diff.rstrip(),
+                markup=False,
+                highlight=False,
+                soft_wrap=True,
+            )
+
+
+@pilot_app.command("compare", help="Compare two versions (by default the latest two)")
+def pilot_compare(
+    a: Annotated[
+        Optional[str], typer.Argument(help="The earlier version, e.g. v002")
+    ] = None,
+    b: Annotated[
+        Optional[str], typer.Argument(help="The later version, e.g. v003")
+    ] = None,
+    path: PilotPathOption = Path("pilot"),
+) -> None:
+    """Print rows, issues, mentions, codes, tokens and cost of two versions."""
+    pilot = _open_pilot(path)
+    try:
+        comparison = pilot.compare(a, b)
+    except (KeyError, ValueError) as e:
+        message = e.args[0] if isinstance(e, KeyError) and e.args else str(e)
+        console.print(str(message), markup=False)
+        raise typer.Exit(code=1)
+    console.print(str(comparison), markup=False, highlight=False, soft_wrap=True)
