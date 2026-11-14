@@ -659,7 +659,7 @@ def build_local_vector_database(
             This makes GPU timings more accurate but adds overhead.
         profile_summary_every_n_batches: Log cumulative profile summary every N
             processed batches.
-        vector_db: ``local``, ``cloud`` or ``pinecone``. If not provided,
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If not provided,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
 
     Returns:

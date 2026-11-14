@@ -611,6 +611,45 @@ class PineconeRetriever(VectorStoreRetriever):
         )
 
 
+class PgVectorRetriever(VectorStoreRetriever):
+    """Retrieve candidate expressions from a PostgreSQL table with pgvector.
+
+    Filters become ``WHERE`` clauses applied during the HNSW search, with
+    iterative index scans on pgvector 0.8+, so the default ``filter_strategy``
+    is ``"native"``, as for Pinecone. See `aatm.pgvector_store`.
+
+    Build one with `aatm.registries.retrievers.load_retriever` and
+    ``AATM_VECTOR_DB=pgvector``, or from an open table:
+
+    ```python
+    from aatm.vector_db import PgVectorConnection
+
+    connection = PgVectorConnection.from_env()
+    store = connection.open_store(connection.table_name("qwen3-06B"))
+    retriever = PgVectorRetriever(store, embedding_function)
+    ```
+    """
+
+    @property
+    def table_name(self) -> str:
+        """Name of the PostgreSQL table."""
+        return self.store.name
+
+    @property
+    def collection_name(self) -> str:
+        """Name of the table, under the name `ChromaDBRetriever` uses."""
+        return self.store.name
+
+    def _to_result(
+        self, distance: float, metadata: dict[str, Any]
+    ) -> RetrievedExpressionMetadata:
+        # Rows copied from ChromaDB may lack optional fields; fill them with None.
+        return RetrievedExpressionMetadata(
+            distance=distance,
+            **(_NULL_EXPRESSION_FIELDS | metadata),  # type: ignore[arg-type]
+        )
+
+
 _NULL_EXPRESSION_FIELDS: dict[str, Any] = {
     name: None
     for name in RetrievedExpressionMetadata.model_fields

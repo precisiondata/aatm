@@ -54,6 +54,7 @@ from typing import Any
 import numpy as np
 
 from aatm.logs import get_logger
+from aatm.vector_db import PG_ITERATIVE_SCAN_MODES, VectorDatabaseConfigError
 from aatm.vector_stores import Hit, UnsupportedFilterError, VectorStore
 
 logger = get_logger(__name__)
@@ -76,7 +77,7 @@ HNSW_MAX_EF_SEARCH = 1000
 DEFAULT_EF_SEARCH = 100
 """Candidates the HNSW search keeps (``hnsw.ef_search``); raised to ``top_k`` per query."""
 
-ITERATIVE_SCAN_MODES = ("off", "strict_order", "relaxed_order")
+ITERATIVE_SCAN_MODES = PG_ITERATIVE_SCAN_MODES
 """Values of pgvector's ``hnsw.iterative_scan``."""
 
 DEFAULT_ITERATIVE_SCAN = "relaxed_order"
@@ -100,7 +101,7 @@ PSYCOPG_MISSING_MESSAGE = (
 )
 
 
-class PgVectorConfigError(ValueError):
+class PgVectorConfigError(VectorDatabaseConfigError):
     """Raised when the database cannot hold AATM's index, e.g. pgvector is missing."""
 
 
@@ -164,7 +165,9 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def to_pg_filter(where: Mapping[str, Any], column: str = "metadata") -> tuple[str, list[Any]]:
+def to_pg_filter(
+    where: Mapping[str, Any], column: str = "metadata"
+) -> tuple[str, list[Any]]:
     """Translate a neutral (ChromaDB-style) ``where`` filter to a SQL condition.
 
     The result is a condition with ``%s`` placeholders and its parameters, for
@@ -212,17 +215,24 @@ def _pg_clause(key: str, value: Any, column: str) -> tuple[str, list[Any]]:
     if key in ("$and", "$or"):
         if isinstance(value, str) or not isinstance(value, Sequence) or not value:
             raise UnsupportedFilterError(f"{key} needs a non-empty list: {value!r}")
-        return _join([to_pg_filter(clause, column) for clause in value], key[1:].upper())
+        return _join(
+            [to_pg_filter(clause, column) for clause in value], key[1:].upper()
+        )
     if key.startswith("$"):
         raise UnsupportedFilterError(f"PostgreSQL filters do not support {key!r}.")
     if _is_scalar(value):
         return _contains(column, key, value)
     if not isinstance(value, Mapping) or not value:
         raise UnsupportedFilterError(f"Unsupported condition on {key!r}: {value!r}")
-    return _join([_pg_condition(key, op, operand, column) for op, operand in value.items()], "AND")
+    return _join(
+        [_pg_condition(key, op, operand, column) for op, operand in value.items()],
+        "AND",
+    )
 
 
-def _pg_condition(key: str, op: str, operand: Any, column: str) -> tuple[str, list[Any]]:
+def _pg_condition(
+    key: str, op: str, operand: Any, column: str
+) -> tuple[str, list[Any]]:
     if op == "$eq" and _is_scalar(operand):
         return _contains(column, key, operand)
     if op == "$ne" and _is_scalar(operand):
@@ -231,7 +241,9 @@ def _pg_condition(key: str, op: str, operand: Any, column: str) -> tuple[str, li
     if op in ("$in", "$nin") and _is_scalar_list(operand):
         if not operand:
             # Nothing is in an empty list; every record with the field is outside it.
-            return ("FALSE", []) if op == "$in" else (f"jsonb_exists({column}, %s)", [key])
+            return (
+                ("FALSE", []) if op == "$in" else (f"jsonb_exists({column}, %s)", [key])
+            )
         any_of = _join([_contains(column, key, item) for item in operand], "OR")
         if op == "$in":
             return any_of
@@ -315,7 +327,15 @@ def connect(dsn: str, register: bool = True) -> Any:
     psycopg = import_psycopg()
     from pgvector.psycopg import register_vector
 
-    conn = psycopg.connect(dsn, autocommit=True)
+    try:
+        conn = psycopg.connect(dsn, autocommit=True)
+    except psycopg.OperationalError as e:
+        from aatm.vector_db import redact_dsn
+
+        where = redact_dsn(dsn) or "libpq defaults"
+        raise PgVectorConfigError(
+            f"Could not connect to PostgreSQL ({where}): {str(e).strip()}"
+        ) from e
     if register:
         try:
             register_vector(conn)
@@ -361,6 +381,29 @@ def pg_table_exists(dsn: str, name: str) -> bool:
     with connect(dsn, register=False) as conn:
         row = conn.execute("SELECT to_regclass(%s)", (_ident(name),)).fetchone()
         return row is not None and row[0] is not None
+
+
+def pg_table_count(dsn: str, name: str) -> int | None:
+    """Return about how many rows an index table holds, or ``None`` if it does not exist.
+
+    Counting millions of rows takes a while, so a table that has been analysed
+    (`create_pg_indexes` does it) reports PostgreSQL's estimate. An empty
+    table always reports 0.
+    """
+    with connect(dsn, register=False) as conn:
+        row = conn.execute(
+            "SELECT reltuples FROM pg_class WHERE oid = to_regclass(%s)",
+            (_ident(name),),
+        ).fetchone()
+        if row is None:
+            return None
+        if conn.execute(f"SELECT NOT EXISTS (SELECT 1 FROM {_ident(name)})").fetchone()[
+            0
+        ]:
+            return 0
+        if row[0] is not None and row[0] > 0:
+            return int(row[0])
+        return int(conn.execute(f"SELECT count(*) FROM {_ident(name)}").fetchone()[0])
 
 
 def create_pg_table(
@@ -489,7 +532,9 @@ def _index_name(table: str, suffix: str) -> str:
     name = f"{table}_{suffix}"
     if len(name) > PG_IDENTIFIER_MAX_LENGTH:
         digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:8]
-        name = f"{table[: PG_IDENTIFIER_MAX_LENGTH - len(suffix) - 10]}_{digest}_{suffix}"
+        name = (
+            f"{table[: PG_IDENTIFIER_MAX_LENGTH - len(suffix) - 10]}_{digest}_{suffix}"
+        )
     return name
 
 
@@ -616,9 +661,14 @@ class PgVectorStore(VectorStore):
             self._set_search_options(conn, top_k)
             for embedding in embeddings:
                 vector = np.asarray(embedding, dtype=np.float32)
-                rows = conn.execute(sql, {"q": vector, "k": int(top_k), **named}).fetchall()
+                rows = conn.execute(
+                    sql, {"q": vector, "k": int(top_k), **named}
+                ).fetchall()
                 results.append(
-                    [(float(distance) ** 2, dict(metadata)) for distance, metadata in rows]
+                    [
+                        (float(distance) ** 2, dict(metadata))
+                        for distance, metadata in rows
+                    ]
                 )
         return results
 

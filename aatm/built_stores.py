@@ -1,7 +1,8 @@
 """Which vector databases are built, and which one a retriever defaults to.
 
 ``aatm init`` builds the vector database of one embedding model, and
-``aatm vector-db upload`` copies one to Chroma Cloud or Pinecone. Each records
+``aatm vector-db upload`` copies one to Chroma Cloud, Pinecone or PostgreSQL.
+Each records
 what it built in ``.aatm/config.yaml``:
 
 ```yaml
@@ -63,10 +64,10 @@ class BuiltStore:
     """Registry name of the embedding model, e.g. ``text-embedding-3-small``."""
 
     vector_db: VectorDbMode
-    """``local``, ``cloud`` or ``pinecone``."""
+    """``local``, ``cloud``, ``pinecone`` or ``pgvector``."""
 
     location: str
-    """The local directory, Chroma Cloud collection or Pinecone index."""
+    """The local directory, Chroma Cloud collection, Pinecone index or PostgreSQL table."""
 
     count: int | None = None
     """Number of expressions, if it was counted."""
@@ -76,7 +77,9 @@ class BuiltStore:
 
     def describe(self) -> str:
         """One line for messages: model, vector database, location and size."""
-        kind = {"cloud": "collection ", "pinecone": "index "}.get(self.vector_db, "")
+        kind = {"cloud": "collection ", "pinecone": "index ", "pgvector": "table "}.get(
+            self.vector_db, ""
+        )
         line = f"{self.embedding_model}  {self.vector_db}  {kind}{self.location}"
         if self.count is not None:
             line += f"  ({self.count:,} expressions)"
@@ -110,7 +113,7 @@ def record_vector_database(
 
     Args:
         embedding_model: Registry name of the embedding model.
-        vector_db: ``local``, ``cloud`` or ``pinecone``.
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``.
         location: The local directory, or the collection or index name.
         keep_date: Keep the build date of an existing record (an existing
             database kept as it was), and only date a new one.
@@ -149,8 +152,8 @@ def recorded_vector_databases(vector_db: str | None = None) -> list[BuiltStore]:
     """The vector databases recorded in ``.aatm/config.yaml``, newest first.
 
     Args:
-        vector_db: Only those in this vector database (``local``, ``cloud`` or
-            ``pinecone``). ``None`` returns all of them.
+        vector_db: Only those in this vector database (``local``, ``cloud``,
+            ``pinecone`` or ``pgvector``). ``None`` returns all of them.
     """
     stores = []
     for entry in _read_config().get("vector_databases") or []:
@@ -234,6 +237,17 @@ def _store_status(spec: Any, mode: VectorDbMode, local_path: str | None = None):
             return index_name, None, f"Pinecone index '{index_name}' is empty"
         return index_name, count, None
 
+    if mode == "pgvector":
+        from aatm.pgvector_store import pg_table_count
+
+        connection, table_name = spec.pgvector_location()
+        count = pg_table_count(connection.dsn, table_name)
+        if count is None:
+            return table_name, None, f"PostgreSQL has no table '{table_name}'"
+        if count == 0:
+            return table_name, None, f"PostgreSQL table '{table_name}' is empty"
+        return table_name, count, None
+
     from chromadb.errors import NotFoundError
 
     connection, collection_name = spec.chroma_location(mode, local_path)
@@ -271,7 +285,7 @@ def built_vector_databases(vector_db: str | None = None) -> list[BuiltStore]:
     """Find the embedding models whose vector database is built and not empty.
 
     Args:
-        vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If ``None``,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
 
     Raises:
@@ -313,7 +327,7 @@ def check_built(
 
     Args:
         embedding_model: Registry name of the embedding model.
-        vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If ``None``,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
         local_path: Directory of the local database, in local mode. Defaults
             to the model's directory under ``.aatm/chroma_vector_dbs``.
@@ -361,7 +375,7 @@ def default_vector_database(vector_db: str | None = None) -> BuiltStore:
     record, the only built one.
 
     Args:
-        vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If ``None``,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
 
     Raises:
