@@ -221,7 +221,7 @@ What it shows:
 - **The limit is the HNSW graph, not the search settings.** Raising `ef_search` from 100
   to 1000 (the maximum) lifts Measurement only to 0.918 at 27 ms; strict ordering is
   worse; keeping the 20 nearest of more candidates changes nothing. A denser graph
-  (larger `m` or `ef_construction`) remains to be tried.
+  helps: see below.
 - **Narrow filters are exact on pgvector.** For Measurement + LOINC, PostgreSQL reads the
   matching rows through the metadata index and sorts them by distance: recall 0.993 in
   about 0.9 s, faster than ChromaDB's 4.6 s and more accurate than its over-fetch.
@@ -230,3 +230,31 @@ What it shows:
 Selection quality on the #33 lab-results benchmark was not run here; it calls an LLM.
 
 Results: `results/embeddinggemma-300M--full.csv`.
+
+#### Denser HNSW graphs
+
+The same table, with the HNSW index rebuilt by `create_pg_indexes` (16 GB of
+`maintenance_work_mem` and 7 workers, from the container `aatm init` sizes), and the same
+30 queries measured against the exact results above. Recall@20, with the worst query in
+brackets, and the median time per query:
+
+| HNSW graph | build | `ef_search` | none | Measurement | Measurement + LOINC | Condition |
+|---|---|---|---|---|---|---|
+| `m=16`, `ef_construction=64` (pgvector's default) | 35 min (64 MB, 2 workers) | 100 | 0.963 (0.85), 5 ms | 0.877 (0.30), 7 ms | 0.963 (0.70), 941 ms | 0.955 (0.75), 9 ms |
+| | | 400 | 0.977 (0.85), 11 ms | 0.890 (0.30), 13 ms | 0.968 (0.70), 942 ms | 0.958 (0.75), 14 ms |
+| `m=16`, `ef_construction=128` | 6.7 min | 100 | 0.982 (0.85), 8 ms | 0.908 (0.40), 11 ms | 0.980 (0.85), 929 ms | 0.945 (0.55), 12 ms |
+| | | 400 | 0.988 (0.85), 13 ms | 0.922 (0.45), 14 ms | 0.992 (0.85), 925 ms | 0.970 (0.75), 14 ms |
+| **`m=24`, `ef_construction=128`** | 8.7 min | 100 | **0.982** (0.85), 8 ms | **0.925** (0.45), 12 ms | 0.978 (0.85), 948 ms | **0.967** (0.80), 16 ms |
+| | | 400 | 0.982 (0.85), 18 ms | 0.927 (0.45), 22 ms | 0.985 (0.85), 947 ms | 0.973 (0.80), 19 ms |
+| ChromaDB, `overfetch_fallback` (for reference) | | | 0.972 (0.70), 30 ms | 0.953 (0.75), 50 ms | 0.952 (0.60), 50 ms | 0.968 (0.80), 48 ms |
+
+- **`m=24`, `ef_construction=128` closes most of the gap** at the default `ef_search`:
+  Measurement from 0.877 to 0.925 (ChromaDB 0.953), Condition from 0.955 to 0.967
+  (0.968), unfiltered from 0.963 to 0.982 (0.972), still in 8 to 16 ms against ChromaDB's
+  30 to 50 ms. Its index is no larger on disk (9.4 GB): with 768 dimensions, each vector
+  fills most of a page either way.
+- Raising `ef_search` to 400 on top adds little; the graph matters more than the search.
+- Measurement's worst query is still "metformin 500 mg tablet", whose true matches rank
+  thousands deep (see above).
+- Measurement + LOINC is answered exactly either way (about 0.9 s); its recall below 1.0
+  comes from ties between records at the same distance.
