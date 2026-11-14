@@ -22,6 +22,13 @@ class FakeDocker:
 
     def __call__(self, args, capture=True):
         self.calls.append(list(args))
+        if args[1] == "container":
+            # `docker container inspect` only looks at containers: a volume of
+            # the same name must not count.
+            assert args[2] == "inspect", args
+            args = [args[0], *args[2:]]
+        elif args[1] == "inspect":
+            raise AssertionError("use `docker container inspect`, not `docker inspect`")
         command = args[1]
         if command == "info":
             if not self.daemon_running:

@@ -166,6 +166,7 @@ def container_state(
     result = run(
         [
             "docker",
+            "container",
             "inspect",
             "--format",
             "{{.State.Running}} {{.HostConfig.ShmSize}}",
@@ -187,7 +188,14 @@ def _published_port(name: str, run: Runner) -> int | None:
     # The configured binding, which a stopped container keeps (`docker port`
     # only reports the ports of a running one).
     result = run(
-        ["docker", "inspect", "--format", "{{json .HostConfig.PortBindings}}", name]
+        [
+            "docker",
+            "container",
+            "inspect",
+            "--format",
+            "{{json .HostConfig.PortBindings}}",
+            name,
+        ]
     )
     if result.returncode != 0:
         return None
