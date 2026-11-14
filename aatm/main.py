@@ -602,7 +602,9 @@ def init(
             # Fail before the long build steps if the server is unreachable.
             vector_db_connection.client().close()  # type: ignore[union-attr]
     except VectorDatabaseConfigError as e:
-        console.print(f"[yellow]OOPS![/yellow] {e}\n")
+        # Unwrapped, so the commands in the message can be copied.
+        console.print("[yellow]OOPS![/yellow]", end=" ")
+        console.print(f"{e}\n", markup=False, highlight=False, soft_wrap=True)
         raise typer.Exit()
     vector_db = vector_db_connection.mode
 
@@ -679,8 +681,10 @@ def built_in(mode: str, quick: bool = False) -> dict[str, Any]:
     """The vector databases built in one backend, by embedding model, newest first.
 
     A local database is checked on disk. For a remote one, ``quick`` reads only
-    what ``.aatm/config.yaml`` records; otherwise the backend is asked, falling
-    back to the records if it cannot be reached.
+    what ``.aatm/config.yaml`` records, keeping the records of the collection,
+    index or table the current settings point to (a record made with another
+    ``AATM_PG_TABLE_PREFIX``, say, is left out). Otherwise the backend is asked,
+    falling back to those records if it cannot be reached.
 
     Returns:
         `aatm.built_stores.BuiltStore` objects keyed by embedding model.
@@ -694,9 +698,23 @@ def built_in(mode: str, quick: bool = False) -> dict[str, Any]:
         except Exception as e:
             logger.debug(f"Could not list the {mode} vector databases: {e!r}")
     if stores is None:
-        stores = recorded_vector_databases(mode)
+        stores = [s for s in recorded_vector_databases(mode) if _is_current(s)]
     newest_first = sorted(stores, key=lambda s: s.built_at or "", reverse=True)
     return {store.embedding_model: store for store in newest_first}
+
+
+def _is_current(store: Any) -> bool:
+    """Whether a recorded database is where the current settings would look for it."""
+    from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY
+
+    spec = CHROMADB_RETRIEVER_MODEL_REGISTRY.get(store.embedding_model)
+    if spec is None:
+        return False
+    try:
+        _, name = spec.vector_db_location(store.vector_db)
+    except Exception:
+        return False
+    return bool(name == store.location)
 
 
 def vector_db_choices(
@@ -717,16 +735,24 @@ def vector_db_choices(
         The choices, and the mode to preselect.
     """
     from aatm.vector_db import (
+        PG_DSN_ENV_VAR,
         VECTOR_DB_LABELS,
         VECTOR_DB_MODES,
+        pg_target,
         vector_db_setup_problem,
     )
 
+    env = dict(os.environ) if env is None else env
     choices = []
     usable = []
     for mode in VECTOR_DB_MODES:
         problem = vector_db_setup_problem(mode, env)
         title = f"{mode:<9} {VECTOR_DB_LABELS[mode]}"
+        if mode == "pgvector" and problem is None:
+            dsn = (env.get(PG_DSN_ENV_VAR) or "").strip()
+            title += f" at {pg_target(dsn, env)}"
+            if not dsn:
+                title += f" ({PG_DSN_ENV_VAR} not set)"
         if problem is None:
             usable.append(mode)
             built = list(built_in(mode, quick=True))
@@ -1386,7 +1412,7 @@ def _check_pgvector(connection: Any, locations: dict[str, tuple[Any, str]]) -> N
                 "WHERE name = 'vector'"
             ).fetchone()
     except VectorDatabaseConfigError as e:
-        console.print(f"[red]{e}[/red]")
+        console.print(str(e), style="red", markup=False, soft_wrap=True)
         raise typer.Exit(code=1)
 
     console.print(f"[green]Connected[/green] (PostgreSQL {server}).")

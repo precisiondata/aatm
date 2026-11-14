@@ -327,15 +327,14 @@ def connect(dsn: str, register: bool = True) -> Any:
     psycopg = import_psycopg()
     from pgvector.psycopg import register_vector
 
-    try:
-        conn = psycopg.connect(dsn, autocommit=True)
-    except psycopg.OperationalError as e:
-        from aatm.vector_db import redact_dsn
+    from aatm.vector_db import pg_connect_timeout
 
-        where = redact_dsn(dsn) or "libpq defaults"
-        raise PgVectorConfigError(
-            f"Could not connect to PostgreSQL ({where}): {str(e).strip()}"
-        ) from e
+    timeout = pg_connect_timeout(dsn)
+    kwargs = {} if timeout is None else {"connect_timeout": timeout}
+    try:
+        conn = psycopg.connect(dsn, autocommit=True, **kwargs)
+    except psycopg.OperationalError as e:
+        raise PgVectorConfigError(connection_failure_message(dsn, e)) from e
     if register:
         try:
             register_vector(conn)
@@ -347,6 +346,32 @@ def connect(dsn: str, register: bool = True) -> Any:
                 "the server, e.g. the pgvector/pgvector Docker image)."
             ) from e
     return conn
+
+
+def connection_failure_message(dsn: str, error: BaseException) -> str:
+    """Explain a failed connection: where AATM tried, why, and how to fix it."""
+    from aatm.vector_db import (
+        PG_DOCKER_COMMAND,
+        PG_DSN_ENV_VAR,
+        PG_EXAMPLE_DSN,
+        pg_target,
+    )
+
+    reason = " ".join(str(error).split()) or type(error).__name__
+    lines = [f"Could not connect to PostgreSQL at {pg_target(dsn)}: {reason}"]
+    if not dsn:
+        lines.append(
+            f"{PG_DSN_ENV_VAR} is not set, so libpq's defaults and the PG* "
+            f"variables apply. Set it (in the environment or .env), e.g. "
+            f"{PG_DSN_ENV_VAR}={PG_EXAMPLE_DSN}"
+        )
+    else:
+        lines.append(f"Check {PG_DSN_ENV_VAR} and that the server is running.")
+    lines.append(
+        "To run PostgreSQL with pgvector on this machine, with Docker:\n  "
+        + PG_DOCKER_COMMAND
+    )
+    return "\n".join(lines)
 
 
 def pgvector_version(conn: Any) -> tuple[int, ...] | None:

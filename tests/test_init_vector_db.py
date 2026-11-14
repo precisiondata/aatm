@@ -70,7 +70,7 @@ def test_every_backend_is_offered_with_what_it_is(built, monkeypatch):
 
     assert [c.value for c in choices] == ["local", "cloud", "pinecone", "pgvector"]
     assert choices[0].title == "local     ChromaDB on this machine"
-    assert choices[3].title == "pgvector  PostgreSQL with pgvector"
+    assert choices[3].title.startswith("pgvector  PostgreSQL with pgvector at ")
     assert default == "local"
 
 
@@ -136,7 +136,7 @@ def test_built_in_falls_back_to_the_records_when_the_backend_fails(monkeypatch):
     def unreachable(mode):
         raise ConnectionError("down")
 
-    recorded = [store("qwen3-06B", "pgvector")]
+    recorded = [BuiltStore("qwen3-06B", "pgvector", "aatm_expressions_qwen3_06b")]
     monkeypatch.setattr(built_stores, "built_vector_databases", unreachable)
     monkeypatch.setattr(
         built_stores, "recorded_vector_databases", lambda mode: recorded
@@ -237,3 +237,37 @@ def test_cancelling_the_prompt_stops_init(init_until_the_build, monkeypatch):
 
     with pytest.raises(typer.Exit):
         init_until_the_build(tty=True)
+
+
+def test_the_pgvector_choice_names_the_server_it_will_use(built, monkeypatch):
+    installed(monkeypatch)
+
+    choices, _ = main.vector_db_choices(
+        "local", env={"AATM_PG_DSN": "postgresql://u:pw@pg.example:5433/terms"}
+    )
+    title = {c.value: c.title for c in choices}["pgvector"]
+    assert title == "pgvector  PostgreSQL with pgvector at pg.example:5433/terms"
+    assert "pw" not in title
+
+    choices, _ = main.vector_db_choices("local", env={"PGHOST": "h", "PGDATABASE": "d"})
+    title = {c.value: c.title for c in choices}["pgvector"]
+    assert (
+        title == "pgvector  PostgreSQL with pgvector at h:5432/d (AATM_PG_DSN not set)"
+    )
+
+
+def test_records_of_other_tables_are_not_listed_as_built(monkeypatch):
+    """A record made with another table prefix is not what init would build into."""
+    from aatm import built_stores
+
+    monkeypatch.setenv("AATM_PG_TABLE_PREFIX", "aatm_expressions")
+    recorded = [
+        store("qwen3-06B", "pgvector", built_at="2"),
+        BuiltStore("qwen3-4B", "pgvector", "aatm_expressions_qwen3_4b", None, "1"),
+        BuiltStore("qwen3-06B", "pgvector", "aatm_subset_qwen3_06b", None, "3"),
+    ]
+    monkeypatch.setattr(
+        built_stores, "recorded_vector_databases", lambda mode: recorded
+    )
+
+    assert list(main.built_in("pgvector", quick=True)) == ["qwen3-4B"]

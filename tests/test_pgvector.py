@@ -306,3 +306,58 @@ def test_metadata_keeps_nulls_and_becomes_json_safe():
         "other": str(object),
     }
     json.dumps(converted, allow_nan=False)
+
+
+# --- Where a connection goes, and why it failed ---------------------------------
+
+
+def test_target_comes_from_the_connection_string():
+    from aatm.vector_db import pg_target
+
+    assert pg_target(DSN, env={}) == "db.example:5433/terms"
+    assert pg_target("host=h dbname=d user=u", env={}) == "h:5432/d"
+
+
+def test_target_falls_back_to_the_pg_variables_then_libpq_defaults(monkeypatch):
+    import getpass
+
+    from aatm.vector_db import pg_target
+
+    monkeypatch.setattr(getpass, "getuser", lambda: "me")
+    assert pg_target("", env={}) == "localhost:5432/me"
+    env = {"PGHOST": "pg", "PGPORT": "6000", "PGDATABASE": "aatm"}
+    assert pg_target("", env=env) == "pg:6000/aatm"
+    assert pg_target("postgresql://u@h/d", env=env) == "h:6000/d"
+
+
+def test_connections_time_out_unless_a_timeout_is_set():
+    from aatm.vector_db import PG_DEFAULT_CONNECT_TIMEOUT, pg_connect_timeout
+
+    assert pg_connect_timeout("", env={}) == PG_DEFAULT_CONNECT_TIMEOUT
+    assert pg_connect_timeout(f"{DSN}?connect_timeout=3", env={}) is None
+    assert pg_connect_timeout("host=h connect_timeout=3", env={}) is None
+    assert pg_connect_timeout("", env={"PGCONNECT_TIMEOUT": "30"}) is None
+
+
+def test_a_failed_connection_says_where_and_how_to_fix_it(monkeypatch):
+    from aatm.pgvector_store import connection_failure_message
+
+    monkeypatch.delenv("PGHOST", raising=False)
+    monkeypatch.delenv("PGPORT", raising=False)
+    message = connection_failure_message("", OSError("connection timeout\n expired"))
+
+    assert message.startswith("Could not connect to PostgreSQL at localhost:5432/")
+    assert "connection timeout expired" in message
+    assert "AATM_PG_DSN is not set" in message
+    assert "AATM_PG_DSN=postgresql://postgres@localhost:5432/aatm" in message
+    assert "docker run" in message and "pgvector/pgvector:pg17" in message
+
+
+def test_a_failed_connection_never_shows_the_password():
+    from aatm.pgvector_store import connection_failure_message
+
+    message = connection_failure_message(DSN, OSError("refused"))
+
+    assert "s3cret" not in message
+    assert "db.example:5433/terms" in message
+    assert "Check AATM_PG_DSN" in message

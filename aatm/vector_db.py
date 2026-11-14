@@ -465,6 +465,73 @@ def redact_dsn(dsn: str) -> str:
     return _DSN_KEY_PASSWORD.sub(r"\1***", dsn)
 
 
+PG_DEFAULT_CONNECT_TIMEOUT = 10
+"""Seconds to wait for PostgreSQL, unless the connection string or ``PGCONNECT_TIMEOUT`` says.
+
+libpq waits without a limit by default, and an unreachable host then hangs for
+minutes before failing.
+"""
+
+PG_DOCKER_COMMAND = (
+    "docker run -d --name aatm-pgvector --shm-size=1g "
+    "-e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=aatm "
+    "-p 127.0.0.1:5432:5432 -v aatm-pgvector:/var/lib/postgresql/data "
+    "pgvector/pgvector:pg17"
+)
+"""Start a local PostgreSQL with pgvector, reachable from this machine only."""
+
+PG_EXAMPLE_DSN = "postgresql://postgres@localhost:5432/aatm"
+"""The connection string of the server `PG_DOCKER_COMMAND` starts."""
+
+
+def _conninfo(dsn: str) -> dict[str, str]:
+    if not dsn:
+        return {}
+    try:
+        from psycopg.conninfo import conninfo_to_dict
+    except ImportError:
+        return {}
+    try:
+        return {k: str(v) for k, v in conninfo_to_dict(dsn).items() if v is not None}
+    except Exception:
+        return {}
+
+
+def pg_target(dsn: str, env: Mapping[str, str] | None = None) -> str:
+    """Return the ``host:port/database`` a connection string reaches, without credentials.
+
+    Settings missing from ``dsn`` come from the ``PG*`` variables, then from
+    libpq's defaults (``localhost``, ``5432``, a database named after the user).
+    """
+    import getpass
+
+    env = os.environ if env is None else env
+    info = _conninfo(dsn)
+
+    def get(key: str, variable: str, default: str) -> str:
+        return info.get(key) or (env.get(variable) or "").strip() or default
+
+    try:
+        os_user = getpass.getuser()
+    except Exception:
+        os_user = "?"
+    user = get("user", "PGUSER", os_user)
+    host = get("host", "PGHOST", "localhost")
+    port = get("port", "PGPORT", "5432")
+    database = get("dbname", "PGDATABASE", user)
+    return f"{host}:{port}/{database}"
+
+
+def pg_connect_timeout(dsn: str, env: Mapping[str, str] | None = None) -> int | None:
+    """The ``connect_timeout`` to add, or ``None`` if the user already set one."""
+    env = os.environ if env is None else env
+    if "connect_timeout" in _conninfo(dsn) or "connect_timeout" in dsn:
+        return None
+    if (env.get("PGCONNECT_TIMEOUT") or "").strip():
+        return None
+    return PG_DEFAULT_CONNECT_TIMEOUT
+
+
 @dataclass(frozen=True, slots=True)
 class PgVectorConnection:
     """Describe how to reach a PostgreSQL database with pgvector, and how to search it.
@@ -541,18 +608,7 @@ class PgVectorConnection:
 
     def location(self) -> str:
         """Return the server and database, without credentials."""
-        if not self.dsn:
-            return "libpq defaults"
-        try:
-            from psycopg.conninfo import conninfo_to_dict
-
-            info = conninfo_to_dict(self.dsn)
-        except Exception:
-            return redact_dsn(self.dsn)
-        host = info.get("host") or "localhost"
-        port = info.get("port") or "5432"
-        database = info.get("dbname") or info.get("user") or "?"
-        return f"{host}:{port}/{database}"
+        return pg_target(self.dsn)
 
     def describe(self) -> str:
         """Return a human-readable location, without credentials."""

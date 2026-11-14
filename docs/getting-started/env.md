@@ -154,6 +154,8 @@ AATM_PG_DSN=postgresql://postgres@localhost:5432/aatm
 
 Prefer `PGPASSWORD` or a [`.pgpass` file](https://www.postgresql.org/docs/current/libpq-pgpass.html) to a password in `AATM_PG_DSN`.
 
+Without `AATM_PG_DSN`, AATM connects where libpq would: `localhost:5432`, to a database named after your user. `aatm init` names the server it will use, and if the connection fails it says where it tried and how to set `AATM_PG_DSN` or start a local server. AATM waits up to 10 seconds per address for the server; set `connect_timeout` in `AATM_PG_DSN`, or `PGCONNECT_TIMEOUT`, to change it.
+
 ```bash
 aatm vector-db check --vector-db pgvector                     # server, pgvector version, the models' tables
 aatm init --vector-db pgvector                                # build the index in PostgreSQL
