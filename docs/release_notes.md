@@ -1,5 +1,28 @@
 # Release notes
 
+## Unreleased
+
+### New
+
+- **PostgreSQL with pgvector** as a vector database (`AATM_VECTOR_DB=pgvector`,
+  [#111](https://github.com/precisiondata/aatm/issues/111)), with the
+  `aatm[pgvector]` extra. Each embedding model gets a table, with an HNSW index on the
+  embeddings and a GIN index on the metadata, built after the load. Domain and
+  vocabulary filters are applied during the search, with iterative index scans, so
+  `PgVectorRetriever` needs no over-fetch. `aatm init --vector-db pgvector` builds the
+  index, `aatm vector-db upload --to pgvector` copies a local one without re-embedding,
+  and `aatm vector-db check --vector-db pgvector` reports the server, the pgvector
+  version and each model's table. See
+  [PostgreSQL with pgvector](getting-started/env.md#postgresql-with-pgvector).
+- **`aatm init` asks where to build the search index**, when `--vector-db` is not
+  given, preselecting `AATM_VECTOR_DB`. Each backend lists the models already built in
+  it, and one that misses a setting or package is shown greyed out with what it needs.
+  The embedding model question then marks the models already built there.
+- **`aatm init` can start PostgreSQL for you.** When PostgreSQL is chosen and no server
+  answers, it offers to start PostgreSQL with pgvector in Docker (container
+  `aatm-pgvector`, reachable from this machine only) and to save `AATM_PG_DSN`, and
+  optionally `AATM_VECTOR_DB=pgvector`, to `.env`. Or you set `AATM_PG_DSN` yourself.
+
 ## 0.4.0
 
 0.4.0 takes the notes-to-OMOP pipeline from a few notes in memory to full datasets:

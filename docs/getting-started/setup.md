@@ -9,7 +9,7 @@ It builds two things in a local `.aatm/` folder:
 | What | File | Used by |
 |---|---|---|
 | The vocabulary database (concepts, synonyms, relationships) | `.aatm/omop.db` | Every workflow: code lookups, checks of every concept id, the agent's lexical search |
-| A search index of concept names and synonyms, for one embedding model | `.aatm/chroma_vector_dbs/<model>/` (or Chroma Cloud, Pinecone) | The terminology mapper and the agent, to search by meaning |
+| A search index of concept names and synonyms, for one embedding model | `.aatm/chroma_vector_dbs/<model>/` (or Chroma Cloud, Pinecone, PostgreSQL) | The terminology mapper and the agent, to search by meaning |
 
 ---
 
@@ -45,18 +45,26 @@ aatm init --vocab-zip ~/Downloads/vocabulary_download_v5_<bundle-id>.zip
 2. checks that the required files (`CONCEPT.csv`, `CONCEPT_RELATIONSHIP.csv`,
    `CONCEPT_SYNONYM.csv`, `VOCABULARY.csv`, `DOMAIN.csv`) are there, and lists the
    vocabularies and versions in the bundle;
-3. builds the vocabulary database, `.aatm/omop.db`;
-4. asks which **embedding model** and **standard vocabularies** to index, and builds the
-   search index;
-5. records the model it built in `.aatm/config.yaml`, so every retriever, mapper and
+3. asks where to build the search index: a local ChromaDB, Chroma Cloud, Pinecone or
+   PostgreSQL with pgvector (see [Vector database](env.md#vector-database)). Each option
+   lists the models already built in it, and an option that misses a setting or a package
+   is greyed out with what to set or install. `AATM_VECTOR_DB` is preselected;
+   `--vector-db` skips the question. If you choose PostgreSQL and no server answers, it
+   offers to start one in Docker and save its settings to `.env`, or to let you set
+   `AATM_PG_DSN` yourself;
+4. builds the vocabulary database, `.aatm/omop.db`;
+5. lists the search indexes already built there, asks which **embedding model** (built
+   ones are marked) and **standard vocabularies** to index, and builds the search index;
+6. records the model it built in `.aatm/config.yaml`, so every retriever, mapper and
    agent uses it unless told otherwise;
-6. adds `.aatm` to your `.gitignore`.
+7. adds `.aatm` to your `.gitignore`.
 
 To answer the questions up front, for scripts and CI:
 
 ```bash
 aatm init \
   --vocab-zip "https://athena.ohdsi.org/api/v1/vocabularies/zip/<bundle-id>" \
+  --vector-db local \
   --embedding-model text-embedding-3-small \
   --standard-vocabs SNOMED --standard-vocabs LOINC --standard-vocabs RxNorm
 ```
@@ -89,8 +97,9 @@ names.
 
 By default the search index is a local ChromaDB folder of several GB. To build it once
 and share it, or to search from machines without the disk space, build it in Chroma
-Cloud or Pinecone with `--vector-db cloud` or `--vector-db pinecone`. See
-[Vector database](env.md#vector-database-local-chroma-cloud-or-pinecone).
+Cloud, Pinecone or a PostgreSQL server with `--vector-db cloud`, `pinecone` or
+`pgvector`. See
+[Vector database](env.md#vector-database).
 
 ---
 

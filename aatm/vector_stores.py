@@ -12,8 +12,9 @@ from a vector database, whichever it is:
 - **Index metadata**: `VectorStore.index_metadata`, e.g. the embedding
   precision the index was built with (see `aatm.precision`).
 
-There are two implementations: `ChromaVectorStore` (a local or Chroma Cloud
-collection) and `PineconeVectorStore` (a Pinecone index).
+Implementations: `ChromaVectorStore` (a local or Chroma Cloud collection),
+`PineconeVectorStore` (a Pinecone index), and
+`aatm.pgvector_store.PgVectorStore` (a PostgreSQL table with pgvector).
 
 **Distances mean the same everywhere.** ChromaDB collections use its default
 ``l2`` space, whose distance is the *squared* Euclidean distance. Pinecone

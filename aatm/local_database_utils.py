@@ -50,6 +50,7 @@ from aatm.data_models import ExpressionMetadata
 from aatm.timing_profiler import TimingProfiler
 from aatm.vector_db import (
     ChromaConnection,
+    PgVectorConnection,
     PineconeConnection,
     VectorDbConnection,
     call_with_retries,
@@ -573,10 +574,11 @@ provider limits on inputs per request.
 
 
 PINECONE_MAX_CHUNK_SIZE = 10_000
-"""Largest chunk for a Pinecone build.
+"""Largest chunk for a Pinecone or PostgreSQL build.
 
-Pinecone has no single batch limit like ChromaDB's: the store splits each chunk
-into upserts within Pinecone's record and request-size limits.
+Neither has a single batch limit like ChromaDB's: the Pinecone store splits
+each chunk into upserts within Pinecone's record and request-size limits, and
+the PostgreSQL store copies it in one ``COPY``.
 """
 
 
@@ -623,9 +625,11 @@ def build_local_vector_database(
 
     The database is local by default. With ``vector_db="cloud"`` (or
     ``AATM_VECTOR_DB=cloud``) it is built in Chroma Cloud instead, and with
-    ``vector_db="pinecone"`` in a Pinecone index; see `aatm.vector_db`.
-    Embeddings are still computed on this machine. A new Pinecone index gets
-    its dimension from one probe embedding.
+    ``vector_db="pinecone"`` in a Pinecone index, and with
+    ``vector_db="pgvector"`` in a PostgreSQL table; see `aatm.vector_db`.
+    Embeddings are still computed on this machine. A new Pinecone index or
+    PostgreSQL table gets its dimension from one probe embedding. A PostgreSQL
+    table gets its HNSW and metadata indexes after the rows are loaded.
 
     Args:
         embedding_model_name: Registry key identifying the embedding model
@@ -659,7 +663,7 @@ def build_local_vector_database(
             This makes GPU timings more accurate but adds overhead.
         profile_summary_every_n_batches: Log cumulative profile summary every N
             processed batches.
-        vector_db: ``local``, ``cloud`` or ``pinecone``. If not provided,
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If not provided,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
 
     Returns:
@@ -700,6 +704,8 @@ def build_local_vector_database(
     client: Any | None = None
     # Set in Pinecone mode only; `client` is a ChromaDB client otherwise.
     pinecone_client: Any | None = None
+    # Set in pgvector mode only.
+    pg_connection: PgVectorConnection | None = None
 
     mode = resolve_vector_db_mode(vector_db)
     # Where the database is recorded in .aatm/config.yaml (see aatm.built_stores).
@@ -714,6 +720,16 @@ def build_local_vector_database(
         with profiler.time_block("pinecone_client_init"):
             pinecone_client = connection.client()
         already_exists = pinecone_index_exists(pinecone_client, collection_name)
+    elif mode == "pgvector":
+        from aatm.pgvector_store import pg_table_exists
+
+        if vector_db_dir is not None:
+            raise ValueError("vector_db_dir only applies to a local vector database.")
+        pg_connection, collection_name = spec.pgvector_location()
+        connection = pg_connection
+        record_location = collection_name
+        console.print(f"Using {connection.describe()}, table '{collection_name}'")
+        already_exists = pg_table_exists(pg_connection.dsn, collection_name)
     elif (location := spec.chroma_location(vector_db))[0].is_cloud:
         connection, collection_name = location
         if vector_db_dir is not None:
@@ -750,6 +766,9 @@ def build_local_vector_database(
         ).ask()
 
         if user_preference == "Skip":
+            if pg_connection is not None:
+                # An interrupted build leaves a table without its search indexes.
+                _index_pg_table(pg_connection, collection_name)
             record_vector_database(
                 embedding_model_name, mode, record_location, keep_date=True
             )
@@ -759,6 +778,10 @@ def build_local_vector_database(
             with profiler.time_block("delete_existing_vector_db"):
                 if pinecone_client is not None:
                     delete_pinecone_index(pinecone_client, collection_name)
+                elif pg_connection is not None:
+                    from aatm.pgvector_store import drop_pg_table
+
+                    drop_pg_table(pg_connection.dsn, collection_name)
                 elif client is not None:
                     client.delete_collection(collection_name)
                 else:
@@ -784,6 +807,14 @@ def build_local_vector_database(
         existing_metadata = (
             PineconeVectorStore.open(pinecone_client, collection_name).index_metadata()
             if pinecone_index_exists(pinecone_client, collection_name)
+            else None
+        )
+    elif pg_connection is not None:
+        from aatm.pgvector_store import pg_table_exists
+
+        existing_metadata = (
+            pg_connection.open_store(collection_name).index_metadata()
+            if pg_table_exists(pg_connection.dsn, collection_name)
             else None
         )
     else:
@@ -846,7 +877,22 @@ def build_local_vector_database(
         ),
     )
 
-    if pinecone_client is not None:
+    if pg_connection is not None:
+        if existing_metadata is None:
+            from aatm.pgvector_store import create_pg_table
+
+            # The embedding column has a fixed dimension, so embed once to learn it.
+            with profiler.time_block("create_collection"):
+                probe = np.asarray(
+                    ensure_cpu_embeddings(embedding_function(["dimension probe"]))
+                )
+                create_pg_table(
+                    pg_connection.dsn,
+                    collection_name,
+                    dimension=int(probe.shape[-1]),
+                    metadata=collection_metadata,
+                )
+    elif pinecone_client is not None:
         if existing_metadata is None:
             # A Pinecone index has a fixed dimension, so embed once to learn it.
             with profiler.time_block("create_collection"):
@@ -990,6 +1036,10 @@ def build_local_vector_database(
     with profiler.time_block("final_gpu_memory_cleanup"):
         gpu_memory_cleanup(synchronize=True)
 
+    if pg_connection is not None:
+        with profiler.time_block("create_pg_indexes"):
+            _index_pg_table(pg_connection, collection_name)
+
     profiler.log_summary(label="final")
 
     record_vector_database(embedding_model_name, mode, record_location)
@@ -1020,7 +1070,7 @@ class UploadSummary:
     skipped: int
 
 
-UPLOAD_TARGETS = ("cloud", "pinecone")
+UPLOAD_TARGETS = ("cloud", "pinecone", "pgvector")
 """Where `upload_vector_database_to_cloud` can copy a local index to."""
 
 PINECONE_UPLOAD_BATCH_SIZE = 1000
@@ -1039,14 +1089,16 @@ def upload_vector_database_to_cloud(
     to: str = "cloud",
     ids: Sequence[str] | None = None,
 ) -> UploadSummary:
-    """Copy a local vector database to Chroma Cloud or Pinecone without re-embedding.
+    """Copy a local vector database to Chroma Cloud, Pinecone or PostgreSQL without re-embedding.
 
     Embeddings, documents and metadata are read from the local collection and
     added to the model's cloud collection (see
-    `ChromaRetrieverModelSpec.cloud_collection_name`) or Pinecone index (see
-    `ChromaRetrieverModelSpec.pinecone_index_name`). The collection or index is
-    created with the local collection's metadata if needed; a new Pinecone
-    index takes its dimension from the local embeddings. Rows already in the
+    `ChromaRetrieverModelSpec.cloud_collection_name`), Pinecone index (see
+    `ChromaRetrieverModelSpec.pinecone_index_name`) or PostgreSQL table (see
+    `ChromaRetrieverModelSpec.pg_table_name`). The collection, index or table
+    is created with the local collection's metadata if needed; a new Pinecone
+    index or PostgreSQL table takes its dimension from the local embeddings,
+    and a PostgreSQL table gets its search indexes once the rows are in. Rows already in the
     destination are skipped, so an interrupted upload can simply be run again.
     With ``ids``, only those rows are copied, e.g. a subset that fits a free
     plan.
@@ -1062,7 +1114,8 @@ def upload_vector_database_to_cloud(
         read_page_size: Rows read from the local database at a time.
         cloud_connection: Destination connection. Defaults to the one
             configured for ``to`` (see `aatm.vector_db`).
-        to: ``cloud`` (Chroma Cloud, the default) or ``pinecone``. Ignored when
+        to: ``cloud`` (Chroma Cloud, the default), ``pinecone`` or
+            ``pgvector``. Ignored when
             ``cloud_connection`` is given.
         ids: Only copy the rows with these IDs. IDs missing from the local
             collection are reported and skipped. Defaults to every row.
@@ -1073,7 +1126,7 @@ def upload_vector_database_to_cloud(
     Raises:
         ValueError: If the local database or collection does not exist, the
             sizes are not positive, ``to`` is unknown, or an existing Pinecone
-            index was built with another embedding precision.
+            index or PostgreSQL table was built with another embedding precision.
         VectorDatabaseConfigError: If the destination configuration is missing.
     """
     from aatm.registries.retrievers import (
@@ -1096,13 +1149,18 @@ def upload_vector_database_to_cloud(
         raise ValueError(f"No local vector database at '{local_dir}'.")
 
     if cloud_connection is None:
-        cloud_connection = (
-            PineconeConnection.from_env()
-            if to == "pinecone"
-            else ChromaConnection.from_env(local_path=str(local_dir), mode="cloud")
+        if to == "pinecone":
+            cloud_connection = PineconeConnection.from_env()
+        elif to == "pgvector":
+            cloud_connection = PgVectorConnection.from_env()
+        else:
+            cloud_connection = ChromaConnection.from_env(
+                local_path=str(local_dir), mode="cloud"
+            )
+    if isinstance(cloud_connection, ChromaConnection) and not cloud_connection.is_cloud:
+        raise ValueError(
+            "cloud_connection must point at Chroma Cloud, Pinecone or PostgreSQL."
         )
-    if not cloud_connection.is_cloud:
-        raise ValueError("cloud_connection must point at Chroma Cloud or Pinecone.")
 
     local_client = ChromaConnection.local(str(local_dir)).client()
     local_collection = get_existing_collection(local_client, spec.collection_name)
@@ -1147,6 +1205,16 @@ def upload_vector_database_to_cloud(
         def retry(func: Callable[[int], Any]) -> Any:
             return func(0)
 
+    elif isinstance(cloud_connection, PgVectorConnection):
+        collection_name = spec.pg_table_name(cloud_connection)
+        store = _open_or_create_pg_table(
+            cloud_connection, collection_name, local_collection, collection_metadata
+        )
+        batch_size = write_batch_size or PG_UPLOAD_BATCH_SIZE
+
+        def retry(func: Callable[[int], Any]) -> Any:
+            return func(0)
+
     else:
         from aatm.vector_stores import ChromaVectorStore
 
@@ -1168,7 +1236,7 @@ def upload_vector_database_to_cloud(
 
     console.print(
         f"Uploading {total} rows from '{local_dir}' to {cloud_connection.describe()}, "
-        f"{'index' if isinstance(store, PineconeVectorStore) else 'collection'} "
+        f"{_store_kind(cloud_connection)} "
         f"'{collection_name}'..."
     )
 
@@ -1209,13 +1277,76 @@ def upload_vector_database_to_cloud(
     console.print(
         f"Uploaded {uploaded} rows; {skipped} were already in the destination."
     )
-    record_vector_database(embedding_model_name, to, collection_name)  # type: ignore[arg-type]
+    if isinstance(cloud_connection, PgVectorConnection):
+        _index_pg_table(cloud_connection, collection_name)
+    record_vector_database(embedding_model_name, cloud_connection.mode, collection_name)
     return UploadSummary(
         collection_name=collection_name,
         total=total,
         uploaded=uploaded,
         skipped=skipped,
     )
+
+
+PG_UPLOAD_BATCH_SIZE = 5000
+"""Rows checked and copied per round-trip when uploading to PostgreSQL."""
+
+
+def _store_kind(connection: VectorDbConnection) -> str:
+    if isinstance(connection, PineconeConnection):
+        return "index"
+    if isinstance(connection, PgVectorConnection):
+        return "table"
+    return "collection"
+
+
+def _index_pg_table(connection: PgVectorConnection, table_name: str) -> None:
+    """Build a PostgreSQL table's search indexes, if missing, after loading it."""
+    from aatm.pgvector_store import create_pg_indexes
+
+    console.print(
+        f"Checking the search indexes of '{table_name}' (building them on the "
+        "full index takes a while)..."
+    )
+    create_pg_indexes(
+        connection.dsn,
+        table_name,
+        maintenance_work_mem=connection.maintenance_work_mem,
+    )
+
+
+def _open_or_create_pg_table(
+    connection: PgVectorConnection,
+    table_name: str,
+    local_collection: Any,
+    collection_metadata: dict[str, Any] | None,
+) -> VectorStore:
+    """Open the destination table of an upload, creating it like the local one."""
+    from aatm.pgvector_store import create_pg_table, pg_table_exists
+
+    if not pg_table_exists(connection.dsn, table_name):
+        first = local_collection.get(limit=1, include=["embeddings"])
+        if not first["ids"]:
+            raise ValueError(
+                "The local collection is empty; there is nothing to upload."
+            )
+        create_pg_table(
+            connection.dsn,
+            table_name,
+            dimension=len(first["embeddings"][0]),
+            metadata=collection_metadata,
+        )
+
+    store = connection.open_store(table_name)
+    local_dtype = (collection_metadata or {}).get(COLLECTION_DTYPE_KEY)
+    remote_dtype = store.index_metadata().get(COLLECTION_DTYPE_KEY)
+    if local_dtype != remote_dtype:
+        raise ValueError(
+            f"The PostgreSQL table '{table_name}' records embedding precision "
+            f"{remote_dtype!r}, but the local database has {local_dtype!r}. "
+            "Uploading would mix precisions in one table; drop the table first."
+        )
+    return store
 
 
 def _open_or_create_pinecone_index(
