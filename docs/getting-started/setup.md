@@ -9,7 +9,7 @@ It builds two things in a local `.aatm/` folder:
 | What | File | Used by |
 |---|---|---|
 | The vocabulary database (concepts, synonyms, relationships) | `.aatm/omop.db` | Every workflow: code lookups, checks of every concept id, the agent's lexical search |
-| A search index of concept names and synonyms, for one embedding model | `.aatm/chroma_vector_dbs/<model>/` (or Chroma Cloud, Pinecone) | The terminology mapper and the agent, to search by meaning |
+| A search index of concept names and synonyms, for one embedding model | `.aatm/chroma_vector_dbs/<model>/` (or Chroma Cloud, Pinecone, PostgreSQL) | The terminology mapper and the agent, to search by meaning |
 
 ---
 
@@ -89,8 +89,9 @@ names.
 
 By default the search index is a local ChromaDB folder of several GB. To build it once
 and share it, or to search from machines without the disk space, build it in Chroma
-Cloud or Pinecone with `--vector-db cloud` or `--vector-db pinecone`. See
-[Vector database](env.md#vector-database-local-chroma-cloud-or-pinecone).
+Cloud, Pinecone or a PostgreSQL server with `--vector-db cloud`, `pinecone` or
+`pgvector`. See
+[Vector database](env.md#vector-database).
 
 ---
 

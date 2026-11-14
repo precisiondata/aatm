@@ -37,12 +37,13 @@ aatm.configure_logging(logging.DEBUG)  # everything
 logging.getLogger("aatm.data_models.extractors").setLevel(logging.DEBUG)  # one module only
 ```
 
-## Vector database (local, Chroma Cloud or Pinecone)
+## Vector database
 
-By default, AATM builds one ChromaDB vector database per embedding model on this machine, under `.aatm/chroma_vector_dbs/`. Two remote backends let a team build the index once and share it, and let machines without the disk space or GPU for a local index run retrieval:
+By default, AATM builds one ChromaDB vector database per embedding model on this machine, under `.aatm/chroma_vector_dbs/`. Three other backends let a team build the index once and share it, let machines without the disk space or GPU for a local index run retrieval, or filter faster:
 
 - [Chroma Cloud](https://trychroma.com/), with `AATM_VECTOR_DB=cloud`.
 - [Pinecone](https://www.pinecone.io/), with `AATM_VECTOR_DB=pinecone` (see [below](#pinecone)).
+- PostgreSQL with [pgvector](https://github.com/pgvector/pgvector), on your machine or a server you run, with `AATM_VECTOR_DB=pgvector` (see [below](#postgresql-with-pgvector)).
 
 Switching is configuration only: retrievers, `aatm map`, `aatm search-ui`, `aatm serve`, the concept search agent and `load_retriever()` all use the configured backend.
 
@@ -52,7 +53,7 @@ Set:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `AATM_VECTOR_DB` | `local` | `local`, `cloud` or `pinecone`. `aatm init --vector-db` overrides it for the build. |
+| `AATM_VECTOR_DB` | `local` | `local`, `cloud`, `pinecone` or `pgvector`. `aatm init --vector-db` overrides it for the build. |
 | `CHROMA_API_KEY` | unset | Chroma Cloud API key. Required in cloud mode. Never logged. |
 | `CHROMA_TENANT` | unset | Chroma Cloud tenant. Optional when the API key is scoped to one database. |
 | `CHROMA_DATABASE` | unset | Chroma Cloud database. Optional when the API key is scoped to one database. |
@@ -114,15 +115,68 @@ How the index maps to Pinecone:
 - **Records.** Pinecone has no document field and no null metadata. The expression text is stored in the metadata (as `expression`), and `None` values are left out. The embedding precision of local models is stored as an index tag (`aatm_embedding_dtype`), and queries are encoded in it.
 - **Writes** use `upsert`, which is idempotent, in requests within Pinecone's limits (1,000 records and 2 MB per request). Every request is retried with backoff on rate limits, server errors and network failures. A repair (`aatm init`, *Repair*) or a rerun of `aatm vector-db upload` only writes the missing records. Newly written records take a moment to become visible, so a repair right after a build may embed a few records again, which is harmless.
 
+### PostgreSQL with pgvector
+
+[pgvector](https://github.com/pgvector/pgvector) adds vector search to PostgreSQL. Use it to keep the index next to OMOP data you already host in Postgres, to run fast filtered searches on your own machine, or to share one index across a team on a server you run.
+
+Install the extra:
+
+```bash
+pip install "aatm[pgvector]"   # or: uv sync --extra pgvector
+```
+
+The quickest local server is the `pgvector/pgvector` Docker image. This one accepts connections from this machine only, without a password:
+
+```bash
+docker run -d --name aatm-pgvector --shm-size=1g \
+  -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=aatm \
+  -p 127.0.0.1:5432:5432 -v aatm-pgvector:/var/lib/postgresql/data \
+  pgvector/pgvector:pg17
+```
+
+`--shm-size` gives the HNSW index build enough shared memory; Docker's 64 MB default makes large parallel builds fail. For a server other people can reach, set a password (`POSTGRES_PASSWORD`) instead of `trust`.
+
+Then set:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AATM_VECTOR_DB` | `local` | Set to `pgvector`. |
+| `AATM_PG_DSN` | unset | Connection string, e.g. `postgresql://postgres@localhost:5432/aatm`. If unset, libpq's defaults and the standard `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` and `PGPASSWORD` variables apply. A password in it is never shown. |
+| `AATM_PG_TABLE_PREFIX` | `aatm_expressions` | Prefix of the table names. |
+| `AATM_PG_EF_SEARCH` | `100` | `hnsw.ef_search`: candidates the search keeps, from 1 to 1000. Higher finds more true neighbours, more slowly. Each query uses at least its `top_k`. |
+| `AATM_PG_ITERATIVE_SCAN` | `relaxed_order` | `hnsw.iterative_scan`: `relaxed_order`, `strict_order` or `off`. How a filtered search keeps scanning until it has `top_k` matches (pgvector 0.8+). |
+| `AATM_PG_MAINTENANCE_WORK_MEM` | server setting | Memory for building the HNSW index, e.g. `4GB`. More memory builds it faster. |
+
+```env
+AATM_VECTOR_DB=pgvector
+AATM_PG_DSN=postgresql://postgres@localhost:5432/aatm
+```
+
+Prefer `PGPASSWORD` or a [`.pgpass` file](https://www.postgresql.org/docs/current/libpq-pgpass.html) to a password in `AATM_PG_DSN`.
+
+```bash
+aatm vector-db check --vector-db pgvector                     # server, pgvector version, the models' tables
+aatm init --vector-db pgvector                                # build the index in PostgreSQL
+aatm vector-db upload --to pgvector -e embeddinggemma-300M    # copy a local index, without re-embedding
+```
+
+How the index maps to PostgreSQL:
+
+- **Tables.** Each embedding model gets its own table, named `<prefix>_<model>` and made a safe identifier (e.g. `aatm_expressions_qwen3_06b`), with columns `id`, `embedding vector(<dimension>)`, `document` and `metadata jsonb`. The table `aatm_index_metadata` records each index's dimension and the embedding precision of local models, and queries are encoded in it. `aatm init` installs the `vector` extension if the database lacks it, which needs the right to create extensions.
+- **Search indexes.** An HNSW index on the embeddings and a GIN index on the metadata are built once the rows are loaded, which is much faster than updating them row by row. On the full index (about 2.5 million expressions) this takes a while; raise `AATM_PG_MAINTENANCE_WORK_MEM` to speed it up. HNSW indexes `vector` columns of up to 2,000 dimensions, so larger embeddings (`qwen3-4B`, `gemini-embedding-001`, `text-embedding-3-large`) are indexed in half precision (`halfvec`, up to 4,000); their distances still come from the full-precision vectors.
+- **Scores.** pgvector's Euclidean distance is squared, so a record has the same `distance` as in ChromaDB and Pinecone, and the confidence score (`1 - distance`), selectors and thresholds work unchanged.
+- **Filters.** Domain and vocabulary filters (`retriever_filter`) become `WHERE` clauses on the metadata, applied **during** the vector search, so the retriever passes them straight to PostgreSQL by default (`filter_strategy="native"`). Iterative index scans keep a filtered search going until it has `top_k` matches; PostgreSQL may also choose the metadata index and an exact search when few rows match. See [Metadata filters](concepts.md#metadata-filters).
+- **Writes** go through a staging table with `COPY`, then into the table. A first write skips IDs already stored, and a retry replaces them, so a repair (`aatm init`, *Repair*) or a rerun of `aatm vector-db upload` only writes the missing records and never duplicates one.
+
 ### Choosing a backend
 
-| | Local ChromaDB | Chroma Cloud | Pinecone |
-|---|---|---|---|
-| Setup | None | API key | API key and `aatm[pinecone]` |
-| Shared across a team | No | Yes | Yes |
-| Disk and memory on this machine | Several GB per model | None | None |
-| Filtered queries (domain, vocabulary) | Over-fetch by default, because ChromaDB's own filtered query takes seconds on a full index | Same as local | Filtered during the search |
-| Cost | Free | Usage-based | Usage-based |
+| | Local ChromaDB | Chroma Cloud | Pinecone | PostgreSQL + pgvector |
+|---|---|---|---|---|
+| Setup | None | API key | API key and `aatm[pinecone]` | A PostgreSQL server with pgvector and `aatm[pgvector]` |
+| Shared across a team | No | Yes | Yes | Yes, on a server others can reach |
+| Disk and memory on this machine | Several GB per model | None | None | Several GB per model, on the server |
+| Filtered queries (domain, vocabulary) | Over-fetch by default, because ChromaDB's own filtered query takes seconds on a full index | Same as local | Filtered during the search | Filtered during the search |
+| Cost | Free | Usage-based | Usage-based | Free locally; your server otherwise |
 
 Embeddings of local models are computed on the machine that runs the build, whichever backend stores them. To compare query time and recall on your own index, see `benchmarks/vector_db_backends`.
 

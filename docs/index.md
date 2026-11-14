@@ -137,7 +137,8 @@ mapper.map(["HbA1c", "creatinina sérica", "dor torácica"], save_to_disk=False)
 - **Batch or interactive.** Code a `SOURCE_TO_CONCEPT_MAP` CSV with `aatm map`, a list
   of terms in Python, a REST API with `aatm serve`, or explore in `aatm search-ui`.
 - **Your index, where you want it.** Six embedding models (OpenAI, Gemini, or local
-  models on your GPU), in a local ChromaDB, Chroma Cloud or Pinecone.
+  models on your GPU), in a local ChromaDB, Chroma Cloud, Pinecone or PostgreSQL
+  with pgvector.
 
 [Medical coding in Python](getting-started/quick_start_python_api.md) ·
 [from the command line](getting-started/quick_start_cli.md) ·

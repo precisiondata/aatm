@@ -52,11 +52,12 @@ Use `EmptyTranslator` when your inputs are already in the desired language.
 
 Retrievers fetch candidate concepts from a vector database.
 
-Implementations, both returned by `load_retriever()` depending on `AATM_VECTOR_DB`
-(see [Environment variables](env.md#vector-database-local-chroma-cloud-or-pinecone)):
+Implementations, all returned by `load_retriever()` depending on `AATM_VECTOR_DB`
+(see [Environment variables](env.md#vector-database)):
 
 - `ChromaDBRetriever`: a local or Chroma Cloud collection.
 - `PineconeRetriever`: a Pinecone index.
+- `PgVectorRetriever`: a PostgreSQL table with pgvector.
 
 `aatm init` and `aatm vector-db upload` record the embedding model they built, the vector
 database and the build date in `.aatm/config.yaml`. Without a model name,
@@ -82,7 +83,7 @@ on both, so selectors and thresholds do not depend on the backend.
 ### Metadata filters
 
 A retriever can restrict its candidates with a `where` filter, written in ChromaDB's
-syntax, which AATM translates for Pinecone. For example, to restrict them to
+syntax, which AATM translates for Pinecone and PostgreSQL. For example, to restrict them to
 one domain and some vocabularies. The OMOP builder does this for every `map` source:
 
 ```python
@@ -102,7 +103,7 @@ only when too few match. `filter_strategy` chooses the method:
 |---|---|---|
 | `"overfetch_fallback"` (default) | Unfiltered query for `max(top_k * overfetch_factor, min_overfetch)` results, then for `max_overfetch` results, then ChromaDB's filtered query, for each query still short of `top_k` matches | Always `top_k` results; about as fast as no filter when the over-fetch finds enough |
 | `"overfetch"` | The same, without the filtered query at the end | Fast, but may return fewer than `top_k` results for rare filters |
-| `"native"` (or `"chroma"`) | Passes the filter to the vector database | ChromaDB: exact, slow on large indexes. Pinecone: the default, filtered during the search |
+| `"native"` (or `"chroma"`) | Passes the filter to the vector database | ChromaDB: exact, slow on large indexes. Pinecone and PostgreSQL: the default, filtered during the search |
 
 Set it when you load the retriever, or per call:
 
@@ -132,6 +133,14 @@ Pinecone applies filters during the vector search, so `PineconeRetriever` defaul
 `filter_strategy="native"` and needs no over-fetch. Filters are translated to
 Pinecone's syntax: `{"field": value}` becomes `{"field": {"$eq": value}}`, and `$ne`,
 `$gt`, `$gte`, `$lt`, `$lte`, `$in` and `$nin` keep their names.
+
+PostgreSQL with pgvector also filters during the search, so `PgVectorRetriever`
+defaults to `filter_strategy="native"` too. Filters become `WHERE` clauses on the
+record's `jsonb` metadata, with values always passed as query parameters: equality and
+`$in` test containment (`metadata @> '{"field": value}'`), so strings, numbers and
+booleans stay apart; `$ne` and `$nin` need the field to exist; `$gt`, `$gte`, `$lt`
+and `$lte` compare numbers. As in ChromaDB, a record that lacks a field never matches
+a condition on it.
 
 ## Reranker
 

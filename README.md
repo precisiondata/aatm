@@ -33,7 +33,7 @@ aatm doctor   # tells you whether local models will use your GPU, and how to fix
 
 With [uv](https://docs.astral.sh/uv/), `uv pip install aatm --torch-backend=auto` also picks
 the right PyTorch for your GPU. Extras: `aatm[anthropic]` for Anthropic models,
-`aatm[pinecone]` for a Pinecone index.
+`aatm[pinecone]` for a Pinecone index, `aatm[pgvector]` for PostgreSQL with pgvector.
 
 AATM cannot ship the OMOP vocabularies, since several have their own licences. Request
 them on [Athena](https://athena.ohdsi.org/vocabulary/list) (SNOMED, LOINC, UCUM and
@@ -111,7 +111,7 @@ aatm map --input-file source_to_concept_map.csv --output-dir output --selector-i
   be restricted to a domain and vocabularies.
 - Code a `SOURCE_TO_CONCEPT_MAP` CSV, a list of terms, a REST API (`aatm serve`), or
   explore in `aatm search-ui`. Six embedding models, local or hosted, in ChromaDB,
-  Chroma Cloud or Pinecone.
+  Chroma Cloud, Pinecone or PostgreSQL with pgvector.
 
 [Medical coding quick start](https://precisiondata.github.io/aatm/latest/getting-started/quick_start_python_api/)
 
