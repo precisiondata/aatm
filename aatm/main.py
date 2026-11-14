@@ -103,7 +103,7 @@ import dotenv
 import typer
 from rich.console import Console
 from pathlib import Path
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, Any, List, Literal, Optional
 import os
 import questionary
 from questionary import Choice
@@ -391,8 +391,9 @@ def init(
             "--vector-db",
             help=(
                 "Where to build the vector database: 'local' (ChromaDB on this "
-                "machine), 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY) "
-                "or 'pinecone' (configured with PINECONE_API_KEY). "
+                "machine), 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY), "
+                "'pinecone' (configured with PINECONE_API_KEY) or 'pgvector' "
+                "(PostgreSQL, configured with AATM_PG_DSN). "
                 "Overrides AATM_VECTOR_DB. Defaults to 'local'."
             ),
             show_default=False,
@@ -458,7 +459,7 @@ def init(
             mapping datasets. If not provided, the user is prompted to
             select one or more interactively.
         vector_db: Where to build the vector database, ``local``,
-            ``cloud`` or ``pinecone``. If not provided, `AATM_VECTOR_DB` is
+            ``cloud``, ``pinecone`` or ``pgvector``. If not provided, `AATM_VECTOR_DB` is
             used, and otherwise ``local``.
         vocab_zip: An Athena vocabulary bundle, as its download link or the
             path of the zip. It is downloaded if needed, unpacked into
@@ -508,6 +509,11 @@ def init(
         the `aatm[pinecone]` extra):
 
             $ aatm init --vector-db pinecone
+
+        Build the vector database in PostgreSQL with pgvector (needs
+        AATM_PG_DSN and the `aatm[pgvector]` extra):
+
+            $ aatm init --vector-db pgvector
     """
     # Setup local directories
     LOCAL_HELPER_PATH.mkdir(exist_ok=True, parents=True)
@@ -583,6 +589,9 @@ def init(
         )
         if vector_db_connection.mode == "pinecone":
             import_pinecone()
+        elif vector_db_connection.mode == "pgvector":
+            # Fail before the long build steps if the server is unreachable.
+            vector_db_connection.client().close()  # type: ignore[union-attr]
     except VectorDatabaseConfigError as e:
         console.print(f"[yellow]OOPS![/yellow] {e}\n")
         raise typer.Exit()
@@ -601,7 +610,11 @@ def init(
 
     console.print(
         "[blue]2) Building vector database[/blue]"
-        + {"cloud": " in Chroma Cloud", "pinecone": " in Pinecone"}.get(vector_db, "")
+        + {
+            "cloud": " in Chroma Cloud",
+            "pinecone": " in Pinecone",
+            "pgvector": " in PostgreSQL",
+        }.get(vector_db, "")
     )
 
     if embedding_model is None:
@@ -1159,7 +1172,7 @@ def schema(
 vector_db_app = typer.Typer(
     help=(
         "Check the vector database settings or upload a local index to Chroma "
-        "Cloud or Pinecone"
+        "Cloud, Pinecone or PostgreSQL"
     )
 )
 app.add_typer(vector_db_app, name="vector-db")
@@ -1173,7 +1186,7 @@ def vector_db_check(
         Optional[str],
         typer.Option(
             "--vector-db",
-            help="'local', 'cloud' or 'pinecone'. Overrides AATM_VECTOR_DB.",
+            help="'local', 'cloud', 'pinecone' or 'pgvector'. Overrides AATM_VECTOR_DB.",
         ),
     ] = None,
 ) -> None:
@@ -1209,6 +1222,11 @@ def vector_db_check(
 
     connection = next(iter(locations.values()))[0]
     console.print(f"Vector database: [bold]{connection.describe()}[/bold]")
+    if mode == "pgvector":
+        _check_pgvector(connection, locations)  # type: ignore[arg-type]
+        _print_recorded_default(mode)
+        return
+
     service = "Pinecone" if mode == "pinecone" else "Chroma Cloud"
     kind = "index" if mode == "pinecone" else "collection"
     try:
@@ -1231,6 +1249,66 @@ def vector_db_check(
     _print_recorded_default(mode)
 
 
+def _check_pgvector(connection: Any, locations: dict[str, tuple[Any, str]]) -> None:
+    """Connect to PostgreSQL, check pgvector and list the built tables.
+
+    Raises:
+        typer.Exit: With code 1 if the connection fails or pgvector is missing
+            and cannot be installed by AATM.
+    """
+    from aatm.pgvector_store import (
+        ITERATIVE_SCAN_MIN_VERSION,
+        pg_table_count,
+        pgvector_version,
+    )
+    from aatm.vector_db import VectorDatabaseConfigError
+
+    try:
+        with connection.client() as conn:
+            server = conn.execute("SHOW server_version").fetchone()[0]
+            version = pgvector_version(conn)
+            available = conn.execute(
+                "SELECT default_version FROM pg_available_extensions "
+                "WHERE name = 'vector'"
+            ).fetchone()
+    except VectorDatabaseConfigError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Connected[/green] (PostgreSQL {server}).")
+    if version is not None:
+        text = ".".join(str(part) for part in version)
+        if version < ITERATIVE_SCAN_MIN_VERSION:
+            console.print(
+                f"pgvector {text}: [yellow]upgrade to 0.8 or later[/yellow] for "
+                "iterative index scans, which filtered searches rely on."
+            )
+        else:
+            console.print(f"pgvector {text}.")
+    elif available is not None:
+        console.print(
+            f"pgvector {available[0]} is available but not installed in this "
+            "database; `aatm init --vector-db pgvector` installs it (or run "
+            "`CREATE EXTENSION vector;`)."
+        )
+    else:
+        console.print(
+            "[red]pgvector is not available on this server.[/red] Install it, "
+            "or use the pgvector/pgvector Docker image."
+        )
+        raise typer.Exit(code=1)
+
+    for name, (_, table_name) in locations.items():
+        rows = pg_table_count(connection.dsn, table_name)
+        if rows is None:
+            status = "not built"
+        elif rows == 0:
+            status = "empty"
+        else:
+            status = f"[green]built[/green], about {rows:,} rows"
+        console.print(f"  {name}: table '{table_name}' ({status})")
+
+
 def _print_recorded_default(mode: str) -> None:
     """Print the vector database a retriever defaults to, if one is recorded."""
     from aatm.built_stores import CONFIG_PATH, recorded_vector_databases
@@ -1245,7 +1323,10 @@ def _print_recorded_default(mode: str) -> None:
 
 @vector_db_app.command(
     "upload",
-    help="Copy a local vector database to Chroma Cloud or Pinecone without re-embedding",
+    help=(
+        "Copy a local vector database to Chroma Cloud, Pinecone or PostgreSQL "
+        "without re-embedding"
+    ),
 )
 def vector_db_upload(
     embedding_model: Annotated[
@@ -1280,7 +1361,7 @@ def vector_db_upload(
         str,
         typer.Option(
             "--to",
-            help="Destination: 'cloud' (Chroma Cloud) or 'pinecone'.",
+            help="Destination: 'cloud' (Chroma Cloud), 'pinecone' or 'pgvector'.",
         ),
     ] = "cloud",
     ids_file: Annotated[
@@ -1295,7 +1376,7 @@ def vector_db_upload(
         ),
     ] = None,
 ) -> None:
-    """Upload a local index to Chroma Cloud or Pinecone. Re-running resumes where it stopped.
+    """Upload a local index to Chroma Cloud, Pinecone or PostgreSQL. Re-running resumes.
 
     Raises:
         typer.Exit: With code 1 if the model is unknown, the local database is
