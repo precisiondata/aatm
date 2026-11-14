@@ -18,6 +18,10 @@
   given, preselecting `AATM_VECTOR_DB`. Each backend lists the models already built in
   it, and one that misses a setting or package is shown greyed out with what it needs.
   The embedding model question then marks the models already built there.
+- **`aatm init` can start PostgreSQL for you.** When PostgreSQL is chosen and no server
+  answers, it offers to start PostgreSQL with pgvector in Docker (container
+  `aatm-pgvector`, reachable from this machine only) and to save `AATM_PG_DSN`, and
+  optionally `AATM_VECTOR_DB=pgvector`, to `.env`. Or you set `AATM_PG_DSN` yourself.
 
 ## 0.4.0
 

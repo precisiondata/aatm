@@ -271,3 +271,58 @@ def test_records_of_other_tables_are_not_listed_as_built(monkeypatch):
     )
 
     assert list(main.built_in("pgvector", quick=True)) == ["qwen3-4B"]
+
+
+def test_init_retries_after_starting_postgres(init_until_the_build, monkeypatch):
+    from aatm import vector_db
+    from aatm.pgvector_store import PgVectorConnectionError
+
+    class Connection:
+        mode = "pgvector"
+
+        def client(self):
+            return type("Conn", (), {"close": lambda self: None})()
+
+    attempts = []
+
+    def connection_from_env(local_path, mode=None):
+        attempts.append(mode)
+        if len(attempts) == 1:
+            raise PgVectorConnectionError("Could not connect to PostgreSQL at x")
+        return Connection()
+
+    monkeypatch.setattr(vector_db, "connection_from_env", connection_from_env)
+    monkeypatch.setattr(main, "choose_vector_db", lambda: "pgvector")
+    offered = []
+    monkeypatch.setattr(
+        main, "offer_local_pgvector", lambda e: offered.append(e) or True
+    )
+
+    calls = init_until_the_build(tty=True)
+
+    assert attempts == ["pgvector", "pgvector"]
+    assert len(offered) == 1
+    assert calls["vector_db"] == "pgvector"
+
+
+def test_init_does_not_offer_docker_without_a_terminal(
+    init_until_the_build, monkeypatch
+):
+    import typer
+
+    from aatm import vector_db
+    from aatm.pgvector_store import PgVectorConnectionError
+
+    def unreachable(local_path, mode=None):
+        raise PgVectorConnectionError("Could not connect")
+
+    monkeypatch.setenv("AATM_VECTOR_DB", "pgvector")
+    monkeypatch.setattr(vector_db, "connection_from_env", unreachable)
+
+    def must_not_offer(e):
+        raise AssertionError("must not prompt without a terminal")
+
+    monkeypatch.setattr(main, "offer_local_pgvector", must_not_offer)
+
+    with pytest.raises(typer.Exit):
+        init_until_the_build(tty=False)

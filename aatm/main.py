@@ -592,20 +592,31 @@ def init(
         if vector_db is None:  # Ctrl+C at the prompt
             raise typer.Exit()
 
-    try:
-        vector_db_connection = connection_from_env(
-            local_path=".aatm/chroma_vector_dbs", mode=vector_db
-        )
-        if vector_db_connection.mode == "pinecone":
-            import_pinecone()
-        elif vector_db_connection.mode == "pgvector":
-            # Fail before the long build steps if the server is unreachable.
-            vector_db_connection.client().close()  # type: ignore[union-attr]
-    except VectorDatabaseConfigError as e:
-        # Unwrapped, so the commands in the message can be copied.
-        console.print("[yellow]OOPS![/yellow]", end=" ")
-        console.print(f"{e}\n", markup=False, highlight=False, soft_wrap=True)
-        raise typer.Exit()
+    from aatm.pgvector_store import PgVectorConnectionError
+
+    for attempt in range(2):
+        try:
+            vector_db_connection = connection_from_env(
+                local_path=".aatm/chroma_vector_dbs", mode=vector_db
+            )
+            if vector_db_connection.mode == "pinecone":
+                import_pinecone()
+            elif vector_db_connection.mode == "pgvector":
+                # Fail before the long build steps if the server is unreachable.
+                vector_db_connection.client().close()  # type: ignore[union-attr]
+            break
+        except VectorDatabaseConfigError as e:
+            if (
+                attempt == 0
+                and isinstance(e, PgVectorConnectionError)
+                and sys.stdin.isatty()
+                and offer_local_pgvector(e)
+            ):
+                continue  # Retry with the server just started.
+            # Unwrapped, so the commands in the message can be copied.
+            console.print("[yellow]OOPS![/yellow]", end=" ")
+            console.print(f"{e}\n", markup=False, highlight=False, soft_wrap=True)
+            raise typer.Exit()
     vector_db = vector_db_connection.mode
 
     console.print("[blue]1) Building local OMOP vocabulary database[/blue]")
@@ -781,6 +792,63 @@ def choose_vector_db() -> Optional[str]:
         choices=choices,
         default=default,
     ).ask()
+
+
+def offer_local_pgvector(error: Exception) -> bool:
+    """Offer to start PostgreSQL with pgvector in Docker when it cannot be reached.
+
+    The user chooses between starting a local container (see
+    `aatm.pg_docker`), whose ``AATM_PG_DSN`` is then saved to ``.env``, and
+    setting ``AATM_PG_DSN`` themselves. When AATM starts the container, it also
+    offers to save ``AATM_VECTOR_DB=pgvector``, so later commands use it.
+
+    Args:
+        error: The connection error, whose first line is shown.
+
+    Returns:
+        Whether a server was started and ``AATM_PG_DSN`` saved, so the
+        connection is worth trying again.
+    """
+    from aatm import pg_docker
+    from aatm.vector_db import PG_DSN_ENV_VAR, VECTOR_DB_ENV_VAR
+
+    console.print(str(error).splitlines()[0], style="yellow", markup=False)
+    problem = pg_docker.docker_problem()
+    answer = questionary.select(
+        "PostgreSQL is not reachable. How would you like to set it up?",
+        choices=[
+            Choice(
+                "Start PostgreSQL with pgvector in Docker on this machine, "
+                f"and save {PG_DSN_ENV_VAR} to .env",
+                value="docker",
+                disabled=problem,
+            ),
+            Choice(f"I'll set {PG_DSN_ENV_VAR} myself", value="manual"),
+        ],
+        default="manual" if problem else "docker",
+    ).ask()
+    if answer != "docker":
+        return False
+
+    try:
+        dsn = pg_docker.start_local_pgvector(log=console.print)
+    except pg_docker.LocalPgVectorError as e:
+        console.print(str(e), style="red", markup=False, soft_wrap=True)
+        return False
+
+    values = {PG_DSN_ENV_VAR: dsn}
+    if (os.environ.get(VECTOR_DB_ENV_VAR) or "").strip().lower() != "pgvector":
+        use_by_default = questionary.confirm(
+            f"Also save {VECTOR_DB_ENV_VAR}=pgvector to .env, so aatm map, the "
+            "search UI and load_retriever() use PostgreSQL by default?",
+            default=True,
+        ).ask()
+        if use_by_default:
+            values[VECTOR_DB_ENV_VAR] = "pgvector"
+    pg_docker.save_env(values)
+    saved = ", ".join(f"{key}={value}" for key, value in values.items())
+    console.print(f"[green]PostgreSQL is ready.[/green] Saved to .env: {saved}")
+    return True
 
 
 def embedding_model_choices(built: dict[str, Any]) -> list[Choice]:

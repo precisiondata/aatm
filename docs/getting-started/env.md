@@ -125,7 +125,12 @@ Install the extra:
 pip install "aatm[pgvector]"   # or: uv sync --extra pgvector
 ```
 
-The quickest local server is the `pgvector/pgvector` Docker image. This one accepts connections from this machine only, without a password:
+**Let `aatm init` set it up.** If you choose PostgreSQL and no server answers, `aatm init` offers two options:
+
+- **Start PostgreSQL with pgvector in Docker on this machine.** AATM starts the container `aatm-pgvector` (or starts it again, or reuses it if it is running), waits until it answers, and saves `AATM_PG_DSN` to `.env`. It also offers to save `AATM_VECTOR_DB=pgvector`, so `aatm map`, the search UI and `load_retriever()` use PostgreSQL by default. It needs Docker running; the option is greyed out otherwise. Port 5432 is used if free, otherwise the next free port.
+- **Set `AATM_PG_DSN` yourself**, for a server you already run. `aatm init` then shows what to set, and stops.
+
+To start the same server by hand, use the `pgvector/pgvector` Docker image. This one accepts connections from this machine only, without a password:
 
 ```bash
 docker run -d --name aatm-pgvector --shm-size=1g \

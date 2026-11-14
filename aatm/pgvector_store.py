@@ -105,6 +105,10 @@ class PgVectorConfigError(VectorDatabaseConfigError):
     """Raised when the database cannot hold AATM's index, e.g. pgvector is missing."""
 
 
+class PgVectorConnectionError(PgVectorConfigError):
+    """Raised when PostgreSQL cannot be reached at all, e.g. no server is running."""
+
+
 # --- Names -----------------------------------------------------------------------
 
 _INVALID_NAME_CHARS = re.compile(r"[^a-z0-9_]+")
@@ -334,7 +338,7 @@ def connect(dsn: str, register: bool = True) -> Any:
     try:
         conn = psycopg.connect(dsn, autocommit=True, **kwargs)
     except psycopg.OperationalError as e:
-        raise PgVectorConfigError(connection_failure_message(dsn, e)) from e
+        raise PgVectorConnectionError(connection_failure_message(dsn, e)) from e
     if register:
         try:
             register_vector(conn)
