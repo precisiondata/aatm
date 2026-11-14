@@ -241,12 +241,12 @@ def _store_status(spec: Any, mode: VectorDbMode, local_path: str | None = None):
         from aatm.pgvector_store import pg_table_count
 
         connection, table_name = spec.pgvector_location()
-        count = pg_table_count(connection.dsn, table_name)
-        if count is None:
+        rows = pg_table_count(connection.dsn, table_name)
+        if rows is None:
             return table_name, None, f"PostgreSQL has no table '{table_name}'"
-        if count == 0:
+        if rows == 0:
             return table_name, None, f"PostgreSQL table '{table_name}' is empty"
-        return table_name, count, None
+        return table_name, rows, None
 
     from chromadb.errors import NotFoundError
 
