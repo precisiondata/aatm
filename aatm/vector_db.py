@@ -38,6 +38,8 @@ Configuration comes from environment variables (a ``.env`` file works too):
   ``off``. How a filtered search keeps scanning until it has ``top_k`` matches.
 - ``AATM_PG_MAINTENANCE_WORK_MEM``: optional memory for building the HNSW index,
   e.g. ``4GB``. Defaults to the server's setting.
+- ``AATM_PG_BUILD_WORKERS``: optional parallel workers for building the HNSW
+  index. Defaults to the server's setting (2).
 
 In cloud mode one database holds the indexes of every embedding model, so each
 model gets its own collection (see `ChromaRetrieverModelSpec.cloud_collection_name`).
@@ -91,6 +93,7 @@ PG_TABLE_PREFIX_ENV_VAR = "AATM_PG_TABLE_PREFIX"
 PG_EF_SEARCH_ENV_VAR = "AATM_PG_EF_SEARCH"
 PG_ITERATIVE_SCAN_ENV_VAR = "AATM_PG_ITERATIVE_SCAN"
 PG_MAINTENANCE_WORK_MEM_ENV_VAR = "AATM_PG_MAINTENANCE_WORK_MEM"
+PG_BUILD_WORKERS_ENV_VAR = "AATM_PG_BUILD_WORKERS"
 PG_ITERATIVE_SCAN_MODES = ("off", "strict_order", "relaxed_order")
 """Values of pgvector's ``hnsw.iterative_scan``."""
 
@@ -473,7 +476,7 @@ minutes before failing.
 """
 
 PG_DOCKER_COMMAND = (
-    "docker run -d --name aatm-pgvector --shm-size=1g "
+    "docker run -d --name aatm-pgvector --shm-size=9g "
     "-e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=aatm "
     "-p 127.0.0.1:5432:5432 -v aatm-pgvector:/var/lib/postgresql/data "
     "pgvector/pgvector:pg17"
@@ -556,6 +559,9 @@ class PgVectorConnection:
     maintenance_work_mem: str | None = None
     """``maintenance_work_mem`` while building the HNSW index, e.g. ``4GB``."""
 
+    build_workers: int | None = None
+    """``max_parallel_maintenance_workers`` while building the HNSW index."""
+
     mode: VectorDbMode = "pgvector"
     """Always ``pgvector``. Mirrors `ChromaConnection.mode`."""
 
@@ -592,12 +598,22 @@ class PgVectorConnection:
                 f"{PG_ITERATIVE_SCAN_ENV_VAR} must be one of "
                 f"{', '.join(PG_ITERATIVE_SCAN_MODES)}; got {iterative_scan!r}."
             )
+        workers_text = setting(PG_BUILD_WORKERS_ENV_VAR)
+        build_workers = None
+        if workers_text:
+            if not workers_text.isdigit():
+                raise VectorDatabaseConfigError(
+                    f"{PG_BUILD_WORKERS_ENV_VAR} must be a whole number; "
+                    f"got {workers_text!r}."
+                )
+            build_workers = int(workers_text)
         return cls(
             dsn=setting(PG_DSN_ENV_VAR),
             table_prefix=setting(PG_TABLE_PREFIX_ENV_VAR) or DEFAULT_PG_TABLE_PREFIX,
             ef_search=ef_search,
             iterative_scan=iterative_scan,
             maintenance_work_mem=setting(PG_MAINTENANCE_WORK_MEM_ENV_VAR) or None,
+            build_workers=build_workers,
         )
 
     def table_name(self, model_name: str) -> str:

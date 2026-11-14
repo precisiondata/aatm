@@ -47,7 +47,7 @@ import math
 import re
 import threading
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from enum import Enum
 from typing import Any
 
@@ -498,26 +498,59 @@ def drop_pg_table(dsn: str, name: str) -> None:
             )
 
 
+IndexProgress = Callable[[str, str, int, int], None]
+"""Reports an index build: ``(step, phase, done, total)``.
+
+``step`` is ``"HNSW index"``, ``"metadata index"`` or ``"statistics"``. ``done``
+and ``total`` count blocks or rows, as PostgreSQL reports them; ``total`` is 0
+while it is unknown. Each step ends with ``phase == "done"``.
+"""
+
+PROGRESS_INTERVAL = 1.0
+"""Seconds between two readings of ``pg_stat_progress_create_index``."""
+
+
+def hnsw_memory_estimate(rows: int, dimension: int, m: int = DEFAULT_HNSW_M) -> int:
+    """Estimate the memory, in bytes, an HNSW build needs to hold its whole graph.
+
+    One vector per row (4 bytes per value, or 2 as ``halfvec``) plus its
+    neighbour lists. On 2.2 million 768-dimension rows the index came to 9.4 GB,
+    and this estimates 9.0 GB.
+    """
+    element = 4 if _index_kind(dimension) == "vector" else 2
+    return int(rows) * (int(dimension) * element + 64 * int(m))
+
+
 def create_pg_indexes(
     dsn: str,
     name: str,
     m: int = DEFAULT_HNSW_M,
     ef_construction: int = DEFAULT_HNSW_EF_CONSTRUCTION,
     maintenance_work_mem: str | None = None,
+    workers: int | None = None,
+    progress: IndexProgress | None = None,
 ) -> None:
     """Create the HNSW and GIN indexes of an index table, if they are missing.
 
     Building them once after the bulk load is much faster than keeping them
-    up to date row by row. On the full index this takes a while; a larger
-    ``maintenance_work_mem`` (e.g. ``4GB``) speeds it up.
+    up to date row by row. When the HNSW graph does not fit in
+    ``maintenance_work_mem``, PostgreSQL builds most of it on disk, which is
+    much slower; a warning then says how much memory the build would need.
 
     Args:
         dsn: Connection string.
         name: Table name.
         m: HNSW links per node.
         ef_construction: HNSW candidate list size while building.
-        maintenance_work_mem: Memory for the build, e.g. ``2GB``. Defaults to
-            the server's setting.
+        maintenance_work_mem: Memory for the build, e.g. ``8GB``. Defaults to
+            the server's setting (PostgreSQL's default is 64 MB). A parallel
+            build keeps it in shared memory, so the server needs at least as
+            much (``--shm-size`` for Docker).
+        workers: Parallel workers for the build
+            (``max_parallel_maintenance_workers``). Defaults to the server's
+            setting (2), and is capped by its ``max_parallel_workers``.
+        progress: Called about every second while an index builds; see
+            `IndexProgress`.
     """
     with connect(dsn) as conn:
         dimension = _dimension(conn, name)
@@ -527,7 +560,13 @@ def create_pg_indexes(
                 "SELECT set_config('maintenance_work_mem', %s, false)",
                 (maintenance_work_mem,),
             )
+        if workers is not None:
+            conn.execute(
+                "SELECT set_config('max_parallel_maintenance_workers', %s, false)",
+                (str(int(workers)),),
+            )
         table = _ident(name)
+        hnsw = _index_name(name, "hnsw")
         started = time.perf_counter()
         if kind is None:
             logger.warning(
@@ -536,25 +575,123 @@ def create_pg_indexes(
                 f"'{name}' will be exact and slow on large indexes."
             )
         else:
+            if not _index_exists(conn, hnsw):
+                _warn_if_memory_is_short(conn, name, dimension, m)
             target = (
                 "embedding vector_l2_ops"
                 if kind == "vector"
                 else f"(embedding::halfvec({dimension})) halfvec_l2_ops"
             )
-            conn.execute(
-                f"CREATE INDEX IF NOT EXISTS {_ident(_index_name(name, 'hnsw'))} "
+            _execute_watched(
+                conn,
+                dsn,
+                f"CREATE INDEX IF NOT EXISTS {_ident(hnsw)} "
                 f"ON {table} USING hnsw ({target}) "
-                f"WITH (m = {int(m)}, ef_construction = {int(ef_construction)})"
+                f"WITH (m = {int(m)}, ef_construction = {int(ef_construction)})",
+                "HNSW index",
+                progress,
             )
-        conn.execute(
+        _execute_watched(
+            conn,
+            dsn,
             f"CREATE INDEX IF NOT EXISTS {_ident(_index_name(name, 'meta'))} "
-            f"ON {table} USING gin (metadata jsonb_path_ops)"
+            f"ON {table} USING gin (metadata jsonb_path_ops)",
+            "metadata index",
+            progress,
         )
-        conn.execute(f"ANALYZE {table}")
+        _execute_watched(conn, dsn, f"ANALYZE {table}", "statistics", progress)
         logger.info(
             f"Indexed '{name}' in {time.perf_counter() - started:.1f}s"
             + ("" if kind is None else f" (HNSW on {kind})")
         )
+
+
+def _index_exists(conn: Any, index: str) -> bool:
+    row = conn.execute("SELECT to_regclass(%s)", (_ident(index),)).fetchone()
+    return row is not None and row[0] is not None
+
+
+def _warn_if_memory_is_short(conn: Any, name: str, dimension: int, m: int) -> None:
+    """Warn when the HNSW graph will not fit in ``maintenance_work_mem``."""
+    rows, memory = conn.execute(
+        "SELECT (SELECT GREATEST(reltuples, 0)::bigint FROM pg_class "
+        "WHERE oid = to_regclass(%s)), "
+        "pg_size_bytes(current_setting('maintenance_work_mem'))",
+        (_ident(name),),
+    ).fetchone()
+    if not rows:
+        rows = conn.execute(f"SELECT count(*) FROM {_ident(name)}").fetchone()[0]
+    needed = hnsw_memory_estimate(int(rows or 0), dimension, m)
+    if needed > int(memory):
+        logger.warning(
+            f"The HNSW index of '{name}' needs about {_gb(needed)} to build in "
+            f"memory, but maintenance_work_mem is {_gb(int(memory))}, so most of "
+            "it is built on disk, which is much slower. Set "
+            "AATM_PG_MAINTENANCE_WORK_MEM (e.g. to "
+            f"{max(1, -(-needed // 2**30))}GB) if the server has the memory, and "
+            "enough shared memory for a parallel build (Docker: --shm-size)."
+        )
+
+
+def _gb(size: int) -> str:
+    return f"{size / 2**30:.1f} GB" if size >= 2**30 else f"{size // 2**20} MB"
+
+
+def _execute_watched(
+    conn: Any, dsn: str, sql: str, step: str, progress: IndexProgress | None
+) -> None:
+    """Run a statement, reporting its ``pg_stat_progress_create_index`` row meanwhile.
+
+    The statement runs in a thread on ``conn``; this thread reads the progress
+    on a second connection. Ctrl+C cancels the statement on the server.
+    """
+    if progress is None:
+        conn.execute(sql)
+        return
+    pid = conn.info.backend_pid
+    errors: list[BaseException] = []
+
+    def work() -> None:
+        try:
+            conn.execute(sql)
+        except BaseException as e:  # re-raised below, in the calling thread
+            errors.append(e)
+
+    progress(step, "starting", 0, 0)
+    worker = threading.Thread(target=work, name=f"aatm-{step}", daemon=True)
+    worker.start()
+    try:
+        with connect(dsn, register=False) as watcher:
+            while worker.is_alive():
+                worker.join(PROGRESS_INTERVAL)
+                if not worker.is_alive():
+                    break
+                row = watcher.execute(
+                    "SELECT phase, blocks_done, blocks_total, tuples_done, "
+                    "tuples_total FROM pg_stat_progress_create_index WHERE pid = %s",
+                    (pid,),
+                ).fetchone()
+                if row is None:
+                    continue
+                phase, blocks_done, blocks_total, tuples_done, tuples_total = row
+                if blocks_total:
+                    progress(step, phase, int(blocks_done), int(blocks_total))
+                elif tuples_total:
+                    progress(step, phase, int(tuples_done), int(tuples_total))
+                else:
+                    progress(step, phase, int(tuples_done or 0), 0)
+    except BaseException:
+        # e.g. Ctrl+C: stop the build on the server too, not just here.
+        cancel = getattr(conn, "cancel_safe", None) or conn.cancel
+        try:
+            cancel()
+        finally:
+            worker.join()
+        raise
+    worker.join()
+    if errors:
+        raise errors[0]
+    progress(step, "done", 1, 1)
 
 
 def _index_name(table: str, suffix: str) -> str:

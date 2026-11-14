@@ -13,6 +13,8 @@ Every test works in tables with a random prefix and drops them afterwards.
 
 # ruff: noqa: F811 - the imported fixtures are used as test arguments
 
+import contextlib
+import logging
 import os
 import uuid
 
@@ -551,3 +553,91 @@ def test_vector_db_check_lists_tables(pg_project, monkeypatch):
     assert "pgvector 0." in result.output
     table = pg_project.table_name("fake-model")
     assert f"fake-model: table '{table}' (built, about 280 rows)" in result.output
+
+
+# --- Index builds: progress and memory -------------------------------------------
+
+
+def test_index_builds_report_their_progress(connection):
+    store = make_store(connection)
+    rng = np.random.default_rng(4)
+    n = 2000
+    store.write(
+        [str(i) for i in range(n)],
+        rng.normal(size=(n, DIM)).astype(np.float32),
+        [""] * n,
+        [{"i": i} for i in range(n)],
+    )
+    reports = []
+
+    create_pg_indexes(DSN, store.name, progress=lambda *r: reports.append(r))
+
+    steps = [step for step, phase, _, _ in reports if phase == "done"]
+    assert steps == ["HNSW index", "metadata index", "statistics"]
+    assert reports[0] == ("HNSW index", "starting", 0, 0)
+    for _, _, done, total in reports:
+        assert total == 0 or 0 <= done <= total
+
+
+def test_index_builds_use_the_given_memory_and_workers(connection, monkeypatch):
+    store = make_store(connection)
+    store.write(["a"], np.ones((1, DIM), dtype=np.float32), [""], [{}])
+    seen = []
+    from aatm import pgvector_store
+
+    real = pgvector_store._execute_watched
+
+    def watched(conn, dsn, sql, step, progress):
+        if step == "HNSW index":
+            seen.append(
+                conn.execute(
+                    "SELECT current_setting('maintenance_work_mem'), "
+                    "current_setting('max_parallel_maintenance_workers')"
+                ).fetchone()
+            )
+        return real(conn, dsn, sql, step, progress)
+
+    monkeypatch.setattr(pgvector_store, "_execute_watched", watched)
+
+    create_pg_indexes(DSN, store.name, maintenance_work_mem="128MB", workers=3)
+
+    assert seen == [("128MB", "3")]
+
+
+@contextlib.contextmanager
+def pgvector_warnings(caplog):
+    """Capture the store's warnings, also once `aatm.configure_logging` stops propagation."""
+    logger = logging.getLogger("aatm.pgvector_store")
+    logger.addHandler(caplog.handler)
+    try:
+        with caplog.at_level(logging.WARNING, logger="aatm.pgvector_store"):
+            yield
+    finally:
+        logger.removeHandler(caplog.handler)
+
+
+def test_too_little_build_memory_is_reported(connection, caplog):
+    store = make_store(connection)
+    n = 3000  # about 3 MB of graph
+    store.write(
+        [str(i) for i in range(n)],
+        np.ones((n, DIM), dtype=np.float32),
+        [""] * n,
+        [{}] * n,
+    )
+
+    with pgvector_warnings(caplog):
+        create_pg_indexes(DSN, store.name, maintenance_work_mem="1MB")
+
+    assert "needs about 3 MB to build in memory" in caplog.text
+    assert "AATM_PG_MAINTENANCE_WORK_MEM" in caplog.text
+
+
+def test_enough_build_memory_is_not_reported(connection, caplog):
+    store = make_store(connection)
+    store.write(["a"], np.ones((1, DIM), dtype=np.float32), [""], [{}])
+
+    with pgvector_warnings(caplog):
+        create_pg_indexes(DSN, store.name, maintenance_work_mem="64MB")
+
+    assert "maintenance_work_mem" not in caplog.text

@@ -22,6 +22,11 @@
   answers, it offers to start PostgreSQL with pgvector in Docker (container
   `aatm-pgvector`, reachable from this machine only) and to save `AATM_PG_DSN`, and
   optionally `AATM_VECTOR_DB=pgvector`, to `.env`. Or you set `AATM_PG_DSN` yourself.
+- **Faster PostgreSQL index builds, with progress.** Building the search indexes shows a
+  progress bar from PostgreSQL's own report, and warns when `maintenance_work_mem` is
+  too small for the HNSW graph. `AATM_PG_BUILD_WORKERS` sets the parallel workers. The
+  container `aatm init` starts gets shared memory, build memory and workers sized from
+  Docker's resources instead of PostgreSQL's defaults (64 MB, 2 workers).
 
 ## 0.4.0
 

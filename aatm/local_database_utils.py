@@ -1301,18 +1301,52 @@ def _store_kind(connection: VectorDbConnection) -> str:
 
 
 def _index_pg_table(connection: PgVectorConnection, table_name: str) -> None:
-    """Build a PostgreSQL table's search indexes, if missing, after loading it."""
+    """Build a PostgreSQL table's search indexes, if missing, with a progress bar.
+
+    The bar follows PostgreSQL's own progress report (blocks or rows read, per
+    phase), so a long HNSW build shows how far it is and how long it has left.
+    """
+    from rich.progress import (
+        BarColumn,
+        TaskProgressColumn,
+        TextColumn,
+        TimeElapsedColumn,
+        TimeRemainingColumn,
+    )
+
     from aatm.pgvector_store import create_pg_indexes
 
-    console.print(
-        f"Checking the search indexes of '{table_name}' (building them on the "
-        "full index takes a while)..."
+    console.print(f"Building the search indexes of '{table_name}', if missing...")
+    columns = (
+        TextColumn("{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        TextColumn("left"),
+        TimeRemainingColumn(),
+        TextColumn("[dim]{task.fields[phase]}"),
     )
-    create_pg_indexes(
-        connection.dsn,
-        table_name,
-        maintenance_work_mem=connection.maintenance_work_mem,
-    )
+    with Progress(*columns, console=console) as bar:
+        tasks: dict[str, TaskID] = {}
+
+        def report(step: str, phase: str, done: int, total: int) -> None:
+            if step not in tasks:
+                tasks[step] = bar.add_task(step.capitalize(), total=None, phase="")
+            task = tasks[step]
+            if phase == "done":
+                bar.update(task, total=1, completed=1, phase="done")
+            elif total:
+                bar.update(task, total=total, completed=done, phase=phase)
+            else:
+                bar.update(task, phase=phase)
+
+        create_pg_indexes(
+            connection.dsn,
+            table_name,
+            maintenance_work_mem=connection.maintenance_work_mem,
+            workers=connection.build_workers,
+            progress=report,
+        )
 
 
 def _open_or_create_pg_table(

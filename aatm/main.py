@@ -831,12 +831,12 @@ def offer_local_pgvector(error: Exception) -> bool:
         return False
 
     try:
-        dsn = pg_docker.start_local_pgvector(log=console.print)
+        server = pg_docker.start_local_pgvector(log=console.print)
     except pg_docker.LocalPgVectorError as e:
         console.print(str(e), style="red", markup=False, soft_wrap=True)
         return False
 
-    values = {PG_DSN_ENV_VAR: dsn}
+    values = server.env()
     if (os.environ.get(VECTOR_DB_ENV_VAR) or "").strip().lower() != "pgvector":
         use_by_default = questionary.confirm(
             f"Also save {VECTOR_DB_ENV_VAR}=pgvector to .env, so aatm map, the "

@@ -9,11 +9,14 @@ container:
   (``POSTGRES_HOST_AUTH_METHOD=trust``), on port 5432 or the next free one;
 - with its data in a Docker volume of the same name, so the index survives the
   container being removed;
-- with 1 GB of shared memory, which the HNSW index build needs.
+- with shared memory sized for the HNSW index build (see `build_settings`).
 
 A stopped container of that name is started again; a running one is reused.
-`save_env` writes ``AATM_PG_DSN`` (and optionally ``AATM_VECTOR_DB``) to
-``.env``, which every ``aatm`` command loads.
+`start_local_pgvector` also returns the build memory and workers that suit the
+container and Docker's resources: PostgreSQL's defaults (64 MB, 2 workers)
+leave a full index building on disk for over half an hour. `save_env` writes
+``AATM_PG_DSN``, those settings (and optionally ``AATM_VECTOR_DB``) to ``.env``,
+which every ``aatm`` command loads.
 """
 
 from __future__ import annotations
@@ -76,23 +79,108 @@ def docker_problem(run: Runner = _run) -> str | None:
     return None
 
 
+MiB = 2**20
+GiB = 2**30
+
+MAX_BUILD_MEMORY = 16 * GiB
+"""Most memory `build_settings` gives an index build.
+
+Enough for the full index of the largest models: about 9 GB for 2.2 million
+768-dimension embeddings, 14 GB for 2,560 dimensions in half precision.
+"""
+
+BUILD_MEMORY_SHARE = 0.3
+"""Share of Docker's memory `build_settings` gives an index build."""
+
+SHM_HEADROOM = 1 * GiB
+"""Shared memory a new container gets on top of its build memory."""
+
+MAX_BUILD_WORKERS = 7
+"""Most parallel build workers: the server's default ``max_worker_processes`` is 8."""
+
+
+@dataclass(frozen=True)
+class BuildSettings:
+    """Index build settings that suit a container, and its shared memory."""
+
+    maintenance_work_mem: str
+    """For ``AATM_PG_MAINTENANCE_WORK_MEM``, e.g. ``"8192MB"``."""
+
+    workers: int
+    """For ``AATM_PG_BUILD_WORKERS``."""
+
+    shm_bytes: int
+    """``--shm-size`` of a new container."""
+
+
+def build_settings(
+    memory: int | None, cpus: int | None, shm_bytes: int | None = None
+) -> BuildSettings:
+    """Choose the index build memory and workers for a local container.
+
+    A parallel HNSW build keeps its graph in shared memory, so the build memory
+    must fit in the container's ``--shm-size``.
+
+    Args:
+        memory: Docker's memory in bytes (``docker info``), or ``None``.
+        cpus: Docker's CPUs, or ``None``.
+        shm_bytes: The shared memory of an existing container. ``None`` for a
+            new one, which gets the build memory plus `SHM_HEADROOM`.
+
+    Returns:
+        30% of Docker's memory, at most 16 GB (1 GB if unknown), and within an
+        existing container's shared memory; one worker less than the CPUs, at
+        most 7.
+    """
+    build = int(min(MAX_BUILD_MEMORY, memory * BUILD_MEMORY_SHARE)) if memory else GiB
+    if shm_bytes is not None:
+        build = min(build, shm_bytes - 256 * MiB)
+    build = max(64 * MiB, build // MiB * MiB)
+    workers = max(1, min(MAX_BUILD_WORKERS, (cpus or 3) - 1))
+    shm = shm_bytes if shm_bytes is not None else build + SHM_HEADROOM
+    return BuildSettings(f"{build // MiB}MB", workers, shm)
+
+
+def docker_resources(run: Runner = _run) -> tuple[int | None, int | None]:
+    """Docker's memory in bytes and its CPUs, or ``None`` for what it does not say."""
+    result = run(["docker", "info", "--format", "{{.MemTotal}} {{.NCPU}}"])
+    parts = result.stdout.split() if result.returncode == 0 else []
+    values = [int(part) if part.isdigit() else None for part in parts[:2]]
+    memory, cpus = (values + [None, None])[:2]
+    return memory, cpus
+
+
 @dataclass(frozen=True)
 class ContainerState:
-    """An existing container: whether it runs, and the host port of PostgreSQL."""
+    """An existing container: whether it runs, PostgreSQL's host port, its shared memory."""
 
     running: bool
     port: int | None
+    shm_bytes: int | None = None
 
 
 def container_state(
     name: str = CONTAINER_NAME, run: Runner = _run
 ) -> ContainerState | None:
     """Return the state of the container ``name``, or ``None`` if there is none."""
-    result = run(["docker", "inspect", "--format", "{{.State.Running}}", name])
+    result = run(
+        [
+            "docker",
+            "inspect",
+            "--format",
+            "{{.State.Running}} {{.HostConfig.ShmSize}}",
+            name,
+        ]
+    )
     if result.returncode != 0:
         return None
-    running = result.stdout.strip().lower() == "true"
-    return ContainerState(running=running, port=_published_port(name, run))
+    running, _, shm = result.stdout.strip().partition(" ")
+    return ContainerState(
+        running=running.lower() == "true",
+        port=_published_port(name, run),
+        # Docker reports 0 for its default of 64 MB.
+        shm_bytes=(int(shm) or 64 * MiB) if shm.isdigit() else None,
+    )
 
 
 def _published_port(name: str, run: Runner) -> int | None:
@@ -135,7 +223,9 @@ def dsn_for(port: int) -> str:
     return f"postgresql://postgres@{HOST}:{port}/{DATABASE}"
 
 
-def run_command(port: int, name: str = CONTAINER_NAME) -> list[str]:
+def run_command(
+    port: int, name: str = CONTAINER_NAME, shm_bytes: int = 2 * GiB
+) -> list[str]:
     """The ``docker run`` command that creates the container."""
     return [
         "docker",
@@ -143,7 +233,7 @@ def run_command(port: int, name: str = CONTAINER_NAME) -> list[str]:
         "-d",
         "--name",
         name,
-        "--shm-size=1g",
+        f"--shm-size={shm_bytes // MiB}m",
         "-e",
         "POSTGRES_HOST_AUTH_METHOD=trust",
         "-e",
@@ -162,12 +252,37 @@ def _check(result: subprocess.CompletedProcess, what: str) -> None:
         raise LocalPgVectorError(f"Could not {what}: {detail or 'docker failed'}")
 
 
+@dataclass(frozen=True)
+class LocalServer:
+    """A local PostgreSQL container that answers, and the settings that suit it."""
+
+    dsn: str
+    """For ``AATM_PG_DSN``, e.g. ``postgresql://postgres@127.0.0.1:5432/aatm``."""
+
+    build: BuildSettings
+    """Index build memory and workers."""
+
+    def env(self) -> dict[str, str]:
+        """The settings to save to ``.env``."""
+        from aatm.vector_db import (
+            PG_BUILD_WORKERS_ENV_VAR,
+            PG_DSN_ENV_VAR,
+            PG_MAINTENANCE_WORK_MEM_ENV_VAR,
+        )
+
+        return {
+            PG_DSN_ENV_VAR: self.dsn,
+            PG_MAINTENANCE_WORK_MEM_ENV_VAR: self.build.maintenance_work_mem,
+            PG_BUILD_WORKERS_ENV_VAR: str(self.build.workers),
+        }
+
+
 def start_local_pgvector(
     name: str = CONTAINER_NAME,
     run: Runner = _run,
     wait: Callable[[str, float], None] | None = None,
     log: Callable[[str], None] = logger.info,
-) -> str:
+) -> LocalServer:
     """Start (or reuse) the local PostgreSQL container and wait until it answers.
 
     Args:
@@ -178,7 +293,8 @@ def start_local_pgvector(
         log: Reports each step.
 
     Returns:
-        The connection string, e.g. ``postgresql://postgres@127.0.0.1:5432/aatm``.
+        Its connection string, and the index build settings that fit its shared
+        memory and Docker's resources (see `build_settings`).
 
     Raises:
         LocalPgVectorError: If Docker is unavailable, the container cannot be
@@ -193,22 +309,47 @@ def start_local_pgvector(
             f"A container named '{name}' exists but does not publish PostgreSQL's "
             f"port. Remove it (docker rm -f {name}) and try again."
         )
+    memory, cpus = docker_resources(run)
     if state is None:
+        build = build_settings(memory, cpus)
         port = free_port()
-        log(f"Starting PostgreSQL with pgvector in Docker ({IMAGE}) on port {port}...")
+        log(
+            f"Starting PostgreSQL with pgvector in Docker ({IMAGE}) on port {port}, "
+            f"with {build.maintenance_work_mem} and {build.workers} workers for "
+            "index builds..."
+        )
         # Not captured: the first run downloads the image, and shows its progress.
-        _check(run(run_command(port, name), capture=False), "start the container")
-    elif not state.running:
-        port = state.port  # type: ignore[assignment]
-        log(f"Starting the existing container '{name}' on port {port}...")
-        _check(run(["docker", "start", name]), f"start the container '{name}'")
+        _check(
+            run(run_command(port, name, build.shm_bytes), capture=False),
+            "start the container",
+        )
     else:
+        build = build_settings(memory, cpus, shm_bytes=state.shm_bytes)
         port = state.port  # type: ignore[assignment]
-        log(f"Using the running container '{name}' on port {port}.")
+        if not state.running:
+            log(f"Starting the existing container '{name}' on port {port}...")
+            _check(run(["docker", "start", name]), f"start the container '{name}'")
+        else:
+            log(f"Using the running container '{name}' on port {port}.")
+        _hint_if_shm_limits(name, state.shm_bytes, build_settings(memory, cpus), log)
 
     dsn = dsn_for(port)
     (wait or wait_until_ready)(dsn, READY_TIMEOUT)
-    return dsn
+    return LocalServer(dsn, build)
+
+
+def _hint_if_shm_limits(
+    name: str, shm_bytes: int | None, ideal: BuildSettings, log: Callable[[str], None]
+) -> None:
+    """Say how to give an existing container's index builds more memory."""
+    if shm_bytes is None or shm_bytes >= ideal.shm_bytes:
+        return
+    log(
+        f"The container '{name}' has {shm_bytes // MiB} MB of shared memory, which "
+        f"limits index builds; they could use {ideal.maintenance_work_mem}. To "
+        f"recreate it with more (its data stays in the volume '{name}'): "
+        f"docker rm -f {name}, then run aatm init again."
+    )
 
 
 def wait_until_ready(

@@ -127,19 +127,19 @@ pip install "aatm[pgvector]"   # or: uv sync --extra pgvector
 
 **Let `aatm init` set it up.** If you choose PostgreSQL and no server answers, `aatm init` offers two options:
 
-- **Start PostgreSQL with pgvector in Docker on this machine.** AATM starts the container `aatm-pgvector` (or starts it again, or reuses it if it is running), waits until it answers, and saves `AATM_PG_DSN` to `.env`. It also offers to save `AATM_VECTOR_DB=pgvector`, so `aatm map`, the search UI and `load_retriever()` use PostgreSQL by default. It needs Docker running; the option is greyed out otherwise. Port 5432 is used if free, otherwise the next free port.
+- **Start PostgreSQL with pgvector in Docker on this machine.** AATM starts the container `aatm-pgvector` (or starts it again, or reuses it if it is running), waits until it answers, and saves `AATM_PG_DSN` to `.env`, with build settings that suit Docker's resources (`AATM_PG_MAINTENANCE_WORK_MEM`, 30% of Docker's memory up to 16 GB, and `AATM_PG_BUILD_WORKERS`, one less than its CPUs up to 7; a new container gets shared memory to match). It also offers to save `AATM_VECTOR_DB=pgvector`, so `aatm map`, the search UI and `load_retriever()` use PostgreSQL by default. It needs Docker running; the option is greyed out otherwise. Port 5432 is used if free, otherwise the next free port.
 - **Set `AATM_PG_DSN` yourself**, for a server you already run. `aatm init` then shows what to set, and stops.
 
 To start the same server by hand, use the `pgvector/pgvector` Docker image. This one accepts connections from this machine only, without a password:
 
 ```bash
-docker run -d --name aatm-pgvector --shm-size=1g \
+docker run -d --name aatm-pgvector --shm-size=9g \
   -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=aatm \
   -p 127.0.0.1:5432:5432 -v aatm-pgvector:/var/lib/postgresql/data \
   pgvector/pgvector:pg17
 ```
 
-`--shm-size` gives the HNSW index build enough shared memory; Docker's 64 MB default makes large parallel builds fail. For a server other people can reach, set a password (`POSTGRES_PASSWORD`) instead of `trust`.
+A parallel HNSW build keeps its graph in shared memory, so `--shm-size` must exceed `AATM_PG_MAINTENANCE_WORK_MEM` (here up to 8 GB); Docker's 64 MB default makes large parallel builds fail. For a server other people can reach, set a password (`POSTGRES_PASSWORD`) instead of `trust`.
 
 Then set:
 
@@ -150,7 +150,8 @@ Then set:
 | `AATM_PG_TABLE_PREFIX` | `aatm_expressions` | Prefix of the table names. |
 | `AATM_PG_EF_SEARCH` | `100` | `hnsw.ef_search`: candidates the search keeps, from 1 to 1000. Higher finds more true neighbours, more slowly. Each query uses at least its `top_k`. |
 | `AATM_PG_ITERATIVE_SCAN` | `relaxed_order` | `hnsw.iterative_scan`: `relaxed_order`, `strict_order` or `off`. How a filtered search keeps scanning until it has `top_k` matches (pgvector 0.8+). |
-| `AATM_PG_MAINTENANCE_WORK_MEM` | server setting | Memory for building the HNSW index, e.g. `4GB`. More memory builds it faster. |
+| `AATM_PG_MAINTENANCE_WORK_MEM` | server setting | Memory for building the HNSW index, e.g. `8GB`. PostgreSQL's default is 64 MB. When the graph does not fit, most of it is built on disk, much more slowly, and AATM warns with the memory it would need (about 9 GB for the full 768-dimension index). |
+| `AATM_PG_BUILD_WORKERS` | server setting | Parallel workers for building the HNSW index (`max_parallel_maintenance_workers`). PostgreSQL's default is 2, and its `max_parallel_workers` (8) caps it. |
 
 ```env
 AATM_VECTOR_DB=pgvector
@@ -170,7 +171,7 @@ aatm vector-db upload --to pgvector -e embeddinggemma-300M    # copy a local ind
 How the index maps to PostgreSQL:
 
 - **Tables.** Each embedding model gets its own table, named `<prefix>_<model>` and made a safe identifier (e.g. `aatm_expressions_qwen3_06b`), with columns `id`, `embedding vector(<dimension>)`, `document` and `metadata jsonb`. The table `aatm_index_metadata` records each index's dimension and the embedding precision of local models, and queries are encoded in it. `aatm init` installs the `vector` extension if the database lacks it, which needs the right to create extensions.
-- **Search indexes.** An HNSW index on the embeddings and a GIN index on the metadata are built once the rows are loaded, which is much faster than updating them row by row. On the full index (about 2.5 million expressions) this takes a while; raise `AATM_PG_MAINTENANCE_WORK_MEM` to speed it up. HNSW indexes `vector` columns of up to 2,000 dimensions, so larger embeddings (`qwen3-4B`, `gemini-embedding-001`, `text-embedding-3-large`) are indexed in half precision (`halfvec`, up to 4,000); their distances still come from the full-precision vectors.
+- **Search indexes.** An HNSW index on the embeddings and a GIN index on the metadata are built once the rows are loaded, which is much faster than updating them row by row. `aatm init` and `aatm vector-db upload` show a progress bar for each, from PostgreSQL's own progress report. On the full index (about 2.5 million expressions), the HNSW build took 35 minutes with PostgreSQL's defaults (64 MB, 2 workers); give it more memory and workers (`AATM_PG_MAINTENANCE_WORK_MEM`, `AATM_PG_BUILD_WORKERS`) to speed it up. An existing index is kept, so this happens once. HNSW indexes `vector` columns of up to 2,000 dimensions, so larger embeddings (`qwen3-4B`, `gemini-embedding-001`, `text-embedding-3-large`) are indexed in half precision (`halfvec`, up to 4,000); their distances still come from the full-precision vectors.
 - **Scores.** pgvector's Euclidean distance is squared, so a record has the same `distance` as in ChromaDB and Pinecone, and the confidence score (`1 - distance`), selectors and thresholds work unchanged.
 - **Filters.** Domain and vocabulary filters (`retriever_filter`) become `WHERE` clauses on the metadata, applied **during** the vector search, so the retriever passes them straight to PostgreSQL by default (`filter_strategy="native"`). Iterative index scans keep a filtered search going until it has `top_k` matches; PostgreSQL may also choose the metadata index and an exact search when few rows match. See [Metadata filters](concepts.md#metadata-filters).
 - **Writes** go through a staging table with `COPY`, then into the table. A first write skips IDs already stored, and a retry replaces them, so a repair (`aatm init`, *Repair*) or a rerun of `aatm vector-db upload` only writes the missing records and never duplicates one.

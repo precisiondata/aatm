@@ -13,8 +13,10 @@ REAL_FREE_PORT = pg_docker.free_port
 class FakeDocker:
     """Answers ``docker`` commands from a dict of containers, and records them."""
 
-    def __init__(self, running=True, containers=None):
+    def __init__(self, running=True, containers=None, memory=64 * 2**30, cpus=8):
         self.daemon_running = running
+        self.memory = memory
+        self.cpus = cpus
         self.containers = containers if containers is not None else {}
         self.calls = []
 
@@ -22,7 +24,11 @@ class FakeDocker:
         self.calls.append(list(args))
         command = args[1]
         if command == "info":
-            return self._result(0 if self.daemon_running else 1, "28.5.2")
+            if not self.daemon_running:
+                return self._result(1)
+            if "MemTotal" in args[3]:
+                return self._result(0, f"{self.memory} {self.cpus}")
+            return self._result(0, "28.5.2")
         if command == "inspect":
             name = args[-1]
             if name not in self.containers:
@@ -36,11 +42,14 @@ class FakeDocker:
                     else {}
                 )
                 return self._result(0, json.dumps(bindings))
-            return self._result(0, "true" if container["running"] else "false")
+            running = "true" if container["running"] else "false"
+            return self._result(0, f"{running} {container.get('shm', 2**30)}")
         if command == "run":
             name = args[args.index("--name") + 1]
             port = int(args[args.index("-p") + 1].split(":")[1])
-            self.containers[name] = {"running": True, "port": port}
+            shm = next(a for a in args if a.startswith("--shm-size="))
+            shm_bytes = int(shm.split("=")[1].rstrip("m")) * 2**20
+            self.containers[name] = {"running": True, "port": port, "shm": shm_bytes}
             return self._result(0, "abc123")
         if command == "start":
             self.containers[args[2]]["running"] = True
@@ -72,24 +81,31 @@ def test_docker_must_be_running():
 def test_a_new_container_is_started_on_localhost_only():
     docker = FakeDocker()
 
-    dsn = pg_docker.start_local_pgvector(run=docker, wait=no_wait, log=lambda _: None)
+    server = pg_docker.start_local_pgvector(
+        run=docker, wait=no_wait, log=lambda _: None
+    )
 
-    assert dsn == "postgresql://postgres@127.0.0.1:5432/aatm"
+    assert server.dsn == "postgresql://postgres@127.0.0.1:5432/aatm"
     (run,) = [call for call in docker.calls if call[1] == "run"]
-    assert run == pg_docker.run_command(5432)
+    assert run == pg_docker.run_command(5432, shm_bytes=server.build.shm_bytes)
     assert "127.0.0.1:5432:5432" in run
     assert "POSTGRES_HOST_AUTH_METHOD=trust" in run
     assert "aatm-pgvector:/var/lib/postgresql/data" in run
-    assert "--shm-size=1g" in run
+    # 30% of 64 GB for index builds (capped at 16 GB), plus 1 GB of headroom.
+    assert server.build.maintenance_work_mem == "16384MB"
+    assert "--shm-size=17408m" in run
+    assert server.build.workers == 7
     assert run[-1] == "pgvector/pgvector:pg17"
 
 
 def test_a_running_container_is_reused_on_its_port():
     docker = FakeDocker(containers={"aatm-pgvector": {"running": True, "port": 5440}})
 
-    dsn = pg_docker.start_local_pgvector(run=docker, wait=no_wait, log=lambda _: None)
+    server = pg_docker.start_local_pgvector(
+        run=docker, wait=no_wait, log=lambda _: None
+    )
 
-    assert dsn == "postgresql://postgres@127.0.0.1:5440/aatm"
+    assert server.dsn == "postgresql://postgres@127.0.0.1:5440/aatm"
     assert "run" not in docker.commands()
     assert "start" not in docker.commands()
 
@@ -97,9 +113,11 @@ def test_a_running_container_is_reused_on_its_port():
 def test_a_stopped_container_is_started_again():
     docker = FakeDocker(containers={"aatm-pgvector": {"running": False, "port": 5433}})
 
-    dsn = pg_docker.start_local_pgvector(run=docker, wait=no_wait, log=lambda _: None)
+    server = pg_docker.start_local_pgvector(
+        run=docker, wait=no_wait, log=lambda _: None
+    )
 
-    assert dsn.endswith(":5433/aatm")
+    assert server.dsn.endswith(":5433/aatm")
     assert ["docker", "start", "aatm-pgvector"] in docker.calls
     assert "run" not in docker.commands()
 
@@ -194,6 +212,10 @@ class Answers:
         monkeypatch.setattr(main.questionary, "confirm", make(confirm))
 
 
+def server(dsn):
+    return pg_docker.LocalServer(dsn, pg_docker.BuildSettings("8192MB", 7, 9 * 2**30))
+
+
 @pytest.fixture
 def in_tmp(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
@@ -206,7 +228,7 @@ def test_choosing_docker_starts_it_and_saves_the_settings(in_tmp, monkeypatch):
     monkeypatch.setattr(
         pg_docker,
         "start_local_pgvector",
-        lambda log: "postgresql://postgres@127.0.0.1:5432/aatm",
+        lambda log: server("postgresql://postgres@127.0.0.1:5432/aatm"),
     )
     answers = Answers(monkeypatch, select="docker", confirm=True)
 
@@ -214,6 +236,8 @@ def test_choosing_docker_starts_it_and_saves_the_settings(in_tmp, monkeypatch):
 
     assert (in_tmp / ".env").read_text().splitlines() == [
         "AATM_PG_DSN=postgresql://postgres@127.0.0.1:5432/aatm",
+        "AATM_PG_MAINTENANCE_WORK_MEM=8192MB",
+        "AATM_PG_BUILD_WORKERS=7",
         "AATM_VECTOR_DB=pgvector",
     ]
     assert "AATM_VECTOR_DB=pgvector" in answers.questions[1]
@@ -221,12 +245,14 @@ def test_choosing_docker_starts_it_and_saves_the_settings(in_tmp, monkeypatch):
 
 def test_the_default_backend_is_left_alone_if_declined(in_tmp, monkeypatch):
     monkeypatch.setattr(pg_docker, "docker_problem", lambda: None)
-    monkeypatch.setattr(pg_docker, "start_local_pgvector", lambda log: "postgresql://x")
+    monkeypatch.setattr(
+        pg_docker, "start_local_pgvector", lambda log: server("postgresql://x")
+    )
     Answers(monkeypatch, select="docker", confirm=False)
 
     main.offer_local_pgvector(OSError("x"))
 
-    assert (in_tmp / ".env").read_text().strip() == "AATM_PG_DSN=postgresql://x"
+    assert "AATM_VECTOR_DB" not in (in_tmp / ".env").read_text()
 
 
 def test_setting_it_myself_changes_nothing(in_tmp, monkeypatch):
@@ -262,3 +288,54 @@ def test_a_failed_start_is_reported_and_nothing_is_saved(in_tmp, monkeypatch):
 
     assert main.offer_local_pgvector(OSError("x")) is False
     assert not (in_tmp / ".env").exists()
+
+
+# --- Build memory and workers ----------------------------------------------------
+
+GiB = 2**30
+
+
+@pytest.mark.parametrize(
+    "memory, cpus, shm, expected",
+    [
+        (64 * GiB, 32, None, ("16384MB", 7, 17 * GiB)),  # capped at 16 GB and 7
+        (8 * GiB, 4, None, ("2457MB", 3, 2457 * 2**20 + GiB)),  # 30% of 8 GB
+        (None, None, None, ("1024MB", 2, 2 * GiB)),  # unknown: 1 GB
+        (64 * GiB, 32, 1 * GiB, ("768MB", 7, 1 * GiB)),  # within an existing shm
+        (64 * GiB, 1, 64 * 2**20, ("64MB", 1, 64 * 2**20)),  # never below 64 MB
+    ],
+)
+def test_build_settings(memory, cpus, shm, expected):
+    settings = pg_docker.build_settings(memory, cpus, shm_bytes=shm)
+
+    assert (settings.maintenance_work_mem, settings.workers, settings.shm_bytes) == (
+        expected
+    )
+
+
+def test_a_reused_container_gets_settings_within_its_shared_memory():
+    docker = FakeDocker(
+        containers={"aatm-pgvector": {"running": True, "port": 5432, "shm": GiB}}
+    )
+    messages = []
+
+    server = pg_docker.start_local_pgvector(
+        run=docker, wait=no_wait, log=messages.append
+    )
+
+    assert server.build.maintenance_work_mem == "768MB"
+    assert server.env()["AATM_PG_MAINTENANCE_WORK_MEM"] == "768MB"
+    # And says how to give it more.
+    assert any("docker rm -f aatm-pgvector" in m for m in messages)
+    assert any("its data stays in the volume" in m for m in messages)
+
+
+def test_a_container_with_enough_shared_memory_gets_no_hint():
+    docker = FakeDocker(
+        containers={"aatm-pgvector": {"running": True, "port": 5432, "shm": 20 * GiB}}
+    )
+    messages = []
+
+    pg_docker.start_local_pgvector(run=docker, wait=no_wait, log=messages.append)
+
+    assert not any("docker rm" in m for m in messages)
