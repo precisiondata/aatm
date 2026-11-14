@@ -446,6 +446,24 @@ def test_overwrite_recreates_the_table(pg_project, monkeypatch):
     assert table_store(pg_project).count() == 280
 
 
+def test_skip_adds_the_indexes_an_interrupted_build_missed(pg_project, monkeypatch):
+    table = pg_project.table_name("fake-model")
+    store = make_store(pg_project, "fake-model", dimension=4)
+    store.write(["x"], np.ones((1, 4), dtype=np.float32), ["x"], [{}])
+    answer_prompt(monkeypatch, "Skip")
+
+    ldu.build_local_vector_database("fake-model", chunk_size=100, vector_db="pgvector")
+
+    with pg_project.client() as conn:
+        indexes = [
+            row[0]
+            for row in conn.execute(
+                "SELECT indexdef FROM pg_indexes WHERE tablename = %s", (table,)
+            )
+        ]
+    assert any("USING hnsw" in index for index in indexes)
+
+
 def test_build_rejects_a_local_directory(pg_project, tmp_path):
     with pytest.raises(ValueError, match="local vector database"):
         ldu.build_local_vector_database(

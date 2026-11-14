@@ -766,6 +766,9 @@ def build_local_vector_database(
         ).ask()
 
         if user_preference == "Skip":
+            if pg_connection is not None:
+                # An interrupted build leaves a table without its search indexes.
+                _index_pg_table(pg_connection, collection_name)
             record_vector_database(
                 embedding_model_name, mode, record_location, keep_date=True
             )
@@ -1302,8 +1305,8 @@ def _index_pg_table(connection: PgVectorConnection, table_name: str) -> None:
     from aatm.pgvector_store import create_pg_indexes
 
     console.print(
-        f"Building the search indexes of '{table_name}' (on the full index this "
-        "takes a while)..."
+        f"Checking the search indexes of '{table_name}' (building them on the "
+        "full index takes a while)..."
     )
     create_pg_indexes(
         connection.dsn,
