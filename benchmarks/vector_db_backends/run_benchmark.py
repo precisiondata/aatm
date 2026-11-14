@@ -1,23 +1,29 @@
-"""Compare ChromaDB and Pinecone on the full expression index: query time and recall.
+"""Compare vector database backends on the expression index: query time and recall.
 
 For each query and filter, every (backend, filter strategy) pair retrieves ``top_k``
 records. Query embeddings are computed once and reused, so timings exclude the
-embedding call. As in issue #45, the reference for a query is the ``top_k`` nearest
-records found by *any* method (distances are the same on both backends, see
-`aatm.vector_stores`), and recall@k is the share of the reference a method found.
+embedding call. The reference for a query is the exact ``top_k`` nearest records when
+the ``pgvector-exact`` backend runs (PostgreSQL without its HNSW index), and otherwise,
+as in issue #45, the ``top_k`` nearest records found by *any* method (distances are the
+same on every backend, see `aatm.vector_stores`). Recall@k is the share of the
+reference a method found.
 
-Run from the repository root, with the same model's index in both databases (build it
-with ``aatm init``, then copy it with ``aatm vector-db upload --to pinecone``):
+Run from the repository root, with the same model's index in every database (build it
+with ``aatm init``, then copy it with ``aatm vector-db upload --to pinecone`` or
+``--to pgvector``):
 
 ```bash
 uv run python benchmarks/vector_db_backends/run_benchmark.py --retriever text-embedding-3-small
+uv run python benchmarks/vector_db_backends/run_benchmark.py --retriever text-embedding-3-small --backends chroma,pgvector,pgvector-exact
 ```
 
-``--chroma`` picks the ChromaDB side (``local``, the default, or ``cloud``), and
-``--chroma-dir`` a local database other than the model's default one, e.g. the subset
-made by ``make_subset.py``. ``PINECONE_INDEX_PREFIX`` picks the Pinecone index. Writes
-one row per query, filter and method to ``results/<retriever><--label>.csv`` and prints
-a summary.
+``--backends`` picks the backends: ``chroma``, ``pinecone``, ``pgvector`` and
+``pgvector-exact`` (default ``chroma,pinecone``). ``--chroma`` picks the ChromaDB side
+(``local``, the default, or ``cloud``), and ``--chroma-dir`` a local database other than
+the model's default one, e.g. the subset made by ``make_subset.py``.
+``PINECONE_INDEX_PREFIX`` and ``AATM_PG_TABLE_PREFIX`` pick the Pinecone index and the
+PostgreSQL table. Writes one row per query, filter and method to
+``results/<retriever><--label>.csv`` and prints a summary.
 """
 
 import argparse
@@ -31,7 +37,8 @@ from typing import Any
 import pandas as pd
 
 from aatm.omop.coding import retriever_filter
-from aatm.registries.retrievers import load_retriever
+from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY, load_retriever
+from aatm.retrievers import PgVectorRetriever, VectorStoreRetriever
 
 HERE = Path(__file__).parent
 LAB_CASES = HERE.parent / "concept_search" / "lab_results.csv"
@@ -60,7 +67,12 @@ FILTERS: dict[str, dict[str, Any] | None] = {
 STRATEGIES = {
     "chroma": ["native", "overfetch_fallback"],
     "pinecone": ["native", "overfetch_fallback"],
+    "pgvector": ["native", "overfetch_fallback"],
+    "pgvector-exact": ["native"],
 }
+
+EXACT = "pgvector-exact"
+"""The backend whose results are exact, used as the recall reference when it runs."""
 
 
 class CachedEmbeddings:
@@ -78,17 +90,27 @@ def load_queries(n_lab: int) -> list[str]:
     return lab + OTHER_TEXTS
 
 
+def open_backend(name: str, args: argparse.Namespace) -> VectorStoreRetriever:
+    if name == "chroma":
+        return load_retriever(
+            args.retriever, vector_db=args.chroma, local_path=args.chroma_dir
+        )
+    if name == EXACT:
+        retriever = load_retriever(args.retriever, vector_db="pgvector")
+        connection, table = CHROMADB_RETRIEVER_MODEL_REGISTRY[
+            args.retriever
+        ].pgvector_location()
+        store = type(retriever.store)(connection.dsn, table, exact=True)
+        return PgVectorRetriever(store, retriever.embedding_function)
+    return load_retriever(args.retriever, vector_db=name)
+
+
 def run(args: argparse.Namespace) -> pd.DataFrame:
     queries = load_queries(args.lab_queries)
-    retrievers = {
-        "chroma": load_retriever(
-            args.retriever, vector_db=args.chroma, local_path=args.chroma_dir
-        ),
-        "pinecone": load_retriever(args.retriever, vector_db="pinecone"),
-    }
-    # Both backends hold the same vectors: embed once, with the model the index
+    retrievers = {name: open_backend(name, args) for name in args.backends}
+    # Every backend holds the same vectors: embed once, with the model the index
     # was built with, and reuse the embeddings everywhere.
-    embedding_function = retrievers["chroma"].embedding_function
+    embedding_function = next(iter(retrievers.values())).embedding_function
     embeddings = list(
         getattr(embedding_function, "embed_query", embedding_function)(input=queries)
     )
@@ -130,14 +152,20 @@ def run(args: argparse.Namespace) -> pd.DataFrame:
 
 
 def recall_against_union(df: pd.DataFrame, top_k: int) -> pd.Series:
-    """Recall@k of each row against the k nearest records any method found."""
+    """Recall@k of each row against the exact results, or the k nearest any method found."""
     recall = pd.Series(index=df.index, dtype=float)
     for _, group in df.groupby(["filter", "query"]):
-        nearest: dict[str, float] = {}
-        for ids, distances in zip(group.ids, group.distances):
-            for identifier, distance in zip(ids, distances):
-                nearest[identifier] = min(distance, nearest.get(identifier, distance))
-        reference = set(sorted(nearest, key=nearest.__getitem__)[:top_k])
+        exact = group[group.backend == EXACT]
+        if len(exact):
+            reference = set(exact.ids.iloc[0])
+        else:
+            nearest: dict[str, float] = {}
+            for ids, distances in zip(group.ids, group.distances):
+                for identifier, distance in zip(ids, distances):
+                    nearest[identifier] = min(
+                        distance, nearest.get(identifier, distance)
+                    )
+            reference = set(sorted(nearest, key=nearest.__getitem__)[:top_k])
         for index, ids in zip(group.index, group.ids):
             recall[index] = len(reference & set(ids)) / max(len(reference), 1)
     return recall
@@ -146,6 +174,12 @@ def recall_against_union(df: pd.DataFrame, top_k: int) -> pd.Series:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--retriever", default="text-embedding-3-small")
+    parser.add_argument(
+        "--backends",
+        default="chroma,pinecone",
+        type=lambda text: [part.strip() for part in text.split(",") if part.strip()],
+        help=f"Comma-separated backends among: {', '.join(STRATEGIES)}.",
+    )
     parser.add_argument("--chroma", default="local", choices=["local", "cloud"])
     parser.add_argument(
         "--chroma-dir", default=None, help="Local ChromaDB directory (local mode)."
@@ -159,6 +193,9 @@ def main() -> None:
         "--repeats", type=int, default=3, help="Runs per query; the median is kept."
     )
     args = parser.parse_args()
+    unknown = [name for name in args.backends if name not in STRATEGIES]
+    if unknown or not args.backends:
+        parser.error(f"Unknown backends {unknown}; use: {', '.join(STRATEGIES)}.")
 
     df = run(args)
     suffix = f"--{args.label}" if args.label else ""

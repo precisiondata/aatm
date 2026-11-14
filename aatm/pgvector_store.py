@@ -568,6 +568,7 @@ class PgVectorStore(VectorStore):
         iterative_scan: str = DEFAULT_ITERATIVE_SCAN,
         max_scan_tuples: int | None = None,
         location: str | None = None,
+        exact: bool = False,
     ):
         """Open the index table ``name``.
 
@@ -583,6 +584,9 @@ class PgVectorStore(VectorStore):
                 scan goes. Defaults to the server's setting (20,000).
             location: Server and database, without credentials, for the
                 fingerprint.
+            exact: Search exactly, without the HNSW index: every matching row
+                is compared with the query. Slow on large tables; a reference
+                for recall benchmarks.
 
         Raises:
             PgVectorConfigError: If the table, or pgvector, is missing.
@@ -599,6 +603,7 @@ class PgVectorStore(VectorStore):
         self.ef_search = ef_search
         self.max_scan_tuples = max_scan_tuples
         self.location = location
+        self.exact = exact
         self._local = threading.local()
 
         conn = self._conn()
@@ -608,10 +613,10 @@ class PgVectorStore(VectorStore):
         if iterative_scan != "off" and (
             self.version is None or self.version < ITERATIVE_SCAN_MIN_VERSION
         ):
+            version = ".".join(str(part) for part in self.version or ())
             logger.warning(
-                "pgvector %s has no iterative index scans (0.8+); filtered "
-                "searches may return fewer than top_k results.",
-                ".".join(map(str, self.version or ())),
+                f"pgvector {version or '?'} has no iterative index scans (0.8+); "
+                "filtered searches may return fewer than top_k results."
             )
             iterative_scan = "off"
         self.iterative_scan = iterative_scan
@@ -631,7 +636,7 @@ class PgVectorStore(VectorStore):
             self._local.conn = None
 
     def _order_by(self) -> str:
-        if self.index_kind == "halfvec":
+        if self.index_kind == "halfvec" and not self.exact:
             cast = f"halfvec({self.dimension})"
             return f"embedding::{cast} <-> %(q)s::{cast}"
         return "embedding <-> %(q)s"
@@ -673,6 +678,11 @@ class PgVectorStore(VectorStore):
         return results
 
     def _set_search_options(self, conn: Any, top_k: int) -> None:
+        if self.exact:
+            # Without index scans the planner reads the matching rows and sorts
+            # them by distance: an exact search.
+            conn.execute("SELECT set_config('enable_indexscan', 'off', true)")
+            return
         settings = {
             "hnsw.ef_search": str(min(HNSW_MAX_EF_SEARCH, max(self.ef_search, top_k)))
         }
