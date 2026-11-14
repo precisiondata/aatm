@@ -62,7 +62,7 @@ $ aatm init [OPTIONS]
 * `-e, --embedding-model TEXT`: Name of the embedding model to use.
 * `--embedding-dtype TEXT`: Precision for local embedding models: float32, bfloat16 or float16. Defaults to the precision of the model&#x27;s checkpoint. Half precision is faster and uses less GPU memory, but requires an NVIDIA GPU. Overrides AATM_EMBEDDING_DTYPE.
 * `-sv, --standard-vocabs TEXT`: List of standard vocabularies to use. Available options: [&#x27;LOINC&#x27;, &#x27;SNOMED&#x27;, &#x27;RxNorm&#x27;].
-* `--vector-db TEXT`: Where to build the vector database: &#x27;local&#x27; (ChromaDB on this machine), &#x27;cloud&#x27; (Chroma Cloud, configured with CHROMA_API_KEY), &#x27;pinecone&#x27; (configured with PINECONE_API_KEY) or &#x27;pgvector&#x27; (PostgreSQL, configured with AATM_PG_DSN). Overrides AATM_VECTOR_DB. Defaults to &#x27;local&#x27;.
+* `--vector-db TEXT`: Where to build the vector database: &#x27;local&#x27; (ChromaDB on this machine), &#x27;cloud&#x27; (Chroma Cloud, configured with CHROMA_API_KEY), &#x27;pinecone&#x27; (configured with PINECONE_API_KEY) or &#x27;pgvector&#x27; (PostgreSQL, configured with AATM_PG_DSN). If not given, aatm init asks, preselecting AATM_VECTOR_DB, and lists what each backend needs and which models are built in it.
 * `--vocab-zip TEXT`: Athena vocabulary bundle to set up from: the download link Athena emailed, or the path of the downloaded zip. It is unpacked into --vocab-dir (default ./vocabularies).
 * `--force`: With --vocab-zip, overwrite existing vocabulary files without asking.
 * `--umls-api-key TEXT`: UMLS API key used to add the CPT4 names when the bundle includes CPT4. Read from UMLS_API_KEY when not given.  [env var: UMLS_API_KEY]

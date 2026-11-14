@@ -393,8 +393,9 @@ def init(
                 "Where to build the vector database: 'local' (ChromaDB on this "
                 "machine), 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY), "
                 "'pinecone' (configured with PINECONE_API_KEY) or 'pgvector' "
-                "(PostgreSQL, configured with AATM_PG_DSN). "
-                "Overrides AATM_VECTOR_DB. Defaults to 'local'."
+                "(PostgreSQL, configured with AATM_PG_DSN). If not given, aatm "
+                "init asks, preselecting AATM_VECTOR_DB, and lists what each "
+                "backend needs and which models are built in it."
             ),
             show_default=False,
         ),
@@ -459,8 +460,11 @@ def init(
             mapping datasets. If not provided, the user is prompted to
             select one or more interactively.
         vector_db: Where to build the vector database, ``local``,
-            ``cloud``, ``pinecone`` or ``pgvector``. If not provided, `AATM_VECTOR_DB` is
-            used, and otherwise ``local``.
+            ``cloud``, ``pinecone`` or ``pgvector``. If not provided, the
+            user is asked (see `choose_vector_db`), with `AATM_VECTOR_DB`
+            preselected; without a terminal, `AATM_VECTOR_DB` is used, and
+            otherwise ``local``. The models already built there are listed
+            before the embedding model is chosen.
         vocab_zip: An Athena vocabulary bundle, as its download link or the
             path of the zip. It is downloaded if needed, unpacked into
             `vocab_dir`, and its CPT4 names are added when it includes CPT4.
@@ -583,6 +587,11 @@ def init(
         import_pinecone,
     )
 
+    if vector_db is None and sys.stdin.isatty():
+        vector_db = choose_vector_db()
+        if vector_db is None:  # Ctrl+C at the prompt
+            raise typer.Exit()
+
     try:
         vector_db_connection = connection_from_env(
             local_path=".aatm/chroma_vector_dbs", mode=vector_db
@@ -617,13 +626,16 @@ def init(
         }.get(vector_db, "")
     )
 
+    built = built_in(vector_db)
+    if built:
+        console.print(f"Already built in {vector_db}:")
+        for store in built.values():
+            console.print(f"  {store.describe()}", markup=False, highlight=False)
+    else:
+        console.print(f"No vector database is built in {vector_db} yet.")
+
     if embedding_model is None:
-        supported_embedding_models_choices = [
-            Choice(f"{model_name} (default)", value=model_name)
-            if model_name == DEFAULT_EMBEDDING_MODEL
-            else Choice(model_name, value=model_name)
-            for model_name in SUPPORTED_EMBEDDING_MODELS
-        ]
+        supported_embedding_models_choices = embedding_model_choices(built)
         selected_embedding_model = questionary.select(
             "Select one of the supported embedding models for building the vector database:",
             choices=supported_embedding_models_choices,
@@ -661,6 +673,108 @@ def init(
         selected_embedding_model, embedding_dtype=embedding_dtype, vector_db=vector_db
     )
     console.print("[green]Done![/green]\n")
+
+
+def built_in(mode: str, quick: bool = False) -> dict[str, Any]:
+    """The vector databases built in one backend, by embedding model, newest first.
+
+    A local database is checked on disk. For a remote one, ``quick`` reads only
+    what ``.aatm/config.yaml`` records; otherwise the backend is asked, falling
+    back to the records if it cannot be reached.
+
+    Returns:
+        `aatm.built_stores.BuiltStore` objects keyed by embedding model.
+    """
+    from aatm.built_stores import built_vector_databases, recorded_vector_databases
+
+    stores = None
+    if mode == "local" or not quick:
+        try:
+            stores = built_vector_databases(mode)
+        except Exception as e:
+            logger.debug(f"Could not list the {mode} vector databases: {e!r}")
+    if stores is None:
+        stores = recorded_vector_databases(mode)
+    newest_first = sorted(stores, key=lambda s: s.built_at or "", reverse=True)
+    return {store.embedding_model: store for store in newest_first}
+
+
+def vector_db_choices(
+    default: str, env: Optional[dict[str, str]] = None
+) -> tuple[list[Choice], str]:
+    """The choices of the vector database prompt in ``aatm init``, and the default.
+
+    Each choice says what the backend is and which embedding models are built in
+    it. A backend that misses a setting or a package is shown disabled, with
+    what to set or install.
+
+    Args:
+        default: The mode to preselect, e.g. from ``AATM_VECTOR_DB``. Falls back
+            to ``local`` when it is not usable.
+        env: Environment to read. Defaults to `os.environ`.
+
+    Returns:
+        The choices, and the mode to preselect.
+    """
+    from aatm.vector_db import (
+        VECTOR_DB_LABELS,
+        VECTOR_DB_MODES,
+        vector_db_setup_problem,
+    )
+
+    choices = []
+    usable = []
+    for mode in VECTOR_DB_MODES:
+        problem = vector_db_setup_problem(mode, env)
+        title = f"{mode:<9} {VECTOR_DB_LABELS[mode]}"
+        if problem is None:
+            usable.append(mode)
+            built = list(built_in(mode, quick=True))
+            if built:
+                title += f"  (built: {', '.join(built)})"
+        choices.append(Choice(title, value=mode, disabled=problem))
+    return choices, default if default in usable else "local"
+
+
+def choose_vector_db() -> Optional[str]:
+    """Ask where to build the vector database, preselecting ``AATM_VECTOR_DB``.
+
+    Returns:
+        The chosen mode, or ``None`` if the prompt was cancelled.
+    """
+    from aatm.vector_db import VectorDatabaseConfigError, resolve_vector_db_mode
+
+    configured: str
+    try:
+        configured = resolve_vector_db_mode()
+    except VectorDatabaseConfigError:
+        configured = "local"
+    choices, default = vector_db_choices(configured)
+    return questionary.select(
+        "Where should the vector database be built?",
+        choices=choices,
+        default=default,
+    ).ask()
+
+
+def embedding_model_choices(built: dict[str, Any]) -> list[Choice]:
+    """The embedding model choices of ``aatm init``, marking the models already built."""
+    choices = []
+    for model_name in SUPPORTED_EMBEDDING_MODELS:
+        notes = []
+        if model_name == DEFAULT_EMBEDDING_MODEL:
+            notes.append("default")
+        if model_name in built:
+            store = built[model_name]
+            note = "built"
+            if store.count is not None:
+                note += f", {store.count:,} expressions"
+            if store.built_at:
+                note += f", {store.built_at[:10]}"
+            notes.append(note)
+        title = model_name + (f" ({'; '.join(notes)})" if notes else "")
+        choices.append(Choice(title, value=model_name))
+    return choices
 
 
 STREAMLIT_FILE_WATCHER_ENV_VAR = "STREAMLIT_SERVER_FILE_WATCHER_TYPE"

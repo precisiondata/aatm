@@ -14,6 +14,10 @@
   and `aatm vector-db check --vector-db pgvector` reports the server, the pgvector
   version and each model's table. See
   [PostgreSQL with pgvector](getting-started/env.md#postgresql-with-pgvector).
+- **`aatm init` asks where to build the search index**, when `--vector-db` is not
+  given, preselecting `AATM_VECTOR_DB`. Each backend lists the models already built in
+  it, and one that misses a setting or package is shown greyed out with what it needs.
+  The embedding model question then marks the models already built there.
 
 ## 0.4.0
 

@@ -110,6 +110,54 @@ class VectorDatabaseConfigError(ValueError):
     """Raised when the vector database configuration is missing or invalid."""
 
 
+VECTOR_DB_LABELS: dict[VectorDbMode, str] = {
+    "local": "ChromaDB on this machine",
+    "cloud": "Chroma Cloud",
+    "pinecone": "Pinecone",
+    "pgvector": "PostgreSQL with pgvector",
+}
+"""What each vector database mode is, for prompts and messages."""
+
+
+def _installed(*modules: str) -> bool:
+    from importlib.util import find_spec
+
+    try:
+        return all(find_spec(module) is not None for module in modules)
+    except (ImportError, ValueError):
+        return False
+
+
+def vector_db_setup_problem(
+    mode: str, env: Mapping[str, str] | None = None
+) -> str | None:
+    """Say what is missing to use a vector database, without connecting to it.
+
+    Args:
+        mode: ``local``, ``cloud``, ``pinecone`` or ``pgvector``.
+        env: Environment to read. Defaults to `os.environ`.
+
+    Returns:
+        ``None`` when the settings and packages it needs are there (the
+        connection itself is not tested), and otherwise what to set or install.
+    """
+    env = os.environ if env is None else env
+
+    def missing(name: str) -> bool:
+        return not (env.get(name) or "").strip()
+
+    if mode == "cloud" and missing(CHROMA_API_KEY_ENV_VAR):
+        return f"set {CHROMA_API_KEY_ENV_VAR}"
+    if mode == "pinecone":
+        if not _installed("pinecone"):
+            return "install aatm[pinecone]"
+        if missing(PINECONE_API_KEY_ENV_VAR):
+            return f"set {PINECONE_API_KEY_ENV_VAR}"
+    if mode == "pgvector" and not _installed("psycopg", "pgvector"):
+        return "install aatm[pgvector]"
+    return None
+
+
 def resolve_vector_db_mode(
     mode: str | None = None, env: Mapping[str, str] | None = None
 ) -> VectorDbMode:
