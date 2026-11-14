@@ -2022,6 +2022,8 @@
       
         
       
+        
+      
     
     
     
@@ -2280,6 +2282,34 @@
     
   
     Vector stores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/pgvector_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL with pgvector
   
 
     
@@ -2567,7 +2597,7 @@ Setting them up is done once per project, with one command: <code>aatm init</cod
 </tr>
 <tr>
 <td>A search index of concept names and synonyms, for one embedding model</td>
-<td><code>.aatm/chroma_vector_dbs/&lt;model&gt;/</code> (or Chroma Cloud, Pinecone)</td>
+<td><code>.aatm/chroma_vector_dbs/&lt;model&gt;/</code> (or Chroma Cloud, Pinecone, PostgreSQL)</td>
 <td>The terminology mapper and the agent, to search by meaning</td>
 </tr>
 </tbody>
@@ -2598,9 +2628,18 @@ for this, so this step is done in the browser:</p>
 <li>checks that the required files (<code>CONCEPT.csv</code>, <code>CONCEPT_RELATIONSHIP.csv</code>,
    <code>CONCEPT_SYNONYM.csv</code>, <code>VOCABULARY.csv</code>, <code>DOMAIN.csv</code>) are there, and lists the
    vocabularies and versions in the bundle;</li>
+<li>asks where to build the search index: a local ChromaDB, Chroma Cloud, Pinecone or
+   PostgreSQL with pgvector (see <a href="../env/#vector-database">Vector database</a>). Each option
+   lists the models already built in it, and an option that misses a setting or a package
+   is greyed out with what to set or install. <code>AATM_VECTOR_DB</code> is preselected;
+   <code>--vector-db</code> skips the question. If you choose PostgreSQL and no server answers, it
+   offers to start one in Docker and save its settings to <code>.env</code>, or to let you set
+   <code>AATM_PG_DSN</code> yourself. It guides you through installing or starting Docker if
+   needed, and suggests the container's index build memory and workers from your
+   machine's resources, which you can change;</li>
 <li>builds the vocabulary database, <code>.aatm/omop.db</code>;</li>
-<li>asks which <strong>embedding model</strong> and <strong>standard vocabularies</strong> to index, and builds the
-   search index;</li>
+<li>lists the search indexes already built there, asks which <strong>embedding model</strong> (built
+   ones are marked) and <strong>standard vocabularies</strong> to index, and builds the search index;</li>
 <li>records the model it built in <code>.aatm/config.yaml</code>, so every retriever, mapper and
    agent uses it unless told otherwise;</li>
 <li>adds <code>.aatm</code> to your <code>.gitignore</code>.</li>
@@ -2608,8 +2647,9 @@ for this, so this step is done in the browser:</p>
 <p>To answer the questions up front, for scripts and CI:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>aatm<span class="w"> </span>init<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--vocab-zip<span class="w"> </span><span class="s2">"https://athena.ohdsi.org/api/v1/vocabularies/zip/&lt;bundle-id&gt;"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--embedding-model<span class="w"> </span>text-embedding-3-small<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>SNOMED<span class="w"> </span>--standard-vocabs<span class="w"> </span>LOINC<span class="w"> </span>--standard-vocabs<span class="w"> </span>RxNorm
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--vector-db<span class="w"> </span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--embedding-model<span class="w"> </span>text-embedding-3-small<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>--standard-vocabs<span class="w"> </span>SNOMED<span class="w"> </span>--standard-vocabs<span class="w"> </span>LOINC<span class="w"> </span>--standard-vocabs<span class="w"> </span>RxNorm
 </span></code></pre></div>
 <p>If you unpacked the zip yourself, put the CSV files in <code>./vocabularies</code> and run
 <code>aatm init</code>, or point to them with <code>--vocab-dir path/to/vocabularies</code>.</p>
@@ -2657,8 +2697,9 @@ names.</p>
 <h3 id="sharing-the-index-with-a-team">Sharing the index with a team</h3>
 <p>By default the search index is a local ChromaDB folder of several GB. To build it once
 and share it, or to search from machines without the disk space, build it in Chroma
-Cloud or Pinecone with <code>--vector-db cloud</code> or <code>--vector-db pinecone</code>. See
-<a href="../env/#vector-database-local-chroma-cloud-or-pinecone">Vector database</a>.</p>
+Cloud, Pinecone or a PostgreSQL server with <code>--vector-db cloud</code>, <code>pinecone</code> or
+<code>pgvector</code>. See
+<a href="../env/#vector-database">Vector database</a>.</p>
 <hr>
 <h2 id="3-set-your-api-keys">3. Set your API keys</h2>
 <p>Put the keys of the providers you use in a <code>.env</code> file at the project root; AATM loads

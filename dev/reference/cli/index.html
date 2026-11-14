@@ -1361,6 +1361,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#aatm-vector-db-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm vector-db sync
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#aatm-vector-db-upload" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2209,6 +2220,8 @@
       
         
       
+        
+      
     
     
     
@@ -2490,6 +2503,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../pgvector_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL with pgvector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../logs/" class="md-nav__link">
         
   
@@ -2675,6 +2716,17 @@
     <span class="md-ellipsis">
       
         aatm vector-db check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aatm-vector-db-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm vector-db sync
       
     </span>
   </a>
@@ -2984,7 +3036,7 @@ schedulers can act on it.</p>
 <li><code>-e, --embedding-model TEXT</code>: Name of the embedding model to use.</li>
 <li><code>--embedding-dtype TEXT</code>: Precision for local embedding models: float32, bfloat16 or float16. Defaults to the precision of the model's checkpoint. Half precision is faster and uses less GPU memory, but requires an NVIDIA GPU. Overrides AATM_EMBEDDING_DTYPE.</li>
 <li><code>-sv, --standard-vocabs TEXT</code>: List of standard vocabularies to use. Available options: ['LOINC', 'SNOMED', 'RxNorm'].</li>
-<li><code>--vector-db TEXT</code>: Where to build the vector database: 'local' (ChromaDB on this machine), 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY) or 'pinecone' (configured with PINECONE_API_KEY). Overrides AATM_VECTOR_DB. Defaults to 'local'.</li>
+<li><code>--vector-db TEXT</code>: Where to build the vector database: 'local' (ChromaDB on this machine), 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY), 'pinecone' (configured with PINECONE_API_KEY) or 'pgvector' (PostgreSQL, configured with AATM_PG_DSN). If not given, aatm init asks, preselecting AATM_VECTOR_DB, and lists what each backend needs and which models are built in it.</li>
 <li><code>--vocab-zip TEXT</code>: Athena vocabulary bundle to set up from: the download link Athena emailed, or the path of the downloaded zip. It is unpacked into --vocab-dir (default ./vocabularies).</li>
 <li><code>--force</code>: With --vocab-zip, overwrite existing vocabulary files without asking.</li>
 <li><code>--umls-api-key TEXT</code>: UMLS API key used to add the CPT4 names when the bundle includes CPT4. Read from UMLS_API_KEY when not given.  [env var: UMLS_API_KEY]</li>
@@ -3057,7 +3109,7 @@ schedulers can act on it.</p>
 <li><code>--help</code>: Show this message and exit.</li>
 </ul>
 <h3 id="aatm-vector-db"><code>aatm vector-db</code></h3>
-<p>Check the vector database settings or upload a local index to Chroma Cloud or Pinecone</p>
+<p>Check the vector database settings or upload a local index to Chroma Cloud, Pinecone or PostgreSQL</p>
 <p><strong>Usage</strong>:</p>
 <div class="language-console highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
 </span></code></pre></div>
@@ -3068,6 +3120,7 @@ schedulers can act on it.</p>
 <p><strong>Commands</strong>:</p>
 <ul>
 <li><code>check</code>: Show where the vector database lives and...</li>
+<li><code>sync</code>: Record the built vector databases that...</li>
 <li><code>upload</code>: Copy a local vector database to Chroma...</li>
 </ul>
 <h4 id="aatm-vector-db-check"><code>aatm vector-db check</code></h4>
@@ -3077,27 +3130,39 @@ schedulers can act on it.</p>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
-<li><code>--vector-db TEXT</code>: 'local', 'cloud' or 'pinecone'. Overrides AATM_VECTOR_DB.</li>
+<li><code>--vector-db TEXT</code>: 'local', 'cloud', 'pinecone' or 'pgvector'. Overrides AATM_VECTOR_DB.</li>
+<li><code>--help</code>: Show this message and exit.</li>
+</ul>
+<h4 id="aatm-vector-db-sync"><code>aatm vector-db sync</code></h4>
+<p>Record the built vector databases that .aatm/config.yaml does not list, e.g. built before AATM recorded its builds, and choose the default</p>
+<p><strong>Usage</strong>:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span>sync<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</span></code></pre></div>
+<p><strong>Options</strong>:</p>
+<ul>
+<li><code>--vector-db TEXT</code>: 'local', 'cloud', 'pinecone' or 'pgvector'. Defaults to local and, if different, AATM_VECTOR_DB.</li>
+<li><code>--default TEXT</code>: Embedding model retrievers use when none is given, instead of the most recently built one. Applies to --vector-db (or AATM_VECTOR_DB).</li>
+<li><code>--prune</code>: Also remove the records of databases that are not built any more.</li>
 <li><code>--help</code>: Show this message and exit.</li>
 </ul>
 <h4 id="aatm-vector-db-upload"><code>aatm vector-db upload</code></h4>
-<p>Copy a local vector database to Chroma Cloud or Pinecone without re-embedding</p>
+<p>Copy a local vector database to Chroma Cloud, Pinecone or PostgreSQL without re-embedding</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span>upload<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span>upload<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
 <li><code>-e, --embedding-model TEXT</code>: Name of the embedding model whose index to upload.  [required]</li>
 <li><code>--local-dir PATH</code>: Local vector database directory. Defaults to the model's path under .aatm/chroma_vector_dbs.</li>
 <li><code>--batch-size INTEGER</code>: Rows per write. Capped at Chroma Cloud's maximum batch size; split into requests within Pinecone's limits.</li>
-<li><code>--to TEXT</code>: Destination: 'cloud' (Chroma Cloud) or 'pinecone'.  [default: cloud]</li>
+<li><code>--to TEXT</code>: Destination: 'cloud' (Chroma Cloud), 'pinecone' or 'pgvector'.  [default: cloud]</li>
 <li><code>--ids-file PATH</code>: Only upload the rows whose IDs this file lists, one per line, e.g. a subset that fits a free plan.</li>
 <li><code>--help</code>: Show this message and exit.</li>
 </ul>
 <h3 id="aatm-cache"><code>aatm cache</code></h3>
 <p>Inspect or clear the coding cache (.aatm/coding_cache.db)</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
+<div class="language-console highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3111,7 +3176,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-cache-info"><code>aatm cache info</code></h4>
 <p>Show the entries, size and coders of the cache</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span>info<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span>info<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3121,7 +3186,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-cache-clear"><code>aatm cache clear</code></h4>
 <p>Delete the cached results and shrink the file</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span>clear<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span>clear<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3133,7 +3198,7 @@ schedulers can act on it.</p>
 <h3 id="aatm-omop"><code>aatm omop</code></h3>
 <p>Run, rebuild and inspect OMOP extraction runs</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
+<div class="language-console highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3150,7 +3215,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-run"><code>aatm omop run</code></h4>
 <p>Extract notes into OMOP tables, in chunks, resuming where an earlier run stopped. Exit codes: 0 every note built, 2 some notes failed, 1 error, 130 stopped</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>SOURCE<span class="o">]</span><span class="w"> </span><span class="o">[</span>OUTPUT<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>SOURCE<span class="o">]</span><span class="w"> </span><span class="o">[</span>OUTPUT<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
@@ -3193,7 +3258,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-rebuild"><code>aatm omop rebuild</code></h4>
 <p>Build the tables of a run again from its stored extraction results, with no extraction call (after changing the omop blocks or the coder). Options not given are those the run recorded in options.yaml</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>rebuild<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
+<div class="language-console highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>rebuild<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
@@ -3224,7 +3289,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-status"><code>aatm omop status</code></h4>
 <p>Notes built and failed, issues by reason, and the last summary</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>status<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
+<div class="language-console highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>status<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
@@ -3238,7 +3303,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-failures"><code>aatm omop failures</code></h4>
 <p>The notes that failed: stage, error and attempts</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>failures<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
+<div class="language-console highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>failures<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
@@ -3252,7 +3317,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-pilot"><code>aatm omop pilot</code></h4>
 <p>Read a pilot workspace: versioned runs on a fixed sample of notes (see aatm.omop.Pilot)</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
+<div class="language-console highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3266,7 +3331,7 @@ schedulers can act on it.</p>
 <h5 id="aatm-omop-pilot-log"><code>aatm omop pilot log</code></h5>
 <p>List the versions and what changed in each</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span>log<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span>log<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3277,7 +3342,7 @@ schedulers can act on it.</p>
 <h5 id="aatm-omop-pilot-compare"><code>aatm omop pilot compare</code></h5>
 <p>Compare two versions (by default the latest two)</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span>compare<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>A<span class="o">]</span><span class="w"> </span><span class="o">[</span>B<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span>compare<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>A<span class="o">]</span><span class="w"> </span><span class="o">[</span>B<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>

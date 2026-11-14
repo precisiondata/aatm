@@ -1972,6 +1972,8 @@
       
         
       
+        
+      
     
     
     
@@ -2250,6 +2252,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/pgvector_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL with pgvector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/logs/" class="md-nav__link">
         
   
@@ -2460,9 +2490,9 @@ project root.</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── downloads/              # Athena bundles fetched by aatm init --vocab-zip
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>└── coding_cache.db         # coding results, with cache=True (OMOP runs)
 </span></code></pre></div>
-<p>With <code>AATM_VECTOR_DB=cloud</code> or <code>AATM_VECTOR_DB=pinecone</code>, the search indexes live in
-Chroma Cloud or Pinecone instead of <code>chroma_vector_dbs/</code> (see
-<a href="../env/#vector-database-local-chroma-cloud-or-pinecone">Environment variables</a>).</p>
+<p>With <code>AATM_VECTOR_DB=cloud</code>, <code>pinecone</code> or <code>pgvector</code>, the search indexes live in
+Chroma Cloud, Pinecone or PostgreSQL instead of <code>chroma_vector_dbs/</code> (see
+<a href="../env/#vector-database">Environment variables</a>).</p>
 <p><code>aatm init</code> also unpacks the vocabulary CSV files into <code>./vocabularies</code> (or
 <code>--vocab-dir</code>). They can be deleted once <code>omop.db</code> is built, unless you want to rebuild
 it.</p>

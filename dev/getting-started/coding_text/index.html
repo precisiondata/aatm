@@ -2000,6 +2000,8 @@
       
         
       
+        
+      
     
     
     
@@ -2258,6 +2260,34 @@
     
   
     Vector stores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/pgvector_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL with pgvector
   
 
     
@@ -2910,7 +2940,8 @@ goes over a limit, the entries used least recently are deleted first:</p>
 </span></code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">Rebuilt data the cache cannot see</p>
-<p>The data of a retriever that is neither a ChromaDB collection nor a Pinecone index
+<p>The data of a retriever that is not a ChromaDB collection, a Pinecone index or a
+PostgreSQL table
 (a retriever of your own, for example) cannot be fingerprinted. When the cache opens, a warning names such
 components: <code>changes to the content of ... cannot be detected</code>. If you rebuild
 their index, run <code>aatm cache clear</code>, or results coded against the old data will be

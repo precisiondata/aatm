@@ -642,15 +642,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#vector-database-local-chroma-cloud-or-pinecone" class="md-nav__link">
+  <a href="#vector-database" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vector database (local, Chroma Cloud or Pinecone)
+        Vector database
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Vector database (local, Chroma Cloud or Pinecone)">
+    <nav class="md-nav" aria-label="Vector database">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -669,6 +669,17 @@
     <span class="md-ellipsis">
       
         Pinecone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postgresql-with-pgvector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PostgreSQL with pgvector
       
     </span>
   </a>
@@ -2033,6 +2044,8 @@
       
         
       
+        
+      
     
     
     
@@ -2311,6 +2324,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/pgvector_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL with pgvector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/logs/" class="md-nav__link">
         
   
@@ -2424,15 +2465,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#vector-database-local-chroma-cloud-or-pinecone" class="md-nav__link">
+  <a href="#vector-database" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vector database (local, Chroma Cloud or Pinecone)
+        Vector database
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Vector database (local, Chroma Cloud or Pinecone)">
+    <nav class="md-nav" aria-label="Vector database">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2451,6 +2492,17 @@
     <span class="md-ellipsis">
       
         Pinecone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postgresql-with-pgvector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PostgreSQL with pgvector
       
     </span>
   </a>
@@ -2610,11 +2662,12 @@
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">aatm</span><span class="o">.</span><span class="n">configure_logging</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>  <span class="c1"># everything</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"aatm.data_models.extractors"</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>  <span class="c1"># one module only</span>
 </span></code></pre></div>
-<h2 id="vector-database-local-chroma-cloud-or-pinecone">Vector database (local, Chroma Cloud or Pinecone)</h2>
-<p>By default, AATM builds one ChromaDB vector database per embedding model on this machine, under <code>.aatm/chroma_vector_dbs/</code>. Two remote backends let a team build the index once and share it, and let machines without the disk space or GPU for a local index run retrieval:</p>
+<h2 id="vector-database">Vector database</h2>
+<p>By default, AATM builds one ChromaDB vector database per embedding model on this machine, under <code>.aatm/chroma_vector_dbs/</code>. Three other backends let a team build the index once and share it, let machines without the disk space or GPU for a local index run retrieval, or filter faster:</p>
 <ul>
 <li><a href="https://trychroma.com/">Chroma Cloud</a>, with <code>AATM_VECTOR_DB=cloud</code>.</li>
 <li><a href="https://www.pinecone.io/">Pinecone</a>, with <code>AATM_VECTOR_DB=pinecone</code> (see <a href="#pinecone">below</a>).</li>
+<li>PostgreSQL with <a href="https://github.com/pgvector/pgvector">pgvector</a>, on your machine or a server you run, with <code>AATM_VECTOR_DB=pgvector</code> (see <a href="#postgresql-with-pgvector">below</a>).</li>
 </ul>
 <p>Switching is configuration only: retrievers, <code>aatm map</code>, <code>aatm search-ui</code>, <code>aatm serve</code>, the concept search agent and <code>load_retriever()</code> all use the configured backend.</p>
 <h3 id="chroma-cloud">Chroma Cloud</h3>
@@ -2631,7 +2684,7 @@
 <tr>
 <td><code>AATM_VECTOR_DB</code></td>
 <td><code>local</code></td>
-<td><code>local</code>, <code>cloud</code> or <code>pinecone</code>. <code>aatm init --vector-db</code> overrides it for the build.</td>
+<td><code>local</code>, <code>cloud</code>, <code>pinecone</code> or <code>pgvector</code>. <code>aatm init --vector-db</code> overrides it for the build.</td>
 </tr>
 <tr>
 <td><code>CHROMA_API_KEY</code></td>
@@ -2722,6 +2775,93 @@
 <li><strong>Records.</strong> Pinecone has no document field and no null metadata. The expression text is stored in the metadata (as <code>expression</code>), and <code>None</code> values are left out. The embedding precision of local models is stored as an index tag (<code>aatm_embedding_dtype</code>), and queries are encoded in it.</li>
 <li><strong>Writes</strong> use <code>upsert</code>, which is idempotent, in requests within Pinecone's limits (1,000 records and 2 MB per request). Every request is retried with backoff on rate limits, server errors and network failures. A repair (<code>aatm init</code>, <em>Repair</em>) or a rerun of <code>aatm vector-db upload</code> only writes the missing records. Newly written records take a moment to become visible, so a repair right after a build may embed a few records again, which is harmless.</li>
 </ul>
+<h3 id="postgresql-with-pgvector">PostgreSQL with pgvector</h3>
+<p><a href="https://github.com/pgvector/pgvector">pgvector</a> adds vector search to PostgreSQL. Use it to keep the index next to OMOP data you already host in Postgres, to run fast filtered searches on your own machine, or to share one index across a team on a server you run.</p>
+<p>Install the extra:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"aatm[pgvector]"</span><span class="w">   </span><span class="c1"># or: uv sync --extra pgvector</span>
+</span></code></pre></div>
+<p><strong>Let <code>aatm init</code> set it up.</strong> If you choose PostgreSQL and no server answers, <code>aatm init</code> offers two options:</p>
+<ul>
+<li><strong>Start PostgreSQL with pgvector in Docker on this machine.</strong><ol>
+<li><strong>Docker.</strong> If Docker is not installed, not running, or your user may not use it, AATM says how to fix that on your platform (Docker Desktop on Windows and macOS, Docker Engine on Linux). It can open Docker Desktop for you and wait for it, and checks again when you say so, so you can install or start Docker without leaving <code>aatm init</code>.</li>
+<li><strong>Size.</strong> AATM shows what the container can use: Docker's memory and CPU limits, and how much of the machine's memory is free. It suggests index build settings for them: 30% of that memory for <code>AATM_PG_MAINTENANCE_WORK_MEM</code> (at most 16 GB, enough for the full index of every model), and one worker per CPU but one for <code>AATM_PG_BUILD_WORKERS</code> (at most 7). Keep them, or enter your own (e.g. <code>8GB</code> and <code>4</code>); AATM refuses more than 80% of the available memory or more than 7 workers. A new container gets 1 GB of shared memory more than the build memory, which a parallel build needs.</li>
+<li><strong>Container.</strong> AATM starts the container <code>aatm-pgvector</code> on port 5432 (or the next free port), starts it again if it is stopped, or reuses it if it is running. If an existing container has too little shared memory for the build memory you chose, AATM asks whether to recreate it (its data stays in the volume <code>aatm-pgvector</code>) or to build with less.</li>
+<li><strong>Settings.</strong> AATM waits until PostgreSQL answers and saves <code>AATM_PG_DSN</code>, <code>AATM_PG_MAINTENANCE_WORK_MEM</code> and <code>AATM_PG_BUILD_WORKERS</code> to <code>.env</code>. It also offers to save <code>AATM_VECTOR_DB=pgvector</code>, so <code>aatm map</code>, the search UI and <code>load_retriever()</code> use PostgreSQL by default.</li>
+</ol>
+</li>
+<li><strong>Set <code>AATM_PG_DSN</code> yourself</strong>, for a server you already run. <code>aatm init</code> then shows what to set, and stops.</li>
+</ul>
+<p>To start the same server by hand, use the <code>pgvector/pgvector</code> Docker image. This one accepts connections from this machine only, without a password:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--name<span class="w"> </span>aatm-pgvector<span class="w"> </span>--shm-size<span class="o">=</span>9g<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">POSTGRES_HOST_AUTH_METHOD</span><span class="o">=</span>trust<span class="w"> </span>-e<span class="w"> </span><span class="nv">POSTGRES_DB</span><span class="o">=</span>aatm<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>-p<span class="w"> </span><span class="m">127</span>.0.0.1:5432:5432<span class="w"> </span>-v<span class="w"> </span>aatm-pgvector:/var/lib/postgresql/data<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span>pgvector/pgvector:pg17
+</span></code></pre></div>
+<p>A parallel HNSW build keeps its graph in shared memory, so <code>--shm-size</code> must exceed <code>AATM_PG_MAINTENANCE_WORK_MEM</code> (here up to 8 GB); Docker's 64 MB default makes large parallel builds fail. For a server other people can reach, set a password (<code>POSTGRES_PASSWORD</code>) instead of <code>trust</code>.</p>
+<p>Then set:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AATM_VECTOR_DB</code></td>
+<td><code>local</code></td>
+<td>Set to <code>pgvector</code>.</td>
+</tr>
+<tr>
+<td><code>AATM_PG_DSN</code></td>
+<td>unset</td>
+<td>Connection string, e.g. <code>postgresql://postgres@localhost:5432/aatm</code>. If unset, libpq's defaults and the standard <code>PGHOST</code>, <code>PGPORT</code>, <code>PGDATABASE</code>, <code>PGUSER</code> and <code>PGPASSWORD</code> variables apply. A password in it is never shown.</td>
+</tr>
+<tr>
+<td><code>AATM_PG_TABLE_PREFIX</code></td>
+<td><code>aatm_expressions</code></td>
+<td>Prefix of the table names.</td>
+</tr>
+<tr>
+<td><code>AATM_PG_EF_SEARCH</code></td>
+<td><code>100</code></td>
+<td><code>hnsw.ef_search</code>: candidates the search keeps, from 1 to 1000. Higher finds more true neighbours, more slowly. Each query uses at least its <code>top_k</code>.</td>
+</tr>
+<tr>
+<td><code>AATM_PG_ITERATIVE_SCAN</code></td>
+<td><code>relaxed_order</code></td>
+<td><code>hnsw.iterative_scan</code>: <code>relaxed_order</code>, <code>strict_order</code> or <code>off</code>. How a filtered search keeps scanning until it has <code>top_k</code> matches (pgvector 0.8+).</td>
+</tr>
+<tr>
+<td><code>AATM_PG_MAINTENANCE_WORK_MEM</code></td>
+<td>server setting</td>
+<td>Memory for building the HNSW index, e.g. <code>8GB</code>. PostgreSQL's default is 64 MB. When the graph does not fit, most of it is built on disk, much more slowly, and AATM warns with the memory it would need (about 9 GB for the full 768-dimension index).</td>
+</tr>
+<tr>
+<td><code>AATM_PG_BUILD_WORKERS</code></td>
+<td>server setting</td>
+<td>Parallel workers for building the HNSW index (<code>max_parallel_maintenance_workers</code>). PostgreSQL's default is 2, and its <code>max_parallel_workers</code> (8) caps it.</td>
+</tr>
+</tbody>
+</table>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>AATM_VECTOR_DB=pgvector
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>AATM_PG_DSN=postgresql://postgres@localhost:5432/aatm
+</span></code></pre></div>
+<p>Prefer <code>PGPASSWORD</code> or a <a href="https://www.postgresql.org/docs/current/libpq-pgpass.html"><code>.pgpass</code> file</a> to a password in <code>AATM_PG_DSN</code>.</p>
+<p>Without <code>AATM_PG_DSN</code>, AATM connects where libpq would: <code>localhost:5432</code>, to a database named after your user. <code>aatm init</code> names the server it will use, and if the connection fails it says where it tried and how to set <code>AATM_PG_DSN</code> or start a local server. AATM waits up to 10 seconds per address for the server; set <code>connect_timeout</code> in <code>AATM_PG_DSN</code>, or <code>PGCONNECT_TIMEOUT</code>, to change it.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>aatm<span class="w"> </span>vector-db<span class="w"> </span>check<span class="w"> </span>--vector-db<span class="w"> </span>pgvector<span class="w">                     </span><span class="c1"># server, pgvector version, the models' tables</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>aatm<span class="w"> </span>init<span class="w"> </span>--vector-db<span class="w"> </span>pgvector<span class="w">                                </span><span class="c1"># build the index in PostgreSQL</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>aatm<span class="w"> </span>vector-db<span class="w"> </span>upload<span class="w"> </span>--to<span class="w"> </span>pgvector<span class="w"> </span>-e<span class="w"> </span>embeddinggemma-300M<span class="w">    </span><span class="c1"># copy a local index, without re-embedding</span>
+</span></code></pre></div>
+<p>How the index maps to PostgreSQL:</p>
+<ul>
+<li><strong>Tables.</strong> Each embedding model gets its own table, named <code>&lt;prefix&gt;_&lt;model&gt;</code> and made a safe identifier (e.g. <code>aatm_expressions_qwen3_06b</code>), with columns <code>id</code>, <code>embedding vector(&lt;dimension&gt;)</code>, <code>document</code> and <code>metadata jsonb</code>. The table <code>aatm_index_metadata</code> records each index's dimension and the embedding precision of local models, and queries are encoded in it. <code>aatm init</code> installs the <code>vector</code> extension if the database lacks it, which needs the right to create extensions.</li>
+<li><strong>Search indexes.</strong> An HNSW index on the embeddings and a GIN index on the metadata are built once the rows are loaded, which is much faster than updating them row by row. <code>aatm init</code> and <code>aatm vector-db upload</code> show a progress bar for each, from PostgreSQL's own progress report. On the full index (about 2.5 million expressions), the HNSW build took 35 minutes with PostgreSQL's defaults (64 MB, 2 workers); give it more memory and workers (<code>AATM_PG_MAINTENANCE_WORK_MEM</code>, <code>AATM_PG_BUILD_WORKERS</code>) to speed it up. An existing index is kept, so this happens once. HNSW indexes <code>vector</code> columns of up to 2,000 dimensions, so larger embeddings (<code>qwen3-4B</code>, <code>gemini-embedding-001</code>, <code>text-embedding-3-large</code>) are indexed in half precision (<code>halfvec</code>, up to 4,000); their distances still come from the full-precision vectors.</li>
+<li><strong>Scores.</strong> pgvector's Euclidean distance is squared, so a record has the same <code>distance</code> as in ChromaDB and Pinecone, and the confidence score (<code>1 - distance</code>), selectors and thresholds work unchanged.</li>
+<li><strong>Filters.</strong> Domain and vocabulary filters (<code>retriever_filter</code>) become <code>WHERE</code> clauses on the metadata, applied <strong>during</strong> the vector search, so the retriever passes them straight to PostgreSQL by default (<code>filter_strategy="native"</code>). Iterative index scans keep a filtered search going until it has <code>top_k</code> matches; PostgreSQL may also choose the metadata index and an exact search when few rows match. See <a href="../concepts/#metadata-filters">Metadata filters</a>.</li>
+<li><strong>Writes</strong> go through a staging table with <code>COPY</code>, then into the table. A first write skips IDs already stored, and a retry replaces them, so a repair (<code>aatm init</code>, <em>Repair</em>) or a rerun of <code>aatm vector-db upload</code> only writes the missing records and never duplicates one.</li>
+</ul>
 <h3 id="choosing-a-backend">Choosing a backend</h3>
 <table>
 <thead>
@@ -2730,6 +2870,7 @@
 <th>Local ChromaDB</th>
 <th>Chroma Cloud</th>
 <th>Pinecone</th>
+<th>PostgreSQL + pgvector</th>
 </tr>
 </thead>
 <tbody>
@@ -2738,23 +2879,27 @@
 <td>None</td>
 <td>API key</td>
 <td>API key and <code>aatm[pinecone]</code></td>
+<td>A PostgreSQL server with pgvector and <code>aatm[pgvector]</code></td>
 </tr>
 <tr>
 <td>Shared across a team</td>
 <td>No</td>
 <td>Yes</td>
 <td>Yes</td>
+<td>Yes, on a server others can reach</td>
 </tr>
 <tr>
 <td>Disk and memory on this machine</td>
 <td>Several GB per model</td>
 <td>None</td>
 <td>None</td>
+<td>Several GB per model, on the server</td>
 </tr>
 <tr>
 <td>Filtered queries (domain, vocabulary)</td>
 <td>Over-fetch by default, because ChromaDB's own filtered query takes seconds on a full index</td>
 <td>Same as local</td>
+<td>Filtered during the search</td>
 <td>Filtered during the search</td>
 </tr>
 <tr>
@@ -2762,6 +2907,7 @@
 <td>Free</td>
 <td>Usage-based</td>
 <td>Usage-based</td>
+<td>Free locally; your server otherwise</td>
 </tr>
 </tbody>
 </table>
