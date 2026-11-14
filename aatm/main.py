@@ -1578,13 +1578,28 @@ def vector_db_check(
         raise typer.Exit(code=1)
 
     if mode == "local":
+        from aatm.built_stores import recorded_vector_databases
+
+        recorded = {s.embedding_model for s in recorded_vector_databases("local")}
+        unrecorded = 0
         console.print("Vector database: [bold]local[/bold]")
         for name, (connection, collection_name) in locations.items():
             path = getattr(connection, "path", None)
-            status = (
-                "[green]built[/green]" if path and Path(path).exists() else "not built"
-            )
+            if not (path and Path(path).exists()):
+                status = "not built"
+            elif name in recorded:
+                status = "[green]built[/green]"
+            else:
+                status = "[green]built[/green], not recorded"
+                unrecorded += 1
             console.print(f"  {name}: {path} ({status})")
+        if unrecorded:
+            console.print(
+                f"{unrecorded} built database(s) are not recorded in .aatm/config.yaml, "
+                "so retrievers cannot default to them. Record them with: "
+                "aatm vector-db sync",
+                style="yellow",
+            )
         _print_recorded_default(mode)
         return
 
@@ -1615,6 +1630,133 @@ def vector_db_check(
         status = "[green]built[/green]" if collection_name in existing else "not built"
         console.print(f"  {name}: {kind} '{collection_name}' ({status})")
     _print_recorded_default(mode)
+
+
+@vector_db_app.command(
+    "sync",
+    help=(
+        "Record the built vector databases that .aatm/config.yaml does not list, "
+        "e.g. built before AATM recorded its builds, and choose the default"
+    ),
+)
+def vector_db_sync(
+    vector_db: Annotated[
+        Optional[str],
+        typer.Option(
+            "--vector-db",
+            help=(
+                "'local', 'cloud', 'pinecone' or 'pgvector'. Defaults to local and, "
+                "if different, AATM_VECTOR_DB."
+            ),
+            show_default=False,
+        ),
+    ] = None,
+    default: Annotated[
+        Optional[str],
+        typer.Option(
+            "--default",
+            help=(
+                "Embedding model retrievers use when none is given, instead of the "
+                "most recently built one. Applies to --vector-db (or AATM_VECTOR_DB)."
+            ),
+            show_default=False,
+        ),
+    ] = None,
+    prune: Annotated[
+        bool,
+        typer.Option(
+            "--prune",
+            help="Also remove the records of databases that are not built any more.",
+        ),
+    ] = False,
+) -> None:
+    """Record built vector databases missing from ``.aatm/config.yaml``.
+
+    Local indexes are dated from when their files last changed; remote ones
+    get no date. Existing records are kept. See
+    `aatm.built_stores.sync_vector_databases`.
+
+    Raises:
+        typer.Exit: With code 1 if a configuration is invalid, a backend cannot
+            be reached, or ``--default`` names a model that is not built.
+    """
+    from aatm.built_stores import (
+        CONFIG_PATH,
+        default_vector_database,
+        set_default_vector_database,
+        sync_vector_databases,
+    )
+    from aatm.vector_db import VectorDatabaseConfigError, resolve_vector_db_mode
+
+    try:
+        configured = resolve_vector_db_mode(vector_db)
+    except VectorDatabaseConfigError as e:
+        console.print(f"[yellow]OOPS![/yellow] {e}")
+        raise typer.Exit(code=1)
+    modes = (
+        [configured]
+        if vector_db is not None
+        else list(dict.fromkeys(["local", configured]))
+    )
+
+    results = {}
+    for mode in modes:
+        try:
+            results[mode] = sync_vector_databases(mode, prune=prune)
+        except VectorDatabaseConfigError as e:
+            console.print(f"{mode}: could not check it.", style="yellow")
+            console.print(str(e), markup=False, soft_wrap=True)
+            raise typer.Exit(code=1)
+
+    for mode, result in results.items():
+        console.print(f"[bold]{mode}[/bold]")
+        for store in result.added:
+            date = f", last changed {store.built_at[:10]}" if store.built_at else ""
+            console.print(
+                f"  [green]recorded[/green] {store.embedding_model} ({store.location}{date})",
+                markup=True,
+                highlight=False,
+            )
+        for store in result.kept:
+            console.print(
+                f"  already recorded {store.embedding_model}", highlight=False
+            )
+        for store in result.missing:
+            action = "[yellow]removed[/yellow]" if result.pruned else "not built"
+            console.print(
+                f"  {action} {store.embedding_model} ({store.location})",
+                highlight=False,
+            )
+        if not (result.added or result.kept or result.missing):
+            console.print("  nothing built")
+        if result.missing and not result.pruned:
+            console.print(
+                "  [dim]Records of databases that are not built are kept; "
+                "--prune removes them.[/dim]"
+            )
+
+    if default is not None:
+        built = {s.embedding_model for s in results[configured].added} | {
+            s.embedding_model for s in results[configured].kept
+        }
+        if default not in built:
+            console.print(
+                f"[yellow]OOPS![/yellow] '{default}' is not built in {configured}. "
+                f"Built: {', '.join(sorted(built)) or 'none'}."
+            )
+            raise typer.Exit(code=1)
+        set_default_vector_database(default, configured)
+
+    for mode in modes:
+        try:
+            chosen = default_vector_database(mode)
+        except Exception:
+            continue
+        console.print(
+            f"Default {mode} retriever: [bold]{chosen.embedding_model}[/bold]"
+            + ("" if default else "  [dim](choose another with --default)[/dim]")
+        )
+    console.print(f"[dim]Records are in {CONFIG_PATH.as_posix()}.[/dim]")
 
 
 def _check_pgvector(connection: Any, locations: dict[str, tuple[Any, str]]) -> None:

@@ -51,3 +51,21 @@ def _record_built_stores_in_tmp(monkeypatch, tmp_path_factory):
 
     path = tmp_path_factory.mktemp("aatm") / "config.yaml"
     monkeypatch.setattr(built_stores, "CONFIG_PATH", path)
+
+
+@pytest.fixture(autouse=True)
+def _restore_aatm_logging():
+    """Undo what a test's CLI run did to AATM's logger.
+
+    Invoking the CLI configures the ``aatm`` logger onto the test runner's
+    output stream, which is closed afterwards, and stops propagation, so later
+    tests would write to a closed file or see nothing in ``caplog``.
+    """
+    import logging
+
+    logger = logging.getLogger("aatm")
+    handlers, level, propagate = list(logger.handlers), logger.level, logger.propagate
+    yield
+    logger.handlers[:] = handlers
+    logger.setLevel(level)
+    logger.propagate = propagate

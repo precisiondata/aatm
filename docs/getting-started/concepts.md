@@ -65,6 +65,19 @@ database and the build date in `.aatm/config.yaml`. Without a model name,
 the most recently built one for the configured vector database (and log which), or,
 with nothing recorded, the only built one. `aatm vector-db check` shows that default.
 
+Indexes built before AATM recorded its builds (0.4.0), or copied from another project,
+work but are not recorded. `aatm vector-db check` marks them *not recorded*, and
+`aatm vector-db sync` records them: a local index is dated from when its files last
+changed, the closest thing to a build date ChromaDB keeps. To choose the default
+yourself rather than take the most recent, add `--default <model>`; it holds until the
+next build in that vector database. `--prune` also removes the records of indexes that
+are gone.
+
+```bash
+aatm vector-db sync                          # record local indexes (and AATM_VECTOR_DB's)
+aatm vector-db sync --default qwen3-06B      # ... and make qwen3-06B the default
+```
+
 A retriever only opens an index that is built: naming a model whose index does not
 exist or is empty raises `VectorDatabaseNotBuiltError` instead of searching an empty
 collection. The message lists the indexes that are built and how to build the one

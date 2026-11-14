@@ -33,6 +33,10 @@
   container can use (Docker's limits and the machine's free memory), suggests index
   build memory and workers, and lets you change them. An existing container with too
   little shared memory for them can be recreated, keeping its data.
+- **`aatm vector-db sync`** records the indexes `.aatm/config.yaml` does not list, such
+  as those built before 0.4.0, which `aatm vector-db check` now marks *not recorded*.
+  `--default <model>` chooses which one retrievers use when none is given, and
+  `--prune` drops records of indexes that are gone.
 
 ## 0.4.0
 

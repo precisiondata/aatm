@@ -176,6 +176,7 @@ $ aatm vector-db [OPTIONS] COMMAND [ARGS]...
 **Commands**:
 
 * `check`: Show where the vector database lives and...
+* `sync`: Record the built vector databases that...
 * `upload`: Copy a local vector database to Chroma...
 
 #### `aatm vector-db check`
@@ -191,6 +192,23 @@ $ aatm vector-db check [OPTIONS]
 **Options**:
 
 * `--vector-db TEXT`: &#x27;local&#x27;, &#x27;cloud&#x27;, &#x27;pinecone&#x27; or &#x27;pgvector&#x27;. Overrides AATM_VECTOR_DB.
+* `--help`: Show this message and exit.
+
+#### `aatm vector-db sync`
+
+Record the built vector databases that .aatm/config.yaml does not list, e.g. built before AATM recorded its builds, and choose the default
+
+**Usage**:
+
+```console
+$ aatm vector-db sync [OPTIONS]
+```
+
+**Options**:
+
+* `--vector-db TEXT`: &#x27;local&#x27;, &#x27;cloud&#x27;, &#x27;pinecone&#x27; or &#x27;pgvector&#x27;. Defaults to local and, if different, AATM_VECTOR_DB.
+* `--default TEXT`: Embedding model retrievers use when none is given, instead of the most recently built one. Applies to --vector-db (or AATM_VECTOR_DB).
+* `--prune`: Also remove the records of databases that are not built any more.
 * `--help`: Show this message and exit.
 
 #### `aatm vector-db upload`
