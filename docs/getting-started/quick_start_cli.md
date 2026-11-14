@@ -14,7 +14,7 @@ searches the index it builds.
     | `aatm map` | Maps a CSV of terms to standard concepts (this page) |
     | `aatm omop run`, `rebuild`, `status`, `failures`, `pilot` | Clinical notes to OMOP tables ([Quick start](quick_start_omop.md), [High-level guide](high_level.md)) |
     | `aatm cache info`, `clear` | The coding cache of OMOP runs |
-    | `aatm vector-db check`, `upload` | Where the search index is, and copying it to Chroma Cloud or Pinecone ([Environment variables](env.md#vector-database-local-chroma-cloud-or-pinecone)) |
+    | `aatm vector-db check`, `upload` | Where the search index is, and copying it to Chroma Cloud, Pinecone or PostgreSQL ([Environment variables](env.md#vector-database)) |
     | `aatm search-ui` | An interactive search over the vocabularies (below) |
     | `aatm serve` | A REST API for mapping |
 

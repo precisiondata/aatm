@@ -1,5 +1,43 @@
 # Release notes
 
+## Unreleased
+
+### New
+
+- **PostgreSQL with pgvector** as a vector database (`AATM_VECTOR_DB=pgvector`,
+  [#111](https://github.com/precisiondata/aatm/issues/111)), with the
+  `aatm[pgvector]` extra. Each embedding model gets a table, with an HNSW index on the
+  embeddings and a GIN index on the metadata, built after the load. Domain and
+  vocabulary filters are applied during the search, with iterative index scans, so
+  `PgVectorRetriever` needs no over-fetch. `aatm init --vector-db pgvector` builds the
+  index, `aatm vector-db upload --to pgvector` copies a local one without re-embedding,
+  and `aatm vector-db check --vector-db pgvector` reports the server, the pgvector
+  version and each model's table. See
+  [PostgreSQL with pgvector](getting-started/env.md#postgresql-with-pgvector).
+- **`aatm init` asks where to build the search index**, when `--vector-db` is not
+  given, preselecting `AATM_VECTOR_DB`. Each backend lists the models already built in
+  it, and one that misses a setting or package is shown greyed out with what it needs.
+  The embedding model question then marks the models already built there.
+- **`aatm init` can start PostgreSQL for you.** When PostgreSQL is chosen and no server
+  answers, it offers to start PostgreSQL with pgvector in Docker (container
+  `aatm-pgvector`, reachable from this machine only) and to save `AATM_PG_DSN`, and
+  optionally `AATM_VECTOR_DB=pgvector`, to `.env`. Or you set `AATM_PG_DSN` yourself.
+- **Faster PostgreSQL index builds, with progress.** Building the search indexes shows a
+  progress bar from PostgreSQL's own report, and warns when `maintenance_work_mem` is
+  too small for the HNSW graph. `AATM_PG_BUILD_WORKERS` sets the parallel workers. The
+  container `aatm init` starts gets shared memory, build memory and workers sized from
+  Docker's resources instead of PostgreSQL's defaults (64 MB, 2 workers).
+- **`aatm init` guides you through Docker and the container's size.** When Docker is not
+  installed, not running or not usable, it says how to fix that on your platform, can
+  open Docker Desktop for you, and checks again. It then shows the memory and CPUs the
+  container can use (Docker's limits and the machine's free memory), suggests index
+  build memory and workers, and lets you change them. An existing container with too
+  little shared memory for them can be recreated, keeping its data.
+- **`aatm vector-db sync`** records the indexes `.aatm/config.yaml` does not list, such
+  as those built before 0.4.0, which `aatm vector-db check` now marks *not recorded*.
+  `--default <model>` chooses which one retrievers use when none is given, and
+  `--prune` drops records of indexes that are gone.
+
 ## 0.4.0
 
 0.4.0 takes the notes-to-OMOP pipeline from a few notes in memory to full datasets:

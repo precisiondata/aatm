@@ -22,9 +22,9 @@ Duplicate IDs are harmless: ChromaDB ignores an ``add`` for an ID that already
 exists and keeps the first version.
 
 The parent must not keep its own ChromaDB client open on the same directory
-while the writer runs. For Chroma Cloud and Pinecone (see `aatm.vector_db`)
-that restriction does not apply, and lookups and writes are retried on
-transient errors. Every backend is reached through
+while the writer runs. For Chroma Cloud, Pinecone and PostgreSQL (see
+`aatm.vector_db`) that restriction does not apply; Chroma Cloud and Pinecone
+lookups and writes are retried on transient errors. Every backend is reached through
 `aatm.vector_stores.VectorStore`, opened with the connection's ``open_store``.
 """
 

@@ -62,6 +62,10 @@ anthropic = [
 pinecone = [
     "pinecone>=10.0.0",
 ]
+pgvector = [
+    "pgvector>=0.3",
+    "psycopg[binary]>=3.2",
+]
 
 [project.scripts]
 aatm = "aatm.main:app"

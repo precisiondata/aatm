@@ -252,3 +252,149 @@ def test_a_store_that_cannot_be_opened_is_not_built(project, monkeypatch):
     assert [s.embedding_model for s in built_vector_databases()] == ["fake-small"]
     with pytest.raises(VectorDatabaseNotBuiltError, match="could not be opened"):
         registry.load_retriever("fake-large")
+
+
+# --- recording databases built before they were recorded --------------------------
+
+
+def test_sync_records_the_built_databases_without_a_record(project):
+    build("fake-small")
+    build("fake-large")
+
+    result = built_stores.sync_vector_databases("local")
+
+    assert sorted(s.embedding_model for s in result.added) == list(sorted(MODELS))
+    assert result.kept == [] and result.missing == []
+    recorded = {s.embedding_model: s for s in recorded_vector_databases("local")}
+    assert set(recorded) == set(MODELS)
+    small = recorded["fake-small"]
+    assert small.location == ".aatm/chroma_vector_dbs/fake-small"
+    # Dated from when its files last changed.
+    assert small.built_at == built_stores.last_modified(small.location)
+    assert small.built_at is not None
+
+
+def test_sync_keeps_existing_records_and_their_dates(project):
+    build("fake-small")
+    build("fake-large")
+    record_vector_database("fake-small", "local", ".aatm/chroma_vector_dbs/fake-small")
+    before = {s.embedding_model: s.built_at for s in recorded_vector_databases()}
+
+    result = built_stores.sync_vector_databases("local")
+
+    assert [s.embedding_model for s in result.kept] == ["fake-small"]
+    assert [s.embedding_model for s in result.added] == ["fake-large"]
+    after = {s.embedding_model: s.built_at for s in recorded_vector_databases()}
+    assert after["fake-small"] == before["fake-small"]
+
+
+def test_sync_reports_records_of_missing_databases_and_prunes_on_request(project):
+    build("fake-small")
+    record_vector_database("fake-large", "local", ".aatm/chroma_vector_dbs/fake-large")
+
+    result = built_stores.sync_vector_databases("local")
+    assert [s.embedding_model for s in result.missing] == ["fake-large"]
+    assert "fake-large" in {s.embedding_model for s in recorded_vector_databases()}
+
+    result = built_stores.sync_vector_databases("local", prune=True)
+    assert result.pruned
+    assert {s.embedding_model for s in recorded_vector_databases()} == {"fake-small"}
+
+
+def test_sync_leaves_other_vector_databases_alone(project):
+    build("fake-small")
+    record_vector_database("fake-large", "pgvector", "aatm_expressions_fake_large")
+
+    built_stores.sync_vector_databases("local", prune=True)
+
+    assert ("fake-large", "pgvector") in {
+        (s.embedding_model, s.vector_db) for s in recorded_vector_databases()
+    }
+
+
+def test_after_a_sync_the_default_is_the_last_changed(project):
+    import os
+    import time
+
+    build("fake-small")
+    build("fake-large")
+    old = time.time() - 3600
+    for f in Path(".aatm/chroma_vector_dbs/fake-small").rglob("*"):
+        os.utime(f, (old, old))
+
+    built_stores.sync_vector_databases("local")
+
+    assert default_retriever_name("local") == "fake-large"
+
+
+def test_an_explicit_default_wins_until_the_next_build(project):
+    build("fake-small")
+    build("fake-large")
+    built_stores.sync_vector_databases("local")
+
+    built_stores.set_default_vector_database("fake-small", "local")
+    assert default_retriever_name("local") == "fake-small"
+
+    # A new build of the other model becomes the default again.
+    record_vector_database("fake-large", "local", ".aatm/chroma_vector_dbs/fake-large")
+    assert default_retriever_name("local") == "fake-large"
+    assert built_stores.explicit_default("local") is None
+
+
+def test_a_skipped_build_keeps_the_explicit_default(project):
+    build("fake-small")
+    build("fake-large")
+    built_stores.sync_vector_databases("local")
+    built_stores.set_default_vector_database("fake-small", "local")
+
+    record_vector_database(
+        "fake-large", "local", ".aatm/chroma_vector_dbs/fake-large", keep_date=True
+    )
+
+    assert default_retriever_name("local") == "fake-small"
+
+
+def test_several_unrecorded_databases_point_to_sync(project):
+    build("fake-small")
+    build("fake-large")
+
+    with pytest.raises(VectorDatabaseNotBuiltError) as error:
+        default_retriever_name("local")
+
+    assert "aatm vector-db sync --default" in str(error.value)
+
+
+def test_the_sync_command_records_and_sets_the_default(project):
+    from typer.testing import CliRunner
+
+    from aatm.main import app
+
+    build("fake-small")
+    build("fake-large")
+
+    result = CliRunner().invoke(
+        app,
+        ["vector-db", "sync", "--vector-db", "local", "--default", "fake-small"],
+        env={"COLUMNS": "200"},
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "recorded fake-small" in result.output
+    assert "recorded fake-large" in result.output
+    assert "Default local retriever: fake-small" in result.output
+    assert default_retriever_name("local") == "fake-small"
+
+
+def test_the_sync_command_refuses_a_default_that_is_not_built(project):
+    from typer.testing import CliRunner
+
+    from aatm.main import app
+
+    build("fake-small")
+
+    result = CliRunner().invoke(
+        app, ["vector-db", "sync", "--vector-db", "local", "--default", "fake-large"]
+    )
+
+    assert result.exit_code == 1
+    assert "'fake-large' is not built in local" in result.output

@@ -1,7 +1,8 @@
 """Which vector databases are built, and which one a retriever defaults to.
 
 ``aatm init`` builds the vector database of one embedding model, and
-``aatm vector-db upload`` copies one to Chroma Cloud or Pinecone. Each records
+``aatm vector-db upload`` copies one to Chroma Cloud, Pinecone or PostgreSQL.
+Each records
 what it built in ``.aatm/config.yaml``:
 
 ```yaml
@@ -46,6 +47,9 @@ logger = get_logger(__name__)
 CONFIG_PATH = Path(".aatm/config.yaml")
 """Where ``aatm init`` records the vector databases it built."""
 
+DEFAULTS_KEY = "default_vector_databases"
+"""The ``.aatm/config.yaml`` key of the defaults `set_default_vector_database` sets."""
+
 
 class VectorDatabaseNotBuiltError(ValueError):
     """The vector database of the requested embedding model is not built."""
@@ -63,10 +67,10 @@ class BuiltStore:
     """Registry name of the embedding model, e.g. ``text-embedding-3-small``."""
 
     vector_db: VectorDbMode
-    """``local``, ``cloud`` or ``pinecone``."""
+    """``local``, ``cloud``, ``pinecone`` or ``pgvector``."""
 
     location: str
-    """The local directory, Chroma Cloud collection or Pinecone index."""
+    """The local directory, Chroma Cloud collection, Pinecone index or PostgreSQL table."""
 
     count: int | None = None
     """Number of expressions, if it was counted."""
@@ -76,7 +80,9 @@ class BuiltStore:
 
     def describe(self) -> str:
         """One line for messages: model, vector database, location and size."""
-        kind = {"cloud": "collection ", "pinecone": "index "}.get(self.vector_db, "")
+        kind = {"cloud": "collection ", "pinecone": "index ", "pgvector": "table "}.get(
+            self.vector_db, ""
+        )
         line = f"{self.embedding_model}  {self.vector_db}  {kind}{self.location}"
         if self.count is not None:
             line += f"  ({self.count:,} expressions)"
@@ -103,17 +109,24 @@ def record_vector_database(
     location: str | Path,
     *,
     keep_date: bool = False,
+    built_at: str | None | object = ...,
 ) -> None:
     """Record in ``.aatm/config.yaml`` that a vector database is built.
 
-    A record of the same model and vector database is replaced.
+    A record of the same model and vector database is replaced. A new build
+    (neither ``keep_date`` nor ``built_at`` given) also clears a default set
+    with `set_default_vector_database` for its vector database, so the model
+    just built becomes the default, as the most recently built one.
 
     Args:
         embedding_model: Registry name of the embedding model.
-        vector_db: ``local``, ``cloud`` or ``pinecone``.
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``.
         location: The local directory, or the collection or index name.
         keep_date: Keep the build date of an existing record (an existing
             database kept as it was), and only date a new one.
+        built_at: The build date to record (ISO 8601), or ``None`` when it is
+            unknown, for a database found rather than built (see
+            `sync_vector_databases`). Defaults to now.
     """
     config = _read_config()
     entries = [e for e in config.get("vector_databases") or [] if isinstance(e, dict)]
@@ -126,10 +139,16 @@ def record_vector_database(
         ),
         None,
     )
-    built_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    new_build = built_at is ... and not keep_date
+    if built_at is ...:
+        built_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     if keep_date and previous is not None and previous.get("built_at"):
         built_at = str(previous["built_at"])
     entries = [e for e in entries if e is not previous]
+    if new_build:
+        defaults = config.get(DEFAULTS_KEY)
+        if isinstance(defaults, dict):
+            defaults.pop(vector_db, None)
     entries.append(
         {
             "embedding_model": embedding_model,
@@ -141,16 +160,15 @@ def record_vector_database(
         }
     )
     config["vector_databases"] = entries
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    _write_config(config)
 
 
 def recorded_vector_databases(vector_db: str | None = None) -> list[BuiltStore]:
     """The vector databases recorded in ``.aatm/config.yaml``, newest first.
 
     Args:
-        vector_db: Only those in this vector database (``local``, ``cloud`` or
-            ``pinecone``). ``None`` returns all of them.
+        vector_db: Only those in this vector database (``local``, ``cloud``,
+            ``pinecone`` or ``pgvector``). ``None`` returns all of them.
     """
     stores = []
     for entry in _read_config().get("vector_databases") or []:
@@ -234,6 +252,17 @@ def _store_status(spec: Any, mode: VectorDbMode, local_path: str | None = None):
             return index_name, None, f"Pinecone index '{index_name}' is empty"
         return index_name, count, None
 
+    if mode == "pgvector":
+        from aatm.pgvector_store import pg_table_count
+
+        connection, table_name = spec.pgvector_location()
+        rows = pg_table_count(connection.dsn, table_name)
+        if rows is None:
+            return table_name, None, f"PostgreSQL has no table '{table_name}'"
+        if rows == 0:
+            return table_name, None, f"PostgreSQL table '{table_name}' is empty"
+        return table_name, rows, None
+
     from chromadb.errors import NotFoundError
 
     connection, collection_name = spec.chroma_location(mode, local_path)
@@ -271,7 +300,7 @@ def built_vector_databases(vector_db: str | None = None) -> list[BuiltStore]:
     """Find the embedding models whose vector database is built and not empty.
 
     Args:
-        vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If ``None``,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
 
     Raises:
@@ -313,7 +342,7 @@ def check_built(
 
     Args:
         embedding_model: Registry name of the embedding model.
-        vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If ``None``,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
         local_path: Directory of the local database, in local mode. Defaults
             to the model's directory under ``.aatm/chroma_vector_dbs``.
@@ -357,11 +386,12 @@ def default_retriever_name(vector_db: str | None = None) -> str:
 def default_vector_database(vector_db: str | None = None) -> BuiltStore:
     """The vector database a retriever uses when none is given.
 
-    The most recently built one recorded for the vector database, or, with no
-    record, the only built one.
+    The one set with `set_default_vector_database` (``aatm vector-db sync
+    --default``), else the most recently built one recorded for the vector
+    database, or, with no record, the only built one.
 
     Args:
-        vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If ``None``,
             ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
 
     Raises:
@@ -377,6 +407,13 @@ def default_vector_database(vector_db: str | None = None) -> BuiltStore:
         for s in recorded_vector_databases(mode)
         if s.embedding_model in CHROMADB_RETRIEVER_MODEL_REGISTRY
     ]
+    chosen = explicit_default(mode)
+    for store in recorded:
+        if store.embedding_model == chosen:
+            logger.info(
+                f"Using retriever '{chosen}', the default {mode} vector database"
+            )
+            return store
     if recorded:
         name = recorded[0].embedding_model
         if len(recorded) > 1:
@@ -403,5 +440,136 @@ def default_vector_database(vector_db: str | None = None) -> BuiltStore:
     raise VectorDatabaseNotBuiltError(
         "Several vector databases are built and none is recorded in "
         f"{CONFIG_PATH.as_posix()}:\n{_list_built(built)}\n"
-        f'Choose one, e.g. retriever="{built[0].embedding_model}".'
+        f'Choose one, e.g. retriever="{built[0].embedding_model}", or record them '
+        "and pick the default with: aatm vector-db sync"
+        + ("" if mode == "local" else f" --vector-db {mode}")
+        + f" --default {built[0].embedding_model}"
     )
+
+
+# --- recording databases built before they were recorded ---------------------------
+
+
+def explicit_default(vector_db: str) -> str | None:
+    """The default embedding model set for a vector database, if any."""
+    defaults = _read_config().get(DEFAULTS_KEY)
+    if not isinstance(defaults, dict):
+        return None
+    value = defaults.get(vector_db)
+    return str(value) if value else None
+
+
+def set_default_vector_database(embedding_model: str, vector_db: str) -> None:
+    """Make retrievers of ``vector_db`` default to ``embedding_model``.
+
+    It takes precedence over "most recently built" until the next build in
+    that vector database (see `record_vector_database`).
+    """
+    config = _read_config()
+    defaults = config.get(DEFAULTS_KEY)
+    defaults = dict(defaults) if isinstance(defaults, dict) else {}
+    defaults[vector_db] = embedding_model
+    config[DEFAULTS_KEY] = defaults
+    _write_config(config)
+
+
+def forget_vector_database(embedding_model: str, vector_db: str) -> None:
+    """Remove the record of one model's vector database, if there is one."""
+    config = _read_config()
+    entries = [e for e in config.get("vector_databases") or [] if isinstance(e, dict)]
+    config["vector_databases"] = [
+        e
+        for e in entries
+        if not (
+            e.get("embedding_model") == embedding_model
+            and e.get("vector_db") == vector_db
+        )
+    ]
+    defaults = config.get(DEFAULTS_KEY)
+    if isinstance(defaults, dict) and defaults.get(vector_db) == embedding_model:
+        defaults.pop(vector_db)
+    _write_config(config)
+
+
+def _write_config(config: dict[str, Any]) -> None:
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_PATH.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+
+def last_modified(path: str | Path) -> str | None:
+    """When a local database's files last changed (ISO 8601, UTC), or ``None``.
+
+    ChromaDB keeps no build date. This is the closest there is: it is when the
+    build or a later repair finished writing, though opening the database can
+    touch its files too.
+    """
+    root = Path(path)
+    if not root.exists():
+        return None
+    times = [f.stat().st_mtime for f in root.rglob("*") if f.is_file()]
+    if not times:
+        return None
+    moment = datetime.fromtimestamp(max(times), tz=timezone.utc)
+    return moment.isoformat(timespec="seconds")
+
+
+@dataclass(frozen=True)
+class SyncResult:
+    """What `sync_vector_databases` changed in ``.aatm/config.yaml``."""
+
+    vector_db: VectorDbMode
+    added: list[BuiltStore]
+    """Built databases that had no record, now recorded."""
+
+    kept: list[BuiltStore]
+    """Built databases already recorded, left as they were."""
+
+    missing: list[BuiltStore]
+    """Records of databases that are not built (removed with ``prune``)."""
+
+    pruned: bool
+
+
+def sync_vector_databases(
+    vector_db: str | None = None, prune: bool = False
+) -> SyncResult:
+    """Record the built vector databases that ``.aatm/config.yaml`` does not list.
+
+    Databases built before AATM recorded its builds (0.4.0), or with another
+    copy of the project, work but are missing from the records, so retrievers
+    cannot default to them. This finds them as `built_vector_databases` does
+    and records them: a local one dated from `last_modified`, a remote one
+    without a date (it sorts as the oldest). Existing records are kept.
+
+    Args:
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If
+            ``None``, ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
+        prune: Also remove the records of databases that are not built (any
+            more), or not where the current settings look for them.
+
+    Raises:
+        VectorDatabaseConfigError: If the vector database configuration is
+            invalid or the backend cannot be reached.
+    """
+    mode = resolve_vector_db_mode(vector_db)
+    built = {s.embedding_model: s for s in built_vector_databases(mode)}
+    recorded = {s.embedding_model: s for s in recorded_vector_databases(mode)}
+    added, kept = [], []
+    for model, store in built.items():
+        previous = recorded.get(model)
+        if previous is not None and previous.location == store.location:
+            kept.append(previous)
+            continue
+        date = last_modified(store.location) if mode == "local" else None
+        record_vector_database(model, mode, store.location, built_at=date)
+        added.append(BuiltStore(model, mode, store.location, store.count, date))
+    missing = [
+        store
+        for model, store in recorded.items()
+        if model not in built or built[model].location != store.location
+    ]
+    if prune:
+        for store in missing:
+            if store.embedding_model not in built:
+                forget_vector_database(store.embedding_model, mode)
+    return SyncResult(mode, added, kept, missing, prune)

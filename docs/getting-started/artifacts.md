@@ -17,9 +17,9 @@ project root.
 └── coding_cache.db         # coding results, with cache=True (OMOP runs)
 ```
 
-With `AATM_VECTOR_DB=cloud` or `AATM_VECTOR_DB=pinecone`, the search indexes live in
-Chroma Cloud or Pinecone instead of `chroma_vector_dbs/` (see
-[Environment variables](env.md#vector-database-local-chroma-cloud-or-pinecone)).
+With `AATM_VECTOR_DB=cloud`, `pinecone` or `pgvector`, the search indexes live in
+Chroma Cloud, Pinecone or PostgreSQL instead of `chroma_vector_dbs/` (see
+[Environment variables](env.md#vector-database)).
 
 `aatm init` also unpacks the vocabulary CSV files into `./vocabularies` (or
 `--vocab-dir`). They can be deleted once `omop.db` is built, unless you want to rebuild

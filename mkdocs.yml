@@ -57,6 +57,7 @@ nav:
       - Local database utilities: 'reference/local_database_utils.md'
       - Vector database location: 'reference/vector_db.md'
       - Vector stores: 'reference/vector_stores.md'
+      - PostgreSQL with pgvector: 'reference/pgvector_store.md'
       - Logs: 'reference/logs.md'
       - Prompt helpers: 'reference/prompt_helpers.md'
 

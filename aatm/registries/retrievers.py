@@ -7,7 +7,8 @@ retriever, including the model identifier, embedding function class, collection
 name, and optional rate limit metadata.
 
 The module also provides a factory function, `load_retriever`, which returns a
-``ChromaDBRetriever`` or a ``PineconeRetriever`` for a registered model name,
+``ChromaDBRetriever``, a ``PineconeRetriever`` or a ``PgVectorRetriever`` for a
+registered model name,
 depending on the configured vector database (see `aatm.vector_db`).
 """
 
@@ -29,9 +30,15 @@ from ..embedding_functions import (
     Qwen3EmbeddingModels,
 )
 from ..precision import COLLECTION_DTYPE_KEY, dtype_for_queries
-from ..retrievers import ChromaDBRetriever, PineconeRetriever, VectorStoreRetriever
+from ..retrievers import (
+    ChromaDBRetriever,
+    PgVectorRetriever,
+    PineconeRetriever,
+    VectorStoreRetriever,
+)
 from ..vector_db import (
     ChromaConnection,
+    PgVectorConnection,
     PineconeConnection,
     VectorDbConnection,
     resolve_vector_db_mode,
@@ -130,13 +137,31 @@ class ChromaRetrieverModelSpec:
         connection = PineconeConnection.from_env()
         return connection, self.pinecone_index_name(connection)
 
+    def pg_table_name(self, connection: PgVectorConnection) -> str:
+        """Return the name of this model's PostgreSQL table.
+
+        Each embedding model gets its own table, named
+        ``<AATM_PG_TABLE_PREFIX>_<name>`` and made a safe identifier (see
+        `aatm.pgvector_store.pg_table_name`).
+        """
+        return connection.table_name(self.name)
+
+    def pgvector_location(self) -> tuple[PgVectorConnection, str]:
+        """Return the PostgreSQL connection and this model's table name.
+
+        Raises:
+            VectorDatabaseConfigError: If an ``AATM_PG_*`` setting is invalid.
+        """
+        connection = PgVectorConnection.from_env()
+        return connection, self.pg_table_name(connection)
+
     def vector_db_location(
         self, vector_db: str | None = None, local_path: str | None = None
     ) -> tuple[VectorDbConnection, str]:
         """Return where this retriever's index lives, for any vector database.
 
         Args:
-            vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
+            vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If ``None``,
                 ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
             local_path: Directory of the local database. Defaults to
                 `chromadb_path`. Only used in local mode.
@@ -147,8 +172,11 @@ class ChromaRetrieverModelSpec:
         Raises:
             VectorDatabaseConfigError: If the configuration is invalid.
         """
-        if resolve_vector_db_mode(vector_db) == "pinecone":
+        mode = resolve_vector_db_mode(vector_db)
+        if mode == "pinecone":
             return self.pinecone_location()
+        if mode == "pgvector":
+            return self.pgvector_location()
         return self.chroma_location(vector_db, local_path)
 
     @property
@@ -234,7 +262,8 @@ def load_retriever(
 
     This function looks up a retriever specification in the model registry,
     opens the configured vector database (a local persistent ChromaDB
-    database, Chroma Cloud or Pinecone, see `aatm.vector_db`), instantiates the
+    database, Chroma Cloud, Pinecone or PostgreSQL with pgvector, see
+    `aatm.vector_db`), instantiates the
     corresponding embedding function, and returns a configured retriever.
 
     Only a built vector database is opened: one that does not exist or is
@@ -245,15 +274,16 @@ def load_retriever(
         model_name: Registry name of the retriever model to instantiate. If
             ``None``, the model built by ``aatm init`` (see
             `aatm.built_stores.default_vector_database`).
-        vector_db: ``local``, ``cloud`` or ``pinecone``. If ``None``,
-            ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
+        vector_db: ``local``, ``cloud``, ``pinecone`` or ``pgvector``. If
+            ``None``, ``AATM_VECTOR_DB`` decides, and otherwise ``local``.
         local_path: Directory of the local database, in local mode. Defaults
             to the model's directory under ``.aatm/chroma_vector_dbs``.
         **retriever_kwargs: Passed on to the retriever, e.g. ``top_k``,
             ``filter_strategy`` or ``overfetch_factor``.
 
     Returns:
-        A ``ChromaDBRetriever`` (local or cloud) or a ``PineconeRetriever``.
+        A ``ChromaDBRetriever`` (local or cloud), a ``PineconeRetriever`` or a
+        ``PgVectorRetriever``.
 
     Raises:
         ValueError: If the provided model name is not present in the retriever
@@ -275,8 +305,11 @@ def load_retriever(
         ) from e
 
     check_built(model_name, vector_db, local_path)
-    if resolve_vector_db_mode(vector_db) == "pinecone":
+    mode = resolve_vector_db_mode(vector_db)
+    if mode == "pinecone":
         return _load_pinecone_retriever(spec, **retriever_kwargs)
+    if mode == "pgvector":
+        return _load_pgvector_retriever(spec, **retriever_kwargs)
 
     connection, collection_name = spec.chroma_location(vector_db, local_path)
     client = connection.client()
@@ -322,6 +355,23 @@ def _load_pinecone_retriever(
     store = PineconeVectorStore.open(client, index_name)
     model_kwargs = _query_model_kwargs(spec, store.index_metadata())
     return PineconeRetriever(
+        store=store,
+        embedding_function=spec.embedding_function_cls(
+            model=spec.model_id,
+            **model_kwargs,  # type: ignore[call-arg]
+        ),
+        **retriever_kwargs,
+    )
+
+
+def _load_pgvector_retriever(
+    spec: ChromaRetrieverModelSpec, **retriever_kwargs: Any
+) -> PgVectorRetriever:
+    """Open a model's PostgreSQL table (checked to be built) and return a retriever."""
+    connection, table_name = spec.pgvector_location()
+    store = connection.open_store(table_name)
+    model_kwargs = _query_model_kwargs(spec, store.index_metadata())
+    return PgVectorRetriever(
         store=store,
         embedding_function=spec.embedding_function_cls(
             model=spec.model_id,

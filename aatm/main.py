@@ -103,7 +103,7 @@ import dotenv
 import typer
 from rich.console import Console
 from pathlib import Path
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, Any, List, Literal, Optional
 import os
 import questionary
 from questionary import Choice
@@ -391,9 +391,11 @@ def init(
             "--vector-db",
             help=(
                 "Where to build the vector database: 'local' (ChromaDB on this "
-                "machine), 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY) "
-                "or 'pinecone' (configured with PINECONE_API_KEY). "
-                "Overrides AATM_VECTOR_DB. Defaults to 'local'."
+                "machine), 'cloud' (Chroma Cloud, configured with CHROMA_API_KEY), "
+                "'pinecone' (configured with PINECONE_API_KEY) or 'pgvector' "
+                "(PostgreSQL, configured with AATM_PG_DSN). If not given, aatm "
+                "init asks, preselecting AATM_VECTOR_DB, and lists what each "
+                "backend needs and which models are built in it."
             ),
             show_default=False,
         ),
@@ -458,8 +460,11 @@ def init(
             mapping datasets. If not provided, the user is prompted to
             select one or more interactively.
         vector_db: Where to build the vector database, ``local``,
-            ``cloud`` or ``pinecone``. If not provided, `AATM_VECTOR_DB` is
-            used, and otherwise ``local``.
+            ``cloud``, ``pinecone`` or ``pgvector``. If not provided, the
+            user is asked (see `choose_vector_db`), with `AATM_VECTOR_DB`
+            preselected; without a terminal, `AATM_VECTOR_DB` is used, and
+            otherwise ``local``. The models already built there are listed
+            before the embedding model is chosen.
         vocab_zip: An Athena vocabulary bundle, as its download link or the
             path of the zip. It is downloaded if needed, unpacked into
             `vocab_dir`, and its CPT4 names are added when it includes CPT4.
@@ -508,6 +513,11 @@ def init(
         the `aatm[pinecone]` extra):
 
             $ aatm init --vector-db pinecone
+
+        Build the vector database in PostgreSQL with pgvector (needs
+        AATM_PG_DSN and the `aatm[pgvector]` extra):
+
+            $ aatm init --vector-db pgvector
     """
     # Setup local directories
     LOCAL_HELPER_PATH.mkdir(exist_ok=True, parents=True)
@@ -577,15 +587,36 @@ def init(
         import_pinecone,
     )
 
-    try:
-        vector_db_connection = connection_from_env(
-            local_path=".aatm/chroma_vector_dbs", mode=vector_db
-        )
-        if vector_db_connection.mode == "pinecone":
-            import_pinecone()
-    except VectorDatabaseConfigError as e:
-        console.print(f"[yellow]OOPS![/yellow] {e}\n")
-        raise typer.Exit()
+    if vector_db is None and sys.stdin.isatty():
+        vector_db = choose_vector_db()
+        if vector_db is None:  # Ctrl+C at the prompt
+            raise typer.Exit()
+
+    from aatm.pgvector_store import PgVectorConnectionError
+
+    for attempt in range(2):
+        try:
+            vector_db_connection = connection_from_env(
+                local_path=".aatm/chroma_vector_dbs", mode=vector_db
+            )
+            if vector_db_connection.mode == "pinecone":
+                import_pinecone()
+            elif vector_db_connection.mode == "pgvector":
+                # Fail before the long build steps if the server is unreachable.
+                vector_db_connection.client().close()  # type: ignore[union-attr]
+            break
+        except VectorDatabaseConfigError as e:
+            if (
+                attempt == 0
+                and isinstance(e, PgVectorConnectionError)
+                and sys.stdin.isatty()
+                and offer_local_pgvector(e)
+            ):
+                continue  # Retry with the server just started.
+            # Unwrapped, so the commands in the message can be copied.
+            console.print("[yellow]OOPS![/yellow]", end=" ")
+            console.print(f"{e}\n", markup=False, highlight=False, soft_wrap=True)
+            raise typer.Exit()
     vector_db = vector_db_connection.mode
 
     console.print("[blue]1) Building local OMOP vocabulary database[/blue]")
@@ -601,16 +632,23 @@ def init(
 
     console.print(
         "[blue]2) Building vector database[/blue]"
-        + {"cloud": " in Chroma Cloud", "pinecone": " in Pinecone"}.get(vector_db, "")
+        + {
+            "cloud": " in Chroma Cloud",
+            "pinecone": " in Pinecone",
+            "pgvector": " in PostgreSQL",
+        }.get(vector_db, "")
     )
 
+    built = built_in(vector_db)
+    if built:
+        console.print(f"Already built in {vector_db}:")
+        for store in built.values():
+            console.print(f"  {store.describe()}", markup=False, highlight=False)
+    else:
+        console.print(f"No vector database is built in {vector_db} yet.")
+
     if embedding_model is None:
-        supported_embedding_models_choices = [
-            Choice(f"{model_name} (default)", value=model_name)
-            if model_name == DEFAULT_EMBEDDING_MODEL
-            else Choice(model_name, value=model_name)
-            for model_name in SUPPORTED_EMBEDDING_MODELS
-        ]
+        supported_embedding_models_choices = embedding_model_choices(built)
         selected_embedding_model = questionary.select(
             "Select one of the supported embedding models for building the vector database:",
             choices=supported_embedding_models_choices,
@@ -648,6 +686,349 @@ def init(
         selected_embedding_model, embedding_dtype=embedding_dtype, vector_db=vector_db
     )
     console.print("[green]Done![/green]\n")
+
+
+def built_in(mode: str, quick: bool = False) -> dict[str, Any]:
+    """The vector databases built in one backend, by embedding model, newest first.
+
+    A local database is checked on disk. For a remote one, ``quick`` reads only
+    what ``.aatm/config.yaml`` records, keeping the records of the collection,
+    index or table the current settings point to (a record made with another
+    ``AATM_PG_TABLE_PREFIX``, say, is left out). Otherwise the backend is asked,
+    falling back to those records if it cannot be reached.
+
+    Returns:
+        `aatm.built_stores.BuiltStore` objects keyed by embedding model.
+    """
+    from aatm.built_stores import built_vector_databases, recorded_vector_databases
+
+    stores = None
+    if mode == "local" or not quick:
+        try:
+            stores = built_vector_databases(mode)
+        except Exception as e:
+            logger.debug(f"Could not list the {mode} vector databases: {e!r}")
+    if stores is None:
+        stores = [s for s in recorded_vector_databases(mode) if _is_current(s)]
+    newest_first = sorted(stores, key=lambda s: s.built_at or "", reverse=True)
+    return {store.embedding_model: store for store in newest_first}
+
+
+def _is_current(store: Any) -> bool:
+    """Whether a recorded database is where the current settings would look for it."""
+    from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY
+
+    spec = CHROMADB_RETRIEVER_MODEL_REGISTRY.get(store.embedding_model)
+    if spec is None:
+        return False
+    try:
+        _, name = spec.vector_db_location(store.vector_db)
+    except Exception:
+        return False
+    return bool(name == store.location)
+
+
+def vector_db_choices(
+    default: str, env: Optional[dict[str, str]] = None
+) -> tuple[list[Choice], str]:
+    """The choices of the vector database prompt in ``aatm init``, and the default.
+
+    Each choice says what the backend is and which embedding models are built in
+    it. A backend that misses a setting or a package is shown disabled, with
+    what to set or install.
+
+    Args:
+        default: The mode to preselect, e.g. from ``AATM_VECTOR_DB``. Falls back
+            to ``local`` when it is not usable.
+        env: Environment to read. Defaults to `os.environ`.
+
+    Returns:
+        The choices, and the mode to preselect.
+    """
+    from aatm.vector_db import (
+        PG_DSN_ENV_VAR,
+        VECTOR_DB_LABELS,
+        VECTOR_DB_MODES,
+        pg_target,
+        vector_db_setup_problem,
+    )
+
+    env = dict(os.environ) if env is None else env
+    choices = []
+    usable = []
+    for mode in VECTOR_DB_MODES:
+        problem = vector_db_setup_problem(mode, env)
+        title = f"{mode:<9} {VECTOR_DB_LABELS[mode]}"
+        if mode == "pgvector" and problem is None:
+            dsn = (env.get(PG_DSN_ENV_VAR) or "").strip()
+            title += f" at {pg_target(dsn, env)}"
+            if not dsn:
+                title += f" ({PG_DSN_ENV_VAR} not set)"
+        if problem is None:
+            usable.append(mode)
+            built = list(built_in(mode, quick=True))
+            if built:
+                title += f"  (built: {', '.join(built)})"
+        choices.append(Choice(title, value=mode, disabled=problem))
+    return choices, default if default in usable else "local"
+
+
+def choose_vector_db() -> Optional[str]:
+    """Ask where to build the vector database, preselecting ``AATM_VECTOR_DB``.
+
+    Returns:
+        The chosen mode, or ``None`` if the prompt was cancelled.
+    """
+    from aatm.vector_db import VectorDatabaseConfigError, resolve_vector_db_mode
+
+    configured: str
+    try:
+        configured = resolve_vector_db_mode()
+    except VectorDatabaseConfigError:
+        configured = "local"
+    choices, default = vector_db_choices(configured)
+    return questionary.select(
+        "Where should the vector database be built?",
+        choices=choices,
+        default=default,
+    ).ask()
+
+
+def offer_local_pgvector(error: Exception) -> bool:
+    """Offer to start PostgreSQL with pgvector in Docker when it cannot be reached.
+
+    The user chooses between starting a local container (see
+    `aatm.pg_docker`) and setting ``AATM_PG_DSN`` themselves. For the container:
+
+    1. If Docker is not installed, not running or not usable, AATM explains how
+       to fix that on this platform, can open Docker Desktop, and checks again
+       (`ensure_docker`).
+    2. It shows the memory and CPUs a container can use, suggests index build
+       settings for them, and lets the user change them (`choose_build`).
+    3. An existing container with too little shared memory for those settings
+       can be recreated; its data stays in its volume.
+    4. It starts the container and saves ``AATM_PG_DSN`` and the build settings
+       to ``.env``, and offers to save ``AATM_VECTOR_DB=pgvector`` too.
+
+    Args:
+        error: The connection error, whose first line is shown.
+
+    Returns:
+        Whether a server was started and its settings saved, so the connection
+        is worth trying again.
+    """
+    from aatm import pg_docker
+    from aatm.vector_db import PG_DSN_ENV_VAR, VECTOR_DB_ENV_VAR
+
+    console.print(str(error).splitlines()[0], style="yellow", markup=False)
+    status = pg_docker.docker_status()
+    docker_title = (
+        "Start PostgreSQL with pgvector in Docker on this machine, and save its "
+        "settings to .env"
+    )
+    if not status.ready:
+        docker_title += f" ({status.reason()}: AATM shows how to fix that)"
+    answer = questionary.select(
+        "PostgreSQL is not reachable. How would you like to set it up?",
+        choices=[
+            Choice(docker_title, value="docker"),
+            Choice(f"I'll set {PG_DSN_ENV_VAR} myself", value="manual"),
+        ],
+        default="docker",
+    ).ask()
+    if answer != "docker" or not ensure_docker(status):
+        return False
+
+    choice = choose_build()
+    if choice is None:
+        return False
+    build, recreate, resources = choice
+
+    try:
+        server = pg_docker.start_local_pgvector(
+            log=console.print, build=build, recreate=recreate, resources=resources
+        )
+    except pg_docker.LocalPgVectorError as e:
+        console.print(str(e), style="red", markup=False, soft_wrap=True)
+        return False
+
+    values = server.env()
+    if (os.environ.get(VECTOR_DB_ENV_VAR) or "").strip().lower() != "pgvector":
+        use_by_default = questionary.confirm(
+            f"Also save {VECTOR_DB_ENV_VAR}=pgvector to .env, so aatm map, the "
+            "search UI and load_retriever() use PostgreSQL by default?",
+            default=True,
+        ).ask()
+        if use_by_default:
+            values[VECTOR_DB_ENV_VAR] = "pgvector"
+    pg_docker.save_env(values)
+    saved = ", ".join(f"{key}={value}" for key, value in values.items())
+    console.print(f"[green]PostgreSQL is ready.[/green] Saved to .env: {saved}")
+    return True
+
+
+def ensure_docker(status: Any = None) -> bool:
+    """Guide the user until Docker answers, or they give up.
+
+    Explains how to install, start or get access to Docker on this platform
+    (`aatm.pg_docker.docker_guidance`), offers to open Docker Desktop when it is
+    installed but stopped, and checks again whenever the user says so.
+
+    Args:
+        status: A `aatm.pg_docker.DockerStatus` already read, or ``None``.
+
+    Returns:
+        Whether Docker is ready.
+    """
+    from aatm import pg_docker
+    from aatm.vector_db import PG_DSN_ENV_VAR
+
+    status = status or pg_docker.docker_status()
+    while not status.ready:
+        console.print(pg_docker.docker_guidance(status), markup=False, soft_wrap=True)
+        choices = []
+        if status.state == "stopped" and pg_docker.docker_desktop_command():
+            choices.append(
+                Choice("Start Docker Desktop for me, and wait", value="launch")
+            )
+        choices += [
+            Choice("Check again (once Docker is installed or running)", value="retry"),
+            Choice(f"Stop here; I'll set {PG_DSN_ENV_VAR} myself", value="stop"),
+        ]
+        answer = questionary.select(
+            "Docker is needed to run PostgreSQL on this machine. What next?",
+            choices=choices,
+            default=choices[0].value,
+        ).ask()
+        if answer == "launch":
+            pg_docker.launch_docker_desktop()
+            with console.status("Waiting for Docker to start (up to 3 minutes)..."):
+                status = pg_docker.wait_for_docker()
+            if not status.ready:
+                console.print("Docker did not answer yet.", style="yellow")
+        elif answer == "retry":
+            status = pg_docker.docker_status()
+        else:
+            return False
+    return True
+
+
+def choose_build() -> Optional[tuple[Any, bool, Any]]:
+    """Suggest index build settings for this machine, and let the user change them.
+
+    Shows the memory and CPUs a container can use, the suggested build memory
+    and workers (`aatm.pg_docker.suggest_build`), and asks whether to use them
+    or enter others, checked against those resources. When an existing
+    container has too little shared memory for the chosen memory, asks whether
+    to recreate it (its data stays in its volume) or build with less.
+
+    Returns:
+        The `aatm.pg_docker.BuildSettings`, whether to recreate the container,
+        and the `aatm.pg_docker.Resources`; ``None`` if a prompt was cancelled.
+    """
+    from aatm import pg_docker
+
+    resources = pg_docker.detect_resources()
+    state = pg_docker.container_state()
+    suggested = pg_docker.suggest_build(resources)
+    memory_text = suggested.maintenance_work_mem
+    console.print(f"{resources.describe()}.", markup=False)
+    console.print(
+        f"Suggested for building the search index: [bold]{memory_text}[/bold] of "
+        f"memory and [bold]{suggested.workers}[/bold] parallel workers."
+    )
+    console.print(
+        "[dim]30% of the memory a container can use (at most 16 GB, enough for the "
+        "full index of every model) and one worker per CPU but one (at most 7). "
+        "PostgreSQL's defaults, 64 MB and 2 workers, build the full index "
+        "several times slower.[/dim]"
+    )
+    answer = questionary.select(
+        "Index build settings:",
+        choices=[
+            Choice("Use the suggested settings", value="use"),
+            Choice("Change them", value="change"),
+        ],
+        default="use",
+    ).ask()
+    if answer is None:
+        return None
+    build = suggested
+    if answer == "change":
+
+        def valid_memory(text: str) -> bool | str:
+            try:
+                memory = pg_docker.parse_memory(text)
+            except ValueError as e:
+                return str(e)
+            return pg_docker.check_build(memory, 1, resources) or True
+
+        def valid_workers(text: str) -> bool | str:
+            if not text.strip().isdigit():
+                return "Enter a whole number."
+            return pg_docker.check_build(64 * 2**20, int(text), resources) or True
+
+        memory_answer = questionary.text(
+            "Memory for index builds (e.g. 8GB or 4096MB):",
+            default=memory_text,
+            validate=valid_memory,
+        ).ask()
+        if memory_answer is None:
+            return None
+        workers_answer = questionary.text(
+            f"Parallel workers (1 to {pg_docker.MAX_BUILD_WORKERS}):",
+            default=str(suggested.workers),
+            validate=valid_workers,
+        ).ask()
+        if workers_answer is None:
+            return None
+        build = pg_docker.custom_build(
+            pg_docker.parse_memory(memory_answer), int(workers_answer.strip())
+        )
+
+    recreate = False
+    if state is not None and not pg_docker.fits(build, state.shm_bytes):
+        shm = state.shm_bytes or 0
+        allowed = max(64 * 2**20, shm - 256 * 2**20)
+        name = pg_docker.CONTAINER_NAME
+        answer = questionary.select(
+            f"The container '{name}' already exists, with {shm // 2**20} MB of shared "
+            f"memory: enough for {allowed // 2**20}MB of build memory, not "
+            f"{build.maintenance_work_mem}. What should AATM do?",
+            choices=[
+                Choice(
+                    f"Recreate it with {build.shm_bytes // 2**20} MB of shared memory "
+                    f"(its data stays in the volume '{name}')",
+                    value="recreate",
+                ),
+                Choice(f"Keep it, and build with {allowed // 2**20}MB", value="keep"),
+            ],
+            default="recreate",
+        ).ask()
+        if answer is None:
+            return None
+        recreate = answer == "recreate"
+    return build, recreate, resources
+
+
+def embedding_model_choices(built: dict[str, Any]) -> list[Choice]:
+    """The embedding model choices of ``aatm init``, marking the models already built."""
+    choices = []
+    for model_name in SUPPORTED_EMBEDDING_MODELS:
+        notes = []
+        if model_name == DEFAULT_EMBEDDING_MODEL:
+            notes.append("default")
+        if model_name in built:
+            store = built[model_name]
+            note = "built"
+            if store.count is not None:
+                note += f", {store.count:,} expressions"
+            if store.built_at:
+                note += f", {store.built_at[:10]}"
+            notes.append(note)
+        title = model_name + (f" ({'; '.join(notes)})" if notes else "")
+        choices.append(Choice(title, value=model_name))
+    return choices
 
 
 STREAMLIT_FILE_WATCHER_ENV_VAR = "STREAMLIT_SERVER_FILE_WATCHER_TYPE"
@@ -1159,7 +1540,7 @@ def schema(
 vector_db_app = typer.Typer(
     help=(
         "Check the vector database settings or upload a local index to Chroma "
-        "Cloud or Pinecone"
+        "Cloud, Pinecone or PostgreSQL"
     )
 )
 app.add_typer(vector_db_app, name="vector-db")
@@ -1173,7 +1554,7 @@ def vector_db_check(
         Optional[str],
         typer.Option(
             "--vector-db",
-            help="'local', 'cloud' or 'pinecone'. Overrides AATM_VECTOR_DB.",
+            help="'local', 'cloud', 'pinecone' or 'pgvector'. Overrides AATM_VECTOR_DB.",
         ),
     ] = None,
 ) -> None:
@@ -1197,18 +1578,38 @@ def vector_db_check(
         raise typer.Exit(code=1)
 
     if mode == "local":
+        from aatm.built_stores import recorded_vector_databases
+
+        recorded = {s.embedding_model for s in recorded_vector_databases("local")}
+        unrecorded = 0
         console.print("Vector database: [bold]local[/bold]")
         for name, (connection, collection_name) in locations.items():
             path = getattr(connection, "path", None)
-            status = (
-                "[green]built[/green]" if path and Path(path).exists() else "not built"
-            )
+            if not (path and Path(path).exists()):
+                status = "not built"
+            elif name in recorded:
+                status = "[green]built[/green]"
+            else:
+                status = "[green]built[/green], not recorded"
+                unrecorded += 1
             console.print(f"  {name}: {path} ({status})")
+        if unrecorded:
+            console.print(
+                f"{unrecorded} built database(s) are not recorded in .aatm/config.yaml, "
+                "so retrievers cannot default to them. Record them with: "
+                "aatm vector-db sync",
+                style="yellow",
+            )
         _print_recorded_default(mode)
         return
 
     connection = next(iter(locations.values()))[0]
     console.print(f"Vector database: [bold]{connection.describe()}[/bold]")
+    if mode == "pgvector":
+        _check_pgvector(connection, locations)  # type: ignore[arg-type]
+        _print_recorded_default(mode)
+        return
+
     service = "Pinecone" if mode == "pinecone" else "Chroma Cloud"
     kind = "index" if mode == "pinecone" else "collection"
     try:
@@ -1231,6 +1632,193 @@ def vector_db_check(
     _print_recorded_default(mode)
 
 
+@vector_db_app.command(
+    "sync",
+    help=(
+        "Record the built vector databases that .aatm/config.yaml does not list, "
+        "e.g. built before AATM recorded its builds, and choose the default"
+    ),
+)
+def vector_db_sync(
+    vector_db: Annotated[
+        Optional[str],
+        typer.Option(
+            "--vector-db",
+            help=(
+                "'local', 'cloud', 'pinecone' or 'pgvector'. Defaults to local and, "
+                "if different, AATM_VECTOR_DB."
+            ),
+            show_default=False,
+        ),
+    ] = None,
+    default: Annotated[
+        Optional[str],
+        typer.Option(
+            "--default",
+            help=(
+                "Embedding model retrievers use when none is given, instead of the "
+                "most recently built one. Applies to --vector-db (or AATM_VECTOR_DB)."
+            ),
+            show_default=False,
+        ),
+    ] = None,
+    prune: Annotated[
+        bool,
+        typer.Option(
+            "--prune",
+            help="Also remove the records of databases that are not built any more.",
+        ),
+    ] = False,
+) -> None:
+    """Record built vector databases missing from ``.aatm/config.yaml``.
+
+    Local indexes are dated from when their files last changed; remote ones
+    get no date. Existing records are kept. See
+    `aatm.built_stores.sync_vector_databases`.
+
+    Raises:
+        typer.Exit: With code 1 if a configuration is invalid, a backend cannot
+            be reached, or ``--default`` names a model that is not built.
+    """
+    from aatm.built_stores import (
+        CONFIG_PATH,
+        default_vector_database,
+        set_default_vector_database,
+        sync_vector_databases,
+    )
+    from aatm.vector_db import VectorDatabaseConfigError, resolve_vector_db_mode
+
+    try:
+        configured = resolve_vector_db_mode(vector_db)
+    except VectorDatabaseConfigError as e:
+        console.print(f"[yellow]OOPS![/yellow] {e}")
+        raise typer.Exit(code=1)
+    modes = (
+        [configured]
+        if vector_db is not None
+        else list(dict.fromkeys(["local", configured]))
+    )
+
+    results = {}
+    for mode in modes:
+        try:
+            results[mode] = sync_vector_databases(mode, prune=prune)
+        except VectorDatabaseConfigError as e:
+            console.print(f"{mode}: could not check it.", style="yellow")
+            console.print(str(e), markup=False, soft_wrap=True)
+            raise typer.Exit(code=1)
+
+    for mode, result in results.items():
+        console.print(f"[bold]{mode}[/bold]")
+        for store in result.added:
+            date = f", last changed {store.built_at[:10]}" if store.built_at else ""
+            console.print(
+                f"  [green]recorded[/green] {store.embedding_model} ({store.location}{date})",
+                markup=True,
+                highlight=False,
+            )
+        for store in result.kept:
+            console.print(
+                f"  already recorded {store.embedding_model}", highlight=False
+            )
+        for store in result.missing:
+            action = "[yellow]removed[/yellow]" if result.pruned else "not built"
+            console.print(
+                f"  {action} {store.embedding_model} ({store.location})",
+                highlight=False,
+            )
+        if not (result.added or result.kept or result.missing):
+            console.print("  nothing built")
+        if result.missing and not result.pruned:
+            console.print(
+                "  [dim]Records of databases that are not built are kept; "
+                "--prune removes them.[/dim]"
+            )
+
+    if default is not None:
+        built = {s.embedding_model for s in results[configured].added} | {
+            s.embedding_model for s in results[configured].kept
+        }
+        if default not in built:
+            console.print(
+                f"[yellow]OOPS![/yellow] '{default}' is not built in {configured}. "
+                f"Built: {', '.join(sorted(built)) or 'none'}."
+            )
+            raise typer.Exit(code=1)
+        set_default_vector_database(default, configured)
+
+    for mode in modes:
+        try:
+            chosen = default_vector_database(mode)
+        except Exception:
+            continue
+        console.print(
+            f"Default {mode} retriever: [bold]{chosen.embedding_model}[/bold]"
+            + ("" if default else "  [dim](choose another with --default)[/dim]")
+        )
+    console.print(f"[dim]Records are in {CONFIG_PATH.as_posix()}.[/dim]")
+
+
+def _check_pgvector(connection: Any, locations: dict[str, tuple[Any, str]]) -> None:
+    """Connect to PostgreSQL, check pgvector and list the built tables.
+
+    Raises:
+        typer.Exit: With code 1 if the connection fails or pgvector is missing
+            and cannot be installed by AATM.
+    """
+    from aatm.pgvector_store import (
+        ITERATIVE_SCAN_MIN_VERSION,
+        pg_table_count,
+        pgvector_version,
+    )
+    from aatm.vector_db import VectorDatabaseConfigError
+
+    try:
+        with connection.client() as conn:
+            server = conn.execute("SHOW server_version").fetchone()[0]
+            version = pgvector_version(conn)
+            available = conn.execute(
+                "SELECT default_version FROM pg_available_extensions "
+                "WHERE name = 'vector'"
+            ).fetchone()
+    except VectorDatabaseConfigError as e:
+        console.print(str(e), style="red", markup=False, soft_wrap=True)
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Connected[/green] (PostgreSQL {server}).")
+    if version is not None:
+        text = ".".join(str(part) for part in version)
+        if version < ITERATIVE_SCAN_MIN_VERSION:
+            console.print(
+                f"pgvector {text}: [yellow]upgrade to 0.8 or later[/yellow] for "
+                "iterative index scans, which filtered searches rely on."
+            )
+        else:
+            console.print(f"pgvector {text}.")
+    elif available is not None:
+        console.print(
+            f"pgvector {available[0]} is available but not installed in this "
+            "database; `aatm init --vector-db pgvector` installs it (or run "
+            "`CREATE EXTENSION vector;`)."
+        )
+    else:
+        console.print(
+            "[red]pgvector is not available on this server.[/red] Install it, "
+            "or use the pgvector/pgvector Docker image."
+        )
+        raise typer.Exit(code=1)
+
+    for name, (_, table_name) in locations.items():
+        rows = pg_table_count(connection.dsn, table_name)
+        if rows is None:
+            status = "not built"
+        elif rows == 0:
+            status = "empty"
+        else:
+            status = f"[green]built[/green], about {rows:,} rows"
+        console.print(f"  {name}: table '{table_name}' ({status})")
+
+
 def _print_recorded_default(mode: str) -> None:
     """Print the vector database a retriever defaults to, if one is recorded."""
     from aatm.built_stores import CONFIG_PATH, recorded_vector_databases
@@ -1245,7 +1833,10 @@ def _print_recorded_default(mode: str) -> None:
 
 @vector_db_app.command(
     "upload",
-    help="Copy a local vector database to Chroma Cloud or Pinecone without re-embedding",
+    help=(
+        "Copy a local vector database to Chroma Cloud, Pinecone or PostgreSQL "
+        "without re-embedding"
+    ),
 )
 def vector_db_upload(
     embedding_model: Annotated[
@@ -1280,7 +1871,7 @@ def vector_db_upload(
         str,
         typer.Option(
             "--to",
-            help="Destination: 'cloud' (Chroma Cloud) or 'pinecone'.",
+            help="Destination: 'cloud' (Chroma Cloud), 'pinecone' or 'pgvector'.",
         ),
     ] = "cloud",
     ids_file: Annotated[
@@ -1295,7 +1886,7 @@ def vector_db_upload(
         ),
     ] = None,
 ) -> None:
-    """Upload a local index to Chroma Cloud or Pinecone. Re-running resumes where it stopped.
+    """Upload a local index to Chroma Cloud, Pinecone or PostgreSQL. Re-running resumes.
 
     Raises:
         typer.Exit: With code 1 if the model is unknown, the local database is
