@@ -58,6 +58,9 @@ class FakeDocker:
             shm_bytes = int(shm.split("=")[1].rstrip("m")) * 2**20
             self.containers[name] = {"running": True, "port": port, "shm": shm_bytes}
             return self._result(0, "abc123")
+        if command == "rm":
+            self.containers.pop(args[-1], None)
+            return self._result(0, args[-1])
         if command == "start":
             self.containers[args[2]]["running"] = True
             return self._result(0, args[2])
@@ -78,6 +81,8 @@ def no_wait(dsn, timeout):
 @pytest.fixture(autouse=True)
 def free_5432(monkeypatch):
     monkeypatch.setattr(pg_docker, "free_port", lambda: 5432)
+    # Size from the fake Docker only, not from this machine's free memory.
+    monkeypatch.setattr(pg_docker, "host_memory_reading", lambda: (None, None))
 
 
 def test_docker_must_be_running():
@@ -201,100 +206,435 @@ def test_save_env_creates_the_file(tmp_path):
 
 
 class Answers:
-    """Stand-in for questionary prompts: returns queued answers, records questions."""
+    """Stand-in for questionary prompts: answers in order, and records the questions."""
 
-    def __init__(self, monkeypatch, select=None, confirm=None):
+    def __init__(self, monkeypatch, *answers):
+        self.answers = list(answers)
         self.questions = []
         self.choices = []
+        self.defaults = []
 
-        def make(answer):
-            def prompt(question, **kwargs):
-                self.questions.append(question)
-                self.choices.append(kwargs.get("choices"))
-                return type("Q", (), {"ask": lambda _self: answer})()
+        def prompt(question, **kwargs):
+            self.questions.append(question)
+            self.choices.append(kwargs.get("choices"))
+            self.defaults.append(kwargs.get("default"))
+            validate = kwargs.get("validate")
+            answer = self.answers.pop(0)
+            if validate is not None and answer is not None:
+                assert validate(answer) is True, (answer, validate(answer))
+            return type("Q", (), {"ask": lambda _self: answer})()
 
-            return prompt
-
-        monkeypatch.setattr(main.questionary, "select", make(select))
-        monkeypatch.setattr(main.questionary, "confirm", make(confirm))
+        for kind in ("select", "confirm", "text"):
+            monkeypatch.setattr(main.questionary, kind, prompt)
 
 
-def server(dsn):
-    return pg_docker.LocalServer(dsn, pg_docker.BuildSettings("8192MB", 7, 9 * 2**30))
+READY = pg_docker.DockerStatus("ready")
+RESOURCES = pg_docker.Resources(
+    docker_memory=64 * 2**30, docker_cpus=8, host_memory=128 * 2**30
+)
+
+
+def server(dsn, build=None):
+    return pg_docker.LocalServer(
+        dsn, build or pg_docker.BuildSettings("8192MB", 7, 9 * 2**30)
+    )
 
 
 @pytest.fixture
 def in_tmp(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("AATM_PG_DSN", raising=False)
+    monkeypatch.delenv("AATM_VECTOR_DB", raising=False)
+    monkeypatch.setattr(pg_docker, "docker_status", lambda run=None: READY)
+    monkeypatch.setattr(pg_docker, "detect_resources", lambda run=None: RESOURCES)
+    monkeypatch.setattr(pg_docker, "container_state", lambda name=None, run=None: None)
     return tmp_path
 
 
-def test_choosing_docker_starts_it_and_saves_the_settings(in_tmp, monkeypatch):
-    monkeypatch.setattr(pg_docker, "docker_problem", lambda: None)
-    monkeypatch.setattr(
-        pg_docker,
-        "start_local_pgvector",
-        lambda log: server("postgresql://postgres@127.0.0.1:5432/aatm"),
-    )
-    answers = Answers(monkeypatch, select="docker", confirm=True)
+@pytest.fixture
+def started(monkeypatch):
+    """Record how `start_local_pgvector` is called, and pretend it worked."""
+    calls = []
+
+    def start(log, build=None, recreate=False, resources=None):
+        calls.append({"build": build, "recreate": recreate})
+        return server("postgresql://postgres@127.0.0.1:5432/aatm", build)
+
+    monkeypatch.setattr(pg_docker, "start_local_pgvector", start)
+    return calls
+
+
+def test_choosing_docker_starts_it_and_saves_the_settings(in_tmp, monkeypatch, started):
+    answers = Answers(monkeypatch, "docker", "use", True)
 
     assert main.offer_local_pgvector(OSError("Could not connect\nmore")) is True
 
+    suggested = pg_docker.suggest_build(RESOURCES)
+    assert started == [{"build": suggested, "recreate": False}]
     assert (in_tmp / ".env").read_text().splitlines() == [
         "AATM_PG_DSN=postgresql://postgres@127.0.0.1:5432/aatm",
-        "AATM_PG_MAINTENANCE_WORK_MEM=8192MB",
-        "AATM_PG_BUILD_WORKERS=7",
+        f"AATM_PG_MAINTENANCE_WORK_MEM={suggested.maintenance_work_mem}",
+        f"AATM_PG_BUILD_WORKERS={suggested.workers}",
         "AATM_VECTOR_DB=pgvector",
     ]
-    assert "AATM_VECTOR_DB=pgvector" in answers.questions[1]
+    assert "AATM_VECTOR_DB=pgvector" in answers.questions[-1]
 
 
-def test_the_default_backend_is_left_alone_if_declined(in_tmp, monkeypatch):
-    monkeypatch.setattr(pg_docker, "docker_problem", lambda: None)
-    monkeypatch.setattr(
-        pg_docker, "start_local_pgvector", lambda log: server("postgresql://x")
-    )
-    Answers(monkeypatch, select="docker", confirm=False)
+def test_the_suggestion_can_be_changed(in_tmp, monkeypatch, started):
+    Answers(monkeypatch, "docker", "change", "4GB", "3", False)
 
     main.offer_local_pgvector(OSError("x"))
 
-    assert "AATM_VECTOR_DB" not in (in_tmp / ".env").read_text()
+    (call,) = started
+    assert call["build"].maintenance_work_mem == "4096MB"
+    assert call["build"].workers == 3
+    assert call["build"].shm_bytes == 5 * 2**30  # a new container gets 1 GB more
+    env = (in_tmp / ".env").read_text()
+    assert "AATM_PG_MAINTENANCE_WORK_MEM=4096MB" in env
+    assert "AATM_PG_BUILD_WORKERS=3" in env
+    assert "AATM_VECTOR_DB" not in env
+
+
+def test_changed_settings_are_checked_against_the_resources(in_tmp, monkeypatch):
+    validators = {}
+
+    def text(question, default=None, validate=None):
+        validators[question.split(" ")[0]] = validate
+        return type("Q", (), {"ask": lambda _self: None})()
+
+    Answers(monkeypatch, "docker", "change")
+    monkeypatch.setattr(main.questionary, "text", text)
+
+    assert main.offer_local_pgvector(OSError("x")) is False
+
+    memory = validators["Memory"]
+    assert memory("8GB") is True
+    assert "Not a memory size" in memory("lots")
+    assert "more than 80%" in memory("60GB")  # Docker can use 64 GB
+    assert "at least 64 MB" in memory("10MB")
+
+
+def test_too_many_workers_are_refused(in_tmp, monkeypatch):
+    seen = {}
+
+    def text(question, default=None, validate=None):
+        seen[question.split(" ")[0]] = validate
+        answer = "8GB" if question.startswith("Memory") else None
+        return type("Q", (), {"ask": lambda _self: answer})()
+
+    Answers(monkeypatch, "docker", "change")
+    monkeypatch.setattr(main.questionary, "text", text)
+
+    main.offer_local_pgvector(OSError("x"))
+
+    workers = seen["Parallel"]
+    assert workers("7") is True
+    assert "1 to 7 workers" in workers("12")
+    assert "whole number" in workers("two")
+
+
+def test_an_undersized_container_can_be_recreated(in_tmp, monkeypatch, started):
+    existing = pg_docker.ContainerState(running=True, port=5432, shm_bytes=2**30)
+    monkeypatch.setattr(
+        pg_docker, "container_state", lambda name=None, run=None: existing
+    )
+    answers = Answers(monkeypatch, "docker", "use", "recreate", False)
+
+    main.offer_local_pgvector(OSError("x"))
+
+    assert "1024 MB of shared memory" in answers.questions[2]
+    assert "data stays in the volume" in answers.choices[2][0].title
+    assert started[0]["recreate"] is True
+
+
+def test_an_undersized_container_can_be_kept(in_tmp, monkeypatch, started):
+    existing = pg_docker.ContainerState(running=True, port=5432, shm_bytes=2**30)
+    monkeypatch.setattr(
+        pg_docker, "container_state", lambda name=None, run=None: existing
+    )
+    Answers(monkeypatch, "docker", "use", "keep", False)
+
+    main.offer_local_pgvector(OSError("x"))
+
+    assert started[0]["recreate"] is False
+
+
+def test_a_container_with_enough_shared_memory_is_not_questioned(
+    in_tmp, monkeypatch, started
+):
+    existing = pg_docker.ContainerState(running=True, port=5432, shm_bytes=40 * 2**30)
+    monkeypatch.setattr(
+        pg_docker, "container_state", lambda name=None, run=None: existing
+    )
+    answers = Answers(monkeypatch, "docker", "use", False)
+
+    main.offer_local_pgvector(OSError("x"))
+
+    assert len(answers.questions) == 3  # no recreate question
+    assert started[0]["recreate"] is False
 
 
 def test_setting_it_myself_changes_nothing(in_tmp, monkeypatch):
-    monkeypatch.setattr(pg_docker, "docker_problem", lambda: None)
-
-    def must_not_start(log):
+    def must_not_start(**kwargs):
         raise AssertionError("must not start a container")
 
     monkeypatch.setattr(pg_docker, "start_local_pgvector", must_not_start)
-    Answers(monkeypatch, select="manual")
+    Answers(monkeypatch, "manual")
 
     assert main.offer_local_pgvector(OSError("x")) is False
     assert not (in_tmp / ".env").exists()
 
 
-def test_without_docker_the_option_is_disabled_with_the_reason(in_tmp, monkeypatch):
-    monkeypatch.setattr(pg_docker, "docker_problem", lambda: "Docker is not running")
-    answers = Answers(monkeypatch, select="manual")
+def test_a_failed_start_is_reported_and_nothing_is_saved(in_tmp, monkeypatch):
+    def fails(**kwargs):
+        raise pg_docker.LocalPgVectorError("image not found")
+
+    monkeypatch.setattr(pg_docker, "start_local_pgvector", fails)
+    Answers(monkeypatch, "docker", "use")
+
+    assert main.offer_local_pgvector(OSError("x")) is False
+    assert not (in_tmp / ".env").exists()
+
+
+# --- Without Docker --------------------------------------------------------------
+
+
+def test_the_docker_choice_says_what_is_missing(in_tmp, monkeypatch):
+    status = pg_docker.DockerStatus("missing")
+    monkeypatch.setattr(pg_docker, "docker_status", lambda run=None: status)
+    answers = Answers(monkeypatch, "manual")
 
     main.offer_local_pgvector(OSError("x"))
 
     docker_choice = answers.choices[0][0]
-    assert docker_choice.disabled == "Docker is not running"
+    assert docker_choice.disabled is None  # chosen, it explains what to do
+    assert "Docker is not installed: AATM shows how to fix that" in docker_choice.title
 
 
-def test_a_failed_start_is_reported_and_nothing_is_saved(in_tmp, monkeypatch):
-    def fails(log):
-        raise pg_docker.LocalPgVectorError("image not found")
+def test_missing_docker_is_explained_and_checked_again(in_tmp, monkeypatch, started):
+    statuses = iter([pg_docker.DockerStatus("missing"), READY])
+    monkeypatch.setattr(pg_docker, "docker_status", lambda run=None: next(statuses))
+    shown = []
+    monkeypatch.setattr(
+        main.console, "print", lambda *a, **k: shown.append(" ".join(map(str, a)))
+    )
+    answers = Answers(monkeypatch, "docker", "retry", "use", False)
 
-    monkeypatch.setattr(pg_docker, "docker_problem", lambda: None)
-    monkeypatch.setattr(pg_docker, "start_local_pgvector", fails)
-    Answers(monkeypatch, select="docker")
+    assert main.offer_local_pgvector(OSError("x")) is True
+
+    assert any("Install Docker" in line for line in shown)
+    values = [c.value for c in answers.choices[1]]
+    assert values == ["retry", "stop"]  # nothing to launch when it is not installed
+    assert started
+
+
+def test_stopped_docker_desktop_can_be_started_for_the_user(
+    in_tmp, monkeypatch, started
+):
+    monkeypatch.setattr(
+        pg_docker, "docker_status", lambda run=None: pg_docker.DockerStatus("stopped")
+    )
+    monkeypatch.setattr(pg_docker, "docker_desktop_command", lambda: ["Docker.exe"])
+    launched = []
+    monkeypatch.setattr(pg_docker, "launch_docker_desktop", lambda: launched.append(1))
+    monkeypatch.setattr(pg_docker, "wait_for_docker", lambda: READY)
+    answers = Answers(monkeypatch, "docker", "launch", "use", False)
+
+    assert main.offer_local_pgvector(OSError("x")) is True
+
+    assert launched == [1]
+    assert answers.choices[1][0].value == "launch"
+    assert answers.defaults[1] == "launch"
+
+
+def test_giving_up_on_docker_stops_the_offer(in_tmp, monkeypatch):
+    monkeypatch.setattr(
+        pg_docker, "docker_status", lambda run=None: pg_docker.DockerStatus("stopped")
+    )
+    monkeypatch.setattr(pg_docker, "docker_desktop_command", lambda: None)
+    Answers(monkeypatch, "docker", "stop")
 
     assert main.offer_local_pgvector(OSError("x")) is False
     assert not (in_tmp / ".env").exists()
+
+
+@pytest.mark.parametrize(
+    "state, platform, expected",
+    [
+        (
+            "missing",
+            "win32",
+            "Install Docker Desktop: https://docs.docker.com/desktop/setup/install/windows-install/",
+        ),
+        ("missing", "darwin", "brew install --cask docker"),
+        (
+            "missing",
+            "linux",
+            "Install Docker Engine: https://docs.docker.com/engine/install/",
+        ),
+        ("stopped", "win32", "Start Docker Desktop (from the Start menu)"),
+        ("stopped", "darwin", "Start Docker Desktop (from Applications)"),
+        ("stopped", "linux", "sudo systemctl start docker"),
+        ("denied", "linux", "sudo usermod -aG docker $USER"),
+    ],
+)
+def test_guidance_fits_the_platform(state, platform, expected):
+    guidance = pg_docker.docker_guidance(pg_docker.DockerStatus(state), platform)
+
+    assert expected in guidance
+
+
+def test_docker_status_tells_stopped_from_denied():
+    class Docker(FakeDocker):
+        def __init__(self, stderr):
+            super().__init__()
+            self.stderr = stderr
+
+        def __call__(self, args, capture=True):
+            return self._result(1, stderr=self.stderr)
+
+    stopped = pg_docker.docker_status(Docker("Cannot connect to the Docker daemon"))
+    denied = pg_docker.docker_status(
+        Docker("permission denied while trying to connect")
+    )
+
+    assert stopped.state == "stopped"
+    assert denied.state == "denied"
+
+
+def test_waiting_for_docker_stops_when_it_answers():
+    answers = iter([1, 1, 0])
+
+    class Docker(FakeDocker):
+        def __call__(self, args, capture=True):
+            return self._result(next(answers), "28.5.2")
+
+    naps = []
+    status = pg_docker.wait_for_docker(run=Docker(), sleep=naps.append, clock=lambda: 0)
+
+    assert status.ready
+    assert len(naps) == 2
+
+
+def test_waiting_for_docker_gives_up():
+    class Docker(FakeDocker):
+        def __call__(self, args, capture=True):
+            return self._result(1)
+
+    times = iter(range(0, 1000, 60))
+    status = pg_docker.wait_for_docker(
+        timeout=180, run=Docker(), sleep=lambda _: None, clock=lambda: next(times)
+    )
+
+    assert not status.ready
+
+
+def test_launching_docker_desktop_runs_it_in_the_background(tmp_path, monkeypatch):
+    app = tmp_path / "Docker" / "Docker" / "Docker Desktop.exe"
+    app.parent.mkdir(parents=True)
+    app.touch()
+    monkeypatch.setenv("ProgramFiles", str(tmp_path))
+    started_commands = []
+
+    assert pg_docker.launch_docker_desktop(
+        "win32", popen=lambda command, **kw: started_commands.append(command)
+    )
+    assert started_commands == [[str(app)]]
+    assert pg_docker.docker_desktop_command("linux") is None
+
+
+# --- Resources and memory sizes --------------------------------------------------
+
+
+def test_the_memory_limit_is_dockers_within_what_is_free():
+    assert pg_docker.Resources(docker_memory=64, host_available=32).memory_limit == 32
+    assert pg_docker.Resources(docker_memory=16, host_available=32).memory_limit == 16
+    assert pg_docker.Resources().memory_limit is None
+
+
+def test_the_suggestion_follows_free_memory():
+    tight = pg_docker.Resources(docker_memory=64 * 2**30, host_available=8 * 2**30)
+
+    assert pg_docker.suggest_build(tight).maintenance_work_mem == "2457MB"
+
+
+def test_resources_are_described():
+    resources = pg_docker.Resources(
+        docker_memory=int(62.6 * 2**30),
+        docker_cpus=32,
+        host_memory=int(127.7 * 2**30),
+        host_available=int(90.5 * 2**30),
+    )
+
+    assert resources.describe() == (
+        "Docker can use 62.6 GB and 32 CPUs; 90.5 GB of this machine's 127.7 GB is free"
+    )
+
+
+@pytest.mark.parametrize(
+    "text, size",
+    [
+        ("8GB", 8 * 2**30),
+        ("8g", 8 * 2**30),
+        ("8 GiB", 8 * 2**30),
+        ("8192MB", 8 * 2**30),
+        ("8192", 8 * 2**30),
+        ("1.5GB", int(1.5 * 2**30)),
+        ("512mb", 512 * 2**20),
+    ],
+)
+def test_memory_sizes_are_read(text, size):
+    assert pg_docker.parse_memory(text) == size
+
+
+@pytest.mark.parametrize("text", ["", "lots", "8 GB please", "-1GB"])
+def test_other_text_is_not_a_memory_size(text):
+    with pytest.raises(ValueError):
+        pg_docker.parse_memory(text)
+
+
+def test_chosen_settings_fit_a_container_or_not():
+    build = pg_docker.custom_build(8 * 2**30, 4)
+
+    assert pg_docker.fits(build, 9 * 2**30)
+    assert not pg_docker.fits(build, 2**30)
+    assert pg_docker.fits(build, None)
+
+
+def test_settings_chosen_for_an_existing_container_stay_within_its_shm():
+    docker = FakeDocker(
+        containers={"aatm-pgvector": {"running": True, "port": 5432, "shm": 2**30}}
+    )
+
+    server = pg_docker.start_local_pgvector(
+        run=docker,
+        wait=no_wait,
+        log=lambda _: None,
+        build=pg_docker.custom_build(8 * 2**30, 3),
+    )
+
+    assert server.build.maintenance_work_mem == "768MB"
+    assert server.build.workers == 3  # the chosen workers are kept
+
+
+def test_recreating_removes_the_container_and_starts_a_bigger_one():
+    docker = FakeDocker(
+        containers={"aatm-pgvector": {"running": True, "port": 5432, "shm": 2**30}}
+    )
+
+    server = pg_docker.start_local_pgvector(
+        run=docker,
+        wait=no_wait,
+        log=lambda _: None,
+        build=pg_docker.custom_build(8 * 2**30, 3),
+        recreate=True,
+    )
+
+    assert ["docker", "rm", "-f", "aatm-pgvector"] in docker.calls
+    (run,) = [call for call in docker.calls if call[1] == "run"]
+    assert "--shm-size=9216m" in run
+    assert "aatm-pgvector:/var/lib/postgresql/data" in run  # the same volume
+    assert server.build.maintenance_work_mem == "8192MB"
 
 
 # --- Build memory and workers ----------------------------------------------------

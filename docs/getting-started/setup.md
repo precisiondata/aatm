@@ -51,7 +51,9 @@ aatm init --vocab-zip ~/Downloads/vocabulary_download_v5_<bundle-id>.zip
    is greyed out with what to set or install. `AATM_VECTOR_DB` is preselected;
    `--vector-db` skips the question. If you choose PostgreSQL and no server answers, it
    offers to start one in Docker and save its settings to `.env`, or to let you set
-   `AATM_PG_DSN` yourself;
+   `AATM_PG_DSN` yourself. It guides you through installing or starting Docker if
+   needed, and suggests the container's index build memory and workers from your
+   machine's resources, which you can change;
 4. builds the vocabulary database, `.aatm/omop.db`;
 5. lists the search indexes already built there, asks which **embedding model** (built
    ones are marked) and **standard vocabularies** to index, and builds the search index;

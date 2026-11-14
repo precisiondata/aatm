@@ -27,6 +27,12 @@
   too small for the HNSW graph. `AATM_PG_BUILD_WORKERS` sets the parallel workers. The
   container `aatm init` starts gets shared memory, build memory and workers sized from
   Docker's resources instead of PostgreSQL's defaults (64 MB, 2 workers).
+- **`aatm init` guides you through Docker and the container's size.** When Docker is not
+  installed, not running or not usable, it says how to fix that on your platform, can
+  open Docker Desktop for you, and checks again. It then shows the memory and CPUs the
+  container can use (Docker's limits and the machine's free memory), suggests index
+  build memory and workers, and lets you change them. An existing container with too
+  little shared memory for them can be recreated, keeping its data.
 
 ## 0.4.0
 

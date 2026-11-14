@@ -798,40 +798,56 @@ def offer_local_pgvector(error: Exception) -> bool:
     """Offer to start PostgreSQL with pgvector in Docker when it cannot be reached.
 
     The user chooses between starting a local container (see
-    `aatm.pg_docker`), whose ``AATM_PG_DSN`` is then saved to ``.env``, and
-    setting ``AATM_PG_DSN`` themselves. When AATM starts the container, it also
-    offers to save ``AATM_VECTOR_DB=pgvector``, so later commands use it.
+    `aatm.pg_docker`) and setting ``AATM_PG_DSN`` themselves. For the container:
+
+    1. If Docker is not installed, not running or not usable, AATM explains how
+       to fix that on this platform, can open Docker Desktop, and checks again
+       (`ensure_docker`).
+    2. It shows the memory and CPUs a container can use, suggests index build
+       settings for them, and lets the user change them (`choose_build`).
+    3. An existing container with too little shared memory for those settings
+       can be recreated; its data stays in its volume.
+    4. It starts the container and saves ``AATM_PG_DSN`` and the build settings
+       to ``.env``, and offers to save ``AATM_VECTOR_DB=pgvector`` too.
 
     Args:
         error: The connection error, whose first line is shown.
 
     Returns:
-        Whether a server was started and ``AATM_PG_DSN`` saved, so the
-        connection is worth trying again.
+        Whether a server was started and its settings saved, so the connection
+        is worth trying again.
     """
     from aatm import pg_docker
     from aatm.vector_db import PG_DSN_ENV_VAR, VECTOR_DB_ENV_VAR
 
     console.print(str(error).splitlines()[0], style="yellow", markup=False)
-    problem = pg_docker.docker_problem()
+    status = pg_docker.docker_status()
+    docker_title = (
+        "Start PostgreSQL with pgvector in Docker on this machine, and save its "
+        "settings to .env"
+    )
+    if not status.ready:
+        docker_title += f" ({status.reason()}: AATM shows how to fix that)"
     answer = questionary.select(
         "PostgreSQL is not reachable. How would you like to set it up?",
         choices=[
-            Choice(
-                "Start PostgreSQL with pgvector in Docker on this machine, "
-                f"and save {PG_DSN_ENV_VAR} to .env",
-                value="docker",
-                disabled=problem,
-            ),
+            Choice(docker_title, value="docker"),
             Choice(f"I'll set {PG_DSN_ENV_VAR} myself", value="manual"),
         ],
-        default="manual" if problem else "docker",
+        default="docker",
     ).ask()
-    if answer != "docker":
+    if answer != "docker" or not ensure_docker(status):
         return False
 
+    choice = choose_build()
+    if choice is None:
+        return False
+    build, recreate, resources = choice
+
     try:
-        server = pg_docker.start_local_pgvector(log=console.print)
+        server = pg_docker.start_local_pgvector(
+            log=console.print, build=build, recreate=recreate, resources=resources
+        )
     except pg_docker.LocalPgVectorError as e:
         console.print(str(e), style="red", markup=False, soft_wrap=True)
         return False
@@ -849,6 +865,150 @@ def offer_local_pgvector(error: Exception) -> bool:
     saved = ", ".join(f"{key}={value}" for key, value in values.items())
     console.print(f"[green]PostgreSQL is ready.[/green] Saved to .env: {saved}")
     return True
+
+
+def ensure_docker(status: Any = None) -> bool:
+    """Guide the user until Docker answers, or they give up.
+
+    Explains how to install, start or get access to Docker on this platform
+    (`aatm.pg_docker.docker_guidance`), offers to open Docker Desktop when it is
+    installed but stopped, and checks again whenever the user says so.
+
+    Args:
+        status: A `aatm.pg_docker.DockerStatus` already read, or ``None``.
+
+    Returns:
+        Whether Docker is ready.
+    """
+    from aatm import pg_docker
+    from aatm.vector_db import PG_DSN_ENV_VAR
+
+    status = status or pg_docker.docker_status()
+    while not status.ready:
+        console.print(pg_docker.docker_guidance(status), markup=False, soft_wrap=True)
+        choices = []
+        if status.state == "stopped" and pg_docker.docker_desktop_command():
+            choices.append(
+                Choice("Start Docker Desktop for me, and wait", value="launch")
+            )
+        choices += [
+            Choice("Check again (once Docker is installed or running)", value="retry"),
+            Choice(f"Stop here; I'll set {PG_DSN_ENV_VAR} myself", value="stop"),
+        ]
+        answer = questionary.select(
+            "Docker is needed to run PostgreSQL on this machine. What next?",
+            choices=choices,
+            default=choices[0].value,
+        ).ask()
+        if answer == "launch":
+            pg_docker.launch_docker_desktop()
+            with console.status("Waiting for Docker to start (up to 3 minutes)..."):
+                status = pg_docker.wait_for_docker()
+            if not status.ready:
+                console.print("Docker did not answer yet.", style="yellow")
+        elif answer == "retry":
+            status = pg_docker.docker_status()
+        else:
+            return False
+    return True
+
+
+def choose_build() -> Optional[tuple[Any, bool, Any]]:
+    """Suggest index build settings for this machine, and let the user change them.
+
+    Shows the memory and CPUs a container can use, the suggested build memory
+    and workers (`aatm.pg_docker.suggest_build`), and asks whether to use them
+    or enter others, checked against those resources. When an existing
+    container has too little shared memory for the chosen memory, asks whether
+    to recreate it (its data stays in its volume) or build with less.
+
+    Returns:
+        The `aatm.pg_docker.BuildSettings`, whether to recreate the container,
+        and the `aatm.pg_docker.Resources`; ``None`` if a prompt was cancelled.
+    """
+    from aatm import pg_docker
+
+    resources = pg_docker.detect_resources()
+    state = pg_docker.container_state()
+    suggested = pg_docker.suggest_build(resources)
+    memory_text = suggested.maintenance_work_mem
+    console.print(f"{resources.describe()}.", markup=False)
+    console.print(
+        f"Suggested for building the search index: [bold]{memory_text}[/bold] of "
+        f"memory and [bold]{suggested.workers}[/bold] parallel workers."
+    )
+    console.print(
+        "[dim]30% of the memory a container can use (at most 16 GB, enough for the "
+        "full index of every model) and one worker per CPU but one (at most 7). "
+        "PostgreSQL's defaults, 64 MB and 2 workers, build the full index "
+        "several times slower.[/dim]"
+    )
+    answer = questionary.select(
+        "Index build settings:",
+        choices=[
+            Choice("Use the suggested settings", value="use"),
+            Choice("Change them", value="change"),
+        ],
+        default="use",
+    ).ask()
+    if answer is None:
+        return None
+    build = suggested
+    if answer == "change":
+
+        def valid_memory(text: str) -> bool | str:
+            try:
+                memory = pg_docker.parse_memory(text)
+            except ValueError as e:
+                return str(e)
+            return pg_docker.check_build(memory, 1, resources) or True
+
+        def valid_workers(text: str) -> bool | str:
+            if not text.strip().isdigit():
+                return "Enter a whole number."
+            return pg_docker.check_build(64 * 2**20, int(text), resources) or True
+
+        memory_answer = questionary.text(
+            "Memory for index builds (e.g. 8GB or 4096MB):",
+            default=memory_text,
+            validate=valid_memory,
+        ).ask()
+        if memory_answer is None:
+            return None
+        workers_answer = questionary.text(
+            f"Parallel workers (1 to {pg_docker.MAX_BUILD_WORKERS}):",
+            default=str(suggested.workers),
+            validate=valid_workers,
+        ).ask()
+        if workers_answer is None:
+            return None
+        build = pg_docker.custom_build(
+            pg_docker.parse_memory(memory_answer), int(workers_answer.strip())
+        )
+
+    recreate = False
+    if state is not None and not pg_docker.fits(build, state.shm_bytes):
+        shm = state.shm_bytes or 0
+        allowed = max(64 * 2**20, shm - 256 * 2**20)
+        name = pg_docker.CONTAINER_NAME
+        answer = questionary.select(
+            f"The container '{name}' already exists, with {shm // 2**20} MB of shared "
+            f"memory: enough for {allowed // 2**20}MB of build memory, not "
+            f"{build.maintenance_work_mem}. What should AATM do?",
+            choices=[
+                Choice(
+                    f"Recreate it with {build.shm_bytes // 2**20} MB of shared memory "
+                    f"(its data stays in the volume '{name}')",
+                    value="recreate",
+                ),
+                Choice(f"Keep it, and build with {allowed // 2**20}MB", value="keep"),
+            ],
+            default="recreate",
+        ).ask()
+        if answer is None:
+            return None
+        recreate = answer == "recreate"
+    return build, recreate, resources
 
 
 def embedding_model_choices(built: dict[str, Any]) -> list[Choice]:

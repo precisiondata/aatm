@@ -23,13 +23,16 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
+import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Literal
 
 from aatm.logs import get_logger
 
@@ -61,22 +64,153 @@ def _run(args: Sequence[str], capture: bool = True) -> subprocess.CompletedProce
     )
 
 
-def docker_problem(run: Runner = _run) -> str | None:
-    """Say why Docker cannot be used, or ``None`` when it can.
+DockerState = Literal["ready", "missing", "stopped", "denied", "error"]
 
-    Returns:
-        ``None`` when the ``docker`` command exists and its daemon answers, and
-        otherwise what to install or start.
-    """
+
+@dataclass(frozen=True)
+class DockerStatus:
+    """Whether Docker can be used, and if not, why."""
+
+    state: DockerState
+    """``ready``, ``missing`` (not installed), ``stopped`` (its daemon does not
+    answer), ``denied`` (no permission to use it) or ``error``."""
+
+    detail: str = ""
+    """What ``docker`` said, when it failed."""
+
+    @property
+    def ready(self) -> bool:
+        return self.state == "ready"
+
+    def reason(self) -> str:
+        """One line on what is wrong, for a disabled choice."""
+        return {
+            "ready": "Docker is ready",
+            "missing": "Docker is not installed",
+            "stopped": "Docker is not running",
+            "denied": "no permission to use Docker",
+            "error": f"Docker failed: {self.detail}",
+        }[self.state]
+
+
+def docker_status(run: Runner = _run) -> DockerStatus:
+    """Check whether the ``docker`` command exists and its daemon answers."""
     if run is _run and shutil.which("docker") is None:
-        return "Docker is not installed (https://docs.docker.com/get-docker/)"
+        return DockerStatus("missing")
     try:
         result = run(["docker", "info", "--format", "{{.ServerVersion}}"])
     except (OSError, subprocess.SubprocessError) as e:
-        return f"Docker could not be run: {e}"
-    if result.returncode != 0:
-        return "Docker is not running; start Docker Desktop (or the Docker daemon)"
+        return DockerStatus("error", str(e))
+    if result.returncode == 0:
+        return DockerStatus("ready")
+    detail = " ".join((result.stderr or result.stdout or "").split())
+    if "permission denied" in detail.lower():
+        return DockerStatus("denied", detail)
+    return DockerStatus("stopped", detail)
+
+
+def docker_problem(run: Runner = _run) -> str | None:
+    """Say why Docker cannot be used, or ``None`` when it can."""
+    status = docker_status(run)
+    return None if status.ready else status.reason()
+
+
+DOCKER_INSTALL_URLS = {
+    "win32": "https://docs.docker.com/desktop/setup/install/windows-install/",
+    "darwin": "https://docs.docker.com/desktop/setup/install/mac-install/",
+    "linux": "https://docs.docker.com/engine/install/",
+}
+
+
+def _platform(platform: str | None) -> str:
+    platform = platform or sys.platform
+    return "linux" if platform.startswith("linux") else platform
+
+
+def docker_guidance(status: DockerStatus, platform: str | None = None) -> str:
+    """Explain how to install, start or get access to Docker on this platform."""
+    platform = _platform(platform)
+    if status.state == "missing":
+        url = DOCKER_INSTALL_URLS.get(platform, "https://docs.docker.com/get-docker/")
+        if platform == "win32":
+            return (
+                f"Docker is not installed. Install Docker Desktop: {url}\n"
+                "It needs WSL 2 (the installer offers to set it up). Then start "
+                "Docker Desktop and wait until it says 'Engine running'."
+            )
+        if platform == "darwin":
+            return (
+                f"Docker is not installed. Install Docker Desktop: {url}\n"
+                "(or: brew install --cask docker). Then open Docker Desktop and "
+                "wait until it says 'Engine running'."
+            )
+        return (
+            f"Docker is not installed. Install Docker Engine: {url}\n"
+            "Then start it (sudo systemctl start docker) and let your user run it "
+            "(sudo usermod -aG docker $USER, then log out and in)."
+        )
+    if status.state == "stopped":
+        if platform in ("win32", "darwin"):
+            where = "the Start menu" if platform == "win32" else "Applications"
+            return (
+                f"Docker is installed but not running. Start Docker Desktop (from "
+                f"{where}) and wait until it says 'Engine running'."
+            )
+        return (
+            "Docker is installed but its daemon is not running. Start it: "
+            "sudo systemctl start docker"
+        )
+    if status.state == "denied":
+        return (
+            "Docker is running, but your user may not use it. Run: "
+            "sudo usermod -aG docker $USER, then log out and in.\n"
+            f"Docker said: {status.detail}"
+        )
+    return f"Docker could not be used: {status.detail or status.reason()}"
+
+
+def docker_desktop_command(platform: str | None = None) -> list[str] | None:
+    """The command that opens Docker Desktop, or ``None`` if it is not found here."""
+    platform = _platform(platform)
+    if platform == "win32":
+        roots = [os.environ.get("ProgramFiles", r"C:\Program Files")]
+        for root in roots:
+            app = Path(root) / "Docker" / "Docker" / "Docker Desktop.exe"
+            if app.exists():
+                return [str(app)]
+        return None
+    if platform == "darwin":
+        app = Path("/Applications/Docker.app")
+        return ["open", "-a", "Docker"] if app.exists() else None
     return None
+
+
+def launch_docker_desktop(
+    platform: str | None = None,
+    popen: Callable[..., Any] = subprocess.Popen,
+) -> bool:
+    """Open Docker Desktop in the background. Returns whether it was found."""
+    command = docker_desktop_command(platform)
+    if command is None:
+        return False
+    popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return True
+
+
+def wait_for_docker(
+    timeout: float = 180.0,
+    interval: float = 3.0,
+    run: Runner = _run,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> DockerStatus:
+    """Wait until Docker answers, e.g. after Docker Desktop was opened."""
+    deadline = clock() + timeout
+    status = docker_status(run)
+    while not status.ready and clock() < deadline:
+        sleep(interval)
+        status = docker_status(run)
+    return status
 
 
 MiB = 2**20
@@ -148,6 +282,132 @@ def docker_resources(run: Runner = _run) -> tuple[int | None, int | None]:
     values = [int(part) if part.isdigit() else None for part in parts[:2]]
     memory, cpus = (values + [None, None])[:2]
     return memory, cpus
+
+
+@dataclass(frozen=True)
+class Resources:
+    """The memory and CPUs a local container can use.
+
+    Docker Desktop runs containers in a VM with its own memory and CPU limits
+    (``docker info``); the machine's free memory bounds them further.
+    """
+
+    docker_memory: int | None = None
+    docker_cpus: int | None = None
+    host_memory: int | None = None
+    host_available: int | None = None
+    host_cpus: int | None = None
+
+    @property
+    def memory_limit(self) -> int | None:
+        """The most memory a container can count on: Docker's, within what is free."""
+        known = [m for m in (self.docker_memory, self.host_available) if m]
+        return min(known) if known else None
+
+    @property
+    def cpus(self) -> int | None:
+        return self.docker_cpus or self.host_cpus
+
+    def describe(self) -> str:
+        """One line, e.g. ``Docker can use 62.6 GB and 32 CPUs; 90.8 GB of 127.7 GB is free``."""
+        parts = []
+        if self.docker_memory or self.docker_cpus:
+            docker = []
+            if self.docker_memory:
+                docker.append(_gb(self.docker_memory))
+            if self.docker_cpus:
+                docker.append(f"{self.docker_cpus} CPUs")
+            parts.append("Docker can use " + " and ".join(docker))
+        if self.host_available and self.host_memory:
+            parts.append(
+                f"{_gb(self.host_available)} of this machine's "
+                f"{_gb(self.host_memory)} is free"
+            )
+        return "; ".join(parts) or "Docker's resources are unknown"
+
+
+def _gb(size: int) -> str:
+    return f"{size / GiB:.1f} GB" if size >= GiB else f"{size // MiB} MB"
+
+
+def detect_resources(run: Runner = _run) -> Resources:
+    """Read Docker's limits and, with ``psutil``, this machine's free memory."""
+    docker_memory, docker_cpus = docker_resources(run)
+    host_memory, host_available = host_memory_reading()
+    return Resources(
+        docker_memory=docker_memory,
+        docker_cpus=docker_cpus,
+        host_memory=host_memory,
+        host_available=host_available,
+        host_cpus=os.cpu_count(),
+    )
+
+
+def host_memory_reading() -> tuple[int | None, int | None]:
+    """This machine's total and free memory in bytes, with ``psutil``, if it can tell."""
+    try:
+        import psutil  # type: ignore[import-untyped]
+
+        memory = psutil.virtual_memory()
+        return int(memory.total), int(memory.available)
+    except Exception:  # psutil missing, or no reading on this platform
+        return None, None
+
+
+def suggest_build(resources: Resources, shm_bytes: int | None = None) -> BuildSettings:
+    """`build_settings` for these resources: what ``aatm init`` suggests."""
+    return build_settings(resources.memory_limit, resources.cpus, shm_bytes)
+
+
+_MEMORY = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([kmgt]?)i?b?\s*$", re.IGNORECASE)
+_UNITS = {"": MiB, "k": 2**10, "m": MiB, "g": GiB, "t": 2**40}
+
+
+def parse_memory(text: str) -> int:
+    """Read a memory size such as ``8GB``, ``8g``, ``8192MB`` or ``8192`` (MB), in bytes.
+
+    Raises:
+        ValueError: If it is not a size.
+    """
+    match = _MEMORY.match(text or "")
+    if not match:
+        raise ValueError(f"Not a memory size: {text!r}. Use e.g. 8GB or 4096MB.")
+    number, unit = match.groups()
+    return int(float(number) * _UNITS[unit.lower()])
+
+
+def custom_build(
+    memory: int, workers: int, shm_bytes: int | None = None
+) -> BuildSettings:
+    """Build settings the user chose; a new container gets shared memory to match."""
+    memory = max(64 * MiB, memory // MiB * MiB)
+    shm = shm_bytes if shm_bytes is not None else memory + SHM_HEADROOM
+    return BuildSettings(f"{memory // MiB}MB", int(workers), shm)
+
+
+def check_build(memory: int, workers: int, resources: Resources) -> str | None:
+    """Say why build settings will not work here, or ``None`` when they can."""
+    if memory < 64 * MiB:
+        return "Use at least 64 MB."
+    limit = resources.memory_limit
+    if limit and memory > limit * 0.8:
+        return (
+            f"{_gb(memory)} is more than 80% of the {_gb(limit)} a container can "
+            "use here; the server and the rest of the build need memory too."
+        )
+    if not 1 <= workers <= MAX_BUILD_WORKERS:
+        return f"Use 1 to {MAX_BUILD_WORKERS} workers (PostgreSQL's limit is 8)."
+    return None
+
+
+def build_memory_bytes(build: BuildSettings) -> int:
+    """The build memory of ``build``, in bytes."""
+    return parse_memory(build.maintenance_work_mem)
+
+
+def fits(build: BuildSettings, shm_bytes: int | None) -> bool:
+    """Whether a parallel build with ``build`` fits in ``shm_bytes`` of shared memory."""
+    return shm_bytes is None or build_memory_bytes(build) <= shm_bytes - 256 * MiB
 
 
 @dataclass(frozen=True)
@@ -290,6 +550,9 @@ def start_local_pgvector(
     run: Runner = _run,
     wait: Callable[[str, float], None] | None = None,
     log: Callable[[str], None] = logger.info,
+    build: BuildSettings | None = None,
+    recreate: bool = False,
+    resources: Resources | None = None,
 ) -> LocalServer:
     """Start (or reuse) the local PostgreSQL container and wait until it answers.
 
@@ -299,10 +562,15 @@ def start_local_pgvector(
         wait: Waits until a connection string answers, or raises. Defaults to
             `wait_until_ready`.
         log: Reports each step.
+        build: Index build settings. A new container gets their shared
+            memory. Defaults to `suggest_build` for ``resources``.
+        recreate: Remove an existing container first, e.g. to give it more
+            shared memory. Its data stays in the volume of the same name.
+        resources: What the container can use. Defaults to `detect_resources`.
 
     Returns:
-        Its connection string, and the index build settings that fit its shared
-        memory and Docker's resources (see `build_settings`).
+        Its connection string, and the index build settings, within an
+        existing container's shared memory.
 
     Raises:
         LocalPgVectorError: If Docker is unavailable, the container cannot be
@@ -312,14 +580,20 @@ def start_local_pgvector(
         raise LocalPgVectorError(problem)
 
     state = container_state(name, run)
+    if state is not None and recreate:
+        log(
+            f"Removing the container '{name}' (its data stays in the volume '{name}')..."
+        )
+        _check(run(["docker", "rm", "-f", name]), f"remove the container '{name}'")
+        state = None
     if state is not None and state.port is None:
         raise LocalPgVectorError(
             f"A container named '{name}' exists but does not publish PostgreSQL's "
             f"port. Remove it (docker rm -f {name}) and try again."
         )
-    memory, cpus = docker_resources(run)
+    resources = resources or detect_resources(run)
     if state is None:
-        build = build_settings(memory, cpus)
+        build = build or suggest_build(resources)
         port = free_port()
         log(
             f"Starting PostgreSQL with pgvector in Docker ({IMAGE}) on port {port}, "
@@ -332,14 +606,23 @@ def start_local_pgvector(
             "start the container",
         )
     else:
-        build = build_settings(memory, cpus, shm_bytes=state.shm_bytes)
+        ideal = build or suggest_build(resources)
+        if fits(ideal, state.shm_bytes):
+            build = custom_build(
+                build_memory_bytes(ideal), ideal.workers, state.shm_bytes
+            )
+        else:
+            build = suggest_build(resources, shm_bytes=state.shm_bytes)
+            build = custom_build(
+                build_memory_bytes(build), ideal.workers, state.shm_bytes
+            )
+            _hint_if_shm_limits(name, state.shm_bytes, ideal, log)
         port = state.port  # type: ignore[assignment]
         if not state.running:
             log(f"Starting the existing container '{name}' on port {port}...")
             _check(run(["docker", "start", name]), f"start the container '{name}'")
         else:
             log(f"Using the running container '{name}' on port {port}.")
-        _hint_if_shm_limits(name, state.shm_bytes, build_settings(memory, cpus), log)
 
     dsn = dsn_for(port)
     (wait or wait_until_ready)(dsn, READY_TIMEOUT)
@@ -350,10 +633,10 @@ def _hint_if_shm_limits(
     name: str, shm_bytes: int | None, ideal: BuildSettings, log: Callable[[str], None]
 ) -> None:
     """Say how to give an existing container's index builds more memory."""
-    if shm_bytes is None or shm_bytes >= ideal.shm_bytes:
+    if fits(ideal, shm_bytes):
         return
     log(
-        f"The container '{name}' has {shm_bytes // MiB} MB of shared memory, which "
+        f"The container '{name}' has {shm_bytes // MiB} MB of shared memory, which "  # type: ignore[operator]
         f"limits index builds; they could use {ideal.maintenance_work_mem}. To "
         f"recreate it with more (its data stays in the volume '{name}'): "
         f"docker rm -f {name}, then run aatm init again."
