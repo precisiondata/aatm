@@ -2648,6 +2648,14 @@
   as those built before 0.4.0, which <code>aatm vector-db check</code> now marks <em>not recorded</em>.
   <code>--default &lt;model&gt;</code> chooses which one retrievers use when none is given, and
   <code>--prune</code> drops records of indexes that are gone.</li>
+<li><strong>Denser HNSW indexes for PostgreSQL.</strong> New pgvector indexes are built with <code>m=24</code> and
+  <code>ef_construction=128</code> instead of pgvector's defaults (16 and 64). On the full
+  <code>embeddinggemma-300M</code> index, filtered searches find 0.925 (Measurement) and 0.967
+  (Condition) of the true 20 nearest records instead of 0.877 and 0.955, still in 8 to
+  16 ms (ChromaDB's default: 0.953 and 0.968, in about 50 ms), for a build about a third
+  longer and an index of the same size. The container <code>aatm init</code> starts may now give
+  index builds up to 20 GB, which the 3,072-dimension models need. Existing indexes keep
+  their settings until rebuilt. See <code>benchmarks/vector_db_backends</code>.</li>
 </ul>
 <h2 id="040">0.4.0</h2>
 <p>0.4.0 takes the notes-to-OMOP pipeline from a few notes in memory to full datasets:
