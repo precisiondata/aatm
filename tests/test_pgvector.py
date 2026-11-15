@@ -361,3 +361,55 @@ def test_a_failed_connection_never_shows_the_password():
     assert "s3cret" not in message
     assert "db.example:5433/terms" in message
     assert "Check AATM_PG_DSN" in message
+
+
+# --- HNSW density settings -------------------------------------------------------
+
+
+def test_hnsw_settings_default_to_aatms_denser_graph():
+    from aatm.pgvector_store import DEFAULT_HNSW_EF_CONSTRUCTION, DEFAULT_HNSW_M
+
+    connection = PgVectorConnection.from_env(env={})
+
+    assert (connection.hnsw_m, connection.hnsw_ef_construction) == (24, 128)
+    assert (DEFAULT_HNSW_M, DEFAULT_HNSW_EF_CONSTRUCTION) == (24, 128)
+
+
+def test_hnsw_settings_come_from_the_environment():
+    connection = PgVectorConnection.from_env(
+        env={"AATM_PG_HNSW_M": " 32 ", "AATM_PG_HNSW_EF_CONSTRUCTION": "200"}
+    )
+
+    assert (connection.hnsw_m, connection.hnsw_ef_construction) == (32, 200)
+
+
+@pytest.mark.parametrize(
+    "env, message",
+    [
+        (
+            {"AATM_PG_HNSW_M": "1"},
+            "AATM_PG_HNSW_M must be a whole number from 2 to 100",
+        ),
+        ({"AATM_PG_HNSW_M": "101"}, "from 2 to 100"),
+        ({"AATM_PG_HNSW_M": "dense"}, "from 2 to 100"),
+        ({"AATM_PG_HNSW_EF_CONSTRUCTION": "3"}, "from 4 to 1000"),
+        ({"AATM_PG_HNSW_EF_CONSTRUCTION": "1001"}, "from 4 to 1000"),
+        # pgvector needs ef_construction >= 2 * m.
+        (
+            {"AATM_PG_HNSW_M": "48", "AATM_PG_HNSW_EF_CONSTRUCTION": "64"},
+            "at least twice AATM_PG_HNSW_M",
+        ),
+        ({"AATM_PG_HNSW_M": "100"}, "use at least 200"),  # with the default 128
+    ],
+)
+def test_invalid_hnsw_settings_are_rejected(env, message):
+    with pytest.raises(VectorDatabaseConfigError, match=message):
+        PgVectorConnection.from_env(env=env)
+
+
+def test_ef_construction_of_exactly_twice_m_is_accepted():
+    connection = PgVectorConnection.from_env(
+        env={"AATM_PG_HNSW_M": "64", "AATM_PG_HNSW_EF_CONSTRUCTION": "128"}
+    )
+
+    assert connection.hnsw_m == 64

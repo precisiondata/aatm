@@ -45,6 +45,9 @@
   longer and an index of the same size. The container `aatm init` starts may now give
   index builds up to 20 GB, which the 3,072-dimension models need. Existing indexes keep
   their settings until rebuilt. See `benchmarks/vector_db_backends`.
+- **`AATM_PG_HNSW_M` and `AATM_PG_HNSW_EF_CONSTRUCTION`** set the density of the HNSW
+  graph `aatm init` and `aatm vector-db upload` build (default 24 and 128), checked
+  against pgvector's limits before the build starts.
 
 ## 0.4.0
 

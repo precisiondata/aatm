@@ -5,8 +5,11 @@ from aatm.vector_db import (
     CHROMA_CLOUD_HOST_ENV_VAR,
     CHROMA_DATABASE_ENV_VAR,
     CHROMA_TENANT_ENV_VAR,
+    PG_BUILD_WORKERS_ENV_VAR,
     PG_DSN_ENV_VAR,
     PG_EF_SEARCH_ENV_VAR,
+    PG_HNSW_EF_CONSTRUCTION_ENV_VAR,
+    PG_HNSW_M_ENV_VAR,
     PG_ITERATIVE_SCAN_ENV_VAR,
     PG_MAINTENANCE_WORK_MEM_ENV_VAR,
     PG_TABLE_PREFIX_ENV_VAR,
@@ -40,6 +43,9 @@ def _local_vector_db_by_default(monkeypatch):
         PG_EF_SEARCH_ENV_VAR,
         PG_ITERATIVE_SCAN_ENV_VAR,
         PG_MAINTENANCE_WORK_MEM_ENV_VAR,
+        PG_HNSW_M_ENV_VAR,
+        PG_HNSW_EF_CONSTRUCTION_ENV_VAR,
+        PG_BUILD_WORKERS_ENV_VAR,
     ):
         monkeypatch.delenv(name, raising=False)
 

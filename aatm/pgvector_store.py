@@ -54,7 +54,12 @@ from typing import Any
 import numpy as np
 
 from aatm.logs import get_logger
-from aatm.vector_db import PG_ITERATIVE_SCAN_MODES, VectorDatabaseConfigError
+from aatm.vector_db import (
+    PG_DEFAULT_HNSW_EF_CONSTRUCTION,
+    PG_DEFAULT_HNSW_M,
+    PG_ITERATIVE_SCAN_MODES,
+    VectorDatabaseConfigError,
+)
 from aatm.vector_stores import Hit, UnsupportedFilterError, VectorStore
 
 logger = get_logger(__name__)
@@ -89,20 +94,22 @@ Results come back in roughly the right order; `PgVectorStore.query` sorts them.
 ITERATIVE_SCAN_MIN_VERSION = (0, 8, 0)
 """First pgvector version with iterative index scans."""
 
-DEFAULT_HNSW_M = 24
+DEFAULT_HNSW_M = PG_DEFAULT_HNSW_M
 """HNSW ``m``: links per node. pgvector's own default is 16.
 
 With pgvector's defaults (``m=16``, ``ef_construction=64``), filtered searches on the
 full index found 0.877 (Measurement) and 0.955 (Condition) of the true 20 nearest
 records; with ``m=24``, ``ef_construction=128``, 0.925 and 0.967, and unfiltered 0.982
 instead of 0.963, in an index of the same size that takes about a third longer to
-build. See ``benchmarks/vector_db_backends``.
+build. See ``benchmarks/vector_db_backends``. ``AATM_PG_HNSW_M`` overrides it for
+the indexes AATM builds.
 """
 
-DEFAULT_HNSW_EF_CONSTRUCTION = 128
+DEFAULT_HNSW_EF_CONSTRUCTION = PG_DEFAULT_HNSW_EF_CONSTRUCTION
 """HNSW ``ef_construction``: candidates examined per vector while building.
 
-pgvector's own default is 64. See `DEFAULT_HNSW_M`.
+pgvector's own default is 64. See `DEFAULT_HNSW_M`. ``AATM_PG_HNSW_EF_CONSTRUCTION``
+overrides it for the indexes AATM builds.
 """
 
 PSYCOPG_MISSING_MESSAGE = (
