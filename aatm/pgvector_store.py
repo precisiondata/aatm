@@ -89,11 +89,21 @@ Results come back in roughly the right order; `PgVectorStore.query` sorts them.
 ITERATIVE_SCAN_MIN_VERSION = (0, 8, 0)
 """First pgvector version with iterative index scans."""
 
-DEFAULT_HNSW_M = 16
-"""pgvector's default HNSW ``m`` (links per node)."""
+DEFAULT_HNSW_M = 24
+"""HNSW ``m``: links per node. pgvector's own default is 16.
 
-DEFAULT_HNSW_EF_CONSTRUCTION = 64
-"""pgvector's default HNSW ``ef_construction``."""
+With pgvector's defaults (``m=16``, ``ef_construction=64``), filtered searches on the
+full index found 0.877 (Measurement) and 0.955 (Condition) of the true 20 nearest
+records; with ``m=24``, ``ef_construction=128``, 0.925 and 0.967, and unfiltered 0.982
+instead of 0.963, in an index of the same size that takes about a third longer to
+build. See ``benchmarks/vector_db_backends``.
+"""
+
+DEFAULT_HNSW_EF_CONSTRUCTION = 128
+"""HNSW ``ef_construction``: candidates examined per vector while building.
+
+pgvector's own default is 64. See `DEFAULT_HNSW_M`.
+"""
 
 PSYCOPG_MISSING_MESSAGE = (
     "PostgreSQL support needs the 'psycopg' and 'pgvector' packages. Install them "
@@ -514,8 +524,9 @@ def hnsw_memory_estimate(rows: int, dimension: int, m: int = DEFAULT_HNSW_M) -> 
     """Estimate the memory, in bytes, an HNSW build needs to hold its whole graph.
 
     One vector per row (4 bytes per value, or 2 as ``halfvec``) plus its
-    neighbour lists. On 2.2 million 768-dimension rows the index came to 9.4 GB,
-    and this estimates 9.0 GB.
+    neighbour lists. On 2.46 million 768-dimension rows the index came to 9.2 GB
+    on disk with ``m`` 16 and 24 alike; this estimates 9.4 GB for ``m=16`` and
+    10.5 GB for ``m=24``, erring on the safe side.
     """
     element = 4 if _index_kind(dimension) == "vector" else 2
     return int(rows) * (int(dimension) * element + 64 * int(m))
@@ -540,8 +551,9 @@ def create_pg_indexes(
     Args:
         dsn: Connection string.
         name: Table name.
-        m: HNSW links per node.
-        ef_construction: HNSW candidate list size while building.
+        m: HNSW links per node. Defaults to `DEFAULT_HNSW_M` (24).
+        ef_construction: HNSW candidate list size while building. Defaults to
+            `DEFAULT_HNSW_EF_CONSTRUCTION` (128).
         maintenance_work_mem: Memory for the build, e.g. ``8GB``. Defaults to
             the server's setting (PostgreSQL's default is 64 MB). A parallel
             build keeps it in shared memory, so the server needs at least as

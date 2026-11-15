@@ -216,11 +216,12 @@ def wait_for_docker(
 MiB = 2**20
 GiB = 2**30
 
-MAX_BUILD_MEMORY = 16 * GiB
+MAX_BUILD_MEMORY = 20 * GiB
 """Most memory `build_settings` gives an index build.
 
-Enough for the full index of the largest models: about 9 GB for 2.2 million
-768-dimension embeddings, 14 GB for 2,560 dimensions in half precision.
+Enough for the full index (2.46 million expressions) of every model with AATM's HNSW
+settings (``m=24``; see `aatm.pgvector_store.hnsw_memory_estimate`): about 10.5 GB for
+768 dimensions, 15 GB for 2,560 and 17.5 GB for 3,072 in half precision.
 """
 
 BUILD_MEMORY_SHARE = 0.3
@@ -262,7 +263,7 @@ def build_settings(
             new one, which gets the build memory plus `SHM_HEADROOM`.
 
     Returns:
-        30% of Docker's memory, at most 16 GB (1 GB if unknown), and within an
+        30% of Docker's memory, at most 20 GB (1 GB if unknown), and within an
         existing container's shared memory; one worker less than the CPUs, at
         most 7.
     """

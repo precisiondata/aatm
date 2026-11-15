@@ -618,7 +618,7 @@ def pgvector_warnings(caplog):
 
 def test_too_little_build_memory_is_reported(connection, caplog):
     store = make_store(connection)
-    n = 3000  # about 3 MB of graph
+    n = 3000  # about 4 MB of graph with m=24
     store.write(
         [str(i) for i in range(n)],
         np.ones((n, DIM), dtype=np.float32),
@@ -629,7 +629,7 @@ def test_too_little_build_memory_is_reported(connection, caplog):
     with pgvector_warnings(caplog):
         create_pg_indexes(DSN, store.name, maintenance_work_mem="1MB")
 
-    assert "needs about 3 MB to build in memory" in caplog.text
+    assert "needs about 4 MB to build in memory" in caplog.text
     assert "AATM_PG_MAINTENANCE_WORK_MEM" in caplog.text
 
 
@@ -641,3 +641,18 @@ def test_enough_build_memory_is_not_reported(connection, caplog):
         create_pg_indexes(DSN, store.name, maintenance_work_mem="64MB")
 
     assert "maintenance_work_mem" not in caplog.text
+
+
+def test_hnsw_indexes_use_aatms_denser_defaults(connection):
+    store = make_store(connection)
+    store.write(["a"], np.ones((1, DIM), dtype=np.float32), [""], [{}])
+
+    create_pg_indexes(DSN, store.name)
+
+    with connection.client() as conn:
+        (definition,) = conn.execute(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = %s",
+            (f"{store.name}_hnsw",),
+        ).fetchone()
+    assert "m='24'" in definition
+    assert "ef_construction='128'" in definition
