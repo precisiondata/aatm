@@ -103,9 +103,9 @@ def test_a_new_container_is_started_on_localhost_only():
     assert "127.0.0.1:5432:5432" in run
     assert "POSTGRES_HOST_AUTH_METHOD=trust" in run
     assert "aatm-pgvector:/var/lib/postgresql/data" in run
-    # 30% of 64 GB for index builds (capped at 16 GB), plus 1 GB of headroom.
-    assert server.build.maintenance_work_mem == "16384MB"
-    assert "--shm-size=17408m" in run
+    # 30% of 64 GB for index builds, plus 1 GB of headroom.
+    assert server.build.maintenance_work_mem == "19660MB"
+    assert "--shm-size=20684m" in run
     assert server.build.workers == 7
     assert run[-1] == "pgvector/pgvector:pg17"
 
@@ -645,7 +645,8 @@ GiB = 2**30
 @pytest.mark.parametrize(
     "memory, cpus, shm, expected",
     [
-        (64 * GiB, 32, None, ("16384MB", 7, 17 * GiB)),  # capped at 16 GB and 7
+        (128 * GiB, 32, None, ("20480MB", 7, 21 * GiB)),  # capped at 20 GB and 7
+        (64 * GiB, 32, None, ("19660MB", 7, 19660 * 2**20 + GiB)),  # 30% of 64 GB
         (8 * GiB, 4, None, ("2457MB", 3, 2457 * 2**20 + GiB)),  # 30% of 8 GB
         (None, None, None, ("1024MB", 2, 2 * GiB)),  # unknown: 1 GB
         (64 * GiB, 32, 1 * GiB, ("768MB", 7, 1 * GiB)),  # within an existing shm

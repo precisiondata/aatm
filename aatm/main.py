@@ -938,7 +938,7 @@ def choose_build() -> Optional[tuple[Any, bool, Any]]:
         f"memory and [bold]{suggested.workers}[/bold] parallel workers."
     )
     console.print(
-        "[dim]30% of the memory a container can use (at most 16 GB, enough for the "
+        "[dim]30% of the memory a container can use (at most 20 GB, enough for the "
         "full index of every model) and one worker per CPU but one (at most 7). "
         "PostgreSQL's defaults, 64 MB and 2 workers, build the full index "
         "several times slower.[/dim]"

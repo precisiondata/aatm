@@ -164,11 +164,11 @@ Results: `results/embeddinggemma-300M--subset-50k-pgvector.csv`.
 
 ### Full index: ChromaDB and PostgreSQL with pgvector (2026-11-14)
 
-Setup: the full `embeddinggemma-300M` index (768 dimensions, float32), about 2.2 million
+Setup: the full `embeddinggemma-300M` index (768 dimensions, float32), 2,458,830
 expressions, in local ChromaDB 1.5.9 and in PostgreSQL 17.12 with pgvector 0.8.7 (the
 container `aatm init` starts, on the same machine). The PostgreSQL table was built with
 `aatm init --vector-db pgvector`: HNSW with pgvector's defaults (`m=16`,
-`ef_construction=64`), searched with AATM's defaults (`ef_search=100`, `relaxed_order`
+`ef_construction=64`, AATM's defaults at the time), searched with AATM's defaults (`ef_search=100`, `relaxed_order`
 iterative scans). Same 30 queries, `top_k=20`, 3 runs per query with the median kept.
 Recall is against the **exact** 20 nearest records (`pgvector-exact`, which searches
 without the HNSW index). Pinecone was not run: the full index needs a paid plan.
@@ -251,8 +251,8 @@ brackets, and the median time per query:
 - **`m=24`, `ef_construction=128` closes most of the gap** at the default `ef_search`:
   Measurement from 0.877 to 0.925 (ChromaDB 0.953), Condition from 0.955 to 0.967
   (0.968), unfiltered from 0.963 to 0.982 (0.972), still in 8 to 16 ms against ChromaDB's
-  30 to 50 ms. Its index is no larger on disk (9.4 GB): with 768 dimensions, each vector
-  fills most of a page either way.
+  30 to 50 ms. Its index is no larger on disk (9.2 GB): with 768 dimensions, each vector
+  fills most of a page either way. AATM builds new indexes with it since this benchmark.
 - Raising `ef_search` to 400 on top adds little; the graph matters more than the search.
 - Measurement's worst query is still "metformin 500 mg tablet", whose true matches rank
   thousands deep (see above).
