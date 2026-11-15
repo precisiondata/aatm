@@ -40,6 +40,11 @@ Configuration comes from environment variables (a ``.env`` file works too):
   e.g. ``4GB``. Defaults to the server's setting.
 - ``AATM_PG_BUILD_WORKERS``: optional parallel workers for building the HNSW
   index. Defaults to the server's setting (2).
+- ``AATM_PG_HNSW_M`` and ``AATM_PG_HNSW_EF_CONSTRUCTION``: optional density of the
+  HNSW graph AATM builds, from 2 to 100 and from 4 to 1000, with
+  ``ef_construction`` at least twice ``m``. Default 24 and 128. Denser graphs
+  find more true neighbours, take longer to build, and only apply to indexes
+  built after the change.
 
 In cloud mode one database holds the indexes of every embedding model, so each
 model gets its own collection (see `ChromaRetrieverModelSpec.cloud_collection_name`).
@@ -94,6 +99,20 @@ PG_EF_SEARCH_ENV_VAR = "AATM_PG_EF_SEARCH"
 PG_ITERATIVE_SCAN_ENV_VAR = "AATM_PG_ITERATIVE_SCAN"
 PG_MAINTENANCE_WORK_MEM_ENV_VAR = "AATM_PG_MAINTENANCE_WORK_MEM"
 PG_BUILD_WORKERS_ENV_VAR = "AATM_PG_BUILD_WORKERS"
+PG_HNSW_M_ENV_VAR = "AATM_PG_HNSW_M"
+PG_HNSW_EF_CONSTRUCTION_ENV_VAR = "AATM_PG_HNSW_EF_CONSTRUCTION"
+
+PG_DEFAULT_HNSW_M = 24
+"""HNSW ``m`` AATM builds with (pgvector's own default is 16). See `aatm.pgvector_store`."""
+
+PG_DEFAULT_HNSW_EF_CONSTRUCTION = 128
+"""HNSW ``ef_construction`` AATM builds with (pgvector's own default is 64)."""
+
+PG_HNSW_M_RANGE = (2, 100)
+"""The ``m`` values pgvector accepts."""
+
+PG_HNSW_EF_CONSTRUCTION_RANGE = (4, 1000)
+"""The ``ef_construction`` values pgvector accepts; it must also be at least ``2 * m``."""
 PG_ITERATIVE_SCAN_MODES = ("off", "strict_order", "relaxed_order")
 """Values of pgvector's ``hnsw.iterative_scan``."""
 
@@ -535,6 +554,20 @@ def pg_connect_timeout(dsn: str, env: Mapping[str, str] | None = None) -> int | 
     return PG_DEFAULT_CONNECT_TIMEOUT
 
 
+def _whole_number_setting(
+    text: str, name: str, default: int, bounds: tuple[int, int]
+) -> int:
+    """Read a whole-number setting within ``bounds``, or ``default`` when unset."""
+    if not text:
+        return default
+    low, high = bounds
+    if not text.isdigit() or not low <= int(text) <= high:
+        raise VectorDatabaseConfigError(
+            f"{name} must be a whole number from {low} to {high}; got {text!r}."
+        )
+    return int(text)
+
+
 @dataclass(frozen=True, slots=True)
 class PgVectorConnection:
     """Describe how to reach a PostgreSQL database with pgvector, and how to search it.
@@ -561,6 +594,12 @@ class PgVectorConnection:
 
     build_workers: int | None = None
     """``max_parallel_maintenance_workers`` while building the HNSW index."""
+
+    hnsw_m: int = PG_DEFAULT_HNSW_M
+    """HNSW ``m`` (links per node) of the indexes AATM builds."""
+
+    hnsw_ef_construction: int = PG_DEFAULT_HNSW_EF_CONSTRUCTION
+    """HNSW ``ef_construction`` (candidates per vector while building)."""
 
     mode: VectorDbMode = "pgvector"
     """Always ``pgvector``. Mirrors `ChromaConnection.mode`."""
@@ -607,6 +646,24 @@ class PgVectorConnection:
                     f"got {workers_text!r}."
                 )
             build_workers = int(workers_text)
+        hnsw_m = _whole_number_setting(
+            setting(PG_HNSW_M_ENV_VAR),
+            PG_HNSW_M_ENV_VAR,
+            PG_DEFAULT_HNSW_M,
+            PG_HNSW_M_RANGE,
+        )
+        hnsw_ef_construction = _whole_number_setting(
+            setting(PG_HNSW_EF_CONSTRUCTION_ENV_VAR),
+            PG_HNSW_EF_CONSTRUCTION_ENV_VAR,
+            PG_DEFAULT_HNSW_EF_CONSTRUCTION,
+            PG_HNSW_EF_CONSTRUCTION_RANGE,
+        )
+        if hnsw_ef_construction < 2 * hnsw_m:
+            raise VectorDatabaseConfigError(
+                f"{PG_HNSW_EF_CONSTRUCTION_ENV_VAR} must be at least twice "
+                f"{PG_HNSW_M_ENV_VAR}: got ef_construction={hnsw_ef_construction} "
+                f"and m={hnsw_m}, so use at least {2 * hnsw_m}."
+            )
         return cls(
             dsn=setting(PG_DSN_ENV_VAR),
             table_prefix=setting(PG_TABLE_PREFIX_ENV_VAR) or DEFAULT_PG_TABLE_PREFIX,
@@ -614,6 +671,8 @@ class PgVectorConnection:
             iterative_scan=iterative_scan,
             maintenance_work_mem=setting(PG_MAINTENANCE_WORK_MEM_ENV_VAR) or None,
             build_workers=build_workers,
+            hnsw_m=hnsw_m,
+            hnsw_ef_construction=hnsw_ef_construction,
         )
 
     def table_name(self, model_name: str) -> str:
