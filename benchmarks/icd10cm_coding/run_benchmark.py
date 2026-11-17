@@ -68,11 +68,16 @@ TARGET = (
     "(1) code what the clinician states: do not infer a complication, cause or type "
     "from lab values, history or findings, e.g. an elevated A1c alone does not make "
     "diabetes 'with hyperglycemia'; "
-    "(2) when ICD-10-CM links this diagnosis to another of the encounter, by 'with', "
-    "'due to' or a presumed link (hypertension with heart failure or kidney disease, "
-    "diabetes with its complications), use the combination code; "
+    "(2) the exception: ICD-10-CM presumes some links even when the note doesn't "
+    "state them, and then requires the combination code. Hypertension with heart "
+    "failure among the other diagnoses is coded I11.0 on the hypertension, while the "
+    "heart failure keeps its own I50 code; hypertension with chronic kidney disease "
+    "is I12; diabetes with a condition its codes list under 'with' (neuropathy, foot "
+    "ulcer, chronic kidney disease...) takes that combination code; "
     "(3) for an injury, the 7th character is A while it receives active treatment, "
-    "D for routine follow-up during healing, S for a sequela."
+    "D for routine follow-up during healing, S for a sequela; "
+    "(4) external cause codes (V00-Y99) only say how an injury happened: code the "
+    "injury itself, e.g. an insect bite of the knee, never the external cause."
 )
 METHODS = ["llm", "aatm"]
 
