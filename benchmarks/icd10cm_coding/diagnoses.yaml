@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=https://precisiondata.github.io/aatm/latest/schemas/entity_definitions.schema.json
+
+# Encounter diagnoses, for ICD-10-CM coding
+#
+# The diagnoses a professional coder would report for one outpatient encounter, as in
+# the ICD-10-CM annotations of ACI-bench. Unlike the predefined condition_occurrence
+# definitions, which keep every condition, sign and symptom the patient has, these
+# follow the ICD-10-CM outpatient coding guidelines (Section IV):
+#
+# - Only conditions evaluated, treated, monitored or that affected the care given in
+#   this encounter, including chronic conditions that were addressed.
+# - A sign or symptom only when no diagnosis explains it: symptoms routinely part of
+#   a diagnosis the note states are not coded separately.
+# - Uncertain diagnoses ("probable", "suspected", "rule out") are not coded: the
+#   symptoms that led to them are.
+# - One mention per diagnosis, from where the note states it most specifically.
+#
+# Details that change the code (laterality, acuity, type, a complication, the
+# encounter for an injury) are often written apart from the diagnosis's name: they
+# are children, sent to the coder with the diagnosis.
+#
+# No `omop` block: the benchmark codes each diagnosis to ICD-10-CM with the concept
+# search agent itself (standard=False), see run_benchmark.py.
+
+- name: Encounter diagnosis
+  key: diagnosis
+  definition: >
+    A diagnosis, condition, injury, or sign or symptom that a professional coder would
+    report for this encounter: something the clinician evaluated, treated, monitored
+    or took into account in the care given today, copied as written, e.g. "type 2
+    diabetes", "acute systolic heart failure", "right knee medial meniscus tear" or
+    "essential hypertension". Includes chronic conditions that were addressed, e.g. a
+    medication continued or adjusted, or a condition said to be stable under
+    treatment. Take each diagnosis once, from the place where the note states it most
+    specifically, usually the assessment and plan. Be as specific as the note:
+    include laterality, location, acuity, type and stage when they are written as
+    part of the name.
+    A sign or symptom counts only when no diagnosis stated in the note explains it,
+    e.g. "chest pain" when no cause was found.
+    Does not include, and must not be extracted:
+    (1) signs and symptoms that are part of a diagnosis the note states, e.g. "shortness
+    of breath" and "edema" in a patient with heart failure, or "knee pain" with a
+    meniscus tear;
+    (2) uncertain diagnoses, e.g. "probable pneumonia", "rule out MI" or "question of
+    appendicitis" (extract the signs or symptoms that led to them instead);
+    (3) negated or ruled-out conditions, e.g. "no chest pain";
+    (4) past conditions that are resolved and did not affect today's care, and
+    conditions of family members;
+    (5) normal findings, lab values, vital signs, procedures, medications and
+    allergies, unless the note names a diagnosis from them, e.g. "anemia".
+
+- name: Diagnosis detail
+  key: diagnosis_detail
+  definition: >
+    A detail written elsewhere in the note that makes a specific diagnosis more
+    precise for coding: laterality ("left"), acuity ("acute", "chronic", "acute on
+    chronic"), type or cause ("systolic", "due to a fall", "from playing football"),
+    a complication or a related condition ("with hyperglycemia", "with heart
+    failure"), stage or severity ("moderate", "stage 3"), or whether this is the
+    first visit for an injury or a follow-up. Copy only the detail itself, e.g.
+    "ejection fraction of 35%" or "injured last week playing basketball". Only
+    details the diagnosis's own words do not already say.
+  has_parent: true
+  parent_key: diagnosis

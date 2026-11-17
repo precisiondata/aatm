@@ -8,23 +8,22 @@ Methods:
 
 - ``llm``: the model reads the note and answers with ICD-10-CM codes, as in the
   paper's baseline. No AATM involved.
-- ``aatm``: `aatm.omop.OmopExtractionPipeline` with the predefined
-  ``condition_occurrence`` definitions: the model extracts the patient's conditions,
-  and `aatm.omop.AgenticCoder` (the concept search agent, same model) codes each one
-  to a standard concept of the Condition domain.
+- ``aatm``: `aatm.extractors.SimpleLLMExtractor` with ``diagnoses.yaml`` extracts the
+  diagnoses a coder would report, with the details that change their code; the
+  concept search agent (same model) codes each one to an ICD-10-CM code, searching
+  ICD10CM concepts only (``standard=False``).
 
-Scoring (``--summary-only`` rescores saved results):
+Scoring (``--summary-only`` rescores saved results), micro precision, recall and F1
+over encounters:
 
-- **ICD-10-CM**, for methods that answer with codes: exact codes, and 3-character
-  categories. ``llm (verified)`` is the ``llm`` answer with the codes AATM's vocabulary
-  database doesn't know as valid ICD-10-CM dropped.
-- **Standard concepts**, for every method: gold and predicted ICD-10-CM codes are
-  turned into the standard concepts they map to ("Maps to"), and compared with the
-  concepts AATM coded. This is the space AATM codes to, and the one an OMOP CDM holds.
+- **code**: exact ICD-10-CM codes; **category**: their first 3 characters.
+- **standard**: gold and predicted codes replaced by the standard concepts they map
+  to ("Maps to"), the concepts an OMOP CDM would hold.
+- ``llm (verified)``: the ``llm`` answer without the codes the vocabulary database
+  doesn't know as valid ICD-10-CM. AATM only answers with codes it knows.
 
-Micro precision, recall and F1 over encounters. Both scores need ICD10CM in the
-vocabulary database (``.aatm/omop.db``): include it in the Athena bundle given to
-``aatm init``.
+The ``aatm`` method, standard scores and verification need ICD10CM in the vocabulary
+database (``.aatm/omop.db``): include it in the Athena bundle given to ``aatm init``.
 
 Run from the repository root:
 
@@ -59,6 +58,7 @@ HERE = Path(__file__).parent
 DATA = HERE / "data"
 RESULTS = HERE / "results"
 VOCABULARY_DB = Path(".aatm/omop.db")
+DEFINITIONS = HERE / "diagnoses.yaml"
 METHODS = ["llm", "aatm"]
 
 SYSTEM = """\
@@ -145,7 +145,12 @@ class LLMMethod:
 
 
 class AatmMethod:
-    """Extract conditions, then code each to a standard concept with the agent."""
+    """Extract the encounter's diagnoses, then code each to ICD-10-CM with the agent.
+
+    The extraction uses ``diagnoses.yaml``; each diagnosis goes to the concept search
+    agent with its line of the note and its details, restricted to ICD10CM concepts
+    (``standard=False``).
+    """
 
     def __init__(
         self,
@@ -154,43 +159,58 @@ class AatmMethod:
         retriever: Any,
         max_tool_calls: int,
     ):
-        from aatm.omop import AgenticCoder, OmopExtractionPipeline
+        from aatm.concept_search import ConceptSearchAgent, ConceptSearchTools
+        from aatm.data_models.extractors import EntityDefinitions
+        from aatm.extractors import SimpleLLMExtractor
 
-        coder = AgenticCoder(
+        self.extractor = SimpleLLMExtractor(
+            model_id=model,
+            entity_definitions=EntityDefinitions.from_yaml(DEFINITIONS),
+            settings=settings,
+        )
+        self.agent = ConceptSearchAgent(
             model,
-            retriever=retriever,
+            ConceptSearchTools(retriever, VOCABULARY_DB),
             max_tool_calls=max_tool_calls,
             settings=settings,
         )
-        self.pipeline = OmopExtractionPipeline(
-            "condition_occurrence", model_id=model, coder=coder, settings=settings
-        )
 
     async def __call__(self, text: str) -> dict[str, Any]:
-        from aatm.omop import ClinicalNote
+        from aatm.concept_search import CodingContext
 
-        tables = await self.pipeline([ClinicalNote(text=text, note_id=1, person_id=1)])
-        mappings = tables.mappings_dataframe()
-        rows = tables.to_dataframes(provenance=True).get("condition_occurrence")
-        concepts = []
-        if rows is not None:
-            for _, row in rows.iterrows():
-                concepts.append(
-                    {
-                        "text": row.get("_text"),
-                        "concept_id": int(row["condition_concept_id"])
-                        if pd.notna(row["condition_concept_id"])
-                        else 0,
-                        "status_concept_id": row.get("condition_status_concept_id"),
-                    }
-                )
+        (extraction,) = await self.extractor([text])
+        diagnoses = [r for r in extraction.to_records() if r.key == "diagnosis"]
+        contexts = [
+            CodingContext(
+                text=r.text,
+                related={
+                    f"detail_{n}": d.text
+                    for n, d in enumerate(r.children.get("diagnosis_detail", []), 1)
+                },
+                sentence=r.line,
+                target="ICD-10-CM diagnosis code of an outpatient encounter",
+            )
+            for r in diagnoses
+        ]
+        results = await self.agent.search_many(
+            [(c, None) for c in contexts], vocabularies=["ICD10CM"], standard=False
+        )
+        details = [
+            {
+                "text": c.text,
+                "related": c.related,
+                "code": r.concept.concept_code if r.concept else None,
+                "name": r.concept.concept_name if r.concept else None,
+                "confidence": r.confidence,
+                "tool_calls": r.tool_calls,
+                "rationale": r.rationale,
+                "error": r.error,
+            }
+            for c, r in zip(contexts, results)
+        ]
         return {
-            "concept_ids": sorted(
-                {c["concept_id"] for c in concepts if c["concept_id"]}
-            ),
-            "details": concepts,
-            "mappings": json.loads(mappings.to_json(orient="records")),
-            "issues": json.loads(tables.issues_dataframe().to_json(orient="records")),
+            "codes": list(dict.fromkeys(d["code"] for d in details if d["code"])),
+            "details": details,
         }
 
 
@@ -373,57 +393,42 @@ def summarize(split: str, source: str) -> None:
             / max(len(ids), 1),
             "seconds": sum(run[eid]["seconds"] for eid in ids) / max(len(ids), 1),
         }
-        if method == "llm":
-            variants = {
-                "llm": lambda codes: codes,
+        variants = {method: lambda codes: codes}
+        # AATM only answers with codes of the vocabulary database.
+        if method == "llm" and icd.available:
+            variants["llm (verified)"] = lambda codes: {
+                c for c in codes if icd.valid(c)
             }
-            if icd.available:
-                variants["llm (verified)"] = lambda codes: {
-                    c for c in codes if icd.valid(c)
-                }
-            for name, keep in variants.items():
-                pred = [keep(set(run[eid].get("codes", []))) for eid in ids]
-                codes = [c for p in pred for c in p]
-                rows.append(
-                    {
-                        "method": name,
-                        **common,
-                        **{f"code {k}": v for k, v in prf(gold, pred).items()},
-                        **{
-                            f"category {k}": v
-                            for k, v in prf(
-                                [{c[:3] for c in g} for g in gold],
-                                [{c[:3] for c in p} for p in pred],
-                            ).items()
-                        },
-                        "codes / encounter": len(codes) / max(len(ids), 1),
-                    }
-                )
-                if icd.available:
-                    rows[-1].update(
-                        {
-                            f"standard {k}": v
-                            for k, v in prf(
-                                gold_std, [icd.standard(p) for p in pred]
-                            ).items()
-                        }
-                    )
-                    rows[-1]["invalid codes"] = sum(not icd.valid(c) for c in codes)
-                    rows[-1]["non-billable codes"] = sum(
-                        icd.valid(c) and not icd.billable(c) for c in codes
-                    )
-        else:
-            pred_std = [set(run[eid].get("concept_ids", [])) for eid in ids]
+        for name, keep in variants.items():
+            pred = [keep(set(run[eid].get("codes", []))) for eid in ids]
+            codes = [c for p in pred for c in p]
             rows.append(
                 {
-                    "method": method,
+                    "method": name,
                     **common,
-                    "concepts / encounter": sum(map(len, pred_std)) / max(len(ids), 1),
+                    **{f"code {k}": v for k, v in prf(gold, pred).items()},
+                    **{
+                        f"category {k}": v
+                        for k, v in prf(
+                            [{c[:3] for c in g} for g in gold],
+                            [{c[:3] for c in p} for p in pred],
+                        ).items()
+                    },
+                    "codes / encounter": len(codes) / max(len(ids), 1),
                 }
             )
             if icd.available:
                 rows[-1].update(
-                    {f"standard {k}": v for k, v in prf(gold_std, pred_std).items()}
+                    {
+                        f"standard {k}": v
+                        for k, v in prf(
+                            gold_std, [icd.standard(p) for p in pred]
+                        ).items()
+                    }
+                )
+                rows[-1]["invalid codes"] = sum(not icd.valid(c) for c in codes)
+                rows[-1]["non-billable codes"] = sum(
+                    icd.valid(c) and not icd.billable(c) for c in codes
                 )
 
     df = pd.DataFrame(rows).set_index(["method", "model"]).sort_index()
