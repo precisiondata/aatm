@@ -2637,7 +2637,10 @@ for this, so this step is done in the browser:</p>
    <code>AATM_PG_DSN</code> yourself. It guides you through installing or starting Docker if
    needed, and suggests the container's index build memory and workers from your
    machine's resources, which you can change;</li>
-<li>builds the vocabulary database, <code>.aatm/omop.db</code>;</li>
+<li>builds the vocabulary database, <code>.aatm/omop.db</code>, and indexes it, so code, concept
+   and relationship lookups take milliseconds (a few more minutes on a full download).
+   If you keep an existing database, it gets the indexes it lacks; <code>aatm index-vocab</code>
+   adds them without the other steps;</li>
 <li>lists the search indexes already built there, asks which <strong>embedding model</strong> (built
    ones are marked) and <strong>standard vocabularies</strong> to index, and builds the search index;</li>
 <li>records the model it built in <code>.aatm/config.yaml</code>, so every retriever, mapper and

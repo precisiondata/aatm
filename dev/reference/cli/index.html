@@ -1327,6 +1327,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#aatm-index-vocab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm index-vocab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#aatm-schema" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2689,6 +2700,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#aatm-index-vocab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aatm index-vocab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#aatm-schema" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2981,7 +3003,7 @@ version. For how to use the commands together, see the
 <tbody>
 <tr>
 <td>Setup</td>
-<td><a href="#aatm-init"><code>aatm init</code></a>, <a href="#aatm-doctor"><code>aatm doctor</code></a>, <a href="#aatm-vector-db-check"><code>aatm vector-db check</code></a>, <a href="#aatm-vector-db-upload"><code>aatm vector-db upload</code></a></td>
+<td><a href="#aatm-init"><code>aatm init</code></a>, <a href="#aatm-doctor"><code>aatm doctor</code></a>, <a href="#aatm-index-vocab"><code>aatm index-vocab</code></a>, <a href="#aatm-vector-db-check"><code>aatm vector-db check</code></a>, <a href="#aatm-vector-db-upload"><code>aatm vector-db upload</code></a></td>
 </tr>
 <tr>
 <td>Clinical notes to OMOP tables</td>
@@ -3020,6 +3042,7 @@ schedulers can act on it.</p>
 <li><code>map</code>: Map a CSV of source terms...</li>
 <li><code>serve</code>: Serve terminology mapping as a REST API...</li>
 <li><code>doctor</code>: Check whether local models can use a GPU,...</li>
+<li><code>index-vocab</code>: Index the vocabulary database, so code and...</li>
 <li><code>schema</code>: Write the JSON Schema of entity definition...</li>
 <li><code>vector-db</code>: Check the vector database settings or...</li>
 <li><code>cache</code>: Inspect or clear the coding cache...</li>
@@ -3095,10 +3118,20 @@ schedulers can act on it.</p>
 <ul>
 <li><code>--help</code>: Show this message and exit.</li>
 </ul>
+<h3 id="aatm-index-vocab"><code>aatm index-vocab</code></h3>
+<p>Index the vocabulary database, so code and concept lookups take milliseconds.</p>
+<p><strong>Usage</strong>:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>index-vocab<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</span></code></pre></div>
+<p><strong>Options</strong>:</p>
+<ul>
+<li><code>--path PATH</code>: The vocabulary database.  [default: (.aatm/omop.db)]</li>
+<li><code>--help</code>: Show this message and exit.</li>
+</ul>
 <h3 id="aatm-schema"><code>aatm schema</code></h3>
 <p>Write the JSON Schema of entity definition files, for editor support offline.</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>schema<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>DIRECTORY<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>schema<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>DIRECTORY<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
@@ -3111,7 +3144,7 @@ schedulers can act on it.</p>
 <h3 id="aatm-vector-db"><code>aatm vector-db</code></h3>
 <p>Check the vector database settings or upload a local index to Chroma Cloud, Pinecone or PostgreSQL</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
+<div class="language-console highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3126,7 +3159,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-vector-db-check"><code>aatm vector-db check</code></h4>
 <p>Show where the vector database lives and test the connection</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span>check<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span>check<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3136,7 +3169,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-vector-db-sync"><code>aatm vector-db sync</code></h4>
 <p>Record the built vector databases that .aatm/config.yaml does not list, e.g. built before AATM recorded its builds, and choose the default</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span>sync<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span>sync<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3148,7 +3181,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-vector-db-upload"><code>aatm vector-db upload</code></h4>
 <p>Copy a local vector database to Chroma Cloud, Pinecone or PostgreSQL without re-embedding</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span>upload<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>vector-db<span class="w"> </span>upload<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3162,7 +3195,7 @@ schedulers can act on it.</p>
 <h3 id="aatm-cache"><code>aatm cache</code></h3>
 <p>Inspect or clear the coding cache (.aatm/coding_cache.db)</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
+<div class="language-console highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3176,7 +3209,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-cache-info"><code>aatm cache info</code></h4>
 <p>Show the entries, size and coders of the cache</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span>info<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span>info<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3186,7 +3219,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-cache-clear"><code>aatm cache clear</code></h4>
 <p>Delete the cached results and shrink the file</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span>clear<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>cache<span class="w"> </span>clear<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3198,7 +3231,7 @@ schedulers can act on it.</p>
 <h3 id="aatm-omop"><code>aatm omop</code></h3>
 <p>Run, rebuild and inspect OMOP extraction runs</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
+<div class="language-console highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3215,7 +3248,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-run"><code>aatm omop run</code></h4>
 <p>Extract notes into OMOP tables, in chunks, resuming where an earlier run stopped. Exit codes: 0 every note built, 2 some notes failed, 1 error, 130 stopped</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>SOURCE<span class="o">]</span><span class="w"> </span><span class="o">[</span>OUTPUT<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>SOURCE<span class="o">]</span><span class="w"> </span><span class="o">[</span>OUTPUT<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
@@ -3258,7 +3291,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-rebuild"><code>aatm omop rebuild</code></h4>
 <p>Build the tables of a run again from its stored extraction results, with no extraction call (after changing the omop blocks or the coder). Options not given are those the run recorded in options.yaml</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>rebuild<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
+<div class="language-console highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>rebuild<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
@@ -3289,7 +3322,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-status"><code>aatm omop status</code></h4>
 <p>Notes built and failed, issues by reason, and the last summary</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>status<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
+<div class="language-console highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>status<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
@@ -3303,7 +3336,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-failures"><code>aatm omop failures</code></h4>
 <p>The notes that failed: stage, error and attempts</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>failures<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
+<div class="language-console highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>failures<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>OUTPUT
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
@@ -3317,7 +3350,7 @@ schedulers can act on it.</p>
 <h4 id="aatm-omop-pilot"><code>aatm omop pilot</code></h4>
 <p>Read a pilot workspace: versioned runs on a fixed sample of notes (see aatm.omop.Pilot)</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
+<div class="language-console highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span>COMMAND<span class="w"> </span><span class="o">[</span>ARGS<span class="o">]</span>...
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3331,7 +3364,7 @@ schedulers can act on it.</p>
 <h5 id="aatm-omop-pilot-log"><code>aatm omop pilot log</code></h5>
 <p>List the versions and what changed in each</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span>log<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span>log<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Options</strong>:</p>
 <ul>
@@ -3342,7 +3375,7 @@ schedulers can act on it.</p>
 <h5 id="aatm-omop-pilot-compare"><code>aatm omop pilot compare</code></h5>
 <p>Compare two versions (by default the latest two)</p>
 <p><strong>Usage</strong>:</p>
-<div class="language-console highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span>compare<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>A<span class="o">]</span><span class="w"> </span><span class="o">[</span>B<span class="o">]</span>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="gp">$ </span>aatm<span class="w"> </span>omop<span class="w"> </span>pilot<span class="w"> </span>compare<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>A<span class="o">]</span><span class="w"> </span><span class="o">[</span>B<span class="o">]</span>
 </span></code></pre></div>
 <p><strong>Arguments</strong>:</p>
 <ul>
