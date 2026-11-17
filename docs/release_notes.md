@@ -57,7 +57,10 @@
   `*_source_concept_id` columns. Semantic search returns the ICD-10-CM names in the
   index and the codes that map to the standard concepts it finds, hierarchy follows
   the vocabulary's own parents and children, and the agent is asked for the most
-  specific code the context supports. Standard searches are unchanged. See
+  specific code the context supports: a code with children, such as an ICD-10-CM
+  category, is sent back once with them listed. Standard searches are unchanged.
+  On ACI-bench's 120 test encounters with ICD-10-CM annotations, extraction and
+  coding with `gpt-5-mini` reach an exact-code F1 of 77.6 ± 1.1 over 5 runs; see
   `benchmarks/icd10cm_coding`.
 
 ## 0.4.0

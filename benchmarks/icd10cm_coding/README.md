@@ -34,17 +34,24 @@ uv run python benchmarks/icd10cm_coding/prepare_data.py
 - **`aatm`**: two steps, with the same model.
   1. `SimpleLLMExtractor` with [`diagnoses.yaml`](diagnoses.yaml) extracts the
      diagnoses a coder would report for the encounter, following the outpatient
-     coding guidelines: no symptoms that are part of a stated diagnosis, no uncertain
-     diagnoses, chronic conditions only when addressed. Each diagnosis comes with the
-     details written elsewhere in the note that change its code (laterality, acuity,
-     type, a complication, the encounter for an injury).
-  2. The concept search agent codes each diagnosis, with its line and details, to an
-     ICD-10-CM code: `ConceptSearchAgent.search(..., vocabularies=["ICD10CM"],
-     standard=False)`. In this mode its tools search ICD10CM concepts, which are not
-     standard. Semantic search returns the ICD-10-CM names in the index and the codes
-     that map to the standard concepts it finds, and hierarchy follows ICD-10-CM's
-     own parents and children. The agent is asked for the most specific code the
-     context supports.
+     coding guidelines: taken from the assessment and plan, no symptoms that are part
+     of a stated diagnosis, chronic conditions only when addressed. Each diagnosis
+     has a required certainty; uncertain ones ("suspected", "rule out") are not
+     coded. Each comes with the details written elsewhere in the note that change
+     its code (laterality, acuity, type, a complication, the encounter for an
+     injury).
+  2. The concept search agent codes each diagnosis to an ICD-10-CM code:
+     `ConceptSearchAgent.search(..., vocabularies=["ICD10CM"], standard=False)`. In
+     this mode its tools search ICD10CM concepts, which are not standard: semantic
+     search returns the ICD-10-CM names in the index and the codes that map to the
+     standard concepts it finds, hierarchy follows ICD-10-CM's own parents and
+     children, and a code with children (a category such as K21) is sent back once
+     with them listed. The agent gets the diagnosis's line, its details, the other
+     diagnoses of the encounter, and four ICD-10-CM conventions (`TARGET` in
+     `run_benchmark.py`): code what is stated, the combination codes ICD-10-CM
+     presumes (hypertension with heart failure, diabetes with its complications),
+     the 7th character of injuries, and no external-cause codes in place of the
+     injury.
 
 ## Scores
 
@@ -134,12 +141,18 @@ uv run python benchmarks/icd10cm_coding/run_benchmark.py --model openai/gpt-5-mi
   (default `text-embedding-3-small`, local ChromaDB) and tool budget. The retriever is
   part of the result's name, e.g. `aatm-embeddinggemma-300M-pgvector`.
 - `--temperature`: for models that accept it.
+- `--runs 1 2 3 4 5`: repeated runs, one result file each, reported as mean ± SD.
+- `--variant v4`: a label added to the method's name, to keep versions apart.
+- `--concurrency` (default 32): encounters coded at the same time. Every run and
+  method shares one pool, so 5 runs of the test set (600 encounters) take about 25
+  minutes with `gpt-5-mini`. `--max-llm-calls` caps LLM calls in flight for a
+  provider quota; `--request-timeout` (default 120 s) retries a stalled request.
 
-Results go to `results/<split>__<source>__<method>__<model>.jsonl`, one line per
-encounter: codes, and for `aatm` each diagnosis with its details, code, confidence
-and rationale; LLM calls, tokens and seconds. A rerun skips encounters already done
-and retries those that failed. `--summary-only` scores every result file of a split
-and source.
+Results go to `results/<split>__<source>__<method>__<model>[__run<N>].jsonl`, one line
+per encounter: codes, and for `aatm` each diagnosis with its details, code,
+confidence and rationale, and the uncertain diagnoses left out; LLM calls, tokens and
+seconds. A rerun skips encounters already done and retries those that failed.
+`--summary-only` scores every result file of a split and source.
 
 ## Smoke test (2026-11-17, `openai/gpt-5-mini`, first 2 valid encounters)
 
@@ -159,54 +172,73 @@ Too few encounters to compare methods; it checks that everything runs.
   definitions and standard concepts, extracted 26 mentions from the heart-failure
   note (every symptom) and needed 57 LLM calls; the targeted definitions extract 2.
 
-## Results: test set (2026-11-17)
+## Results (2026-11-17)
 
 `aatm`, `openai/gpt-5-mini` for extraction and coding, `embeddinggemma-300M` index in
-pgvector, `max_tool_calls=8`, all 120 test encounters, one run:
+pgvector, `max_tool_calls=8`.
 
-| | Exact R | Exact P | Exact F1 | Prefix-1 F1 | Prefix-2 F1 | Category F1 | Standard F1 |
-|---|---|---|---|---|---|---|---|
-| `aatm` (gpt-5-mini) | 63.6 | 59.5 | **61.4** | 75.0 | 81.4 | 82.5 | 69.7 |
+### Test set: 120 encounters, 5 runs
 
-For reference, from the table above: Symphony 64.1 ± 1.7, Claude Opus 4.6 with a
-coding MCP 59.0, GPT 5.4 alone 54.0, fine-tuned Haiku 3 with verification 57.6. This
-is one run with a small model, not five with frontier models: not yet a like-for-like
-comparison.
+| | Exact R | Exact P | Exact F1 | Prefix-1 F1 | Prefix-2 F1 |
+|---|---|---|---|---|---|
+| **`aatm` v4** (gpt-5-mini) | 76.6 ± 1.3 | 78.6 ± 1.1 | **77.6 ± 1.1** | 83.8 ± 1.3 | 87.7 ± 1.3 |
+| `aatm` v1 (gpt-5-mini), 1 run | 63.6 | 59.5 | 61.4 | 75.0 | 81.4 |
+| Symphony (Edin et al.) | 75.0 | 56.0 | 64.1 ± 1.7 | | |
+| Claude Opus 4.6 + coding MCP (Edin et al.) | 60.3 | 58.1 | 59.0 | | |
+| GPT 5.4, no tools (Edin et al.) | 74.2 | 42.5 | 54.0 ± 1.4 | | |
+| Haiku 3 fine-tuned + verification (Yuan et al.) | | | 57.6 | | |
 
-- 2.2 codes per encounter (gold: 2.1), no invalid code, no failed encounter; 1 of 265
-  extracted diagnoses got no code.
-- 7.0 LLM calls, about 17,000 tokens per encounter. Seconds per encounter (85 on
-  average) are not meaningful: the first 49 encounters ran before the vocabulary
-  database was indexed (`aatm index-vocab`), which made lookups up to 10,000 times
-  faster.
+v4 on test, mean of 5 runs: category F1 89.1, standard-concept F1 82.2; 2.0 codes per
+encounter (gold: 2.06), no invalid code, 3.2 non-billable codes per run (34 for v1),
+no failed encounter. About 18,700 tokens per encounter.
 
-Where the errors come from:
+What the comparison does and doesn't show:
 
-- **Category headers.** 34 of 264 predicted codes are not billable, e.g. K21 for
-  K21.9, J45.90 for J45.909, S83.421 without its 7th character; for 21 of them the
-  gold code is a child of the header. The agent may finish on a code that still has
-  children.
-- **E11.65 instead of E11.9** (6 times in the first 102 encounters): "uncontrolled" diabetes or a high A1c coded
-  as *with hyperglycemia*, where the annotators kept type 2 diabetes without
-  complications.
-- **Visit codes.** Z00.00 (annual exam) and Z09 (follow-up after completed
-  treatment): see Known limitations. Status codes (Z94.0, Z95.1, Z98.890) and
-  screening (Z11.3) were found.
-- **Conventions the search can't infer.** "High risk medication use" is coded Z79.899
-  *Other long term (current) drug therapy*; semantic search finds other "high risk"
-  codes and the agent concluded there was none.
-- **Symptoms and history.** Symptoms the annotators coded beside a diagnosis
-  (M25.561 knee pain, R51.9 headache) are missed; conditions listed only under past
-  history (mitral regurgitation after its repair) are coded.
+- Same data, split, metric and number of runs as Symphony's Table 3, and a smaller,
+  cheaper model than the papers' (Claude Opus 4.6, GPT 5.4, Gemini 3.1 Pro).
+- **v4 was developed on the validation split, but not blind to test.** v1's errors
+  on test were examined before the validation iterations (see the history of this
+  README), and two of the v4 changes address errors first seen there: codes with
+  children (headers) and complications inferred from labs (E11.65). Both are
+  general ICD-10-CM rules, not test cases, and validation (78.6) and test (77.6)
+  agree, but a strictly held-out number would need fresh data or the changes
+  re-derived from train and valid alone.
+- The coding conventions encode the annotators' practice, which follows the official
+  guidelines (presumed hypertension–heart failure links, no uncertain diagnoses,
+  injury 7th characters).
 
-Improvements to the definitions or the agent should be developed on the train and
-valid splits, then scored once on test: the errors above come from the test set.
+### Development on the validation split: 20 encounters, 2 runs each
+
+| Version | Change | Exact R | Exact P | Exact F1 |
+|---|---|---|---|---|
+| v1 | as first run on test | 50.0 | 45.8 | 47.8 ± 2.3 |
+| v2 | + a code with children is sent back once with them (agent) | 61.8 | 54.7 | 58.0 ± 1.7 |
+| v3 | + certainty (uncertain not coded), assessment and plan first, other diagnoses and coding conventions given to the agent | 68.4 | 73.3 | 70.8 ± 4.5 |
+| v4 | + which links ICD-10-CM presumes and where the combination code goes; no external-cause codes for injuries | 75.0 | 82.6 | **78.6 ± 1.2** |
+| `llm` | the model alone, 1 run | 47.4 | 27.7 | 35.0 |
+
+One code is worth about 2.6 F1 points on these 38 gold codes, and two runs of the
+same version differed by up to 6.4 (v3): changes smaller than about 5 points can't be told
+from noise. v1 to v4 are commits on this branch; v1 is the version before
+`c22be60`.
+
+v4's remaining validation errors are one-offs: annotations that infer a detail the
+rules say not to infer (acute systolic heart failure from an ejection fraction of
+45%), a rare code (Q93.88 *Other microdeletions* for Smith-Magenis syndrome), a
+symptom coded as a diagnosis (painful swallowing as esophagitis), and the two
+limitations below.
 
 ## Known limitations
 
-- **Combination codes.** ICD-10-CM presumes hypertension and heart failure are linked
-  and codes them together (I11.0). `aatm` codes each diagnosis on its own, so it
-  can't produce a code that combines two of them; `llm` missed it as well.
-- **Encounter codes.** The gold codes include codes such as Z09 (follow-up exam)
-  that describe the visit rather than a diagnosis. `diagnoses.yaml` doesn't ask for
-  them.
+- **One code per diagnosis.** Some diagnoses need two codes: a diabetic foot ulcer
+  is E11.621 plus an L97 code for the ulcer's site ("use additional code" in the
+  Tabular List). The agent returns one. Combination codes the conventions name
+  (I11.0 for hypertension with heart failure) are found from the other diagnoses
+  of the encounter, but the rest of ICD-10-CM's links live in its Alphabetic Index
+  and Tabular notes, which the OMOP vocabularies don't include: the agent relies on
+  the model's knowledge of them.
+- **Encounter codes.** The gold codes include codes such as Z00.00 (annual exam) and
+  Z09 (follow-up after completed treatment) that describe the visit rather than a
+  diagnosis. `diagnoses.yaml` doesn't ask for them.
+- **Conventions the search can't infer.** "High risk medication use" is coded Z79.899
+  *Other long term (current) drug therapy*, a name that shares no words with it.
