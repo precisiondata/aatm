@@ -54,7 +54,10 @@ aatm init --vocab-zip ~/Downloads/vocabulary_download_v5_<bundle-id>.zip
    `AATM_PG_DSN` yourself. It guides you through installing or starting Docker if
    needed, and suggests the container's index build memory and workers from your
    machine's resources, which you can change;
-4. builds the vocabulary database, `.aatm/omop.db`;
+4. builds the vocabulary database, `.aatm/omop.db`, and indexes it, so code, concept
+   and relationship lookups take milliseconds (a few more minutes on a full download).
+   If you keep an existing database, it gets the indexes it lacks; `aatm index-vocab`
+   adds them without the other steps;
 5. lists the search indexes already built there, asks which **embedding model** (built
    ones are marked) and **standard vocabularies** to index, and builds the search index;
 6. records the model it built in `.aatm/config.yaml`, so every retriever, mapper and

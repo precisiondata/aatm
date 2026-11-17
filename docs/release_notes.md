@@ -45,6 +45,20 @@
   longer and an index of the same size. The container `aatm init` starts may now give
   index builds up to 20 GB, which the 3,072-dimension models need. Existing indexes keep
   their settings until rebuilt. See `benchmarks/vector_db_backends`.
+- **An indexed vocabulary database.** `aatm init` indexes `.aatm/omop.db` (concept ids
+  and codes, relationships, synonyms and ancestors), and adds the indexes a database
+  you keep lacks; `aatm index-vocab` adds them on their own. On a full download with
+  ICD-10-CM, a "Maps to" or hierarchy lookup took 0.7 to 10 s and now takes under a
+  millisecond, which made the concept search agent several times faster. Lookups warn
+  once about a database without them.
+- **Coding to source vocabularies such as ICD-10-CM.**
+  `ConceptSearchAgent.search(..., vocabularies=["ICD10CM"], standard=False)` finds a
+  code of vocabularies whose concepts are not standard, for billing extracts or
+  `*_source_concept_id` columns. Semantic search returns the ICD-10-CM names in the
+  index and the codes that map to the standard concepts it finds, hierarchy follows
+  the vocabulary's own parents and children, and the agent is asked for the most
+  specific code the context supports. Standard searches are unchanged. See
+  `benchmarks/icd10cm_coding`.
 
 ## 0.4.0
 

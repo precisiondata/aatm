@@ -94,8 +94,9 @@ class Candidate(BaseModel):
 class VocabularySearch(SqliteConceptLookup):
     """Searches in the SQLite vocabulary database built by ``aatm init``.
 
-    The tables are not indexed, so each search scans a table once (well under a
-    second for the concept table of a typical download).
+    Lookups by id or code, relationships and the hierarchy use the indexes
+    ``aatm init`` creates (`aatm.omop.vocabulary.VOCABULARY_INDEXES`); searches by
+    name scan the concept and synonym tables.
     """
 
     def __init__(self, path: str | Path = DEFAULT_VOCABULARY_DB):

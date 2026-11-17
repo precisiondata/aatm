@@ -7,7 +7,7 @@ version. For how to use the commands together, see the
 
 | Workflow | Commands |
 |---|---|
-| Setup | [`aatm init`](#aatm-init), [`aatm doctor`](#aatm-doctor), [`aatm vector-db check`](#aatm-vector-db-check), [`aatm vector-db upload`](#aatm-vector-db-upload) |
+| Setup | [`aatm init`](#aatm-init), [`aatm doctor`](#aatm-doctor), [`aatm index-vocab`](#aatm-index-vocab), [`aatm vector-db check`](#aatm-vector-db-check), [`aatm vector-db upload`](#aatm-vector-db-upload) |
 | Clinical notes to OMOP tables | [`aatm omop run`](#aatm-omop-run), [`aatm omop status`](#aatm-omop-status), [`aatm omop failures`](#aatm-omop-failures), [`aatm omop rebuild`](#aatm-omop-rebuild), [`aatm omop pilot log`](#aatm-omop-pilot-log), [`aatm omop pilot compare`](#aatm-omop-pilot-compare), [`aatm cache info`](#aatm-cache-info), [`aatm cache clear`](#aatm-cache-clear) |
 | Entity definitions | [`aatm schema`](#aatm-schema) |
 | Terminology mapping | [`aatm map`](#aatm-map), [`aatm search-ui`](#aatm-search-ui), [`aatm serve`](#aatm-serve) |
@@ -41,6 +41,7 @@ $ aatm [OPTIONS] COMMAND [ARGS]...
 * `map`: Map a CSV of source terms...
 * `serve`: Serve terminology mapping as a REST API...
 * `doctor`: Check whether local models can use a GPU,...
+* `index-vocab`: Index the vocabulary database, so code and...
 * `schema`: Write the JSON Schema of entity definition...
 * `vector-db`: Check the vector database settings or...
 * `cache`: Inspect or clear the coding cache...
@@ -139,6 +140,21 @@ $ aatm doctor [OPTIONS]
 
 **Options**:
 
+* `--help`: Show this message and exit.
+
+### `aatm index-vocab`
+
+Index the vocabulary database, so code and concept lookups take milliseconds.
+
+**Usage**:
+
+```console
+$ aatm index-vocab [OPTIONS]
+```
+
+**Options**:
+
+* `--path PATH`: The vocabulary database.  [default: (.aatm/omop.db)]
 * `--help`: Show this message and exit.
 
 ### `aatm schema`
