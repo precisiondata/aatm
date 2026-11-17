@@ -359,6 +359,48 @@ def test_agent_codes_to_a_source_vocabulary(vocab_db):
     assert "E11.9" in llm.prompts[0]
 
 
+def test_a_source_code_with_children_is_rejected_once_with_them(vocab_db):
+    agent, llm = make_agent(
+        [
+            step("finish", concept_id=45576876, confidence="high"),  # E11: a header
+            step("finish", concept_id=45600002, confidence="high"),  # a listed child
+        ],
+        vocab_db,
+        retriever=FakeRetriever(default=("201826",)),
+    )
+    result = asyncio.run(
+        agent.search(CodingContext(text="t2dm"), vocabularies=ICD, standard=False)
+    )
+    assert result.concept.concept_code == "E11.65"
+    assert result.tool_calls == 1  # the children came with the rejection
+    rejection = llm.prompts[1]
+    assert "E11 has more specific codes" in rejection
+    assert "E11.9" in rejection and "E11.65" in rejection
+
+    # Chosen again, the header stays.
+    agent, _ = make_agent(
+        [
+            step("finish", concept_id=45576876, confidence="high"),
+            step("finish", concept_id=45576876, confidence="medium"),
+        ],
+        vocab_db,
+        retriever=FakeRetriever(default=("201826",)),
+    )
+    result = asyncio.run(
+        agent.search(CodingContext(text="t2dm"), vocabularies=ICD, standard=False)
+    )
+    assert (result.concept.concept_code, result.confidence) == ("E11", "medium")
+
+
+def test_standard_searches_accept_concepts_with_children(vocab_db):
+    agent, llm = make_agent(
+        [step("finish", concept_id=4324383, confidence="high")], vocab_db
+    )
+    result = asyncio.run(agent.search(CodingContext(text="creatinine")))
+    assert result.concept.concept_id == 4324383
+    assert len(llm.prompts) == 1
+
+
 def test_standard_prompt_is_unchanged_by_the_source_prompt():
     from aatm.concept_search.agent import SOURCE_SYSTEM_PROMPT, SYSTEM_PROMPT
 

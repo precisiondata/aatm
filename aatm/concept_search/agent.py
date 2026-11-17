@@ -392,6 +392,7 @@ class ConceptSearchAgent:
         )
         calls_left = self.max_tool_calls
         retries_left = 2  # invalid finishes or unavailable actions
+        headers: set[int] = set()  # codes rejected once for having children
         while True:
             forced = calls_left <= 0
             user = self._prompt(context, history, calls_left)
@@ -410,7 +411,14 @@ class ConceptSearchAgent:
                     return
                 entry.update(concept_id=step.concept_id, confidence=step.confidence)
                 problem = self._finish(
-                    step, seen, domain, vocabularies, result, standard
+                    step,
+                    seen,
+                    domain,
+                    vocabularies,
+                    result,
+                    standard,
+                    # Headers are rejected once, and only while a retry is left.
+                    headers if not forced and retries_left > 0 else None,
                 )
                 if problem is None:
                     if forced:
@@ -553,8 +561,16 @@ class ConceptSearchAgent:
         vocabularies: Optional[Sequence[str]],
         result: ConceptSearchResult,
         standard: bool = True,
+        headers: Optional[set[int]] = None,
     ) -> Optional[str]:
-        """Record a finish step; return why it is rejected, or ``None``."""
+        """Record a finish step; return why it is rejected, or ``None``.
+
+        In a search of source vocabularies (``standard=False``), a code with more
+        specific codes under it, such as an ICD-10-CM category, is rejected once
+        with its children listed, which become valid answers: billing needs the
+        most specific code. `headers` holds the codes already rejected; chosen
+        again, they are accepted. ``None`` skips the check (no retry left).
+        """
         result.rationale = step.reasoning
         if step.concept_id is None:
             result.concept = None
@@ -579,6 +595,36 @@ class ConceptSearchAgent:
                     f"{_scope_text(domain, vocabularies)} returned by a tool."
                 )
             candidate = Candidate.from_concept(concept)
+        if (
+            not standard
+            and headers is not None
+            and candidate.concept_id not in headers
+            and self.tools.vocabulary is not None
+        ):
+            children = [
+                c
+                for c in self.tools.hierarchy(
+                    candidate.concept_id,
+                    "children",
+                    domain,
+                    vocabularies,
+                    self.top_k,
+                    standard=False,
+                )
+                if in_scope(c, domain, vocabularies, standard=False)
+            ]
+            if children:
+                headers.add(candidate.concept_id)
+                for c in children:
+                    seen.setdefault(c.concept_id, c)
+                result.concept = None
+                return (
+                    f"{candidate.concept_code} has more specific codes; code to the "
+                    "most specific one the text and context support, choosing an "
+                    "unspecified one when they don't say (or finish again with "
+                    f"{candidate.concept_id} if it must stay):\n"
+                    + "\n".join(c.line() for c in children)
+                )
         result.concept = candidate
         result.confidence = step.confidence
         result.score = CONFIDENCE_SCORES[step.confidence]
