@@ -159,6 +159,49 @@ Too few encounters to compare methods; it checks that everything runs.
   definitions and standard concepts, extracted 26 mentions from the heart-failure
   note (every symptom) and needed 57 LLM calls; the targeted definitions extract 2.
 
+## Results: test set (2026-11-17)
+
+`aatm`, `openai/gpt-5-mini` for extraction and coding, `embeddinggemma-300M` index in
+pgvector, `max_tool_calls=8`, all 120 test encounters, one run:
+
+| | Exact R | Exact P | Exact F1 | Prefix-1 F1 | Prefix-2 F1 | Category F1 | Standard F1 |
+|---|---|---|---|---|---|---|---|
+| `aatm` (gpt-5-mini) | 63.6 | 59.5 | **61.4** | 75.0 | 81.4 | 82.5 | 69.7 |
+
+For reference, from the table above: Symphony 64.1 ± 1.7, Claude Opus 4.6 with a
+coding MCP 59.0, GPT 5.4 alone 54.0, fine-tuned Haiku 3 with verification 57.6. This
+is one run with a small model, not five with frontier models: not yet a like-for-like
+comparison.
+
+- 2.2 codes per encounter (gold: 2.1), no invalid code, no failed encounter; 1 of 265
+  extracted diagnoses got no code.
+- 7.0 LLM calls, about 17,000 tokens per encounter. Seconds per encounter (85 on
+  average) are not meaningful: the first 49 encounters ran before the vocabulary
+  database was indexed (`aatm index-vocab`), which made lookups up to 10,000 times
+  faster.
+
+Where the errors come from:
+
+- **Category headers.** 34 of 264 predicted codes are not billable, e.g. K21 for
+  K21.9, J45.90 for J45.909, S83.421 without its 7th character; for 21 of them the
+  gold code is a child of the header. The agent may finish on a code that still has
+  children.
+- **E11.65 instead of E11.9** (6 times in the first 102 encounters): "uncontrolled" diabetes or a high A1c coded
+  as *with hyperglycemia*, where the annotators kept type 2 diabetes without
+  complications.
+- **Visit codes.** Z00.00 (annual exam) and Z09 (follow-up after completed
+  treatment): see Known limitations. Status codes (Z94.0, Z95.1, Z98.890) and
+  screening (Z11.3) were found.
+- **Conventions the search can't infer.** "High risk medication use" is coded Z79.899
+  *Other long term (current) drug therapy*; semantic search finds other "high risk"
+  codes and the agent concluded there was none.
+- **Symptoms and history.** Symptoms the annotators coded beside a diagnosis
+  (M25.561 knee pain, R51.9 headache) are missed; conditions listed only under past
+  history (mitral regurgitation after its repair) are coded.
+
+Improvements to the definitions or the agent should be developed on the train and
+valid splits, then scored once on test: the errors above come from the test set.
+
 ## Known limitations
 
 - **Combination codes.** ICD-10-CM presumes hypertension and heart failure are linked
