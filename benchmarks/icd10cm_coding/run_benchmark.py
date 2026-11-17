@@ -112,8 +112,10 @@ def slug(model: str) -> str:
     return re.sub(r"[^A-Za-z0-9.-]+", "_", model)
 
 
-def result_path(split: str, source: str, method: str, model: str) -> Path:
-    return RESULTS / f"{split}__{source}__{method}__{slug(model)}.jsonl"
+def result_path(split: str, source: str, method: str, model: str, run: int = 1) -> Path:
+    """Run 1 has no suffix; later runs of the same method end in ``__run<N>``."""
+    suffix = "" if run == 1 else f"__run{run}"
+    return RESULTS / f"{split}__{source}__{method}__{slug(model)}{suffix}.jsonl"
 
 
 def read_results(path: Path) -> list[dict[str, Any]]:
@@ -353,6 +355,48 @@ def prf(gold: list[set], pred: list[set]) -> dict[str, float]:
     return {"precision": precision, "recall": recall, "f1": f1}
 
 
+def _undotted(code: str) -> str:
+    return code.replace(".", "")
+
+
+def prefix_prf(gold: list[set], pred: list[set], n: int) -> dict[str, float]:
+    """Prefix-n of Yuan et al. (2025): exact match, accepting near misses.
+
+    A predicted code matches a gold code of the same encounter when they agree up to
+    `n` levels above the gold code's leaf: on the gold code without its last `n`
+    characters, never shorter than its 3-character category. I50.2 or I50.22 for
+    gold I50.21 matches at n=1, I50.9 at n=2. Precision counts the predicted codes
+    that match a gold code, recall the gold codes that a prediction matches.
+    """
+
+    def matches(p: str, g: str) -> bool:
+        p, g = _undotted(p), _undotted(g)
+        k = max(3, len(g) - n)
+        return p[:k] == g[:k]
+
+    matched_pred = sum(
+        any(matches(p, g) for g in gs) for gs, ps in zip(gold, pred) for p in ps
+    )
+    matched_gold = sum(
+        any(matches(p, g) for p in ps) for gs, ps in zip(gold, pred) for g in gs
+    )
+    n_pred = sum(len(p) for p in pred)
+    n_gold = sum(len(g) for g in gold)
+    precision = matched_pred / n_pred if n_pred else 0.0
+    recall = matched_gold / n_gold if n_gold else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return {"precision": precision, "recall": recall, "f1": f1}
+
+
+def parse_result_name(path: Path) -> tuple[str, str, str, str, int]:
+    """``split, source, method, model, run`` of a result file."""
+    match = re.fullmatch(r"(.+?)__(.+?)__(.+?)__(.+?)(?:__run(\d+))?", path.stem)
+    if match is None:
+        raise ValueError(f"Not a result file name: {path.name}")
+    split, source, method, model, run = match.groups()
+    return split, source, method, model, int(run or 1)
+
+
 def summarize(split: str, source: str) -> None:
     records = {r["encounter_id"]: r for r in load_split(split)}
     gold_codes = {
@@ -366,8 +410,10 @@ def summarize(split: str, source: str) -> None:
     icd = Icd10cm()
     runs = {}
     for path in files:
-        _, _, method, model = path.stem.split("__", 3)
-        runs[(method, model)] = {r["encounter_id"]: r for r in read_results(path)}
+        _, _, method, model, repeat = parse_result_name(path)
+        runs[(method, model, repeat)] = {
+            r["encounter_id"]: r for r in read_results(path)
+        }
     icd.lookup(
         set().union(*gold_codes.values())
         | {c for run in runs.values() for r in run.values() for c in r.get("codes", [])}
@@ -379,12 +425,13 @@ def summarize(split: str, source: str) -> None:
         print(f"Gold codes without a standard concept: {', '.join(gold_unmapped)}")
 
     rows = []
-    for (method, model), run in runs.items():
+    for (method, model, repeat), run in runs.items():
         ids = [eid for eid in records if eid in run]
         gold = [gold_codes[eid] for eid in ids]
         gold_std = [icd.standard(g) for g in gold]
         common = {
             "model": model,
+            "run": repeat,
             "encounters": len(ids),
             "errors": sum(bool(run[eid].get("error")) for eid in ids),
             "input tokens": sum(run[eid]["input_tokens"] or 0 for eid in ids)
@@ -407,6 +454,11 @@ def summarize(split: str, source: str) -> None:
                     "method": name,
                     **common,
                     **{f"code {k}": v for k, v in prf(gold, pred).items()},
+                    **{
+                        f"prefix-{n} {k}": v
+                        for n in (1, 2)
+                        for k, v in prefix_prf(gold, pred, n).items()
+                    },
                     **{
                         f"category {k}": v
                         for k, v in prf(
@@ -431,9 +483,41 @@ def summarize(split: str, source: str) -> None:
                     icd.valid(c) and not icd.billable(c) for c in codes
                 )
 
-    df = pd.DataFrame(rows).set_index(["method", "model"]).sort_index()
-    print(f"\n## {split}, {source} ({len(records)} encounters)\n")
-    print(df.round(3).to_markdown())
+    df = pd.DataFrame(rows)
+    keys = ["method", "model"]
+    partial = df[df.encounters < len(records)]
+    if len(partial):
+        print(
+            "Not comparable to the papers, which score every encounter of the split: "
+            + ", ".join(
+                f"{r.method} {r.model} run {r.run} ({r.encounters}/{len(records)})"
+                for r in partial.itertuples()
+            )
+        )
+
+    # As in Symphony (Edin et al., 2026, Table 3): micro recall, precision and F1
+    # x 100, mean ± standard deviation over runs.
+    def mean_sd(values: pd.Series) -> str:
+        values = values * 100
+        if len(values) < 2:
+            return f"{values.mean():.1f}"
+        return f"{values.mean():.1f} ± {values.std():.1f}"
+
+    paper = df.groupby(keys).agg(
+        runs=("run", "count"),
+        **{
+            f"{label} {m}": (f"{metric} {m}", mean_sd)
+            for label, metric in [("exact", "code"), ("prefix-1", "prefix-1")]
+            for m in ("recall", "precision", "f1")
+        },
+        **{"prefix-2 f1": ("prefix-2 f1", mean_sd)},
+    )
+    print(f"\n## {split}, {source} ({len(records)} encounters): paper metrics\n")
+    print(paper.to_markdown())
+
+    details = df.drop(columns="run").groupby(keys).mean(numeric_only=True)
+    print(f"\n## {split}, {source}: all metrics (mean over runs)\n")
+    print(details.round(3).to_markdown())
 
 
 # ---------------------------------------------------------------- main
@@ -476,6 +560,14 @@ def main() -> None:
         default=1800.0,
         help="Seconds per encounter. The aatm method codes every condition of a note.",
     )
+    parser.add_argument(
+        "--runs",
+        type=int,
+        nargs="+",
+        default=[1],
+        help="Run numbers, e.g. 1 2 3 4 5: Symphony reports the mean and standard "
+        "deviation of 5 runs. Each run has its own result file.",
+    )
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--summary-only", action="store_true")
     args = parser.parse_args()
@@ -504,13 +596,24 @@ def main() -> None:
                 name = f"aatm-{args.retriever}" + (
                     "" if vector_db == "local" else f"-{vector_db}"
                 )
-            path = result_path(args.split, args.source, name, args.model)
-            if args.overwrite and path.exists():
-                path.unlink()
-            print(f"\n# {name}, {args.model}, {args.split}, {args.source}")
-            asyncio.run(
-                run(method, records, args.source, path, args.concurrency, args.timeout)
-            )
+            for repeat in args.runs:
+                path = result_path(args.split, args.source, name, args.model, repeat)
+                if args.overwrite and path.exists():
+                    path.unlink()
+                print(
+                    f"\n# {name}, {args.model}, {args.split}, {args.source}, "
+                    f"run {repeat}"
+                )
+                asyncio.run(
+                    run(
+                        method,
+                        records,
+                        args.source,
+                        path,
+                        args.concurrency,
+                        args.timeout,
+                    )
+                )
     summarize(args.split, args.source)
 
 
