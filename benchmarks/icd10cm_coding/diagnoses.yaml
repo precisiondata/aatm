@@ -31,8 +31,11 @@
     diabetes", "acute systolic heart failure", "right knee medial meniscus tear" or
     "essential hypertension". Includes chronic conditions that were addressed, e.g. a
     medication continued or adjusted, or a condition said to be stable under
-    treatment. Take each diagnosis once, from the place where the note states it most
-    specifically, usually the assessment and plan. Be as specific as the note:
+    treatment. Take the diagnoses from the assessment and plan (or impression): a
+    condition written only in the history, past medical history, review of systems or
+    medication list counts only when the assessment or plan addresses it. Take each
+    diagnosis once, from the place where the note states it most specifically,
+    usually the assessment and plan. Be as specific as the note:
     include laterality, location, acuity, type and stage when they are written as
     part of the name.
     A sign or symptom counts only when no diagnosis stated in the note explains it,
@@ -48,6 +51,21 @@
     conditions of family members;
     (5) normal findings, lab values, vital signs, procedures, medications and
     allergies, unless the note names a diagnosis from them, e.g. "anemia".
+  attributes:
+    - key: certainty
+      required: true
+      description: How the clinician states this diagnosis.
+      labels:
+        - value: established
+          description: >
+            Stated as a fact, e.g. "type 2 diabetes", "lumbar strain", or a sign or
+            symptom given as the diagnosis, e.g. "non-cardiac chest pain".
+        - value: uncertain
+          description: >
+            Not established: "probable", "suspected", "possible", "likely",
+            "consistent with", "versus", "rule out", "question of", or a cause the
+            clinician only suspects, e.g. "suspected esophagitis" or "I suspect an
+            anxiety attack". Uncertain diagnoses are not coded in outpatient care.
 
 - name: Diagnosis detail
   key: diagnosis_detail

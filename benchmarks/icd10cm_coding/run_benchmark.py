@@ -43,6 +43,7 @@ import asyncio
 import json
 import re
 import sqlite3
+import sys
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -59,6 +60,20 @@ DATA = HERE / "data"
 RESULTS = HERE / "results"
 VOCABULARY_DB = Path(".aatm/omop.db")
 DEFINITIONS = HERE / "diagnoses.yaml"
+
+# What the agent codes to, with the ICD-10-CM conventions (Section I of the official
+# guidelines) that a code search alone doesn't apply.
+TARGET = (
+    "ICD-10-CM diagnosis code for an outpatient encounter. Conventions: "
+    "(1) code what the clinician states: do not infer a complication, cause or type "
+    "from lab values, history or findings, e.g. an elevated A1c alone does not make "
+    "diabetes 'with hyperglycemia'; "
+    "(2) when ICD-10-CM links this diagnosis to another of the encounter, by 'with', "
+    "'due to' or a presumed link (hypertension with heart failure or kidney disease, "
+    "diabetes with its complications), use the combination code; "
+    "(3) for an injury, the 7th character is A while it receives active treatment, "
+    "D for routine follow-up during healing, S for a sequela."
+)
 METHODS = ["llm", "aatm"]
 
 SYSTEM = """\
@@ -181,19 +196,24 @@ class AatmMethod:
         from aatm.concept_search import CodingContext
 
         (extraction,) = await self.extractor([text])
-        diagnoses = [r for r in extraction.to_records() if r.key == "diagnosis"]
-        contexts = [
-            CodingContext(
-                text=r.text,
-                related={
-                    f"detail_{n}": d.text
-                    for n, d in enumerate(r.children.get("diagnosis_detail", []), 1)
-                },
-                sentence=r.line,
-                target="ICD-10-CM diagnosis code of an outpatient encounter",
+        records = [r for r in extraction.to_records() if r.key == "diagnosis"]
+        # Outpatient coding leaves out uncertain diagnoses (guidelines, IV.H).
+        diagnoses = [r for r in records if r.attributes.get("certainty") != "uncertain"]
+        contexts = []
+        for r in diagnoses:
+            related = {
+                f"detail_{n}": d.text
+                for n, d in enumerate(r.children.get("diagnosis_detail", []), 1)
+            }
+            others = [o.text.strip(" .•") for o in diagnoses if o is not r]
+            if others:
+                # For combination codes, e.g. hypertension with heart failure.
+                related["other_diagnoses_of_this_encounter"] = "; ".join(others)
+            contexts.append(
+                CodingContext(
+                    text=r.text, related=related, sentence=r.line, target=TARGET
+                )
             )
-            for r in diagnoses
-        ]
         results = await self.agent.search_many(
             [(c, None) for c in contexts], vocabularies=["ICD10CM"], standard=False
         )
@@ -213,6 +233,7 @@ class AatmMethod:
         return {
             "codes": list(dict.fromkeys(d["code"] for d in details if d["code"])),
             "details": details,
+            "uncertain": [r.text for r in records if r not in diagnoses],
         }
 
 
@@ -577,6 +598,9 @@ def main() -> None:
     parser.add_argument("--summary-only", action="store_true")
     args = parser.parse_args()
     dotenv.load_dotenv()
+    # Tables print "±"; Windows consoles default to a code page without it.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
 
     if not args.summary_only:
         if not args.model:
