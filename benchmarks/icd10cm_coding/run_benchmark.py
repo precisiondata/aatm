@@ -284,7 +284,7 @@ class Icd10cm:
             return
         marks = ",".join("?" * len(new))
         found = {
-            code: {"concept_id": cid, "class": cls, "invalid": invalid}
+            code: {"concept_id": int(cid), "class": cls, "invalid": invalid}
             for cid, code, cls, invalid in self.db.execute(
                 "SELECT concept_id, concept_code, concept_class_id, invalid_reason "
                 f"FROM concept WHERE vocabulary_id = 'ICD10CM' AND concept_code IN ({marks})",
@@ -302,7 +302,8 @@ class Icd10cm:
                 f"AND concept_id_1 IN ({marks})",
                 ids,
             ):
-                self._maps.setdefault(a, set()).add(b)
+                # Ids may be stored as text: compare them as integers.
+                self._maps.setdefault(int(a), set()).add(int(b))
 
     def valid(self, code: str) -> bool:
         """A current ICD-10-CM code (billable or not)."""
