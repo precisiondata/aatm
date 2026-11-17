@@ -63,6 +63,22 @@ CONCEPTS = [
     ("4324383", "Creatinine measurement", "Measurement", "SNOMED", "70901006", "S"),
     ("201826", "Type 2 diabetes mellitus", "Condition", "SNOMED", "44054006", "S"),
     ("45576876", "Type 2 diabetes mellitus", "Condition", "ICD10CM", "E11", None),
+    (
+        "45600001",
+        "Type 2 diabetes mellitus without complications",
+        "Condition",
+        "ICD10CM",
+        "E11.9",
+        None,
+    ),
+    (
+        "45600002",
+        "Type 2 diabetes mellitus with hyperglycemia",
+        "Condition",
+        "ICD10CM",
+        "E11.65",
+        None,
+    ),
     ("40775801", "Creatinine", "Measurement", "LOINC", "LP14355-9", None),
     ("1033306", "Ser/Plas", "Measurement", "LOINC", "LP7567-6", None),
     ("1029650", "MCnc", "Measurement", "LOINC", "LP6827-2", None),
@@ -74,6 +90,14 @@ RELATIONSHIPS = [
     ("3016723", "Has system", "1033306"),
     ("3016723", "Has property", "1029650"),
     ("45576876", "Maps to", "201826"),
+    ("45600001", "Maps to", "201826"),
+    ("201826", "Mapped from", "45576876"),
+    ("201826", "Mapped from", "45600001"),
+    # ICD-10-CM's own hierarchy, which concept_ancestor leaves out.
+    ("45576876", "Subsumes", "45600001"),
+    ("45576876", "Subsumes", "45600002"),
+    ("45600001", "Is a", "45576876"),
+    ("45600002", "Is a", "45576876"),
 ]
 ANCESTORS = [  # ancestor, descendant, min levels
     ("4324383", "3016723", "1"),
@@ -251,6 +275,96 @@ def test_semantic_search_filters_and_dedupes():
         (["creat"], retriever_filter("Measurement", ["LOINC"]), 10)
     ]
     assert tools.actions == ["semantic_search"]
+
+
+# --- source vocabularies (standard=False) -------------------------------------------
+
+ICD = ["ICD10CM"]
+
+
+def test_source_searches_need_vocabularies(vocab_db):
+    with pytest.raises(ValueError, match="needs vocabularies"):
+        VocabularySearch(vocab_db).search_names("diabetes", standard=False)
+    agent, _ = make_agent([], vocab_db)
+    with pytest.raises(ValueError, match="needs vocabularies"):
+        asyncio.run(agent.search(CodingContext(text="t2dm"), standard=False))
+
+
+def test_lexical_search_of_a_source_vocabulary(vocab_db):
+    vocab = VocabularySearch(vocab_db)
+    found = vocab.search_names("type 2 diabetes", vocabularies=ICD, standard=False)
+    assert [c.concept_code for c in found] == ["E11", "E11.65", "E11.9"]
+    assert all(c.standard is False for c in found)
+    # The standard default is unchanged.
+    assert [c.concept_id for c in vocab.search_names("type 2 diabetes")] == [201826]
+
+
+def test_code_lookup_and_hierarchy_of_a_source_vocabulary(vocab_db):
+    tools = ConceptSearchTools(None, vocab_db)
+    found = tools.code_lookup("E11.9", vocabularies=ICD, standard=False)
+    assert [c.concept_id for c in found] == [45600001]
+    # Not the standard concept it maps to, which is out of scope.
+    assert [
+        c.concept_id for c in tools.code_lookup("e11", vocabularies=ICD, standard=False)
+    ] == [45576876]
+    children = tools.hierarchy(45576876, "children", vocabularies=ICD, standard=False)
+    assert {c.concept_code for c in children} == {"E11.9", "E11.65"}
+    parents = tools.hierarchy(45600002, "parents", vocabularies=ICD, standard=False)
+    assert [c.concept_code for c in parents] == ["E11"]
+
+
+def test_semantic_search_of_a_source_vocabulary(vocab_db):
+    # An indexed ICD-10-CM name, then a standard concept without one.
+    named = expression("201826").model_copy(
+        update={
+            "expression": "Type 2 diabetes mellitus with hyperglycemia",
+            "expression_concept_id": "45600002",
+            "expression_origin": "non_standard_concept",
+        }
+    )
+    retriever = FakeRetriever(default=())
+    retriever.retrieve = lambda queries, where=None, top_k=None: RetrieverResults(  # type: ignore[method-assign]
+        queries=queries,
+        results=[[named, expression("3016723"), expression("201826")]],
+    )
+    tools = ConceptSearchTools(retriever, vocab_db)
+    found = tools.semantic_search("t2dm", vocabularies=ICD, top_k=5, standard=False)
+    # The indexed name first, then the ICD10CM concepts that map to 201826.
+    assert [c.concept_code for c in found] == ["E11.65", "E11", "E11.9"]
+    assert found[0].matched == "Type 2 diabetes mellitus with hyperglycemia"
+    assert all(c.vocabulary_id == "ICD10CM" for c in found)
+
+
+def test_agent_codes_to_a_source_vocabulary(vocab_db):
+    agent, llm = make_agent(
+        [
+            step("finish", concept_id=201826, confidence="high"),  # SNOMED: rejected
+            step("hierarchy", concept_id=45576876, direction="children"),
+            step("finish", concept_id=45600001, confidence="high"),
+        ],
+        vocab_db,
+        retriever=FakeRetriever(default=("201826",)),
+    )
+    result = asyncio.run(
+        agent.search(
+            CodingContext(text="type 2 diabetes"), vocabularies=ICD, standard=False
+        )
+    )
+    assert result.concept is not None
+    assert (result.concept.concept_code, result.concept.standard) == ("E11.9", False)
+    assert "source vocabulary" in llm.systems[0]
+    assert "most specific code" in llm.systems[0]
+    assert any("201826 is not a concept" in p for p in llm.prompts)
+    # The first semantic search found the ICD10CM codes that map to the SNOMED concept.
+    assert "E11.9" in llm.prompts[0]
+
+
+def test_standard_prompt_is_unchanged_by_the_source_prompt():
+    from aatm.concept_search.agent import SOURCE_SYSTEM_PROMPT, SYSTEM_PROMPT
+
+    assert SOURCE_SYSTEM_PROMPT != SYSTEM_PROMPT
+    assert "standard concept {scope}" in SYSTEM_PROMPT
+    assert "How to search:" in SOURCE_SYSTEM_PROMPT
 
 
 # --- agent --------------------------------------------------------------------------

@@ -12,6 +12,14 @@
 Every tool except concept details only returns standard concepts within the search
 scope (domain and vocabularies), so whatever the agent picks from its results is a
 valid answer.
+
+**Source vocabularies.** With ``standard=False`` the tools return the valid concepts of
+the given vocabularies instead, standard or not, e.g. ICD-10-CM codes for a
+``*_source_concept_id`` column or a billing extract. Semantic search then returns the
+in-scope concepts whose names were indexed (``aatm init`` indexes the names of
+non-standard concepts that map to a standard one), then those that map to the standard
+concepts it retrieves; hierarchy follows the vocabularies' own "Is a" and "Subsumes"
+relationships.
 """
 
 from pathlib import Path
@@ -95,9 +103,15 @@ class VocabularySearch(SqliteConceptLookup):
 
     @staticmethod
     def _scope_sql(
-        domain: Optional[str], vocabularies: Optional[Sequence[str]], alias: str = "c"
+        domain: Optional[str],
+        vocabularies: Optional[Sequence[str]],
+        alias: str = "c",
+        standard: bool = True,
     ) -> tuple[str, list]:
-        sql = f" AND {alias}.standard_concept = 'S' AND {alias}.invalid_reason IS NULL"
+        _check_scope(vocabularies, standard)
+        sql = f" AND {alias}.invalid_reason IS NULL"
+        if standard:
+            sql += f" AND {alias}.standard_concept = 'S'"
         params: list = []
         if domain is not None:
             sql += f" AND {alias}.domain_id = ?"
@@ -115,8 +129,11 @@ class VocabularySearch(SqliteConceptLookup):
         domain: Optional[str] = None,
         vocabularies: Optional[Sequence[str]] = None,
         limit: int = 20,
+        standard: bool = True,
     ) -> list[Candidate]:
-        """Standard concepts whose name or a synonym contains every word of `query`.
+        """Concepts whose name or a synonym contains every word of `query`.
+
+        Standard concepts only, unless `standard` is ``False`` (see the module).
 
         Ranked by: exact name, name starting with the query, then shorter names, which
         are usually the more general concepts.
@@ -124,7 +141,7 @@ class VocabularySearch(SqliteConceptLookup):
         words = [w for w in query.casefold().split() if w]
         if not words:
             return []
-        scope, scope_params = self._scope_sql(domain, vocabularies)
+        scope, scope_params = self._scope_sql(domain, vocabularies, standard=standard)
         like = " AND ".join("lower({col}) LIKE ?" for _ in words)
         like_params = [f"%{w}%" for w in words]
         rows = self._query(
@@ -181,6 +198,33 @@ class VocabularySearch(SqliteConceptLookup):
         )
         return sorted({r[0] for r in rows if r[0]})[:limit]
 
+    def mapped_from(
+        self,
+        concept_ids: Sequence[int],
+        domain: Optional[str],
+        vocabularies: Sequence[str],
+    ) -> list[Candidate]:
+        """Concepts of `vocabularies` that map to any of `concept_ids` ("Maps to").
+
+        In the order of `concept_ids`, then by code.
+        """
+        if not concept_ids:
+            return []
+        scope, scope_params = self._scope_sql(domain, vocabularies, standard=False)
+        ids = [str(i) for i in concept_ids]
+        marks = ",".join("?" * len(ids))
+        rows = self._query(
+            "SELECT r.concept_id_1, c.concept_id, c.concept_name, c.domain_id, "
+            "c.vocabulary_id, c.concept_code, c.standard_concept, c.invalid_reason "
+            "FROM concept_relationship r JOIN concept c ON c.concept_id = r.concept_id_2 "
+            f"WHERE r.concept_id_1 IN ({marks}) AND r.relationship_id = 'Mapped from' "
+            f"AND r.invalid_reason IS NULL{scope}",
+            [*ids, *scope_params],
+        )
+        rank = {i: n for n, i in enumerate(ids)}
+        rows.sort(key=lambda row: (rank[str(row[0])], row[5]))
+        return [Candidate.from_concept(self._concept(row[1:])) for row in rows]
+
     def neighbours(
         self,
         concept_id: int,
@@ -188,19 +232,35 @@ class VocabularySearch(SqliteConceptLookup):
         domain: Optional[str] = None,
         vocabularies: Optional[Sequence[str]] = None,
         limit: int = 25,
+        standard: bool = True,
     ) -> list[Candidate]:
-        """Direct parents or children of a standard concept (``concept_ancestor``)."""
-        this, other = (
-            ("descendant", "ancestor")
-            if direction == "parents"
-            else ("ancestor", "descendant")
-        )
-        scope, scope_params = self._scope_sql(domain, vocabularies)
+        """Direct parents or children of a concept.
+
+        Of a standard concept, from ``concept_ancestor``. With `standard` ``False``,
+        from the "Is a" (parents) and "Subsumes" (children) relationships, which
+        source vocabularies such as ICD-10-CM have but ``concept_ancestor`` leaves out.
+        """
+        scope, scope_params = self._scope_sql(domain, vocabularies, standard=standard)
+        if standard:
+            this, other = (
+                ("descendant", "ancestor")
+                if direction == "parents"
+                else ("ancestor", "descendant")
+            )
+            source = (
+                f"FROM concept_ancestor a JOIN concept c ON c.concept_id = a.{other}_concept_id "
+                f"WHERE a.{this}_concept_id = ? AND a.min_levels_of_separation = '1'"
+            )
+        else:
+            relationship = "Is a" if direction == "parents" else "Subsumes"
+            source = (
+                "FROM concept_relationship r JOIN concept c ON c.concept_id = r.concept_id_2 "
+                f"WHERE r.concept_id_1 = ? AND r.relationship_id = '{relationship}' "
+                "AND r.invalid_reason IS NULL"
+            )
         rows = self._query(
             "SELECT c.concept_id, c.concept_name, c.domain_id, c.vocabulary_id, "
-            "c.concept_code, c.standard_concept, c.invalid_reason "
-            f"FROM concept_ancestor a JOIN concept c ON c.concept_id = a.{other}_concept_id "
-            f"WHERE a.{this}_concept_id = ? AND a.min_levels_of_separation = '1'{scope}",
+            f"c.concept_code, c.standard_concept, c.invalid_reason {source}{scope}",
             [str(concept_id), *scope_params],
         )
         candidates = sorted(
@@ -285,10 +345,13 @@ class ConceptSearchTools:
         domain: Optional[str] = None,
         vocabularies: Optional[Sequence[str]] = None,
         top_k: Optional[int] = None,
+        standard: bool = True,
     ) -> list[Candidate]:
         if self.retriever is None:
             raise ValueError("semantic_search needs a retriever")
         k = top_k or self.top_k
+        if not standard:
+            return self._semantic_search_source(query, domain, vocabularies, k)
         # Several indexed expressions (synonyms) can point to the same concept:
         # retrieve more to return about k distinct concepts.
         results = self.retriever.retrieve(
@@ -296,16 +359,67 @@ class ConceptSearchTools:
         )
         return candidates_from_expressions(results.results[0])[:k]
 
+    def _semantic_search_source(
+        self,
+        query: str,
+        domain: Optional[str],
+        vocabularies: Optional[Sequence[str]],
+        k: int,
+    ) -> list[Candidate]:
+        """Semantic search for concepts of source vocabularies (``standard=False``).
+
+        The index's filters describe the standard concepts, not the source concepts
+        whose names were indexed: it is searched unfiltered, for more results.
+        Indexed names of in-scope concepts come first, then the in-scope concepts
+        that map to the standard concepts retrieved.
+        """
+        _check_scope(vocabularies, standard=False)
+        assert vocabularies and self.retriever is not None
+        if self.vocabulary is None:
+            raise ValueError(
+                "semantic_search of source vocabularies needs the vocabulary database"
+            )
+        expressions = self.retriever.retrieve([query], where=None, top_k=k * 5)
+        expressions = expressions.results[0]
+        named = self.vocabulary.by_id(
+            int(e.expression_concept_id) for e in expressions if e.expression_concept_id
+        )
+        found: dict[int, Candidate] = {}
+        for e in expressions:
+            concept = (
+                named.get(int(e.expression_concept_id))
+                if e.expression_concept_id
+                else None
+            )
+            if concept is not None and in_scope(
+                concept, domain, vocabularies, standard=False
+            ):
+                candidate = Candidate.from_concept(concept)
+                candidate.matched = e.expression
+                found.setdefault(candidate.concept_id, candidate)
+        if len(found) < k:
+            standard_ids = list(
+                dict.fromkeys(
+                    int(e.std_concept_id) for e in expressions if e.std_concept_id
+                )
+            )
+            for candidate in self.vocabulary.mapped_from(
+                standard_ids[:k], domain, vocabularies
+            ):
+                found.setdefault(candidate.concept_id, candidate)
+        return list(found.values())[:k]
+
     def lexical_search(
         self,
         query: str,
         domain: Optional[str] = None,
         vocabularies: Optional[Sequence[str]] = None,
         top_k: Optional[int] = None,
+        standard: bool = True,
     ) -> list[Candidate]:
         assert self.vocabulary is not None
         return self.vocabulary.search_names(
-            query, domain, vocabularies, limit=top_k or self.top_k
+            query, domain, vocabularies, limit=top_k or self.top_k, standard=standard
         )
 
     def code_lookup(
@@ -313,10 +427,18 @@ class ConceptSearchTools:
         code: str,
         domain: Optional[str] = None,
         vocabularies: Optional[Sequence[str]] = None,
+        standard: bool = True,
     ) -> list[Candidate]:
-        """The concepts with this code, and the in-scope standard concepts they map to."""
+        """The concepts with this code, and the in-scope standard concepts they map to.
+
+        With `standard` ``False``, the in-scope concepts with this code.
+        """
         assert self.vocabulary is not None
         found = self.vocabulary.search_code(code)
+        if not standard:
+            return [
+                c for c in found if in_scope(c, domain, vocabularies, standard=False)
+            ]
         maps_to = self.vocabulary.maps_to(c.concept_id for c in found if not c.standard)
         targets = self.vocabulary.by_id({t for ts in maps_to.values() for t in ts})
         results: list[Candidate] = []
@@ -388,10 +510,23 @@ class ConceptSearchTools:
         domain: Optional[str] = None,
         vocabularies: Optional[Sequence[str]] = None,
         top_k: Optional[int] = None,
+        standard: bool = True,
     ) -> list[Candidate]:
         assert self.vocabulary is not None
         return self.vocabulary.neighbours(
-            concept_id, direction, domain, vocabularies, limit=(top_k or self.top_k) * 2
+            concept_id,
+            direction,
+            domain,
+            vocabularies,
+            limit=(top_k or self.top_k) * 2,
+            standard=standard,
+        )
+
+
+def _check_scope(vocabularies: Optional[Sequence[str]], standard: bool) -> None:
+    if not standard and not vocabularies:
+        raise ValueError(
+            "A search of non-standard concepts needs vocabularies, e.g. ['ICD10CM']"
         )
 
 
@@ -399,14 +534,20 @@ def in_scope(
     candidate: Candidate | Concept,
     domain: Optional[str],
     vocabularies: Optional[Sequence[str]],
+    standard: bool = True,
 ) -> bool:
-    """Whether a concept is a valid standard concept of the domain and vocabularies."""
-    standard = (
+    """Whether a concept is a valid concept of the domain and vocabularies.
+
+    A standard concept, unless `standard` is ``False``: then any valid concept of
+    `vocabularies` (see the module).
+    """
+    _check_scope(vocabularies, standard)
+    is_standard = (
         candidate.is_standard
         if isinstance(candidate, Concept)
         else bool(candidate.standard)
     )
-    if not standard:
+    if standard and not is_standard:
         return False
     if isinstance(candidate, Concept) and candidate.invalid_reason:
         return False
