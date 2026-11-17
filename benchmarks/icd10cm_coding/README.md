@@ -48,10 +48,15 @@ uv run python benchmarks/icd10cm_coding/prepare_data.py
 
 ## Scores
 
-Micro precision, recall and F1 over encounters:
+Micro precision, recall and F1, pooled over every encounter of the split:
 
-- **code**: exact ICD-10-CM codes;
-- **category**: their first 3 characters, e.g. E11 for E11.9;
+- **exact**: exact ICD-10-CM codes;
+- **prefix-1, prefix-2**: the near-miss metrics of Yuan et al. A predicted code
+  matches a gold code of the same encounter when they agree up to n levels above the
+  gold code's leaf, never above its 3-character category: I50.2 or I50.22 for gold
+  I50.21 at n=1, I50.9 at n=2. Precision counts the predictions that match a gold
+  code, recall the gold codes a prediction matches;
+- **category**: the first 3 characters, e.g. E11 for E11.9;
 - **standard**: gold and predicted codes replaced by the standard concepts they map
   to ("Maps to"), the concepts an OMOP CDM would hold;
 - **`llm (verified)`**: the `llm` answer without the codes that the vocabulary
@@ -64,6 +69,57 @@ RxNorm lacks it. Add ICD10CM to the bundle on
 [Athena](https://athena.ohdsi.org/vocabulary/list) and run
 `aatm init --vocab-zip <link>` again; rebuild the index too, so it holds the
 ICD-10-CM names.
+
+## Comparison with published results
+
+Two papers report results on these annotations:
+[Yuan et al. (EMNLP 2025)](https://arxiv.org/abs/2510.07629), who made them, and
+[Symphony (Edin et al., 2026)](https://arxiv.org/abs/2603.29709). The summary's first
+table follows their protocol:
+
+| | Yuan et al. | Symphony | This benchmark |
+|---|---|---|---|
+| Input | clinical note | clinical note | clinical note (`--source note`) |
+| Codes | all of ICD-10-CM | all of ICD-10-CM (Table 3) | all of ICD-10-CM |
+| Encounters | 67 train / 20 dev / 120 test | not stated | test, 120 (`--split test`) |
+| Metrics | exact F1, Prefix-1, Prefix-2 | micro R / P / F1 × 100 | both |
+| Runs | 1 | 5, mean ± SD | `--runs 1 2 3 4 5` |
+
+Symphony's Table 1 counts 225 distinct codes "across all splits", exactly the union
+of the three splits here, so both papers use this release. Neither says how codes
+are normalized; here they are compared as written, with the dot.
+
+Their results, for reference (exact codes, full code set):
+
+| Source | System | Model | R | P | F1 |
+|---|---|---|---|---|---|
+| Symphony, Table 3 | LLM, no tools | Claude Opus 4.6 | 51.0 | 45.3 | 47.6 |
+| | LLM, no tools | GPT 5.4 | 74.2 | 42.5 | 54.0 ± 1.4 |
+| | LLM, with tools (coding MCP) | Claude Opus 4.6 | 60.3 | 58.1 | 59.0 |
+| | LLM, with tools | GPT 5.4 | 72.4 | 36.4 | 48.4 ± 0.9 |
+| | LLM, with tools | Gemini 3.1 Pro | 76.5 | 32.1 | 45.2 |
+| | CLH (Corti) | | 56.0 | 58.5 | 57.2 ± 1.0 |
+| | Symphony | | 75.0 | 56.0 | 64.1 ± 1.7 |
+| Yuan et al., Tables 1, 5 | LLM, simple prompt | Claude Haiku 3 | | | 41.6 |
+| | LLM, simple prompt | Claude Sonnet 3.5 v2 | | | 43.0 |
+| | LLM, fine-tuned on train | Claude Haiku 3 | | | 56.9 |
+| | + verification | Claude Haiku 3, fine-tuned | | | 57.6 |
+
+Yuan et al.'s Prefix-1 and Prefix-2 F1 for the simple prompt are 51.3 and 54.6 with
+Haiku 3, and 49.6 and 53.8 with Sonnet 3.5 v2. The F1 scores were checked twice
+against the papers' HTML versions; recall, precision and Prefix-n were read once:
+check them against the PDFs before quoting them.
+
+What still differs:
+
+- **Models.** Compare models of the same tier: the papers use Claude Opus 4.6,
+  GPT 5.4 and Gemini 3.1 Pro.
+- **Prompt.** `llm` uses its own coder prompt, not Yuan et al.'s one-line prompt
+  (from Boyle et al., 2023) or Symphony's baselines.
+- **Prefix-n.** Yuan et al. describe the metric in one sentence; the definition
+  above is our reading of it.
+- **Split.** Symphony doesn't say which encounters it scores. Yuan et al. fine-tune
+  on the train split, so their scores are on dev or test, presumably test.
 
 ## Run
 
