@@ -1363,6 +1363,8 @@ def _index_pg_table(connection: PgVectorConnection, table_name: str) -> None:
         create_pg_indexes(
             connection.dsn,
             table_name,
+            m=connection.hnsw_m,
+            ef_construction=connection.hnsw_ef_construction,
             maintenance_work_mem=connection.maintenance_work_mem,
             workers=connection.build_workers,
             progress=report,

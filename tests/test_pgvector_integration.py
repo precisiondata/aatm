@@ -656,3 +656,21 @@ def test_hnsw_indexes_use_aatms_denser_defaults(connection):
         ).fetchone()
     assert "m='24'" in definition
     assert "ef_construction='128'" in definition
+
+
+def test_aatms_build_uses_the_hnsw_settings(connection):
+    import dataclasses
+
+    store = make_store(connection)
+    store.write(["a"], np.ones((1, DIM), dtype=np.float32), [""], [{}])
+    configured = dataclasses.replace(connection, hnsw_m=8, hnsw_ef_construction=40)
+
+    ldu._index_pg_table(configured, store.name)
+
+    with connection.client() as conn:
+        (definition,) = conn.execute(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = %s",
+            (f"{store.name}_hnsw",),
+        ).fetchone()
+    assert "m='8'" in definition
+    assert "ef_construction='40'" in definition
