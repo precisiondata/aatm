@@ -141,8 +141,17 @@ def result_path(split: str, source: str, method: str, model: str, run: int = 1) 
 def read_results(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
+    results = []
     with open(path, encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.strip()]
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                results.append(json.loads(line))
+            except json.JSONDecodeError:
+                # A run stopped while writing: the encounter runs again.
+                print(f"{path.name}: skipping an incomplete line")
+    return results
 
 
 # ---------------------------------------------------------------- methods
@@ -242,17 +251,11 @@ class AatmMethod:
         }
 
 
-async def run(
-    method: Any,
-    records: list[dict[str, Any]],
-    source: str,
-    path: Path,
-    concurrency: int,
-    timeout: float,
-) -> None:
-    from aatm.llm import track_usage
+def pending(path: Path, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The encounters of `records` not yet in the result file `path`.
 
-    # Encounters that failed are dropped from the file and run again.
+    Encounters that failed are dropped from the file, so they run again.
+    """
     previous = read_results(path)
     kept = [r for r in previous if not r.get("error")]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -262,14 +265,38 @@ async def run(
     done = {r["encounter_id"] for r in kept}
     todo = [r for r in records if r["encounter_id"] not in done]
     print(
-        f"{len(done)} encounters already in {path.name}, {len(todo)} to run "
+        f"{path.name}: {len(done)} encounters done, {len(todo)} to run "
         f"({len(previous) - len(kept)} failed before)"
     )
+    return todo
+
+
+async def run(
+    jobs: list[tuple[Any, Path, list[dict[str, Any]]]],
+    source: str,
+    concurrency: int,
+    timeout: float,
+) -> None:
+    """Code every encounter of every job in one pool.
+
+    Args:
+        jobs: ``(method, result file, encounters)``, one per method and run. All
+            the encounters of all the jobs share the pool, so runs and methods
+            proceed in parallel instead of one after another.
+        source: ``"note"`` or ``"dialogue"``.
+        concurrency: Encounters coded at the same time, across jobs. Each one
+            makes several LLM calls, some in parallel (one agent per diagnosis).
+        timeout: Seconds per encounter.
+    """
+    from aatm.llm import track_usage
+
     semaphore = asyncio.Semaphore(concurrency)
     lock = asyncio.Lock()
+    total = sum(len(todo) for _, _, todo in jobs)
     finished = 0
+    start_all = time.perf_counter()
 
-    async def one(record: dict[str, Any]) -> None:
+    async def one(method: Any, path: Path, record: dict[str, Any]) -> None:
         nonlocal finished
         async with semaphore:
             start = time.perf_counter()
@@ -293,12 +320,17 @@ async def run(
                 f.write(json.dumps(line, ensure_ascii=False) + "\n")
             finished += 1
             status = f"error: {error}" if error else "ok"
+            elapsed = time.perf_counter() - start_all
+            _, _, name, _, repeat = parse_result_name(path)
             print(
-                f"  [{finished}/{len(todo)}] {record['encounter_id']} {status}",
+                f"  [{finished}/{total}, {elapsed:.0f} s] {name} run {repeat} "
+                f"{record['encounter_id']} {status}",
                 flush=True,
             )
 
-    await asyncio.gather(*(one(r) for r in todo))
+    await asyncio.gather(
+        *(one(method, path, r) for method, path, todo in jobs for r in todo)
+    )
 
 
 # ---------------------------------------------------------------- scoring
@@ -579,7 +611,25 @@ def main() -> None:
     parser.add_argument(
         "--temperature", type=float, help="Leave unset for reasoning models."
     )
-    parser.add_argument("--concurrency", type=int, default=8)
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=32,
+        help="Encounters coded at the same time, across all runs and methods.",
+    )
+    parser.add_argument(
+        "--request-timeout",
+        type=float,
+        default=120.0,
+        help="Seconds before an LLM request is abandoned and retried. The OpenAI "
+        "client waits 600 s, so a stalled request held its encounter for 10 minutes.",
+    )
+    parser.add_argument(
+        "--max-llm-calls",
+        type=int,
+        help="Cap on LLM calls in flight (aatm.llm.set_rate_limits), for a provider "
+        "quota. Rate-limit errors are retried with backoff either way.",
+    )
     parser.add_argument(
         "--timeout",
         type=float,
@@ -611,9 +661,10 @@ def main() -> None:
         if not args.model:
             parser.error("--model is required unless --summary-only")
         records = load_split(args.split)[: args.limit]
-        settings = (
-            {"temperature": args.temperature} if args.temperature is not None else None
-        )
+        settings: dict[str, Any] = {"timeout": args.request_timeout}
+        if args.temperature is not None:
+            settings["temperature"] = args.temperature
+        jobs: list[tuple[Any, Path, list[dict[str, Any]]]] = []
         for name in args.methods:
             if name == "llm":
                 method: Any = LLMMethod(args.model, settings)
@@ -636,20 +687,16 @@ def main() -> None:
                 path = result_path(args.split, args.source, name, args.model, repeat)
                 if args.overwrite and path.exists():
                     path.unlink()
-                print(
-                    f"\n# {name}, {args.model}, {args.split}, {args.source}, "
-                    f"run {repeat}"
-                )
-                asyncio.run(
-                    run(
-                        method,
-                        records,
-                        args.source,
-                        path,
-                        args.concurrency,
-                        args.timeout,
-                    )
-                )
+                jobs.append((method, path, pending(path, records)))
+        if args.max_llm_calls:
+            from aatm.llm import set_rate_limits
+
+            set_rate_limits(args.model, max_concurrency=args.max_llm_calls)
+        print(
+            f"\n# {sum(len(t) for _, _, t in jobs)} encounters, {len(jobs)} result "
+            f"file(s), {args.concurrency} at a time"
+        )
+        asyncio.run(run(jobs, args.source, args.concurrency, args.timeout))
     summarize(args.split, args.source)
 
 
