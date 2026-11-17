@@ -96,7 +96,9 @@ def main() -> None:
             raise ValueError(f"{split}: duplicate encounter ids")
         unmatched = set(codes) - set(ids)
         if unmatched:
-            raise ValueError(f"{split}: annotations without a note: {sorted(unmatched)}")
+            raise ValueError(
+                f"{split}: annotations without a note: {sorted(unmatched)}"
+            )
 
         path = args.output_dir / f"{split}.jsonl"
         with open(path, "w", encoding="utf-8") as f:
