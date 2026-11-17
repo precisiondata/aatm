@@ -270,7 +270,11 @@ def index_local_vocab_database(path: Path = Path(".aatm/omop.db")) -> list[str]:
         path, progress=lambda name: console.print(f"Indexing the vocabulary: {name}")
     )
     if created:
-        console.print(f"Added {len(created)} index(es) to {path}.")
+        console.print(
+            f"Added {len(created)} index(es) to {path}.",
+            highlight=False,
+            soft_wrap=True,
+        )
     return created
 
 

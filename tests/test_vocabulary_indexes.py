@@ -112,22 +112,29 @@ def test_lookup_warns_once_about_an_unindexed_database(tmp_path, caplog):
     assert lookup.by_id([201826])[201826].concept_name == "Type 2 diabetes mellitus"
 
 
-def test_index_vocab_command(tmp_path):
+def test_index_vocab_command(tmp_path, monkeypatch):
+    from aatm import main
     from aatm.main import app
 
-    db = make_db(tmp_path / "omop.db")
+    # A path longer than an 80-column console, as on CI: messages must not wrap.
+    monkeypatch.setattr(main.console, "width", 80)
+    folder = tmp_path / ("a-long-folder-name-" * 5)
+    folder.mkdir()
+    db = make_db(folder / "omop.db")
+    # Wherever a wrap would fall, the long path would no longer be whole.
     result = CliRunner().invoke(app, ["index-vocab", "--path", str(db)])
     assert result.exit_code == 0, result.output
-    assert "Added 7 index(es)" in result.output
+    assert f"Added 7 index(es) to {db}." in result.output
     result = CliRunner().invoke(app, ["index-vocab", "--path", str(db)])
     assert result.exit_code == 0
-    assert "already has every index" in result.output
+    assert f"{db} already has every index." in result.output
 
-    result = CliRunner().invoke(
-        app, ["index-vocab", "--path", str(tmp_path / "none.db")]
-    )
+    missing = folder / "none.db"
+    result = CliRunner().invoke(app, ["index-vocab", "--path", str(missing)])
     assert result.exit_code == 1
-    assert "aatm init" in result.output
+    assert f"No vocabulary database at {missing}. Run `aatm init` first." in (
+        result.output
+    )
 
 
 def test_init_indexes_the_database_it_builds(tmp_path, monkeypatch):

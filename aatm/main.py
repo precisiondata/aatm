@@ -1526,10 +1526,12 @@ def index_vocab(
     """
     from aatm.omop.vocabulary import index_vocabulary_database
 
+    # Unwrapped: the messages hold paths, which should stay whole to be copied.
     if not path.exists():
         console.print(
             f"[yellow]No vocabulary database at {path}.[/yellow] Run `aatm init` first.",
             highlight=False,
+            soft_wrap=True,
         )
         raise typer.Exit(code=1)
     created = index_vocabulary_database(
@@ -1537,9 +1539,15 @@ def index_vocab(
         progress=lambda name: console.print(f"Creating {name}...", highlight=False),
     )
     if created:
-        console.print(f"[green]Added {len(created)} index(es) to {path}.[/green]")
+        console.print(
+            f"[green]Added {len(created)} index(es) to {path}.[/green]",
+            highlight=False,
+            soft_wrap=True,
+        )
     else:
-        console.print(f"{path} already has every index.", highlight=False)
+        console.print(
+            f"{path} already has every index.", highlight=False, soft_wrap=True
+        )
 
 
 @app.command(
