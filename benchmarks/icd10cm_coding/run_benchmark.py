@@ -568,6 +568,11 @@ def main() -> None:
         help="Run numbers, e.g. 1 2 3 4 5: Symphony reports the mean and standard "
         "deviation of 5 runs. Each run has its own result file.",
     )
+    parser.add_argument(
+        "--variant",
+        help="A label added to the method's name, e.g. v2, to keep the results of "
+        "versions of the definitions or the agent apart.",
+    )
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--summary-only", action="store_true")
     args = parser.parse_args()
@@ -596,6 +601,8 @@ def main() -> None:
                 name = f"aatm-{args.retriever}" + (
                     "" if vector_db == "local" else f"-{vector_db}"
                 )
+            if args.variant:
+                name += f"-{args.variant}"
             for repeat in args.runs:
                 path = result_path(args.split, args.source, name, args.model, repeat)
                 if args.overwrite and path.exists():
