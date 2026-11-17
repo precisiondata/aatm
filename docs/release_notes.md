@@ -48,6 +48,23 @@
 - **`AATM_PG_HNSW_M` and `AATM_PG_HNSW_EF_CONSTRUCTION`** set the density of the HNSW
   graph `aatm init` and `aatm vector-db upload` build (default 24 and 128), checked
   against pgvector's limits before the build starts.
+- **An indexed vocabulary database.** `aatm init` indexes `.aatm/omop.db` (concept ids
+  and codes, relationships, synonyms and ancestors), and adds the indexes a database
+  you keep lacks; `aatm index-vocab` adds them on their own. On a full download with
+  ICD-10-CM, a "Maps to" or hierarchy lookup took 0.7 to 10 s and now takes under a
+  millisecond, which made the concept search agent several times faster. Lookups warn
+  once about a database without them.
+- **Coding to source vocabularies such as ICD-10-CM.**
+  `ConceptSearchAgent.search(..., vocabularies=["ICD10CM"], standard=False)` finds a
+  code of vocabularies whose concepts are not standard, for billing extracts or
+  `*_source_concept_id` columns. Semantic search returns the ICD-10-CM names in the
+  index and the codes that map to the standard concepts it finds, hierarchy follows
+  the vocabulary's own parents and children, and the agent is asked for the most
+  specific code the context supports: a code with children, such as an ICD-10-CM
+  category, is sent back once with them listed. Standard searches are unchanged.
+  On ACI-bench's 120 test encounters with ICD-10-CM annotations, extraction and
+  coding with `gpt-5-mini` reach an exact-code F1 of 77.6 ± 1.1 over 5 runs; see
+  `benchmarks/icd10cm_coding`.
 
 ## 0.4.0
 

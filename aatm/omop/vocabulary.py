@@ -2,13 +2,96 @@
 
 import sqlite3
 from pathlib import Path
-from typing import Iterable, Optional, Protocol
+from typing import Callable, Iterable, Optional, Protocol
 
 from pydantic import BaseModel
 
 from aatm.omop.mapping import ConceptRef
 
 DEFAULT_VOCABULARY_DB = Path(".aatm/omop.db")
+
+VOCABULARY_INDEXES: dict[str, tuple[str, str]] = {
+    "idx_aatm_concept_id": ("concept", "concept_id"),
+    "idx_aatm_concept_vocabulary_code": ("concept", "vocabulary_id, concept_code"),
+    "idx_aatm_concept_code_lower": ("concept", "lower(concept_code)"),
+    "idx_aatm_relationship_id1": (
+        "concept_relationship",
+        "concept_id_1, relationship_id",
+    ),
+    "idx_aatm_synonym_id": ("concept_synonym", "concept_id"),
+    "idx_aatm_ancestor_descendant": ("concept_ancestor", "descendant_concept_id"),
+    "idx_aatm_ancestor_ancestor": ("concept_ancestor", "ancestor_concept_id"),
+}
+"""Indexes of the vocabulary database: ``name -> (table, columns)``.
+
+They serve the lookups by id and code, "Maps to" and the hierarchy, which
+otherwise scan tables of tens of millions of rows (seconds per lookup, under a
+millisecond with them). Searches by name (``LIKE '%word%'``) still scan.
+"""
+
+_warned_unindexed: set[Path] = set()
+
+
+def _tables(con: sqlite3.Connection) -> set[str]:
+    return {
+        name
+        for (name,) in con.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+
+
+def missing_vocabulary_indexes(path: str | Path = DEFAULT_VOCABULARY_DB) -> list[str]:
+    """`VOCABULARY_INDEXES` that a vocabulary database lacks, for its tables."""
+    uri = f"file:{Path(path).as_posix()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as con:
+        tables = _tables(con)
+        existing = {
+            name
+            for (name,) in con.execute(
+                "SELECT name FROM sqlite_master WHERE type='index'"
+            )
+        }
+    return [
+        name
+        for name, (table, _) in VOCABULARY_INDEXES.items()
+        if table in tables and name not in existing
+    ]
+
+
+def index_vocabulary_database(
+    path: str | Path = DEFAULT_VOCABULARY_DB,
+    progress: Optional[Callable[[str], None]] = None,
+) -> list[str]:
+    """Create the `VOCABULARY_INDEXES` a vocabulary database lacks.
+
+    Indexes of tables the database doesn't have are skipped. When any is created,
+    ``ANALYZE`` updates the statistics the query planner uses. A full Athena
+    download takes a few minutes, mostly ``concept_relationship`` and
+    ``concept_ancestor``.
+
+    Args:
+        path: The database, by default the one ``aatm init`` builds.
+        progress: Called with each index's name before it is created.
+
+    Returns:
+        The names of the indexes created.
+    """
+    missing = missing_vocabulary_indexes(path)
+    if not missing:
+        return []
+    con = sqlite3.connect(path)
+    try:
+        for name in missing:
+            table, columns = VOCABULARY_INDEXES[name]
+            if progress is not None:
+                progress(name)
+            con.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({columns})")
+            con.commit()
+        con.execute("ANALYZE")
+        con.commit()
+    finally:
+        con.close()
+    _warned_unindexed.discard(Path(path))
+    return missing
 
 
 class Concept(BaseModel):
@@ -58,8 +141,9 @@ _CONCEPT_COLUMNS = (
 class SqliteConceptLookup:
     """`ConceptLookup` over the SQLite vocabulary database (``.aatm/omop.db``).
 
-    The database is opened read-only. Lookups are batched, since the tables are not
-    indexed: each call scans a table once, whatever the number of codes.
+    The database is opened read-only. Lookups are batched, so a database without
+    `VOCABULARY_INDEXES` scans each table once per call, whatever the number of
+    codes; a warning says how to add them.
     """
 
     def __init__(self, path: str | Path = DEFAULT_VOCABULARY_DB):
@@ -68,6 +152,24 @@ class SqliteConceptLookup:
             raise ValueError(
                 f"OMOP vocabulary database not found: {self.path}. "
                 "Run `aatm init` to build it."
+            )
+        self._warn_if_unindexed()
+
+    def _warn_if_unindexed(self) -> None:
+        if self.path in _warned_unindexed:
+            return
+        _warned_unindexed.add(self.path)
+        try:
+            missing = missing_vocabulary_indexes(self.path)
+        except sqlite3.Error:
+            return  # Not a vocabulary database we can read: lookups will say so.
+        if missing:
+            from aatm.logs import get_logger
+
+            get_logger(__name__).warning(
+                f"The vocabulary database {self.path} lacks {len(missing)} index(es), "
+                "so lookups take seconds each instead of milliseconds. Add them "
+                f"with `aatm index-vocab --path {self.path.as_posix()}` (a few minutes)."
             )
 
     def _query(self, sql: str, params: list) -> list[tuple]:

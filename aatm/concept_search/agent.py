@@ -214,6 +214,26 @@ Confidence scale for finish:
 - low: the closest concept available, with a known mismatch or real ambiguity.
 """
 
+_STANDARD_HEAD = SYSTEM_PROMPT.split("How to search:")[0]
+_SOURCE_HEAD = """\
+You code clinical text to a code of a source vocabulary of the OMOP vocabularies, such \
+as ICD-10-CM. You search the vocabularies with tools, one action per turn, until you \
+find the code that matches the text in its context, or conclude that there is none.
+
+Answer: a concept {scope}, standard or not. Only finish with a concept id that a tool \
+returned in this conversation; tool results only list concepts that qualify.
+
+"""
+SOURCE_SYSTEM_PROMPT = SYSTEM_PROMPT.replace(_STANDARD_HEAD, _SOURCE_HEAD).replace(
+    "Prefer a specific concept that matches the context over a general one, but do not \
+invent details the context does not support.",
+    "Codes are hierarchical: prefer the most specific code the text and context \
+support (a code without children, which is usually the billable one), and use \
+hierarchy children to find it. When the context does not state a detail the codes \
+distinguish, take the code for an unspecified one rather than inventing it.",
+)
+"""`SYSTEM_PROMPT` for a search of non-standard concepts (``standard=False``)."""
+
 ACTION_HELP = {
     "semantic_search": "- semantic_search: query. Embedding search over concept names and synonyms.",
     "lexical_search": "- lexical_search: query. Names and synonyms containing every word of the query.",
@@ -272,6 +292,7 @@ class ConceptSearchAgent:
         domain: Optional[str] = None,
         vocabularies: Optional[Sequence[str]] = None,
         initial_candidates: Optional[Sequence[Candidate]] = None,
+        standard: bool = True,
     ) -> ConceptSearchResult:
         """Find the standard concept of `context.text` within a domain and vocabularies.
 
@@ -282,17 +303,28 @@ class ConceptSearchAgent:
             initial_candidates: Candidates already retrieved for the text, e.g. by a
                 `TerminologyMapper`. When ``None``, the agent starts with a semantic
                 search on the text (or a lexical search without a retriever).
+            standard: ``False`` searches the concepts of `vocabularies` whether
+                standard or not, e.g. ``vocabularies=["ICD10CM"]`` for an ICD-10-CM
+                code: see `aatm.concept_search.tools`. `vocabularies` is then
+                required.
 
         Returns:
             The result. Errors from the model are caught and reported in
             ``error``, with no concept.
+
+        Raises:
+            ValueError: If `standard` is ``False`` without `vocabularies`.
         """
+        if not standard and not vocabularies:
+            raise ValueError(
+                "A search of non-standard concepts needs vocabularies, e.g. ['ICD10CM']"
+            )
         start = time.perf_counter()
         result = ConceptSearchResult()
         with track_usage() as usage:
             try:
                 await self._run(
-                    context, domain, vocabularies, initial_candidates, result
+                    context, domain, vocabularies, initial_candidates, result, standard
                 )
             except Exception as e:  # noqa: BLE001 - one text must not stop a batch
                 logger.warning("Concept search failed for %r: %s", context.text, e)
@@ -314,13 +346,14 @@ class ConceptSearchAgent:
         vocabularies: Optional[Sequence[str]],
         initial_candidates: Optional[Sequence[Candidate]],
         result: ConceptSearchResult,
+        standard: bool = True,
     ) -> None:
         seen: dict[int, Candidate] = {}
         history: list[str] = []
 
         def observe(candidates: Sequence[Candidate]) -> str:
             for c in candidates:
-                if c.standard is not False and in_scope(c, domain, vocabularies):
+                if in_scope(c, domain, vocabularies, standard):
                     seen.setdefault(c.concept_id, c)
             if not candidates:
                 return "No results."
@@ -339,7 +372,9 @@ class ConceptSearchAgent:
                 if self.tools.retriever is not None
                 else "lexical_search"
             )
-            first = await self._tool(action, context.text, domain, vocabularies)
+            first = await self._tool(
+                action, context.text, domain, vocabularies, standard
+            )
             result.tool_calls += 1
             label = f"{action} {context.text!r}"
             result.trace.append(
@@ -351,12 +386,13 @@ class ConceptSearchAgent:
             )
         history.append(f"[{label}]\n{observe(first)}")
 
-        system = SYSTEM_PROMPT.format(
+        system = (SYSTEM_PROMPT if standard else SOURCE_SYSTEM_PROMPT).format(
             scope=_scope_text(domain, vocabularies),
             actions="\n".join(ACTION_HELP[a] for a in self.tools.actions),
         )
         calls_left = self.max_tool_calls
         retries_left = 2  # invalid finishes or unavailable actions
+        headers: set[int] = set()  # codes rejected once for having children
         while True:
             forced = calls_left <= 0
             user = self._prompt(context, history, calls_left)
@@ -374,7 +410,16 @@ class ConceptSearchAgent:
                     result.rationale = "Tool budget exhausted before an answer."
                     return
                 entry.update(concept_id=step.concept_id, confidence=step.confidence)
-                problem = self._finish(step, seen, domain, vocabularies, result)
+                problem = self._finish(
+                    step,
+                    seen,
+                    domain,
+                    vocabularies,
+                    result,
+                    standard,
+                    # Headers are rejected once, and only while a retry is left.
+                    headers if not forced and retries_left > 0 else None,
+                )
                 if problem is None:
                     if forced:
                         result.budget_exhausted = True
@@ -412,7 +457,7 @@ class ConceptSearchAgent:
             calls_left -= 1
             result.tool_calls += 1
             label, observation, summary = await self._execute(
-                step, domain, vocabularies, observe
+                step, domain, vocabularies, observe, standard
             )
             entry.update(summary)
             result.trace.append(entry)
@@ -435,10 +480,17 @@ class ConceptSearchAgent:
         query: str,
         domain: Optional[str],
         vocabularies: Optional[Sequence[str]],
+        standard: bool = True,
     ) -> list[Candidate]:
         method = getattr(self.tools, action)
         # The tools block (SQLite, the vector database): run them off the event loop.
-        return await asyncio.to_thread(method, query, domain, vocabularies, self.top_k)
+        if standard:
+            return await asyncio.to_thread(
+                method, query, domain, vocabularies, self.top_k
+            )
+        return await asyncio.to_thread(
+            method, query, domain, vocabularies, self.top_k, standard=False
+        )
 
     async def _execute(
         self,
@@ -446,10 +498,14 @@ class ConceptSearchAgent:
         domain: Optional[str],
         vocabularies: Optional[Sequence[str]],
         observe: Any,
+        standard: bool = True,
     ) -> tuple[str, str, dict[str, Any]]:
+        # Tools get `standard` only when it is False, so tools written before it
+        # existed keep working for standard searches.
+        extra: dict[str, Any] = {} if standard else {"standard": False}
         if step.action in ("semantic_search", "lexical_search"):
             query = step.query.strip()  # type: ignore[union-attr]
-            found = await self._tool(step.action, query, domain, vocabularies)
+            found = await self._tool(step.action, query, domain, vocabularies, standard)
             return (
                 f"{step.action} {query!r}",
                 observe(found),
@@ -458,7 +514,7 @@ class ConceptSearchAgent:
         if step.action == "code_lookup":
             code = step.query.strip()  # type: ignore[union-attr]
             found = await asyncio.to_thread(
-                self.tools.code_lookup, code, domain, vocabularies
+                self.tools.code_lookup, code, domain, vocabularies, **extra
             )
             return (
                 f"code_lookup {code!r}",
@@ -485,6 +541,7 @@ class ConceptSearchAgent:
             domain,
             vocabularies,
             self.top_k,
+            **extra,
         )
         return (
             f"hierarchy {step.direction} of {step.concept_id}",
@@ -503,8 +560,17 @@ class ConceptSearchAgent:
         domain: Optional[str],
         vocabularies: Optional[Sequence[str]],
         result: ConceptSearchResult,
+        standard: bool = True,
+        headers: Optional[set[int]] = None,
     ) -> Optional[str]:
-        """Record a finish step; return why it is rejected, or ``None``."""
+        """Record a finish step; return why it is rejected, or ``None``.
+
+        In a search of source vocabularies (``standard=False``), a code with more
+        specific codes under it, such as an ICD-10-CM category, is rejected once
+        with its children listed, which become valid answers: billing needs the
+        most specific code. `headers` holds the codes already rejected; chosen
+        again, they are accepted. ``None`` skips the check (no retry left).
+        """
         result.rationale = step.reasoning
         if step.concept_id is None:
             result.concept = None
@@ -522,12 +588,43 @@ class ConceptSearchAgent:
                 if vocabulary is not None
                 else None
             )
-            if concept is None or not in_scope(concept, domain, vocabularies):
+            if concept is None or not in_scope(concept, domain, vocabularies, standard):
+                kind = "a standard concept" if standard else "a concept"
                 return (
-                    f"{step.concept_id} is not a standard concept "
+                    f"{step.concept_id} is not {kind} "
                     f"{_scope_text(domain, vocabularies)} returned by a tool."
                 )
             candidate = Candidate.from_concept(concept)
+        if (
+            not standard
+            and headers is not None
+            and candidate.concept_id not in headers
+            and self.tools.vocabulary is not None
+        ):
+            children = [
+                c
+                for c in self.tools.hierarchy(
+                    candidate.concept_id,
+                    "children",
+                    domain,
+                    vocabularies,
+                    self.top_k,
+                    standard=False,
+                )
+                if in_scope(c, domain, vocabularies, standard=False)
+            ]
+            if children:
+                headers.add(candidate.concept_id)
+                for c in children:
+                    seen.setdefault(c.concept_id, c)
+                result.concept = None
+                return (
+                    f"{candidate.concept_code} has more specific codes; code to the "
+                    "most specific one the text and context support, choosing an "
+                    "unspecified one when they don't say (or finish again with "
+                    f"{candidate.concept_id} if it must stay):\n"
+                    + "\n".join(c.line() for c in children)
+                )
         result.concept = candidate
         result.confidence = step.confidence
         result.score = CONFIDENCE_SCORES[step.confidence]
@@ -554,6 +651,7 @@ class ConceptSearchAgent:
         domain: Optional[str] = None,
         vocabularies: Optional[Sequence[str]] = None,
         max_concurrency: int = 8,
+        standard: bool = True,
     ) -> list[ConceptSearchResult]:
         """Search several texts concurrently; identical contexts are searched once.
 
@@ -562,6 +660,7 @@ class ConceptSearchAgent:
             domain: See `search`.
             vocabularies: See `search`.
             max_concurrency: Searches running at the same time.
+            standard: See `search`.
 
         Returns:
             One result per item, in order.
@@ -573,7 +672,9 @@ class ConceptSearchAgent:
 
         async def run(context: CodingContext, initial: Any) -> ConceptSearchResult:
             async with semaphore:
-                return await self.search(context, domain, vocabularies, initial)
+                return await self.search(
+                    context, domain, vocabularies, initial, standard
+                )
 
         keys = list(unique)
         results = await asyncio.gather(*(run(*unique[k]) for k in keys))

@@ -27,6 +27,7 @@ def test_cli_reference_lists_every_visible_command():
     for command in (
         "aatm init",
         "aatm doctor",
+        "aatm index-vocab",
         "aatm map",
         "aatm search-ui",
         "aatm serve",

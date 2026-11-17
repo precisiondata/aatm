@@ -216,6 +216,9 @@ def build_local_sqlite_vocab_database(vocab_dir: Path) -> None:
     ``source_to_concept_map`` file is read as comma-separated, while the other
     vocabulary files are read as tab-separated.
 
+    The database is then indexed (`aatm.omop.vocabulary.VOCABULARY_INDEXES`). An
+    existing database the user keeps gets the indexes it lacks.
+
     Args:
         vocab_dir: Path to the directory containing the vocabulary files to be
             imported into the local SQLite database.
@@ -233,6 +236,7 @@ def build_local_sqlite_vocab_database(vocab_dir: Path) -> None:
         ).ask()
 
         if user_preference == "Skip":
+            index_local_vocab_database()
             return
 
     con = sqlite3.connect(".aatm/omop.db")
@@ -252,6 +256,26 @@ def build_local_sqlite_vocab_database(vocab_dir: Path) -> None:
 
     con.commit()
     con.close()
+    index_local_vocab_database()
+
+
+def index_local_vocab_database(path: Path = Path(".aatm/omop.db")) -> list[str]:
+    """Add the indexes a vocabulary database lacks, printing each one.
+
+    See `aatm.omop.vocabulary.index_vocabulary_database`.
+    """
+    from aatm.omop.vocabulary import index_vocabulary_database
+
+    created = index_vocabulary_database(
+        path, progress=lambda name: console.print(f"Indexing the vocabulary: {name}")
+    )
+    if created:
+        console.print(
+            f"Added {len(created)} index(es) to {path}.",
+            highlight=False,
+            soft_wrap=True,
+        )
+    return created
 
 
 def build_mapping_datasets(standard_vocabularies: list[str]) -> None:

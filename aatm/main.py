@@ -1504,6 +1504,53 @@ def doctor() -> None:
 
 
 @app.command(
+    "index-vocab",
+    help="Index the vocabulary database, so code and concept lookups take milliseconds.",
+)
+def index_vocab(
+    path: Annotated[
+        Path,
+        typer.Option(
+            "--path", help="The vocabulary database.", show_default=".aatm/omop.db"
+        ),
+    ] = Path(".aatm/omop.db"),
+) -> None:
+    """Add the indexes a vocabulary database lacks.
+
+    ``aatm init`` indexes the databases it builds; this adds the indexes to one
+    built before it did. It takes a few minutes on a full Athena download, and
+    does nothing when every index is there.
+
+    Raises:
+        typer.Exit: With code 1 when the database doesn't exist.
+    """
+    from aatm.omop.vocabulary import index_vocabulary_database
+
+    # Unwrapped: the messages hold paths, which should stay whole to be copied.
+    if not path.exists():
+        console.print(
+            f"[yellow]No vocabulary database at {path}.[/yellow] Run `aatm init` first.",
+            highlight=False,
+            soft_wrap=True,
+        )
+        raise typer.Exit(code=1)
+    created = index_vocabulary_database(
+        path,
+        progress=lambda name: console.print(f"Creating {name}...", highlight=False),
+    )
+    if created:
+        console.print(
+            f"[green]Added {len(created)} index(es) to {path}.[/green]",
+            highlight=False,
+            soft_wrap=True,
+        )
+    else:
+        console.print(
+            f"{path} already has every index.", highlight=False, soft_wrap=True
+        )
+
+
+@app.command(
     "schema",
     help="Write the JSON Schema of entity definition files, for editor support offline.",
 )
