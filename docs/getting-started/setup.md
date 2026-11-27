@@ -56,6 +56,9 @@ aatm init --vocab-zip ~/Downloads/vocabulary_download_v5_<bundle-id>.zip
    machine's resources, which you can change;
 4. builds the vocabulary database, `.aatm/omop.db`, and indexes it, so code, concept
    and relationship lookups take milliseconds (a few more minutes on a full download).
+   Each file is imported 500,000 rows at a time, so memory stays around 1.5 GB whatever
+   the bundle's size: a full download (about 135 million rows, SNOMED, RxNorm, NDC and
+   ICD-10-CM included) took about 10 minutes and 11 GB of disk.
    If you keep an existing database, it gets the indexes it lacks; `aatm index-vocab`
    adds them without the other steps;
 5. lists the search indexes already built there, asks which **embedding model** (built
