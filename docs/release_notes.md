@@ -66,6 +66,14 @@
   coding with `gpt-5-mini` reach an exact-code F1 of 77.6 ± 1.1 over 5 runs; see
   `benchmarks/icd10cm_coding`.
 
+### Fixes
+
+- **`aatm init` no longer runs out of memory building the vocabulary database.** Each
+  vocabulary file was read whole into memory before being written: on a full Athena
+  download, `CONCEPT_RELATIONSHIP.csv` (2 GB) took about 17 GB and the process was
+  killed. Files are now imported 500,000 rows at a time; the same download builds with
+  a peak of 1.3 GB.
+
 ## 0.4.0
 
 0.4.0 takes the notes-to-OMOP pipeline from a few notes in memory to full datasets:
