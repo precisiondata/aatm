@@ -47,6 +47,18 @@ def test_resolve_chunk_size(requested, is_local, expected):
     )
 
 
+def test_api_models_default_to_one_request_per_concurrent_slot():
+    chunk_size = ldu.resolve_chunk_size(
+        None, is_local=False, max_chromadb_batch_size=5461, concurrency=8
+    )
+    assert chunk_size == 8 * ldu.API_MODEL_CHUNK_SIZE
+
+    local = ldu.resolve_chunk_size(
+        None, is_local=True, max_chromadb_batch_size=5461, concurrency=8
+    )
+    assert local == ldu.LOCAL_MODEL_CHUNK_SIZE
+
+
 def test_resolve_chunk_size_rejects_non_positive():
     with pytest.raises(ValueError):
         ldu.resolve_chunk_size(0, is_local=True, max_chromadb_batch_size=5461)
@@ -111,12 +123,15 @@ class FakeEmbeddingFunction(EmbeddingFunction):
     """CPU-only stand-in that records every text it embeds."""
 
     calls: list[list[str]] = []
+    concurrencies: list[int] = []
+    concurrency = 1
 
     def __init__(self, model, *args, **kwargs):
         pass
 
     def __call__(self, input):
         FakeEmbeddingFunction.calls.append(list(input))
+        FakeEmbeddingFunction.concurrencies.append(self.concurrency)
         return [np.full(4, float(len(text)), dtype=np.float32) for text in input]
 
 
@@ -126,6 +141,7 @@ def fake_project(tmp_path, monkeypatch):
 
     monkeypatch.chdir(tmp_path)
     FakeEmbeddingFunction.calls = []
+    FakeEmbeddingFunction.concurrencies = []
     spec = retrievers.ChromaRetrieverModelSpec(
         name="fake-model",
         model_id="fake-model",
@@ -252,6 +268,21 @@ def test_rate_limit_and_no_rate_limit_conflict(fake_project):
         )
 
 
+def test_concurrency_reaches_the_api_model_and_sizes_the_chunks(fake_project):
+    ldu.build_local_vector_database("fake-model", concurrency=2)
+
+    assert set(FakeEmbeddingFunction.concurrencies) == {2}
+    assert max(len(call) for call in FakeEmbeddingFunction.calls) == (
+        2 * ldu.API_MODEL_CHUNK_SIZE
+    )
+    assert len(stored_ids(fake_project)) == 280
+
+
+def test_concurrency_must_be_positive(fake_project):
+    with pytest.raises(ValueError, match="concurrency must be > 0"):
+        ldu.build_local_vector_database("fake-model", concurrency=0)
+
+
 def test_errors_while_encoding_stop_the_build(fake_project, monkeypatch):
     def broken(self, input):
         raise RuntimeError("GPU fell over")
@@ -330,6 +361,11 @@ def test_new_database_defaults_to_checkpoint_precision(fake_local_project, monke
 
     assert FakeLocalModel.loaded_dtypes == ["bfloat16"]
     assert stored_dtype(fake_local_project) == "bfloat16"
+
+
+def test_concurrency_is_rejected_for_local_models(fake_local_project):
+    with pytest.raises(ValueError, match="only applies to API models"):
+        ldu.build_local_vector_database("fake-local", concurrency=4)
 
 
 def test_float32_checkpoint_builds_in_float32(fake_local_project):

@@ -17,6 +17,9 @@ provider credentials such as API keys can be resolved before embedding
 clients are instantiated.
 
 Classes:
+    ApiEmbeddingFunction:
+        Shared base for embedding models served by a provider's API: splits
+        calls into requests, sends them concurrently and retries them.
     GoogleEmbeddingFunction:
         ChromaDB embedding function implementation backed by the Google
         GenAI embeddings API.
@@ -47,11 +50,15 @@ Notes:
     module.
 """
 
+import asyncio
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
+from functools import partial
 from typing import Any, ClassVar
 from chromadb import Documents, EmbeddingFunction, Embeddings
 from aatm.llm.gemini import gemini_client
+from aatm.llm.limits import get_rate_limiter
 import os
 import dotenv
 import numpy as np
@@ -70,7 +77,68 @@ from aatm.precision import (
 dotenv.load_dotenv()
 
 
-class GoogleEmbeddingFunction(EmbeddingFunction):
+class ApiEmbeddingFunction(EmbeddingFunction):
+    """Shared base for embedding models served by a provider's API.
+
+    A call is split into requests of at most ``max_batch_size`` texts, sent
+    ``concurrency`` at a time. Each request goes through the `RateLimiter` of
+    ``limiter_id`` (see `aatm.llm.limits`), so rate-limit and transient errors
+    are retried, and limits set with `set_rate_limits` apply.
+
+    Attributes:
+        is_local: Always ``False``: the model runs at the provider.
+        max_batch_size: Most texts the provider accepts in one request.
+        concurrency: Requests in flight at the same time.
+        limiter_id: Model id of the shared rate limiter, ``"provider/model"``.
+    """
+
+    is_local: ClassVar[bool] = False
+    max_batch_size: ClassVar[int]
+    concurrency: int = 1
+    limiter_id: str
+
+    def _embed(self, texts: list[str]) -> list[np.ndarray]:
+        """Embed one request's texts, in order."""
+        raise NotImplementedError
+
+    def request_batches(self, texts: list[str]) -> list[list[str]]:
+        """Split texts into requests, one per concurrent slot when they fit."""
+        if not texts:
+            return []
+        size = min(self.max_batch_size, -(-len(texts) // self.concurrency))
+        return [texts[i : i + size] for i in range(0, len(texts), size)]
+
+    def __call__(self, input: Documents) -> Embeddings:
+        batches = self.request_batches(list(input))
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            results = asyncio.run(self._embed_concurrently(batches))
+        else:
+            # asyncio.run cannot start inside a running event loop.
+            results = [self._embed(batch) for batch in batches]
+        return [vector for result in results for vector in result]
+
+    async def _embed_concurrently(
+        self, batches: list[list[str]]
+    ) -> list[list[np.ndarray]]:
+        if not batches:
+            return []
+        limiter = get_rate_limiter(self.limiter_id)
+        loop = asyncio.get_running_loop()
+        workers = min(self.concurrency, len(batches))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            return await asyncio.gather(
+                *(
+                    limiter.run(
+                        partial(loop.run_in_executor, executor, self._embed, batch)
+                    )
+                    for batch in batches
+                )
+            )
+
+
+class GoogleEmbeddingFunction(ApiEmbeddingFunction):
     """Embed documents using the Google GenAI embeddings API.
 
     This embedding function adapts Google's embedding endpoint to the
@@ -82,6 +150,8 @@ class GoogleEmbeddingFunction(EmbeddingFunction):
         client: Google GenAI client used to request embeddings.
         model: Name of the embedding model to use with the Google API.
     """
+
+    max_batch_size: ClassVar[int] = 100
 
     def __init__(self, model: str, *args: Any, **kwargs: Any) -> None:
         """Initialize the Google embedding function.
@@ -98,17 +168,18 @@ class GoogleEmbeddingFunction(EmbeddingFunction):
         """
         self.client = gemini_client(os.getenv("GOOGLE_API_KEY"))
         self.model = model
+        self.limiter_id = f"gemini/{model}"
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def _embed(self, texts: list[str]) -> list[np.ndarray]:
         response = self.client.models.embed_content(
             model=self.model,
-            contents=input,  # type: ignore[arg-type]
+            contents=texts,  # type: ignore[arg-type]
         )
 
         if response.embeddings is None:
             raise RuntimeError("Google embedding API returned no embeddings.")
 
-        embeddings: Embeddings = []
+        embeddings: list[np.ndarray] = []
 
         for emb in response.embeddings:
             if emb is None or emb.values is None:
@@ -424,7 +495,7 @@ class OpenAIEmbeddingModels(Enum):
     TEXT_EMBEDDING_3_LARGE = "text-embedding-3-large"
 
 
-class OpenAIEmbeddingFunction(EmbeddingFunction):
+class OpenAIEmbeddingFunction(ApiEmbeddingFunction):
     """Embed documents using the OpenAI embeddings API.
 
     This embedding function adapts OpenAI's embeddings endpoint to the
@@ -436,6 +507,8 @@ class OpenAIEmbeddingFunction(EmbeddingFunction):
         model_id: Identifier of the selected OpenAI embedding model.
         client: OpenAI client used to request embeddings.
     """
+
+    max_batch_size: ClassVar[int] = 2048
 
     def __init__(self, model: str, *args: Any, **kwargs: Any) -> None:
         """Initialize the OpenAI embedding function.
@@ -457,20 +530,12 @@ class OpenAIEmbeddingFunction(EmbeddingFunction):
         """
         self.model_id = OpenAIEmbeddingModels(model).value
         self.client = OpenAI()
+        self.limiter_id = f"openai/{self.model_id}"
 
-    def __call__(self, input: Documents) -> Embeddings:
-        """Generate embeddings for the provided documents.
+    def _embed(self, texts: list[str]) -> list[np.ndarray]:
+        response = self.client.embeddings.create(input=texts, model=self.model_id)
 
-        Args:
-            input: Documents to be embedded.
-
-        Returns:
-            Embeddings returned by the OpenAI embeddings API in the format
-            expected by ChromaDB.
-        """
-        response = self.client.embeddings.create(input=input, model=self.model_id)
-
-        embeddings: Embeddings = []
+        embeddings: list[np.ndarray] = []
 
         if response.data is None:
             raise RuntimeError("OpenAI embedding API returned no embeddings.")

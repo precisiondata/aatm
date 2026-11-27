@@ -195,7 +195,7 @@ def init_until_the_build(monkeypatch, tmp_path):
 
     def run(tty: bool, args=()):
         monkeypatch.setattr(sys.stdin, "isatty", lambda: tty, raising=False)
-        main.init(
+        defaults = dict(
             vocab_dir=None,
             embedding_model="qwen3-06B",
             embedding_dtype=None,
@@ -204,8 +204,8 @@ def init_until_the_build(monkeypatch, tmp_path):
             vocab_zip=None,
             force=False,
             umls_api_key=None,
-            **dict(args),
         )
+        main.init(**{**defaults, **dict(args)})
         return calls
 
     return run
@@ -252,6 +252,23 @@ def test_init_passes_no_rate_limit_to_the_build(init_until_the_build):
 
     assert calls["no_rate_limit"] is True
     assert calls["rate_limit"] is None
+
+
+def test_init_passes_the_concurrency_to_the_build(init_until_the_build):
+    calls = init_until_the_build(
+        tty=False,
+        args={"embedding_model": "gemini-embedding-001", "concurrency": 8},
+    )
+
+    assert calls["model"] == "gemini-embedding-001"
+    assert calls["concurrency"] == 8
+
+
+def test_init_rejects_concurrency_for_a_local_model(init_until_the_build):
+    import typer
+
+    with pytest.raises(typer.Exit):
+        init_until_the_build(tty=False, args={"concurrency": 8})  # qwen3-06B
 
 
 def test_init_rejects_rate_limit_with_no_rate_limit(init_until_the_build):
