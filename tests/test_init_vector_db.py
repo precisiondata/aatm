@@ -243,7 +243,24 @@ def test_init_leaves_the_rate_limit_and_chunk_size_to_the_model(init_until_the_b
     calls = init_until_the_build(tty=False)
 
     assert calls["rate_limit"] is None
+    assert calls["no_rate_limit"] is False
     assert calls["chunk_size"] is None
+
+
+def test_init_passes_no_rate_limit_to_the_build(init_until_the_build):
+    calls = init_until_the_build(tty=False, args={"no_rate_limit": True})
+
+    assert calls["no_rate_limit"] is True
+    assert calls["rate_limit"] is None
+
+
+def test_init_rejects_rate_limit_with_no_rate_limit(init_until_the_build):
+    import typer
+
+    with pytest.raises(typer.Exit):
+        init_until_the_build(
+            tty=False, args={"rate_limit": 3000, "no_rate_limit": True}
+        )
 
 
 def test_init_rejects_a_non_positive_rate_limit_or_chunk_size():

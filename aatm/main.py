@@ -444,6 +444,16 @@ def init(
             show_default="the model's, none for local models",
         ),
     ] = None,
+    no_rate_limit: Annotated[
+        bool,
+        typer.Option(
+            "--no-rate-limit",
+            help=(
+                "Embed as fast as the model answers, without the model's rate "
+                "limit. Cannot be combined with --rate-limit."
+            ),
+        ),
+    ] = False,
     chunk_size: Annotated[
         Optional[int],
         typer.Option(
@@ -498,6 +508,8 @@ def init(
             `UMLS_API_KEY` is used; without a key the CPT4 step is skipped.
         rate_limit: Maximum number of texts embedded per minute. If not
             provided, the embedding model's default from the registry is used.
+        no_rate_limit: Ignore the embedding model's rate limit. Cannot be
+            combined with `rate_limit`.
         chunk_size: Number of texts embedded and written per round-trip. If
             not provided, `LOCAL_MODEL_CHUNK_SIZE` is used for local models
             and `API_MODEL_CHUNK_SIZE` for API models.
@@ -533,6 +545,10 @@ def init(
         Embed faster with an API model, within a higher quota:
 
             $ aatm init --embedding-model gemini-embedding-001 --rate-limit 30000 --chunk-size 250
+
+        Or without any rate limit, if your quota allows it:
+
+            $ aatm init --embedding-model gemini-embedding-001 --no-rate-limit
 
         Initialize with specific standard vocabularies:
 
@@ -571,6 +587,12 @@ def init(
 
     print_logo()
     console.print("Let's set up your environment!\n")
+
+    if no_rate_limit and rate_limit is not None:
+        console.print(
+            "[yellow]OOPS![/yellow] Use --rate-limit or --no-rate-limit, not both.\n"
+        )
+        raise typer.Exit()
 
     # Validate provided standard vocabs
     if standard_vocabs is not None:
@@ -720,6 +742,7 @@ def init(
         embedding_dtype=embedding_dtype,
         vector_db=vector_db,
         rate_limit=rate_limit,
+        no_rate_limit=no_rate_limit,
         chunk_size=chunk_size,
     )
     console.print("[green]Done![/green]\n")
