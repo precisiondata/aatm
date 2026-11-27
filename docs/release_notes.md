@@ -71,6 +71,16 @@
   about 18 hours for the default vocabularies. `--rate-limit` raises that limit to
   match your quota, `--no-rate-limit` removes it, and `--chunk-size` sets the texts
   sent per embeddings request.
+- **Concurrent embeddings requests for API models**, with `aatm init --concurrency N`.
+  Gemini and OpenAI embedding functions split each call into requests within the
+  provider's limit on inputs per request (100 texts for Gemini, 2048 for OpenAI), so
+  `--chunk-size` above 100 no longer fails with Gemini, and send up to `N` of them at
+  a time. Requests go through the limiter of `aatm.llm.limits`: rate-limit (429),
+  server and connection errors are retried with backoff instead of stopping the build,
+  and limits set with `set_rate_limits("gemini", ...)` apply. The default chunk of an
+  API model is 100 texts per concurrent request. With `gemini-embedding-001`,
+  `--concurrency 4` embedded about 2.5 times as many texts per second as one request
+  at a time.
 
 ### Fixes
 

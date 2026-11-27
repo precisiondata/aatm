@@ -69,7 +69,8 @@ $ aatm init [OPTIONS]
 * `--umls-api-key TEXT`: UMLS API key used to add the CPT4 names when the bundle includes CPT4. Read from UMLS_API_KEY when not given.  [env var: UMLS_API_KEY]
 * `--rate-limit INTEGER RANGE`: Texts embedded per minute at most while building the vector database. Raise it to match your API quota.  [default: (the model&#x27;s, none for local models); x&gt;=1]
 * `--no-rate-limit`: Embed as fast as the model answers, without the model&#x27;s rate limit. Cannot be combined with --rate-limit.
-* `--chunk-size INTEGER RANGE`: Texts embedded and written together while building the vector database. For API models, texts sent per embeddings request.  [default: (4096 for local models, 100 for API models); x&gt;=1]
+* `--chunk-size INTEGER RANGE`: Texts embedded and written together while building the vector database. API models split them into requests within the provider&#x27;s limit, sent --concurrency at a time.  [default: (4096 for local models, 100 x --concurrency for API models); x&gt;=1]
+* `--concurrency INTEGER RANGE`: Embeddings requests sent at the same time, for API models. Rate-limit and transient errors are retried.  [default: (1); x&gt;=1]
 * `--help`: Show this message and exit.
 
 ### `aatm search-ui`

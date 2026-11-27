@@ -461,9 +461,22 @@ def init(
             min=1,
             help=(
                 "Texts embedded and written together while building the vector "
-                "database. For API models, texts sent per embeddings request."
+                "database. API models split them into requests within the "
+                "provider's limit, sent --concurrency at a time."
             ),
-            show_default="4096 for local models, 100 for API models",
+            show_default="4096 for local models, 100 x --concurrency for API models",
+        ),
+    ] = None,
+    concurrency: Annotated[
+        Optional[int],
+        typer.Option(
+            "--concurrency",
+            min=1,
+            help=(
+                "Embeddings requests sent at the same time, for API models. "
+                "Rate-limit and transient errors are retried."
+            ),
+            show_default="1",
         ),
     ] = None,
 ) -> None:
@@ -512,7 +525,9 @@ def init(
             combined with `rate_limit`.
         chunk_size: Number of texts embedded and written per round-trip. If
             not provided, `LOCAL_MODEL_CHUNK_SIZE` is used for local models
-            and `API_MODEL_CHUNK_SIZE` for API models.
+            and `API_MODEL_CHUNK_SIZE` times `concurrency` for API models.
+        concurrency: Embeddings requests an API model sends at the same
+            time. Defaults to 1. Not allowed for local models.
 
     Raises:
         typer.Exit: If the vocabulary directory does not exist, if the
@@ -544,11 +559,11 @@ def init(
 
         Embed faster with an API model, within a higher quota:
 
-            $ aatm init --embedding-model gemini-embedding-001 --rate-limit 30000 --chunk-size 250
+            $ aatm init --embedding-model gemini-embedding-001 --rate-limit 30000
 
-        Or without any rate limit, if your quota allows it:
+        Or without any rate limit, 8 requests at a time, if your quota allows it:
 
-            $ aatm init --embedding-model gemini-embedding-001 --no-rate-limit
+            $ aatm init --embedding-model gemini-embedding-001 --no-rate-limit --concurrency 8
 
         Initialize with specific standard vocabularies:
 
@@ -713,6 +728,17 @@ def init(
         console.print(f"Using embedding model: {embedding_model}")
         selected_embedding_model = embedding_model
 
+    if concurrency is not None:
+        from aatm.registries.retrievers import CHROMADB_RETRIEVER_MODEL_REGISTRY
+
+        spec = CHROMADB_RETRIEVER_MODEL_REGISTRY[selected_embedding_model]
+        if getattr(spec.embedding_function_cls, "is_local", False):
+            console.print(
+                f"[yellow]OOPS![/yellow] --concurrency only applies to API models; "
+                f"'{selected_embedding_model}' runs locally.\n"
+            )
+            raise typer.Exit()
+
     if standard_vocabs is None:
         selected_standard_vocabularies = questionary.checkbox(
             "Select one or more standard vocabularies to use for mapping:",
@@ -744,6 +770,7 @@ def init(
         rate_limit=rate_limit,
         no_rate_limit=no_rate_limit,
         chunk_size=chunk_size,
+        concurrency=concurrency,
     )
     console.print("[green]Done![/green]\n")
 

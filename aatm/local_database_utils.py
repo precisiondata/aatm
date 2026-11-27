@@ -616,10 +616,10 @@ GPU batch size is chosen separately, see `aatm.gpu_memory`.
 """
 
 API_MODEL_CHUNK_SIZE = 100
-"""Default rows per ChromaDB round-trip for API models.
+"""Default rows per ChromaDB round-trip for API models, per concurrent request.
 
-For API models every chunk is one embeddings request, so this stays within
-provider limits on inputs per request.
+A chunk is split into ``concurrency`` embeddings requests, each within the
+provider's limit on inputs per request (see `ApiEmbeddingFunction`).
 """
 
 
@@ -633,7 +633,10 @@ the PostgreSQL store copies it in one ``COPY``.
 
 
 def resolve_chunk_size(
-    chunk_size: int | None, is_local: bool, max_chromadb_batch_size: int
+    chunk_size: int | None,
+    is_local: bool,
+    max_chromadb_batch_size: int,
+    concurrency: int = 1,
 ) -> int:
     """Choose how many rows to read and write per ChromaDB round-trip.
 
@@ -642,6 +645,9 @@ def resolve_chunk_size(
         is_local: Whether the embedding model runs locally.
         max_chromadb_batch_size: Largest batch the ChromaDB client accepts in a
             single ``add`` call.
+        concurrency: Embeddings requests an API model sends at the same time.
+            The default chunk of an API model holds `API_MODEL_CHUNK_SIZE`
+            rows per request.
 
     Returns:
         The chunk size, capped at ``max_chromadb_batch_size``.
@@ -650,7 +656,9 @@ def resolve_chunk_size(
         ValueError: If ``chunk_size`` is not positive.
     """
     if chunk_size is None:
-        chunk_size = LOCAL_MODEL_CHUNK_SIZE if is_local else API_MODEL_CHUNK_SIZE
+        chunk_size = (
+            LOCAL_MODEL_CHUNK_SIZE if is_local else API_MODEL_CHUNK_SIZE * concurrency
+        )
 
     if chunk_size <= 0:
         raise ValueError("chunk_size must be > 0")
@@ -664,6 +672,7 @@ def build_local_vector_database(
     rate_limit: int | None = None,
     no_rate_limit: bool = False,
     chunk_size: int | None = None,
+    concurrency: int | None = None,
     encode_batch_size: int | None = None,
     encode_max_batch_tokens: int | None = None,
     embedding_dtype: str | None = None,
@@ -695,7 +704,10 @@ def build_local_vector_database(
         chunk_size: Number of dataset rows read, checked against the database
             and written to it per round-trip. Defaults to
             `LOCAL_MODEL_CHUNK_SIZE` for local models and
-            `API_MODEL_CHUNK_SIZE` for API models.
+            `API_MODEL_CHUNK_SIZE` times ``concurrency`` for API models.
+        concurrency: Embeddings requests an API model sends at the same time.
+            Defaults to 1. Not allowed for local models. Rate-limit and
+            transient errors are retried (see `aatm.llm.limits`).
         encode_batch_size: Fixed number of texts a local model encodes per
             forward pass. Turns off batching by token budget. Ignored for API
             models.
@@ -750,6 +762,15 @@ def build_local_vector_database(
             f"embedding_dtype only applies to local models; "
             f"'{embedding_model_name}' is an API model."
         )
+
+    if concurrency is not None:
+        if is_local:
+            raise ValueError(
+                f"concurrency only applies to API models; "
+                f"'{embedding_model_name}' is a local model."
+            )
+        if concurrency <= 0:
+            raise ValueError("concurrency must be > 0")
 
     profiler = TimingProfiler(
         enabled=profile_timing,
@@ -907,6 +928,9 @@ def build_local_vector_database(
             **model_kwargs,  # type: ignore[call-arg]
         )
 
+    if concurrency is not None:
+        embedding_function.concurrency = concurrency  # type: ignore[attr-defined]
+
     if encode_batch_size is not None and encode_max_batch_tokens is not None:
         raise ValueError("Pass encode_batch_size or encode_max_batch_tokens, not both.")
 
@@ -931,6 +955,7 @@ def build_local_vector_database(
         max_chromadb_batch_size=(
             PINECONE_MAX_CHUNK_SIZE if client is None else client.get_max_batch_size()
         ),
+        concurrency=concurrency or 1,
     )
 
     if pg_connection is not None:
