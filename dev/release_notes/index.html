@@ -1186,6 +1186,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1259,7 +1270,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes" class="md-nav__link">
+  <a href="#fixes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixes
@@ -2479,6 +2490,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2552,7 +2574,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes" class="md-nav__link">
+  <a href="#fixes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixes
@@ -2677,6 +2699,14 @@
   coding with <code>gpt-5-mini</code> reach an exact-code F1 of 77.6 ± 1.1 over 5 runs; see
   <code>benchmarks/icd10cm_coding</code>.</li>
 </ul>
+<h3 id="fixes">Fixes</h3>
+<ul>
+<li><strong><code>aatm init</code> no longer runs out of memory building the vocabulary database.</strong> Each
+  vocabulary file was read whole into memory before being written: on a full Athena
+  download, <code>CONCEPT_RELATIONSHIP.csv</code> (2 GB) took about 17 GB and the process was
+  killed. Files are now imported 500,000 rows at a time; the same download builds with
+  a peak of 1.3 GB.</li>
+</ul>
 <h2 id="040">0.4.0</h2>
 <p>0.4.0 takes the notes-to-OMOP pipeline from a few notes in memory to full datasets:
 resumable runs, batch pricing, sharding, a dry run with a cost estimate, a pilot
@@ -2763,7 +2793,7 @@ vocabularies, decision models, and two hosted vector databases.</p>
   <code>on_error="record"</code> to keep a batch going when one note fails.</li>
 <li><strong>JSON Schema for entity definitions</strong>: completion and inline errors in your editor.</li>
 </ul>
-<h3 id="fixes">Fixes</h3>
+<h3 id="fixes_1">Fixes</h3>
 <ul>
 <li><code>TerminologyMapper.map</code> and <code>amap</code> wrote their results to the mapper's own folder
   and ignored the <code>output_dir</code> argument. They now write to the folder given.</li>
