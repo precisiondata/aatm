@@ -3065,7 +3065,8 @@ schedulers can act on it.</p>
 <li><code>--umls-api-key TEXT</code>: UMLS API key used to add the CPT4 names when the bundle includes CPT4. Read from UMLS_API_KEY when not given.  [env var: UMLS_API_KEY]</li>
 <li><code>--rate-limit INTEGER RANGE</code>: Texts embedded per minute at most while building the vector database. Raise it to match your API quota.  [default: (the model's, none for local models); x&gt;=1]</li>
 <li><code>--no-rate-limit</code>: Embed as fast as the model answers, without the model's rate limit. Cannot be combined with --rate-limit.</li>
-<li><code>--chunk-size INTEGER RANGE</code>: Texts embedded and written together while building the vector database. For API models, texts sent per embeddings request.  [default: (4096 for local models, 100 for API models); x&gt;=1]</li>
+<li><code>--chunk-size INTEGER RANGE</code>: Texts embedded and written together while building the vector database. API models split them into requests within the provider's limit, sent --concurrency at a time.  [default: (4096 for local models, 100 x --concurrency for API models); x&gt;=1]</li>
+<li><code>--concurrency INTEGER RANGE</code>: Embeddings requests sent at the same time, for API models. Rate-limit and transient errors are retried.  [default: (1); x&gt;=1]</li>
 <li><code>--help</code>: Show this message and exit.</li>
 </ul>
 <h3 id="aatm-search-ui"><code>aatm search-ui</code></h3>
