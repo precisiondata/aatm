@@ -2698,6 +2698,12 @@
   On ACI-bench's 120 test encounters with ICD-10-CM annotations, extraction and
   coding with <code>gpt-5-mini</code> reach an exact-code F1 of 77.6 ± 1.1 over 5 runs; see
   <code>benchmarks/icd10cm_coding</code>.</li>
+<li><strong><code>aatm init --rate-limit</code>, <code>--no-rate-limit</code> and <code>--chunk-size</code></strong> tune how fast the
+  vector database is built. With an API model such as <code>gemini-embedding-001</code>, the build
+  was held to the model's default of 3000 texts per minute in requests of 100 texts,
+  about 18 hours for the default vocabularies. <code>--rate-limit</code> raises that limit to
+  match your quota, <code>--no-rate-limit</code> removes it, and <code>--chunk-size</code> sets the texts
+  sent per embeddings request.</li>
 </ul>
 <h3 id="fixes">Fixes</h3>
 <ul>

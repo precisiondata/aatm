@@ -3063,6 +3063,9 @@ schedulers can act on it.</p>
 <li><code>--vocab-zip TEXT</code>: Athena vocabulary bundle to set up from: the download link Athena emailed, or the path of the downloaded zip. It is unpacked into --vocab-dir (default ./vocabularies).</li>
 <li><code>--force</code>: With --vocab-zip, overwrite existing vocabulary files without asking.</li>
 <li><code>--umls-api-key TEXT</code>: UMLS API key used to add the CPT4 names when the bundle includes CPT4. Read from UMLS_API_KEY when not given.  [env var: UMLS_API_KEY]</li>
+<li><code>--rate-limit INTEGER RANGE</code>: Texts embedded per minute at most while building the vector database. Raise it to match your API quota.  [default: (the model's, none for local models); x&gt;=1]</li>
+<li><code>--no-rate-limit</code>: Embed as fast as the model answers, without the model's rate limit. Cannot be combined with --rate-limit.</li>
+<li><code>--chunk-size INTEGER RANGE</code>: Texts embedded and written together while building the vector database. For API models, texts sent per embeddings request.  [default: (4096 for local models, 100 for API models); x&gt;=1]</li>
 <li><code>--help</code>: Show this message and exit.</li>
 </ul>
 <h3 id="aatm-search-ui"><code>aatm search-ui</code></h3>
