@@ -432,6 +432,30 @@ def init(
             show_envvar=True,
         ),
     ] = None,
+    rate_limit: Annotated[
+        Optional[int],
+        typer.Option(
+            "--rate-limit",
+            min=1,
+            help=(
+                "Texts embedded per minute at most while building the vector "
+                "database. Raise it to match your API quota."
+            ),
+            show_default="the model's, none for local models",
+        ),
+    ] = None,
+    chunk_size: Annotated[
+        Optional[int],
+        typer.Option(
+            "--chunk-size",
+            min=1,
+            help=(
+                "Texts embedded and written together while building the vector "
+                "database. For API models, texts sent per embeddings request."
+            ),
+            show_default="4096 for local models, 100 for API models",
+        ),
+    ] = None,
 ) -> None:
     """Initialize the local AATM environment.
 
@@ -472,6 +496,11 @@ def init(
             `vocab_zip` without asking.
         umls_api_key: UMLS API key for the CPT4 step. If not provided,
             `UMLS_API_KEY` is used; without a key the CPT4 step is skipped.
+        rate_limit: Maximum number of texts embedded per minute. If not
+            provided, the embedding model's default from the registry is used.
+        chunk_size: Number of texts embedded and written per round-trip. If
+            not provided, `LOCAL_MODEL_CHUNK_SIZE` is used for local models
+            and `API_MODEL_CHUNK_SIZE` for API models.
 
     Raises:
         typer.Exit: If the vocabulary directory does not exist, if the
@@ -500,6 +529,10 @@ def init(
         Build the vector database in half precision on an NVIDIA GPU:
 
             $ aatm init --embedding-model qwen3-4B --embedding-dtype bfloat16
+
+        Embed faster with an API model, within a higher quota:
+
+            $ aatm init --embedding-model gemini-embedding-001 --rate-limit 30000 --chunk-size 250
 
         Initialize with specific standard vocabularies:
 
@@ -683,7 +716,11 @@ def init(
     from aatm.local_database_utils import build_local_vector_database
 
     build_local_vector_database(
-        selected_embedding_model, embedding_dtype=embedding_dtype, vector_db=vector_db
+        selected_embedding_model,
+        embedding_dtype=embedding_dtype,
+        vector_db=vector_db,
+        rate_limit=rate_limit,
+        chunk_size=chunk_size,
     )
     console.print("[green]Done![/green]\n")
 
