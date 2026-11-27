@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -67,6 +67,13 @@ from aatm.vector_stores import (
 
 logger = get_logger(__name__)
 console = Console()
+
+VOCAB_IMPORT_CHUNK_ROWS = 500_000
+"""Rows of a vocabulary file read and written at a time by `build_local_sqlite_vocab_database`.
+
+Reading a whole file at once needs several times its size in memory: on a full Athena
+download, ``CONCEPT_RELATIONSHIP.csv`` (2 GB) alone took over 16 GB.
+"""
 
 
 def log_cuda_memory(label: str) -> None:
@@ -214,7 +221,8 @@ def build_local_sqlite_vocab_database(vocab_dir: Path) -> None:
 
     CSV parsing behavior depends on the table being imported. The
     ``source_to_concept_map`` file is read as comma-separated, while the other
-    vocabulary files are read as tab-separated.
+    vocabulary files are read as tab-separated. Each file is imported in chunks of
+    `VOCAB_IMPORT_CHUNK_ROWS` rows, so memory use does not grow with the file.
 
     The database is then indexed (`aatm.omop.vocabulary.VOCABULARY_INDEXES`). An
     existing database the user keeps gets the indexes it lacks.
@@ -245,18 +253,36 @@ def build_local_sqlite_vocab_database(vocab_dir: Path) -> None:
         list(vocab_dir.glob("*.csv")),
         description="Building vocabulary database...",
     ):
-        table_name = file_path.stem.lower()
-
-        if table_name == "source_to_concept_map":
-            df = pd.read_csv(file_path, sep=",", dtype=str)
-        else:
-            df = pd.read_csv(file_path, sep="\t", dtype=str)
-
-        df.to_sql(table_name, con, index=False, if_exists="replace")
+        import_vocab_file(con, file_path)
 
     con.commit()
     con.close()
     index_local_vocab_database()
+
+
+def import_vocab_file(
+    con: sqlite3.Connection,
+    file_path: Path,
+    chunk_rows: int = VOCAB_IMPORT_CHUNK_ROWS,
+) -> None:
+    """Import one vocabulary file into the table named after it, replacing that table.
+
+    Every column is stored as text. ``SOURCE_TO_CONCEPT_MAP.csv`` is read as
+    comma-separated, the other files as tab-separated.
+
+    Args:
+        con: The SQLite database.
+        file_path: The vocabulary file; the table is its lowercased stem.
+        chunk_rows: Rows read and written at a time.
+    """
+    table_name = file_path.stem.lower()
+    sep = "," if table_name == "source_to_concept_map" else "\t"
+
+    # A file with only a header still yields one empty chunk, which creates the table.
+    if_exists: Literal["replace", "append"] = "replace"
+    for chunk in pd.read_csv(file_path, sep=sep, dtype=str, chunksize=chunk_rows):
+        chunk.to_sql(table_name, con, index=False, if_exists=if_exists)
+        if_exists = "append"
 
 
 def index_local_vocab_database(path: Path = Path(".aatm/omop.db")) -> list[str]:
