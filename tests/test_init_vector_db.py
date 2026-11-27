@@ -187,8 +187,8 @@ def init_until_the_build(monkeypatch, tmp_path):
     monkeypatch.setattr(
         ldu,
         "build_local_vector_database",
-        lambda model, embedding_dtype=None, vector_db=None: calls.update(
-            model=model, vector_db=vector_db
+        lambda model, embedding_dtype=None, vector_db=None, **kwargs: calls.update(
+            model=model, vector_db=vector_db, **kwargs
         ),
     )
     monkeypatch.setattr(main, "built_in", lambda mode, quick=False: {})
@@ -228,6 +228,48 @@ def test_init_uses_the_configured_backend_without_a_terminal(
     monkeypatch.setattr(main, "choose_vector_db", ask)
 
     assert init_until_the_build(tty=False)["vector_db"] == "local"
+
+
+def test_init_passes_the_rate_limit_and_chunk_size_to_the_build(init_until_the_build):
+    calls = init_until_the_build(
+        tty=False, args={"rate_limit": 30000, "chunk_size": 250}
+    )
+
+    assert calls["rate_limit"] == 30000
+    assert calls["chunk_size"] == 250
+
+
+def test_init_leaves_the_rate_limit_and_chunk_size_to_the_model(init_until_the_build):
+    calls = init_until_the_build(tty=False)
+
+    assert calls["rate_limit"] is None
+    assert calls["no_rate_limit"] is False
+    assert calls["chunk_size"] is None
+
+
+def test_init_passes_no_rate_limit_to_the_build(init_until_the_build):
+    calls = init_until_the_build(tty=False, args={"no_rate_limit": True})
+
+    assert calls["no_rate_limit"] is True
+    assert calls["rate_limit"] is None
+
+
+def test_init_rejects_rate_limit_with_no_rate_limit(init_until_the_build):
+    import typer
+
+    with pytest.raises(typer.Exit):
+        init_until_the_build(
+            tty=False, args={"rate_limit": 3000, "no_rate_limit": True}
+        )
+
+
+def test_init_rejects_a_non_positive_rate_limit_or_chunk_size():
+    from typer.testing import CliRunner
+
+    runner = CliRunner()
+    for option in ("--rate-limit", "--chunk-size"):
+        result = runner.invoke(main.app, ["init", option, "0"])
+        assert result.exit_code == 2, result.output
 
 
 def test_cancelling_the_prompt_stops_init(init_until_the_build, monkeypatch):

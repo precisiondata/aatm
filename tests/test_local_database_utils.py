@@ -205,6 +205,53 @@ def test_repair_only_embeds_missing_rows(fake_project, monkeypatch):
     assert len(stored_ids(fake_project)) == 290
 
 
+@pytest.fixture
+def rate_limited(fake_project, monkeypatch):
+    """Give the fake model a registry rate limit and record the limits applied."""
+    from dataclasses import replace
+
+    from aatm.registries import retrievers
+
+    registry = retrievers.CHROMADB_RETRIEVER_MODEL_REGISTRY
+    monkeypatch.setitem(
+        registry, "fake-model", replace(registry["fake-model"], rate_limit=3000)
+    )
+    limits = []
+
+    def record(n_docs, rate_limit, next_allowed_time):
+        limits.append(rate_limit)
+        return next_allowed_time, 0.0
+
+    monkeypatch.setattr(ldu, "rate_limiter", record)
+    return limits
+
+
+def test_build_applies_the_models_rate_limit(rate_limited):
+    ldu.build_local_vector_database("fake-model", chunk_size=100)
+
+    assert rate_limited and set(rate_limited) == {3000}
+
+
+def test_a_given_rate_limit_replaces_the_models(rate_limited):
+    ldu.build_local_vector_database("fake-model", chunk_size=100, rate_limit=30000)
+
+    assert rate_limited and set(rate_limited) == {30000}
+
+
+def test_no_rate_limit_ignores_the_models(rate_limited, fake_project):
+    ldu.build_local_vector_database("fake-model", chunk_size=100, no_rate_limit=True)
+
+    assert rate_limited == []
+    assert len(stored_ids(fake_project)) == 280
+
+
+def test_rate_limit_and_no_rate_limit_conflict(fake_project):
+    with pytest.raises(ValueError, match="not both"):
+        ldu.build_local_vector_database(
+            "fake-model", rate_limit=3000, no_rate_limit=True
+        )
+
+
 def test_errors_while_encoding_stop_the_build(fake_project, monkeypatch):
     def broken(self, input):
         raise RuntimeError("GPU fell over")

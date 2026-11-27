@@ -662,6 +662,7 @@ def build_local_vector_database(
     embedding_model_name: str,
     vector_db_dir: Path | None = None,
     rate_limit: int | None = None,
+    no_rate_limit: bool = False,
     chunk_size: int | None = None,
     encode_batch_size: int | None = None,
     encode_max_batch_tokens: int | None = None,
@@ -689,6 +690,8 @@ def build_local_vector_database(
             used. Not allowed in cloud mode.
         rate_limit: Optional maximum number of documents to embed per minute. If
             not provided, the default value from the model registry is used.
+        no_rate_limit: Embed as fast as the model answers, ignoring the model
+            registry's rate limit. Cannot be combined with ``rate_limit``.
         chunk_size: Number of dataset rows read, checked against the database
             and written to it per round-trip. Defaults to
             `LOCAL_MODEL_CHUNK_SIZE` for local models and
@@ -729,6 +732,9 @@ def build_local_vector_database(
     from aatm.registries.retrievers import (
         CHROMADB_RETRIEVER_MODEL_REGISTRY as model_registry,
     )
+
+    if no_rate_limit and rate_limit is not None:
+        raise ValueError("Pass rate_limit or no_rate_limit, not both.")
 
     spec = model_registry[embedding_model_name]
     is_local = bool(getattr(spec.embedding_function_cls, "is_local", False))
@@ -840,7 +846,7 @@ def build_local_vector_database(
         elif user_preference == "Repair":
             pass
 
-    if rate_limit is None:
+    if rate_limit is None and not no_rate_limit:
         rate_limit = model_registry[embedding_model_name].rate_limit
 
     if rate_limit is not None and rate_limit <= 0:
